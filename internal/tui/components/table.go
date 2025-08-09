@@ -1,0 +1,206 @@
+package components
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/charmbracelet/lipgloss"
+	"github.com/repobird/repobird-cli/internal/tui/styles"
+)
+
+type Column struct {
+	Title string
+	Width int
+}
+
+type Row []string
+
+type Table struct {
+	columns      []Column
+	rows         []Row
+	selectedRow  int
+	showCursor   bool
+	height       int
+	width        int
+	scrollOffset int
+}
+
+func NewTable(columns []Column) *Table {
+	return &Table{
+		columns:     columns,
+		rows:        []Row{},
+		selectedRow: 0,
+		showCursor:  true,
+		height:      20,
+		width:       80,
+	}
+}
+
+func (t *Table) SetRows(rows []Row) {
+	t.rows = rows
+	if t.selectedRow >= len(rows) && len(rows) > 0 {
+		t.selectedRow = len(rows) - 1
+	}
+}
+
+func (t *Table) SetDimensions(width, height int) {
+	t.width = width
+	t.height = height
+}
+
+func (t *Table) MoveUp() {
+	if t.selectedRow > 0 {
+		t.selectedRow--
+		t.ensureVisible()
+	}
+}
+
+func (t *Table) MoveDown() {
+	if t.selectedRow < len(t.rows)-1 {
+		t.selectedRow++
+		t.ensureVisible()
+	}
+}
+
+func (t *Table) PageUp() {
+	t.selectedRow -= 10
+	if t.selectedRow < 0 {
+		t.selectedRow = 0
+	}
+	t.ensureVisible()
+}
+
+func (t *Table) PageDown() {
+	t.selectedRow += 10
+	if t.selectedRow >= len(t.rows) {
+		t.selectedRow = len(t.rows) - 1
+	}
+	t.ensureVisible()
+}
+
+func (t *Table) GoToTop() {
+	t.selectedRow = 0
+	t.scrollOffset = 0
+}
+
+func (t *Table) GoToBottom() {
+	t.selectedRow = len(t.rows) - 1
+	t.ensureVisible()
+}
+
+func (t *Table) GetSelectedIndex() int {
+	return t.selectedRow
+}
+
+func (t *Table) SetSelectedIndex(index int) {
+	if index >= 0 && index < len(t.rows) {
+		t.selectedRow = index
+		t.ensureVisible()
+	}
+}
+
+func (t *Table) ensureVisible() {
+	visibleRows := t.height - 3
+	if t.selectedRow < t.scrollOffset {
+		t.scrollOffset = t.selectedRow
+	} else if t.selectedRow >= t.scrollOffset+visibleRows {
+		t.scrollOffset = t.selectedRow - visibleRows + 1
+	}
+}
+
+func (t *Table) View() string {
+	if t.width == 0 || t.height == 0 {
+		return ""
+	}
+
+	var s strings.Builder
+
+	header := t.renderHeader()
+	s.WriteString(header)
+	s.WriteString("\n")
+	s.WriteString(t.renderSeparator())
+	s.WriteString("\n")
+
+	visibleRows := t.height - 3
+	endRow := t.scrollOffset + visibleRows
+	if endRow > len(t.rows) {
+		endRow = len(t.rows)
+	}
+
+	for i := t.scrollOffset; i < endRow; i++ {
+		row := t.renderRow(i)
+		s.WriteString(row)
+		if i < endRow-1 {
+			s.WriteString("\n")
+		}
+	}
+
+	if len(t.rows) == 0 {
+		emptyMsg := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("241")).
+			Render("No runs found")
+		s.WriteString(lipgloss.Place(t.width, 3, lipgloss.Center, lipgloss.Center, emptyMsg))
+	}
+
+	return s.String()
+}
+
+func (t *Table) renderHeader() string {
+	var cells []string
+	for _, col := range t.columns {
+		cell := truncate(col.Title, col.Width)
+		cell = lipgloss.NewStyle().Width(col.Width).Render(cell)
+		cells = append(cells, cell)
+	}
+	return styles.TableHeaderStyle.Render(strings.Join(cells, " "))
+}
+
+func (t *Table) renderSeparator() string {
+	totalWidth := 0
+	for _, col := range t.columns {
+		totalWidth += col.Width + 1
+	}
+	return strings.Repeat("─", totalWidth-1)
+}
+
+func (t *Table) renderRow(index int) string {
+	if index >= len(t.rows) {
+		return ""
+	}
+
+	row := t.rows[index]
+	var cells []string
+
+	for i, col := range t.columns {
+		cell := ""
+		if i < len(row) {
+			cell = truncate(row[i], col.Width)
+		}
+		cell = lipgloss.NewStyle().Width(col.Width).Render(cell)
+		cells = append(cells, cell)
+	}
+
+	content := strings.Join(cells, " ")
+
+	if t.showCursor && index == t.selectedRow {
+		return styles.TableSelectedRowStyle.Render(content)
+	}
+	return styles.TableRowStyle.Render(content)
+}
+
+func truncate(s string, width int) string {
+	if len(s) <= width {
+		return s
+	}
+	if width <= 3 {
+		return s[:width]
+	}
+	return s[:width-3] + "..."
+}
+
+func (t *Table) StatusLine() string {
+	if len(t.rows) == 0 {
+		return "No items"
+	}
+	return fmt.Sprintf("%d/%d", t.selectedRow+1, len(t.rows))
+}
