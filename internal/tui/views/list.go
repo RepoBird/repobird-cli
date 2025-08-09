@@ -2,6 +2,7 @@ package views
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -165,10 +166,33 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, v.keys.Enter):
 			if idx := v.table.GetSelectedIndex(); idx >= 0 && idx < len(v.filteredRuns) {
 				run := v.filteredRuns[idx]
+				runID := run.GetIDString()
+				
+				// Debug logging for Enter key press
+				debugInfo := fmt.Sprintf("DEBUG: Enter pressed for run idx=%d, runID='%s', repo='%s'\n", 
+					idx, runID, run.Repository)
+				debugInfo += fmt.Sprintf("DEBUG: Cache size=%d, runID in cache=%v\n", 
+					len(v.detailsCache), v.detailsCache[runID] != nil)
+				
+				if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+					f.WriteString(debugInfo)
+					f.Close()
+				}
 				
 				// Use preloaded details if available
-				if detailed, ok := v.detailsCache[run.GetIDString()]; ok {
+				if detailed, ok := v.detailsCache[runID]; ok {
+					debugInfo = fmt.Sprintf("DEBUG: Using cached data for runID='%s'\n", runID)
+					if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+						f.WriteString(debugInfo)
+						f.Close()
+					}
 					return NewRunDetailsViewWithCache(v.client, *detailed, v.runs, v.cached, v.cachedAt, v.detailsCache), nil
+				}
+				
+				debugInfo = fmt.Sprintf("DEBUG: No cached data for runID='%s', loading fresh\n", runID)
+				if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+					f.WriteString(debugInfo)
+					f.Close()
 				}
 				return NewRunDetailsViewWithCache(v.client, run, v.runs, v.cached, v.cachedAt, v.detailsCache), nil
 			}
@@ -253,6 +277,21 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		v.preloading[msg.runID] = false
 		if msg.err == nil && msg.run != nil {
 			v.detailsCache[msg.runID] = msg.run
+			
+			// Debug logging
+			debugInfo := fmt.Sprintf("DEBUG: Cached run with key='%s', actualID='%s', title='%s'\n", 
+				msg.runID, msg.run.GetIDString(), msg.run.Title)
+			if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+				f.WriteString(debugInfo)
+				f.Close()
+			}
+		} else {
+			// Log errors too
+			debugInfo := fmt.Sprintf("DEBUG: Failed to cache run with key='%s', err=%v\n", msg.runID, msg.err)
+			if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+				f.WriteString(debugInfo)
+				f.Close()
+			}
 		}
 
 	case userInfoLoadedMsg:

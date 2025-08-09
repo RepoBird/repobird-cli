@@ -2,6 +2,7 @@ package views
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -39,6 +40,9 @@ type RunDetailsView struct {
 	parentCached       bool
 	parentCachedAt     time.Time
 	parentDetailsCache map[string]*models.RunResponse
+	// Cache retry mechanism
+	cacheRetryCount int
+	maxCacheRetries int
 }
 
 func NewRunDetailsView(client *api.Client, run models.RunResponse) *RunDetailsView {
@@ -54,11 +58,36 @@ func NewRunDetailsViewWithCache(client *api.Client, run models.RunResponse, pare
 
 	// Check if we have preloaded data for this run
 	needsLoading := true
+	runID := run.GetIDString()
+	
+	// Debug logging to file (since we can't use stdout in TUI)
+	debugInfo := fmt.Sprintf("DEBUG: NewRunDetailsViewWithCache - runID='%s', cacheSize=%d\n", 
+		runID, len(parentDetailsCache))
+	
 	if parentDetailsCache != nil {
-		if cachedRun, exists := parentDetailsCache[run.GetIDString()]; exists && cachedRun != nil {
+		// List all cache keys for debugging
+		cacheKeys := make([]string, 0, len(parentDetailsCache))
+		for k := range parentDetailsCache {
+			cacheKeys = append(cacheKeys, fmt.Sprintf("'%s'", k))
+		}
+		debugInfo += fmt.Sprintf("DEBUG: Cache keys: [%s]\n", strings.Join(cacheKeys, ", "))
+		
+		if cachedRun, exists := parentDetailsCache[runID]; exists && cachedRun != nil {
+			debugInfo += fmt.Sprintf("DEBUG: Cache HIT for runID='%s'\n", runID)
 			run = *cachedRun
 			needsLoading = false
+		} else {
+			debugInfo += fmt.Sprintf("DEBUG: Cache MISS for runID='%s' (exists=%v, cachedRun!=nil=%v)\n", 
+				runID, exists, cachedRun != nil)
 		}
+	} else {
+		debugInfo += "DEBUG: parentDetailsCache is nil\n"
+	}
+	
+	// Write debug info to a temporary file
+	if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+		f.WriteString(debugInfo)
+		f.Close()
 	}
 
 	v := &RunDetailsView{
@@ -75,6 +104,14 @@ func NewRunDetailsViewWithCache(client *api.Client, run models.RunResponse, pare
 		parentCachedAt:     parentCachedAt,
 		parentDetailsCache: parentDetailsCache,
 		statusHistory:      make([]string, 0),
+		cacheRetryCount:    0,
+		maxCacheRetries:    3,
+	}
+
+	debugInfo += fmt.Sprintf("DEBUG: Created view with loading=%v\n", needsLoading)
+	if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+		f.WriteString(debugInfo)
+		f.Close()
 	}
 
 	// Initialize status history with current status if we have cached data
@@ -91,8 +128,32 @@ func (v *RunDetailsView) Init() tea.Cmd {
 	
 	// Only load details if not already loaded from cache
 	if v.loading {
-		cmds = append(cmds, v.loadRunDetails())
-		cmds = append(cmds, v.spinner.Tick)
+		// Try cache one more time before making API call
+		if v.parentDetailsCache != nil && v.cacheRetryCount < v.maxCacheRetries {
+			runID := v.run.GetIDString()
+			if cachedRun, exists := v.parentDetailsCache[runID]; exists && cachedRun != nil {
+				// Cache hit on retry!
+				debugInfo := fmt.Sprintf("DEBUG: Cache retry successful for runID='%s'\n", runID)
+				if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+					f.WriteString(debugInfo)
+					f.Close()
+				}
+				
+				v.run = *cachedRun
+				v.loading = false
+				v.updateStatusHistory(string(cachedRun.Status))
+				v.updateContent()
+			} else {
+				v.cacheRetryCount++
+				// Still no cache hit, load from API
+				cmds = append(cmds, v.loadRunDetails())
+				cmds = append(cmds, v.spinner.Tick)
+			}
+		} else {
+			// Load from API
+			cmds = append(cmds, v.loadRunDetails())
+			cmds = append(cmds, v.spinner.Tick)
+		}
 	}
 	
 	// Always start polling for active runs
@@ -152,6 +213,13 @@ func (v *RunDetailsView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			v.updateStatusHistory(string(msg.run.Status))
 		}
 		v.updateContent()
+		
+		// Debug logging for successful load
+		debugInfo := fmt.Sprintf("DEBUG: Successfully loaded run details for '%s'\n", msg.run.GetIDString())
+		if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+			f.WriteString(debugInfo)
+			f.Close()
+		}
 
 	case pollTickMsg:
 		if isActiveStatus(string(v.run.Status)) {
