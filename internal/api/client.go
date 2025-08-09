@@ -124,8 +124,28 @@ func (c *Client) GetRun(id string) (*models.RunResponse, error) {
 		return nil, errors.ParseAPIError(resp.StatusCode, body)
 	}
 
+	// Read the response body for debugging if needed
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if c.debug {
+		fmt.Printf("GetRun Response Body: %s\n", string(body))
+	}
+
+	// Try to decode as SingleRunResponse first (wrapped response)
+	var singleResp models.SingleRunResponse
+	if err := json.Unmarshal(body, &singleResp); err == nil && singleResp.Data != nil {
+		return singleResp.Data, nil
+	}
+
+	// Fall back to direct decoding for backward compatibility
 	var runResp models.RunResponse
-	if err := json.NewDecoder(resp.Body).Decode(&runResp); err != nil {
+	if err := json.Unmarshal(body, &runResp); err != nil {
+		if c.debug {
+			fmt.Printf("Failed to decode GetRun response: %v\n", err)
+		}
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
@@ -254,8 +274,28 @@ func (c *Client) GetRunWithRetry(ctx context.Context, id string) (*models.RunRes
 		return nil, errors.ParseAPIError(resp.StatusCode, body)
 	}
 
+	// Read the response body for debugging if needed
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if c.debug {
+		fmt.Printf("GetRunWithRetry Response Body: %s\n", string(body))
+	}
+
+	// Try to decode as SingleRunResponse first (wrapped response)
+	var singleResp models.SingleRunResponse
+	if err := json.Unmarshal(body, &singleResp); err == nil && singleResp.Data != nil {
+		return singleResp.Data, nil
+	}
+
+	// Fall back to direct decoding for backward compatibility
 	var runResp models.RunResponse
-	if err := json.NewDecoder(resp.Body).Decode(&runResp); err != nil {
+	if err := json.Unmarshal(body, &runResp); err != nil {
+		if c.debug {
+			fmt.Printf("Failed to decode GetRunWithRetry response: %v\n", err)
+		}
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 

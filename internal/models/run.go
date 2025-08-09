@@ -88,6 +88,11 @@ type ListRunsResponse struct {
 	Metadata *PaginationMetadata `json:"metadata"`
 }
 
+type SingleRunResponse struct {
+	Data     *RunResponse        `json:"data"`
+	Metadata *PaginationMetadata `json:"metadata"`
+}
+
 type PaginationMetadata struct {
 	CurrentPage int `json:"currentPage"`
 	Total       int `json:"total"`

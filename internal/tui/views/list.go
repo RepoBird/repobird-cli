@@ -44,11 +44,6 @@ type RunListView struct {
 }
 
 func NewRunListView(client *api.Client) *RunListView {
-	debugInfo := "DEBUG: Creating new RunListView\n"
-	if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-		f.WriteString(debugInfo)
-		f.Close()
-	}
 	return NewRunListViewWithCache(client, nil, false, time.Time{}, nil)
 }
 
@@ -134,13 +129,6 @@ func (v *RunListView) loadUserInfo() tea.Cmd {
 func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
-	// Debug: Log every message type received
-	msgType := fmt.Sprintf("%T", msg)
-	debugInfo := fmt.Sprintf("DEBUG: ListView.Update received message type: %s\n", msgType)
-	if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-		f.WriteString(debugInfo)
-		f.Close()
-	}
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:

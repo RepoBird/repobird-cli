@@ -74,6 +74,8 @@ func NewRunDetailsViewWithCache(client *api.Client, run models.RunResponse, pare
 
 		if cachedRun, exists := parentDetailsCache[runID]; exists && cachedRun != nil {
 			debugInfo += fmt.Sprintf("DEBUG: Cache HIT for runID='%s'\n", runID)
+			debugInfo += fmt.Sprintf("DEBUG: Cached run data - ID='%s', Title='%s', Repository='%s', Status='%s', Source='%s'\n", 
+				cachedRun.GetIDString(), cachedRun.Title, cachedRun.Repository, cachedRun.Status, cachedRun.Source)
 			run = *cachedRun
 			needsLoading = false
 		} else {
