@@ -49,6 +49,11 @@ func (t *Table) SetDimensions(width, height int) {
 	t.width = width
 	t.height = height
 	t.calculateColumnWidths()
+	// Recalculate scroll position to ensure selected row is still visible
+	// but don't scroll unnecessarily
+	if t.scrollOffset > 0 {
+		t.ensureVisible()
+	}
 }
 
 // calculateColumnWidths dynamically calculates column widths based on available space
@@ -147,6 +152,10 @@ func (t *Table) SetSelectedIndex(index int) {
 		t.selectedRow = index
 		t.ensureVisible()
 	}
+}
+
+func (t *Table) ResetScroll() {
+	t.scrollOffset = 0
 }
 
 func (t *Table) ensureVisible() {

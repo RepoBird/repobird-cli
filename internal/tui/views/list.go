@@ -115,8 +115,11 @@ func NewRunListViewWithCache(
 	// If we have cached data, update the table
 	if !shouldLoad && runs != nil && len(runs) > 0 {
 		v.updateTable()
-		// Restore cursor position
+		// Restore cursor position but ensure we don't scroll unnecessarily
 		if selectedIndex >= 0 && selectedIndex < len(v.filteredRuns) {
+			// First reset scroll to top
+			v.table.ResetScroll()
+			// Then set the selected index
 			v.table.SetSelectedIndex(selectedIndex)
 		}
 	}
@@ -126,6 +129,9 @@ func NewRunListViewWithCache(
 
 func (v *RunListView) Init() tea.Cmd {
 	var cmds []tea.Cmd
+
+	// Clear the screen to ensure proper rendering
+	cmds = append(cmds, tea.ClearScreen)
 
 	// Send a window size message with stored dimensions if we have them
 	if v.width > 0 && v.height > 0 {
@@ -186,6 +192,13 @@ func (v *RunListView) handleWindowSizeMsg(msg tea.WindowSizeMsg) {
 
 	v.table.SetDimensions(msg.Width, tableHeight)
 	v.help.Width = msg.Width
+
+	// If this is the first time setting dimensions (width/height were 0),
+	// reset scroll to ensure title and headers are visible
+	if msg.Width > 0 && msg.Height > 0 {
+		// Update the table again to ensure proper rendering
+		v.updateTable()
+	}
 }
 
 // handleSearchMode handles search mode key input
