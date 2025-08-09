@@ -77,11 +77,11 @@ func NewRunListViewWithCache(
 	}
 	debug.LogToFile(debugInfo)
 	columns := []components.Column{
-		{Title: "ID", Width: 8},
-		{Title: "Status", Width: 15},
-		{Title: "Repository", Width: 25},
-		{Title: "Time", Width: 12},
-		{Title: "Branch", Width: 15},
+		{Title: "ID", Width: 8, MinWidth: 8, Flex: 0},           // Fixed width
+		{Title: "Status", Width: 12, MinWidth: 12, Flex: 0},     // Fixed width
+		{Title: "Repository", Width: 25, MinWidth: 20, Flex: 2}, // Flexible, gets 2x space
+		{Title: "Time", Width: 10, MinWidth: 10, Flex: 0},       // Fixed width
+		{Title: "Branch", Width: 15, MinWidth: 12, Flex: 1},     // Flexible, gets 1x space
 	}
 
 	s := spinner.New()
@@ -157,7 +157,27 @@ func (v *RunListView) loadUserInfo() tea.Cmd {
 func (v *RunListView) handleWindowSizeMsg(msg tea.WindowSizeMsg) {
 	v.width = msg.Width
 	v.height = msg.Height
-	v.table.SetDimensions(msg.Width, msg.Height-4)
+
+	// Calculate actual height needed for non-table elements:
+	// - Title: 2 lines (title + blank line)
+	// - Search/filter line: 1 line (when active)
+	// - Status bar: 1 line
+	// - Help (when shown): varies, but we'll account for it dynamically
+	nonTableHeight := 4 // Title (2) + blank line after table (1) + status bar (1)
+	if v.searchMode || v.searchQuery != "" {
+		nonTableHeight++ // Add line for search/filter display
+	}
+	if v.showHelp {
+		// Help takes additional lines, estimate 3-4 lines
+		nonTableHeight += 4
+	}
+
+	tableHeight := msg.Height - nonTableHeight
+	if tableHeight < 3 {
+		tableHeight = 3 // Minimum height for header + separator + at least one row
+	}
+
+	v.table.SetDimensions(msg.Width, tableHeight)
 	v.help.Width = msg.Width
 }
 
@@ -408,12 +428,9 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (v *RunListView) View() string {
 	var s strings.Builder
 
-	// Truncate title if it's too wide for the terminal
+	// Render title using full terminal width
 	titleText := "RepoBird CLI - Runs"
-	if v.width > 0 && v.width < len(titleText)+10 {
-		titleText = "RepoBird"
-	}
-	title := styles.TitleStyle.MaxWidth(v.width).Render(titleText)
+	title := styles.TitleStyle.Width(v.width).Render(titleText)
 	s.WriteString(title)
 	s.WriteString("\n\n")
 

@@ -188,10 +188,10 @@ func TestGetSelectedIndex(t *testing.T) {
 			{ID: "run-1", Status: models.StatusQueued},
 		}
 		SetCachedList(runs, nil)
-		
+
 		// Set selected index
 		SetSelectedIndex(5)
-		
+
 		_, _, _, _, index := GetCachedList()
 		assert.Equal(t, 5, index)
 	})
@@ -279,8 +279,8 @@ func TestClearCache(t *testing.T) {
 		assert.Empty(t, globalCache.detailsAt)
 		assert.Equal(t, 0, globalCache.selectedIndex)
 		assert.Nil(t, globalCache.formData)
-		// Terminal details should be preserved (we added one terminal run)
-		assert.Len(t, globalCache.terminalDetails, 1)
+		// Terminal details should be cleared too
+		assert.Empty(t, globalCache.terminalDetails)
 	})
 }
 

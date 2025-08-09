@@ -9,8 +9,10 @@ import (
 )
 
 type Column struct {
-	Title string
-	Width int
+	Title    string
+	Width    int
+	MinWidth int // Minimum width for this column
+	Flex     int // Flex weight for distributing extra space (0 = fixed width)
 }
 
 type Row []string
@@ -46,6 +48,54 @@ func (t *Table) SetRows(rows []Row) {
 func (t *Table) SetDimensions(width, height int) {
 	t.width = width
 	t.height = height
+	t.calculateColumnWidths()
+}
+
+// calculateColumnWidths dynamically calculates column widths based on available space
+func (t *Table) calculateColumnWidths() {
+	if t.width == 0 {
+		return
+	}
+
+	// Account for spacing between columns (1 space per column gap)
+	totalSpacing := len(t.columns) - 1
+	availableWidth := t.width - totalSpacing
+
+	// First pass: calculate total minimum width and flex weight
+	totalMinWidth := 0
+	totalFlex := 0
+	for _, col := range t.columns {
+		if col.MinWidth > 0 {
+			totalMinWidth += col.MinWidth
+		} else if col.Flex == 0 {
+			// Fixed width column
+			totalMinWidth += col.Width
+		}
+		totalFlex += col.Flex
+	}
+
+	// Calculate remaining space for flexible columns
+	remainingWidth := availableWidth - totalMinWidth
+	if remainingWidth < 0 {
+		remainingWidth = 0
+	}
+
+	// Second pass: assign widths
+	for i := range t.columns {
+		if t.columns[i].Flex > 0 {
+			// Flexible column - distribute remaining space proportionally
+			if totalFlex > 0 {
+				flexWidth := (remainingWidth * t.columns[i].Flex) / totalFlex
+				t.columns[i].Width = t.columns[i].MinWidth + flexWidth
+			} else {
+				t.columns[i].Width = t.columns[i].MinWidth
+			}
+		} else if t.columns[i].MinWidth > 0 {
+			// Fixed column with minimum width
+			t.columns[i].Width = t.columns[i].MinWidth
+		}
+		// else: keep existing width for fixed columns
+	}
 }
 
 func (t *Table) MoveUp() {

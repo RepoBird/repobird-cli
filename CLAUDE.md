@@ -9,6 +9,17 @@ RepoBird CLI is a Go-based command-line tool for interacting with the RepoBird A
 - Manage API configuration securely
 - Auto-detect repository and branch information
 - Support for both run and approval workflows
+- Rich Terminal User Interface (TUI) with Bubble Tea
+
+## Documentation
+Comprehensive documentation is available in the `docs/` directory:
+
+- **[Architecture Overview](docs/architecture.md)** - System design, components, patterns
+- **[API Reference](docs/api-reference.md)** - Endpoints, client methods, error handling
+- **[Development Guide](docs/development-guide.md)** - Setup, building, contributing
+- **[Testing Guide](docs/testing-guide.md)** - Test strategies, patterns, coverage
+- **[Configuration Guide](docs/configuration-guide.md)** - Settings, environment, security
+- **[Troubleshooting Guide](docs/troubleshooting.md)** - Common issues and solutions
 
 ## Architecture
 

@@ -347,7 +347,7 @@ func TestRunResponse_FieldTypes(t *testing.T) {
 		fieldName    string
 		expectedType string
 	}{
-		{"ID", "interface {}"},
+		{"ID", "string"},
 		{"Status", "models.RunStatus"},
 		{"Repository", "string"},
 		{"Source", "string"},

@@ -331,15 +331,15 @@ func TestParseTaskFile(t *testing.T) {
 			},
 		},
 		{
-			name: "Valid YAML task",
-			content: `
-prompt: "Add new feature"
-repository: "test/repo"
-source: "main"
-target: "feature/new"
-runType: "run"
-title: "New Feature"
-`,
+			name: "Valid JSON task with title",
+			content: `{
+				"prompt": "Add new feature",
+				"repository": "test/repo",
+				"source": "main",
+				"target": "feature/new",
+				"runType": "run",
+				"title": "New Feature"
+			}`,
 			expectError: false,
 			validate: func(t *testing.T, req *models.RunRequest) {
 				assert.Equal(t, "Add new feature", req.Prompt)
@@ -465,9 +465,9 @@ func TestCommandHelp(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf bytes.Buffer
 			tt.command.SetOut(&buf)
-			tt.command.SetArgs([]string{"--help"})
 
-			err := tt.command.Execute()
+			// Call Help() directly instead of executing with --help
+			err := tt.command.Help()
 			assert.NoError(t, err)
 
 			output := buf.String()

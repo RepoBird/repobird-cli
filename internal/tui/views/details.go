@@ -186,9 +186,31 @@ func (v *RunDetailsView) Init() tea.Cmd {
 func (v *RunDetailsView) handleWindowSizeMsg(msg tea.WindowSizeMsg) {
 	v.width = msg.Width
 	v.height = msg.Height
+
+	// Calculate actual height for viewport:
+	// - Title: 2 lines (title + blank line)
+	// - Header info: 2-3 lines (status, repo, etc.)
+	// - Status bar: 1 line
+	// - Help (when shown): estimate 3-4 lines
+	nonViewportHeight := 6 // Base: title(2) + header(2) + separator(1) + status bar(1)
+	if v.showHelp {
+		nonViewportHeight += 4
+	}
+	if v.copiedMessage != "" {
+		nonViewportHeight++ // Feedback message takes a line
+	}
+
+	viewportHeight := msg.Height - nonViewportHeight
+	if viewportHeight < 3 {
+		viewportHeight = 3 // Minimum usable height
+	}
+
 	v.viewport.Width = msg.Width
-	v.viewport.Height = msg.Height - 8
+	v.viewport.Height = viewportHeight
 	v.help.Width = msg.Width
+
+	// Update content to reflow for new width
+	v.updateContent()
 }
 
 // handleKeyInput handles all key input events
@@ -201,7 +223,8 @@ func (v *RunDetailsView) handleKeyInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return v, tea.Quit
 	case key.Matches(msg, v.keys.Back):
 		v.stopPolling()
-		return NewRunListView(v.client), nil
+		// Return to list view with cached data
+		return NewRunListViewWithCache(v.client, v.parentRuns, v.parentCached, v.parentCachedAt, v.parentDetailsCache, -1), nil
 	case key.Matches(msg, v.keys.Help):
 		v.showHelp = !v.showHelp
 	case key.Matches(msg, v.keys.Refresh):

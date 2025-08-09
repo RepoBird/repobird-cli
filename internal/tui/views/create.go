@@ -197,8 +197,37 @@ func (v *CreateRunView) handleWindowSizeMsg(msg tea.WindowSizeMsg) {
 	v.width = msg.Width
 	v.height = msg.Height
 	v.help.Width = msg.Width
-	v.promptArea.SetWidth(min(60, msg.Width-10))
-	v.contextArea.SetWidth(min(60, msg.Width-10))
+
+	// Make text areas use most of the available width with some padding
+	textAreaWidth := msg.Width - 10
+	if textAreaWidth < 30 {
+		textAreaWidth = 30 // Minimum usable width
+	}
+
+	// Update widths for all input fields to be responsive
+	for i := range v.fields {
+		v.fields[i].Width = min(textAreaWidth, 80) // Cap at 80 for readability
+	}
+
+	v.promptArea.SetWidth(textAreaWidth)
+	v.contextArea.SetWidth(textAreaWidth)
+
+	// Set appropriate heights for text areas based on available space
+	// Reserve space for: title(2) + form fields(~15) + buttons(2) + status bar(1) + help(4 if shown)
+	reservedHeight := 20
+	if v.showHelp {
+		reservedHeight += 4
+	}
+
+	availableHeight := msg.Height - reservedHeight
+	if availableHeight > 10 {
+		// Split available height between prompt and context areas
+		promptHeight := availableHeight / 2
+		contextHeight := availableHeight - promptHeight
+
+		v.promptArea.SetHeight(max(3, promptHeight))
+		v.contextArea.SetHeight(max(3, contextHeight))
+	}
 }
 
 // handleInsertMode handles keyboard input in insert mode
@@ -257,7 +286,8 @@ func (v *CreateRunView) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if !v.submitting {
 				v.saveFormData()
 				debug.LogToFile("DEBUG: CreateView double ESC - returning to list view\n")
-				return NewRunListView(v.client), nil
+				// Return to list view with cached data
+				return NewRunListViewWithCache(v.client, v.parentRuns, v.parentCached, v.parentCachedAt, v.parentDetailsCache, -1), nil
 			}
 		} else {
 			// First ESC in normal mode - prepare to exit
@@ -269,7 +299,8 @@ func (v *CreateRunView) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if v.backButtonFocused {
 			v.saveFormData()
 			debug.LogToFile("DEBUG: Back button pressed - returning to list view\n")
-			return NewRunListView(v.client), nil
+			// Return to list view with cached data
+			return NewRunListViewWithCache(v.client, v.parentRuns, v.parentCached, v.parentCachedAt, v.parentDetailsCache, -1), nil
 		} else {
 			v.inputMode = components.InsertMode
 			v.exitRequested = false
@@ -325,7 +356,8 @@ func (v *CreateRunView) handleRunCreated(msg runCreatedMsg) (tea.Model, tea.Cmd)
 	v.createdRun = &msg.run
 
 	debug.LogToFilef("DEBUG: Run created successfully with ID='%s', navigating to details\n", runID)
-	return NewRunDetailsView(v.client, msg.run), nil
+	// Pass the cache data to the details view
+	return NewRunDetailsViewWithCache(v.client, msg.run, v.parentRuns, v.parentCached, v.parentCachedAt, v.parentDetailsCache), nil
 }
 
 func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -742,6 +774,13 @@ func (v *CreateRunView) submitRun() tea.Cmd {
 
 func min(a, b int) int {
 	if a < b {
+		return a
+	}
+	return b
+}
+
+func max(a, b int) int {
+	if a > b {
 		return a
 	}
 	return b
