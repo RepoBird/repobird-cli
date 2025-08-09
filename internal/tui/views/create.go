@@ -285,7 +285,7 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case runCreatedMsg:
 		// Debug: Log when run creation response is received
-		debugInfo := fmt.Sprintf("DEBUG: runCreatedMsg received - err=%v, runID='%s'\n", 
+		debugInfo := fmt.Sprintf("DEBUG: runCreatedMsg received - err=%v, runID='%s'\n",
 			msg.err, func() string {
 				if msg.err == nil {
 					return msg.run.GetIDString()
@@ -296,7 +296,7 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			f.WriteString(debugInfo)
 			f.Close()
 		}
-		
+
 		v.submitting = false
 		if msg.err != nil {
 			v.error = msg.err
@@ -571,7 +571,7 @@ func (v *CreateRunView) submitRun() tea.Cmd {
 			f.WriteString(debugInfo)
 			f.Close()
 		}
-		
+
 		// Save form data before submitting in case submission fails
 		v.saveFormData()
 
@@ -645,23 +645,26 @@ func (v *CreateRunView) submitRun() tea.Cmd {
 			}
 		}
 
+		// Convert to API-compatible format
+		apiTask := task.ToAPIRequest()
+
 		// Debug: Log the final task object being sent to API
-		debugInfo = fmt.Sprintf("DEBUG: Final task object being sent to API - Title='%s', Repository='%s', Source='%s', Target='%s', Prompt='%s', Context='%s', RunType='%s'\\n",
-			task.Title, task.Repository, task.Source, task.Target, task.Prompt, task.Context, task.RunType)
+		debugInfo = fmt.Sprintf("DEBUG: Final API task object - Title='%s', RepositoryName='%s', SourceBranch='%s', TargetBranch='%s', Prompt='%s', Context='%s', RunType='%s'\\n",
+			apiTask.Title, apiTask.RepositoryName, apiTask.SourceBranch, apiTask.TargetBranch, apiTask.Prompt, apiTask.Context, apiTask.RunType)
 		if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
 			f.WriteString(debugInfo)
 			f.Close()
 		}
 
-		runPtr, err := v.client.CreateRun(&task)
-		
+		runPtr, err := v.client.CreateRunAPI(apiTask)
+
 		// Debug: Log the API response
 		debugInfo = fmt.Sprintf("DEBUG: API response - err=%v, runPtr!=nil=%v\\n", err, runPtr != nil)
 		if f, err2 := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err2 == nil {
 			f.WriteString(debugInfo)
 			f.Close()
 		}
-		
+
 		if err != nil {
 			return runCreatedMsg{err: err}
 		}

@@ -25,13 +25,39 @@ const (
 
 type RunRequest struct {
 	Prompt     string   `json:"prompt"`
-	Repository string   `json:"repository"`
-	Source     string   `json:"source"`
-	Target     string   `json:"target"`
+	Repository string   `json:"repository"` // User-facing field name
+	Source     string   `json:"source"`     // User-facing field name
+	Target     string   `json:"target"`     // User-facing field name
 	RunType    RunType  `json:"runType"`
 	Title      string   `json:"title,omitempty"`
 	Context    string   `json:"context,omitempty"`
 	Files      []string `json:"files,omitempty"`
+}
+
+// APIRunRequest is the structure that matches the actual API expectations
+type APIRunRequest struct {
+	Prompt         string   `json:"prompt"`
+	RepositoryName string   `json:"repositoryName"`
+	SourceBranch   string   `json:"sourceBranch"`
+	TargetBranch   string   `json:"targetBranch"`
+	RunType        RunType  `json:"runType"`
+	Title          string   `json:"title,omitempty"`
+	Context        string   `json:"context,omitempty"`
+	Files          []string `json:"files,omitempty"`
+}
+
+// ToAPIRequest converts user-facing RunRequest to API-compatible structure
+func (r *RunRequest) ToAPIRequest() *APIRunRequest {
+	return &APIRunRequest{
+		Prompt:         r.Prompt,
+		RepositoryName: r.Repository,
+		SourceBranch:   r.Source,
+		TargetBranch:   r.Target,
+		RunType:        r.RunType,
+		Title:          r.Title,
+		Context:        r.Context,
+		Files:          r.Files,
+	}
 }
 
 type RunResponse struct {

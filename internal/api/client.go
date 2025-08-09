@@ -112,6 +112,26 @@ func (c *Client) CreateRun(request *models.RunRequest) (*models.RunResponse, err
 	return &runResp, nil
 }
 
+func (c *Client) CreateRunAPI(request *models.APIRunRequest) (*models.RunResponse, error) {
+	resp, err := c.doRequest("POST", "/api/v1/runs", request)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, errors.ParseAPIError(resp.StatusCode, body)
+	}
+
+	var runResp models.RunResponse
+	if err := json.NewDecoder(resp.Body).Decode(&runResp); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &runResp, nil
+}
+
 func (c *Client) GetRun(id string) (*models.RunResponse, error) {
 	resp, err := c.doRequest("GET", fmt.Sprintf("/api/v1/runs/%s", id), nil)
 	if err != nil {
