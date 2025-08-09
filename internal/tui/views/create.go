@@ -297,10 +297,9 @@ func (v *CreateRunView) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				v.saveFormData()
 				debug.LogToFile("DEBUG: CreateView double ESC - returning to list view\n")
 				// Return to list view with cached data and current dimensions
-				listView := NewRunListViewWithCache(v.client, v.parentRuns, v.parentCached, v.parentCachedAt, v.parentDetailsCache, -1)
-				listView.width = v.width
-				listView.height = v.height
-				return listView, nil
+				return NewRunListViewWithCacheAndDimensions(
+					v.client, v.parentRuns, v.parentCached, v.parentCachedAt,
+					v.parentDetailsCache, -1, v.width, v.height), nil
 			}
 		} else {
 			// First ESC in normal mode - prepare to exit
@@ -313,10 +312,9 @@ func (v *CreateRunView) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			v.saveFormData()
 			debug.LogToFile("DEBUG: Back button pressed - returning to list view\n")
 			// Return to list view with cached data and current dimensions
-			listView := NewRunListViewWithCache(v.client, v.parentRuns, v.parentCached, v.parentCachedAt, v.parentDetailsCache, -1)
-			listView.width = v.width
-			listView.height = v.height
-			return listView, nil
+			return NewRunListViewWithCacheAndDimensions(
+				v.client, v.parentRuns, v.parentCached, v.parentCachedAt,
+				v.parentDetailsCache, -1, v.width, v.height), nil
 		} else {
 			v.inputMode = components.InsertMode
 			v.exitRequested = false

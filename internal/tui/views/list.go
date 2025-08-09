@@ -51,6 +51,30 @@ func NewRunListView(client *api.Client) *RunListView {
 	return NewRunListViewWithCache(client, runs, cached, cachedAt, detailsCache, selectedIndex)
 }
 
+// NewRunListViewWithCacheAndDimensions creates a new list view with cache and dimensions
+func NewRunListViewWithCacheAndDimensions(
+	client *api.Client,
+	runs []models.RunResponse,
+	cached bool,
+	cachedAt time.Time,
+	detailsCache map[string]*models.RunResponse,
+	selectedIndex int,
+	width int,
+	height int,
+) *RunListView {
+	v := NewRunListViewWithCache(client, runs, cached, cachedAt, detailsCache, selectedIndex)
+
+	// Set dimensions immediately if provided
+	if width > 0 && height > 0 {
+		v.width = width
+		v.height = height
+		// Apply dimensions to table immediately
+		v.handleWindowSizeMsg(tea.WindowSizeMsg{Width: width, Height: height})
+	}
+
+	return v
+}
+
 func NewRunListViewWithCache(
 	client *api.Client,
 	runs []models.RunResponse,
@@ -134,10 +158,17 @@ func (v *RunListView) Init() tea.Cmd {
 	cmds = append(cmds, tea.ClearScreen)
 
 	// Send a window size message with stored dimensions if we have them
+	// This ensures the view knows its size immediately upon returning
 	if v.width > 0 && v.height > 0 {
+		debug.LogToFilef("DEBUG: ListView Init sending WindowSizeMsg with width=%d height=%d\n", v.width, v.height)
+		// Immediately process the dimensions
+		v.handleWindowSizeMsg(tea.WindowSizeMsg{Width: v.width, Height: v.height})
+		// Also send the message for the update cycle
 		cmds = append(cmds, func() tea.Msg {
 			return tea.WindowSizeMsg{Width: v.width, Height: v.height}
 		})
+	} else {
+		debug.LogToFile("DEBUG: ListView Init has no dimensions stored\n")
 	}
 
 	// If we have cached data, use it - don't auto-refresh
@@ -465,89 +496,80 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (v *RunListView) View() string {
-	if v.height == 0 {
+	if v.height == 0 || v.width == 0 {
 		// Terminal dimensions not yet known
 		return ""
 	}
 
-	var lines []string
+	// Pre-allocate array for exactly terminal height lines
+	lines := make([]string, v.height)
+	lineIdx := 0
 
-	// Line 1: Title
+	// Title
 	titleText := "RepoBird CLI - Runs"
 	title := styles.TitleStyle.Width(v.width).Render(titleText)
-	lines = append(lines, title)
+	lines[lineIdx] = title
+	lineIdx++
 
-	// Line 2: Blank line after title
-	lines = append(lines, "")
-
-	// Track how many lines we've used so far
-	linesUsed := 2
+	// Blank line after title
+	lines[lineIdx] = ""
+	lineIdx++
 
 	// Handle loading/error states or normal view
 	if v.loading {
-		lines = append(lines, v.spinner.View()+" Loading runs...")
-		linesUsed++
+		lines[lineIdx] = v.spinner.View() + " Loading runs..."
+		lineIdx++
 	} else if v.error != nil {
-		lines = append(lines, styles.ErrorStyle.Render("Error: "+v.error.Error()))
-		linesUsed++
+		lines[lineIdx] = styles.ErrorStyle.Render("Error: " + v.error.Error())
+		lineIdx++
 	} else {
 		// Search/filter line (if active)
 		if v.searchMode {
-			lines = append(lines, "Search: "+v.searchQuery+"_")
-			linesUsed++
+			lines[lineIdx] = "Search: " + v.searchQuery + "_"
+			lineIdx++
 		} else if v.searchQuery != "" {
-			lines = append(lines, "Filter: "+v.searchQuery)
-			linesUsed++
+			lines[lineIdx] = "Filter: " + v.searchQuery
+			lineIdx++
 		}
 
 		// Table view
 		tableContent := v.table.View()
 		if tableContent != "" {
-			lines = append(lines, tableContent)
-			// Count lines in table content
-			tableLines := strings.Count(tableContent, "\n") + 1
-			linesUsed += tableLines
+			// Split table content into lines
+			tableLines := strings.Split(strings.TrimRight(tableContent, "\n"), "\n")
+			for _, line := range tableLines {
+				if lineIdx < v.height-1 { // Leave room for status bar
+					lines[lineIdx] = line
+					lineIdx++
+				}
+			}
 		}
 	}
 
-	// Calculate how many blank lines we need before the status bar
-	// Reserve lines for: status bar (1) and help (if shown)
-	reservedBottomLines := 1 // status bar
+	// Help content (if shown) - place just before status bar
 	if v.showHelp {
-		// Help takes about 3-4 lines
-		reservedBottomLines += 4
-	}
-
-	// Fill remaining space with blank lines
-	totalContentLines := linesUsed + reservedBottomLines
-	if totalContentLines < v.height {
-		blankLines := v.height - totalContentLines
-		for i := 0; i < blankLines; i++ {
-			lines = append(lines, "")
+		helpContent := v.help.View(v.keys)
+		if helpContent != "" {
+			helpLines := strings.Split(strings.TrimRight(helpContent, "\n"), "\n")
+			// Place help starting from height-1-len(helpLines)
+			helpStart := v.height - 1 - len(helpLines)
+			if helpStart < lineIdx {
+				helpStart = lineIdx
+			}
+			for i, line := range helpLines {
+				if helpStart+i < v.height-1 {
+					lines[helpStart+i] = line
+				}
+			}
 		}
 	}
 
-	// Add help if shown
-	if v.showHelp {
-		helpView := v.help.View(v.keys)
-		lines = append(lines, strings.Split(helpView, "\n")...)
-	}
+	// Status bar always goes in the last line
+	lines[v.height-1] = v.renderStatusBar()
 
-	// Status bar (always last)
-	statusBar := v.renderStatusBar()
-	lines = append(lines, statusBar)
-
-	// Join all lines and ensure we don't exceed terminal height
-	result := strings.Join(lines, "\n")
-
-	// Trim to exact height if we somehow exceeded it
-	resultLines := strings.Split(result, "\n")
-	if len(resultLines) > v.height {
-		resultLines = resultLines[:v.height]
-		result = strings.Join(resultLines, "\n")
-	}
-
-	return result
+	// Join all lines with newlines
+	// This creates exactly height-1 newlines, which is correct
+	return strings.Join(lines, "\n")
 }
 
 func (v *RunListView) filterRuns() {

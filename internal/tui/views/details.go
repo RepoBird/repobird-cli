@@ -231,11 +231,9 @@ func (v *RunDetailsView) handleKeyInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, v.keys.Back):
 		v.stopPolling()
 		// Return to list view with cached data and current dimensions
-		listView := NewRunListViewWithCache(v.client, v.parentRuns, v.parentCached, v.parentCachedAt, v.parentDetailsCache, -1)
-		// Pass current window dimensions
-		listView.width = v.width
-		listView.height = v.height
-		return listView, nil
+		return NewRunListViewWithCacheAndDimensions(
+			v.client, v.parentRuns, v.parentCached, v.parentCachedAt,
+			v.parentDetailsCache, -1, v.width, v.height), nil
 	case key.Matches(msg, v.keys.Help):
 		v.showHelp = !v.showHelp
 	case key.Matches(msg, v.keys.Refresh):
