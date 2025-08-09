@@ -83,7 +83,7 @@ func (c *Client) CreateRun(request *models.RunRequest) (*models.RunResponse, err
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		body, _ := io.ReadAll(resp.Body)
@@ -103,7 +103,7 @@ func (c *Client) GetRun(id string) (*models.RunResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -124,15 +124,35 @@ func (c *Client) ListRuns(limit, offset int) ([]*models.RunResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))
 	}
 
+	// Read the response body for debugging if needed
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if c.debug {
+		fmt.Printf("Response Body: %s\n", string(body))
+	}
+
+	// Try to decode as ListRunsResponse first (paginated response)
+	var listResp models.ListRunsResponse
+	if err := json.Unmarshal(body, &listResp); err == nil && listResp.Data != nil {
+		return listResp.Data, nil
+	}
+
+	// Fall back to direct array decoding for backward compatibility
 	var runs []*models.RunResponse
-	if err := json.NewDecoder(resp.Body).Decode(&runs); err != nil {
+	if err := json.Unmarshal(body, &runs); err != nil {
+		if c.debug {
+			fmt.Printf("Failed to decode as array: %v\n", err)
+		}
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
@@ -144,7 +164,7 @@ func (c *Client) VerifyAuth() (*models.UserInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)

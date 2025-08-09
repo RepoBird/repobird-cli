@@ -168,12 +168,21 @@ func (v *RunDetailsView) renderHeader() string {
 	statusStyle := styles.GetStatusStyle(string(v.run.Status))
 	status := statusStyle.Render(fmt.Sprintf("%s %s", statusIcon, v.run.Status))
 
-	title := fmt.Sprintf("Run #%s", v.run.ID[:8])
+	idStr := v.run.GetIDString()
+	if len(idStr) > 8 {
+		idStr = idStr[:8]
+	}
+	title := fmt.Sprintf("Run #%s", idStr)
 	if v.run.Title != "" {
 		title += " - " + v.run.Title
 	}
 
-	header := styles.TitleStyle.Render(title)
+	// Truncate title if too long for terminal width
+	if v.width > 0 && len(title) > v.width-20 {
+		title = title[:v.width-23] + "..."
+	}
+
+	header := styles.TitleStyle.MaxWidth(v.width).Render(title)
 
 	if isActiveStatus(string(v.run.Status)) {
 		pollingIndicator := styles.ProcessingStyle.Render(" [Polling ⟳]")
@@ -250,7 +259,7 @@ func (v *RunDetailsView) updateStatusHistory(status string) {
 
 func (v *RunDetailsView) loadRunDetails() tea.Cmd {
 	return func() tea.Msg {
-		runPtr, err := v.client.GetRun(v.run.ID)
+		runPtr, err := v.client.GetRun(v.run.GetIDString())
 		if err != nil {
 			return runDetailsLoadedMsg{run: v.run, err: err}
 		}

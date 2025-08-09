@@ -44,7 +44,7 @@ func runCommand(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("failed to open file: %w", err)
 		}
-		defer file.Close()
+		defer func() { _ = file.Close() }()
 		input = file
 	} else {
 		input = os.Stdin
@@ -95,14 +95,14 @@ func runCommand(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("Run created successfully!\n")
-	fmt.Printf("ID: %s\n", runResp.ID)
+	fmt.Printf("ID: %s\n", runResp.GetIDString())
 	fmt.Printf("Status: %s\n", runResp.Status)
 	fmt.Printf("Repository: %s\n", runResp.Repository)
 	fmt.Printf("Source: %s → Target: %s\n", runResp.Source, runResp.Target)
 
 	if follow {
 		fmt.Println("\nFollowing run status...")
-		return followRunStatus(client, runResp.ID)
+		return followRunStatus(client, runResp.GetIDString())
 	}
 
 	return nil

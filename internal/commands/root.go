@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	cfg     *config.Config
+	cfg     *config.SecureConfig
 	cfgFile string
 	debug   bool
 )
@@ -23,9 +23,12 @@ var rootCmd = &cobra.Command{
 manage runs, and integrate with the RepoBird platform.`,
 	PersistentPreRunE: func(_ *cobra.Command, _ []string) error {
 		var err error
-		cfg, err = config.LoadConfig()
+		cfg, err = config.LoadSecureConfig()
 		if err != nil {
-			return fmt.Errorf("failed to load config: %w", err)
+			// Don't fail if config doesn't exist yet
+			cfg = &config.SecureConfig{
+				Config: &config.Config{},
+			}
 		}
 
 		if debug {

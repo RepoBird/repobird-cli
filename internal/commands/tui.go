@@ -28,13 +28,13 @@ func init() {
 }
 
 func runTUI(cmd *cobra.Command, args []string) error {
-	cfg, err := config.LoadConfig()
+	cfg, err := config.LoadSecureConfig()
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
 	if cfg.APIKey == "" {
-		return fmt.Errorf("API key not configured. Run 'repobird config set api-key YOUR_KEY' first")
+		return fmt.Errorf("API key not configured. Run 'rb config set api-key YOUR_KEY' first")
 	}
 
 	client := api.NewClient(cfg.APIKey, cfg.APIURL, cfg.Debug)

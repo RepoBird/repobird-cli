@@ -1,6 +1,9 @@
 package models
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 type RunType string
 
@@ -32,17 +35,35 @@ type RunRequest struct {
 }
 
 type RunResponse struct {
-	ID         string    `json:"id"`
-	Status     RunStatus `json:"status"`
-	Repository string    `json:"repository"`
-	Source     string    `json:"source"`
-	Target     string    `json:"target"`
-	CreatedAt  time.Time `json:"createdAt"`
-	UpdatedAt  time.Time `json:"updatedAt"`
-	Prompt     string    `json:"prompt"`
-	Title      string    `json:"title,omitempty"`
-	Context    string    `json:"context,omitempty"`
-	Error      string    `json:"error,omitempty"`
+	ID          interface{} `json:"id"` // Can be string or int from API
+	Status      RunStatus   `json:"status"`
+	Repository  string      `json:"repository"`
+	RepoId      int         `json:"repoId,omitempty"`
+	Source      string      `json:"source"`
+	Target      string      `json:"target"`
+	CreatedAt   time.Time   `json:"createdAt"`
+	UpdatedAt   time.Time   `json:"updatedAt"`
+	Prompt      string      `json:"prompt"`
+	Title       string      `json:"title,omitempty"`
+	Description string      `json:"description,omitempty"`
+	Context     string      `json:"context,omitempty"`
+	Error       string      `json:"error,omitempty"`
+	PrUrl       *string     `json:"prUrl,omitempty"`
+	RunType     string      `json:"runType,omitempty"`
+}
+
+// GetIDString returns the ID as a string regardless of its actual type
+func (r *RunResponse) GetIDString() string {
+	switch v := r.ID.(type) {
+	case string:
+		return v
+	case float64:
+		return fmt.Sprintf("%.0f", v)
+	case int:
+		return fmt.Sprintf("%d", v)
+	default:
+		return fmt.Sprintf("%v", v)
+	}
 }
 
 type UserInfo struct {
@@ -50,4 +71,15 @@ type UserInfo struct {
 	RemainingRuns int    `json:"remainingRuns"`
 	TotalRuns     int    `json:"totalRuns"`
 	Tier          string `json:"tier"`
+}
+
+type ListRunsResponse struct {
+	Data     []*RunResponse      `json:"data"`
+	Metadata *PaginationMetadata `json:"metadata"`
+}
+
+type PaginationMetadata struct {
+	CurrentPage int `json:"currentPage"`
+	Total       int `json:"total"`
+	TotalPages  int `json:"totalPages"`
 }

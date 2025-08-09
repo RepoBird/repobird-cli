@@ -33,6 +33,8 @@ type RunListView struct {
 	searchMode   bool
 	searchQuery  string
 	filteredRuns []models.RunResponse
+	cached       bool
+	cachedAt     time.Time
 }
 
 func NewRunListView(client *api.Client) *RunListView {
@@ -59,6 +61,11 @@ func NewRunListView(client *api.Client) *RunListView {
 }
 
 func (v *RunListView) Init() tea.Cmd {
+	// If we have cached data and it's recent (< 30 seconds), don't reload
+	if v.cached && time.Since(v.cachedAt) < 30*time.Second {
+		v.loading = false
+		return v.startPolling()
+	}
 	return tea.Batch(
 		v.loadRuns(),
 		v.spinner.Tick,
@@ -134,6 +141,8 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		v.loading = false
 		v.runs = msg.runs
 		v.error = msg.err
+		v.cached = true
+		v.cachedAt = time.Now()
 		v.filterRuns()
 
 	case pollTickMsg:
@@ -155,7 +164,12 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (v *RunListView) View() string {
 	var s strings.Builder
 
-	title := styles.TitleStyle.Render("RepoBird CLI - Runs")
+	// Truncate title if it's too wide for the terminal
+	titleText := "RepoBird CLI - Runs"
+	if v.width > 0 && v.width < len(titleText)+10 {
+		titleText = "RepoBird"
+	}
+	title := styles.TitleStyle.MaxWidth(v.width).Render(titleText)
 	s.WriteString(title)
 	s.WriteString("\n\n")
 
@@ -192,7 +206,7 @@ func (v *RunListView) filterRuns() {
 		v.filteredRuns = []models.RunResponse{}
 		query := strings.ToLower(v.searchQuery)
 		for _, run := range v.runs {
-			if strings.Contains(strings.ToLower(run.ID), query) ||
+			if strings.Contains(strings.ToLower(run.GetIDString()), query) ||
 				strings.Contains(strings.ToLower(run.Repository), query) ||
 				strings.Contains(strings.ToLower(string(run.Status)), query) ||
 				strings.Contains(strings.ToLower(run.Source), query) ||
@@ -215,8 +229,12 @@ func (v *RunListView) updateTable() {
 			branch = fmt.Sprintf("%s→%s", run.Source, run.Target)
 		}
 
+		idStr := run.GetIDString()
+		if len(idStr) > 8 {
+			idStr = idStr[:8]
+		}
 		rows[i] = components.Row{
-			run.ID[:8],
+			idStr,
 			statusText,
 			run.Repository,
 			timeAgo,

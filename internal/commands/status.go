@@ -95,8 +95,8 @@ func listRuns(client *api.Client) error {
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "ID\tSTATUS\tREPOSITORY\tCREATED\tTITLE")
-	fmt.Fprintln(w, "──\t──────\t──────────\t───────\t─────")
+	_, _ = fmt.Fprintln(w, "ID\tSTATUS\tREPOSITORY\tCREATED\tTITLE")
+	_, _ = fmt.Fprintln(w, "──\t──────\t──────────\t───────\t─────")
 
 	for _, run := range runs {
 		created := run.CreatedAt.Format("2006-01-02 15:04")
@@ -104,8 +104,12 @@ func listRuns(client *api.Client) error {
 		if title == "" {
 			title = truncate(run.Prompt, 30)
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
-			run.ID[:8],
+		idStr := run.GetIDString()
+		if len(idStr) > 8 {
+			idStr = idStr[:8]
+		}
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
+			idStr,
 			run.Status,
 			run.Repository,
 			created,
@@ -113,7 +117,7 @@ func listRuns(client *api.Client) error {
 		)
 	}
 
-	w.Flush()
+	_ = w.Flush()
 	return nil
 }
 
@@ -153,7 +157,7 @@ func followSingleRun(client *api.Client, runID string) error {
 }
 
 func printRunDetails(run *models.RunResponse) {
-	fmt.Printf("Run ID: %s\n", run.ID)
+	fmt.Printf("Run ID: %s\n", run.GetIDString())
 	fmt.Printf("Status: %s\n", run.Status)
 	fmt.Printf("Repository: %s\n", run.Repository)
 	fmt.Printf("Branch: %s → %s\n", run.Source, run.Target)
