@@ -20,23 +20,23 @@ func TestGetBuildInfo(t *testing.T) {
 	BuildDate = "2024-01-01"
 
 	info := GetBuildInfo()
-	
+
 	if !strings.Contains(info, "Version: "+testVersion) {
 		t.Error("Build info should contain version")
 	}
-	
+
 	if !strings.Contains(info, "Git Commit: abc123") {
 		t.Error("Build info should contain git commit")
 	}
-	
+
 	if !strings.Contains(info, "Build Date: 2024-01-01") {
 		t.Error("Build info should contain build date")
 	}
-	
+
 	if !strings.Contains(info, "Go Version:") {
 		t.Error("Build info should contain Go version")
 	}
-	
+
 	if !strings.Contains(info, "OS/Arch:") {
 		t.Error("Build info should contain OS/Arch")
 	}

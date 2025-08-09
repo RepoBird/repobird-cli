@@ -69,7 +69,7 @@ func TestCreateRun(t *testing.T) {
 
 		var req models.RunRequest
 		_ = json.NewDecoder(r.Body).Decode(&req)
-		
+
 		resp := models.RunResponse{
 			ID:         testRunID,
 			Status:     models.StatusQueued,
@@ -80,7 +80,7 @@ func TestCreateRun(t *testing.T) {
 			CreatedAt:  time.Now(),
 			UpdatedAt:  time.Now(),
 		}
-		
+
 		w.WriteHeader(http.StatusCreated)
 		_ = json.NewEncoder(w).Encode(resp)
 	}))
@@ -126,7 +126,7 @@ func TestGetRun(t *testing.T) {
 			CreatedAt:  time.Now(),
 			UpdatedAt:  time.Now(),
 		}
-		
+
 		w.WriteHeader(http.StatusOK)
 		_ = json.NewEncoder(w).Encode(resp)
 	}))
@@ -168,7 +168,7 @@ func TestListRuns(t *testing.T) {
 				UpdatedAt:  time.Now(),
 			},
 		}
-		
+
 		w.WriteHeader(http.StatusOK)
 		_ = json.NewEncoder(w).Encode(runs)
 	}))
@@ -203,7 +203,7 @@ func TestVerifyAuth(t *testing.T) {
 			TotalRuns:     10,
 			Tier:          "pro",
 		}
-		
+
 		w.WriteHeader(http.StatusOK)
 		_ = json.NewEncoder(w).Encode(userInfo)
 	}))
