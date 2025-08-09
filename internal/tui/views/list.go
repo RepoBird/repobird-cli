@@ -83,8 +83,9 @@ func NewRunListViewWithCache(client *api.Client, runs []models.RunResponse, cach
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("63"))
 
-	// Determine initial loading state based on cache
-	shouldLoad := !cached || runs == nil || len(runs) == 0 || time.Since(cachedAt) >= 30*time.Second
+	// Only load if we have no cached data at all
+	// User wants cache to always be used when available
+	shouldLoad := !cached || runs == nil || len(runs) == 0
 
 	// Use provided details cache or create new one
 	if detailsCache == nil {
@@ -121,8 +122,8 @@ func NewRunListViewWithCache(client *api.Client, runs []models.RunResponse, cach
 func (v *RunListView) Init() tea.Cmd {
 	var cmds []tea.Cmd
 
-	// If we have cached data and it's recent (< 30 seconds), use it
-	if v.cached && time.Since(v.cachedAt) < 30*time.Second {
+	// If we have cached data, use it - don't auto-refresh
+	if v.cached && v.runs != nil && len(v.runs) > 0 {
 		// Don't show loading, data is already displayed
 		v.loading = false
 		cmds = append(cmds, v.startPolling())

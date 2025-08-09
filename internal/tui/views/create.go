@@ -13,11 +13,13 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/repobird/repobird-cli/internal/api"
+	"github.com/repobird/repobird-cli/internal/cache"
 	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/repobird/repobird-cli/internal/tui/components"
 	"github.com/repobird/repobird-cli/internal/tui/styles"
 	"github.com/repobird/repobird-cli/pkg/utils"
 )
+
 
 type CreateRunView struct {
 	client        *api.Client
@@ -39,6 +41,8 @@ type CreateRunView struct {
 	// Input mode tracking
 	inputMode     components.InputMode
 	exitRequested bool
+	// Back button
+	backButtonFocused bool
 	// Cache from parent list view
 	parentRuns         []models.RunResponse
 	parentCached       bool
@@ -102,6 +106,18 @@ func NewCreateRunViewWithCache(client *api.Client, parentRuns []models.RunRespon
 	filePathInput.Width = 50
 
 	autoDetectGit(repoInput, sourceInput)
+
+	// Load saved form data if available
+	savedData := cache.GetFormData()
+	if savedData != nil {
+		titleInput.SetValue(savedData.Title)
+		repoInput.SetValue(savedData.Repository)
+		sourceInput.SetValue(savedData.Source)
+		targetInput.SetValue(savedData.Target)
+		issueInput.SetValue(savedData.Issue)
+		promptArea.SetValue(savedData.Prompt)
+		contextArea.SetValue(savedData.Context)
+	}
 
 	return &CreateRunView{
 		client: client,
@@ -204,6 +220,8 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if v.exitRequested {
 					// Second ESC - actually exit
 					if !v.submitting {
+						// Save form data before exiting
+						v.saveFormData()
 						// DEBUG: Log when returning from create view
 						debugInfo := "DEBUG: CreateView double ESC - returning to list view\n"
 						if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
@@ -219,10 +237,21 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case key.Matches(msg, v.keys.Help):
 				v.showHelp = !v.showHelp
 			case msg.String() == "i" || msg.String() == "enter":
-				// Enter insert mode and focus current field
-				v.inputMode = components.InsertMode
-				v.exitRequested = false
-				v.updateFocus()
+				if v.backButtonFocused {
+					// Enter pressed on back button - save form and go back
+					v.saveFormData()
+					debugInfo := "DEBUG: Back button pressed - returning to list view\n"
+					if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+						f.WriteString(debugInfo)
+						f.Close()
+					}
+					return NewRunListView(v.client), nil
+				} else {
+					// Enter insert mode and focus current field
+					v.inputMode = components.InsertMode
+					v.exitRequested = false
+					v.updateFocus()
+				}
 			case key.Matches(msg, v.keys.Up) || msg.String() == "k":
 				v.prevField()
 			case key.Matches(msg, v.keys.Down) || msg.String() == "j":
@@ -231,6 +260,12 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if !v.submitting {
 					return v, v.submitRun()
 				}
+			case msg.String() == "ctrl+l":
+				// Clear entire form
+				v.clearAllFields()
+			case msg.String() == "ctrl+x":
+				// Clear current field/area
+				v.clearCurrentField()
 			default:
 				// Block vim navigation keys from doing anything else
 				// This prevents 'b' from accidentally triggering actions
@@ -242,6 +277,8 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			v.error = msg.err
 		} else {
+			// Clear form data on successful submission
+			cache.ClearFormData()
 			v.success = true
 			v.createdRun = &msg.run
 			return NewRunDetailsView(v.client, msg.run), nil
@@ -272,18 +309,28 @@ func (v *CreateRunView) updateFields(msg tea.KeyMsg) []tea.Cmd {
 }
 
 func (v *CreateRunView) nextField() {
+	v.backButtonFocused = false
 	v.focusIndex++
-	totalFields := len(v.fields) + 2
+	totalFields := len(v.fields) + 2 // fields + prompt + context
 	if v.focusIndex >= totalFields {
+		// After last field, go to back button
+		v.backButtonFocused = true
 		v.focusIndex = 0
 	}
 	v.updateFocus()
 }
 
 func (v *CreateRunView) prevField() {
-	v.focusIndex--
-	if v.focusIndex < 0 {
-		v.focusIndex = len(v.fields) + 1
+	if v.backButtonFocused {
+		// From back button, go to last field (context)
+		v.backButtonFocused = false
+		v.focusIndex = len(v.fields) + 1 // context area
+	} else {
+		v.focusIndex--
+		if v.focusIndex < 0 {
+			v.backButtonFocused = true
+			v.focusIndex = 0
+		}
 	}
 	v.updateFocus()
 }
@@ -322,6 +369,45 @@ func (v *CreateRunView) blurAllFields() {
 	v.promptArea.Blur()
 	v.contextArea.Blur()
 	v.filePathInput.Blur()
+}
+
+func (v *CreateRunView) saveFormData() {
+	formData := &cache.FormData{
+		Title:      v.fields[0].Value(),
+		Repository: v.fields[1].Value(),
+		Source:     v.fields[2].Value(),
+		Target:     v.fields[3].Value(),
+		Issue:      v.fields[4].Value(),
+		Prompt:     v.promptArea.Value(),
+		Context:    v.contextArea.Value(),
+	}
+	cache.SaveFormData(formData)
+}
+
+func (v *CreateRunView) clearAllFields() {
+	for i := range v.fields {
+		v.fields[i].SetValue("")
+	}
+	v.promptArea.SetValue("")
+	v.contextArea.SetValue("")
+	v.filePathInput.SetValue("")
+	cache.ClearFormData()
+}
+
+func (v *CreateRunView) clearCurrentField() {
+	if v.backButtonFocused {
+		return // Can't clear back button
+	}
+	
+	if v.useFileInput {
+		v.filePathInput.SetValue("")
+	} else if v.focusIndex < len(v.fields) {
+		v.fields[v.focusIndex].SetValue("")
+	} else if v.focusIndex == len(v.fields) {
+		v.promptArea.SetValue("")
+	} else if v.focusIndex == len(v.fields)+1 {
+		v.contextArea.SetValue("")
+	}
 }
 
 func (v *CreateRunView) View() string {
@@ -389,14 +475,26 @@ func (v *CreateRunView) View() string {
 		s.WriteString(v.contextArea.View())
 		s.WriteString("\n\n")
 
+		// Back button
+		if v.backButtonFocused {
+			if v.inputMode == components.InsertMode {
+				s.WriteString(styles.SelectedStyle.Render("← [Back to Runs]"))
+			} else {
+				s.WriteString(styles.ProcessingStyle.Render("← [Back to Runs]"))
+			}
+		} else {
+			s.WriteString("← [Back to Runs]")
+		}
+		s.WriteString("\n\n")
+
 		// Show mode-specific instructions
 		if v.inputMode == components.InsertMode {
 			s.WriteString("INSERT MODE | ESC: normal mode | Tab: next field | Ctrl+S: submit\n")
 		} else {
 			if v.exitRequested {
-				s.WriteString("Press ESC again to exit | i/Enter: edit field | j/k: navigate\n")
+				s.WriteString("Press ESC again to exit | Enter: select | j/k: navigate\n")
 			} else {
-				s.WriteString("NORMAL MODE | ESC: exit | i/Enter: edit field | j/k: navigate\n")
+				s.WriteString("NORMAL MODE | ESC: exit | Enter: select | j/k: navigate\n")
 			}
 		}
 	}
@@ -422,12 +520,12 @@ func (v *CreateRunView) View() string {
 func (v *CreateRunView) renderStatusBar() string {
 	var statusText string
 	if v.inputMode == components.InsertMode {
-		statusText = "[ESC] normal mode [Tab] next field [Ctrl+S] submit [Ctrl+F] file"
+		statusText = "[ESC] normal mode [Tab] next [Ctrl+S] submit [Ctrl+X] clear field [Ctrl+L] clear all"
 	} else {
 		if v.exitRequested {
-			statusText = "[ESC] exit [i/Enter] edit field [j/k] navigate [Ctrl+S] submit"
+			statusText = "[ESC] exit [Enter] select [j/k] navigate [Ctrl+X] clear field [Ctrl+L] clear all"
 		} else {
-			statusText = "[ESC] exit [i/Enter] edit field [j/k] navigate [?] help"
+			statusText = "[ESC] exit [Enter] select [j/k] navigate [Ctrl+X] clear field [?] help"
 		}
 	}
 	
@@ -436,6 +534,9 @@ func (v *CreateRunView) renderStatusBar() string {
 
 func (v *CreateRunView) submitRun() tea.Cmd {
 	return func() tea.Msg {
+		// Save form data before submitting in case submission fails
+		v.saveFormData()
+		
 		var task models.RunRequest
 
 		if v.useFileInput {
@@ -463,11 +564,27 @@ func (v *CreateRunView) submitRun() tea.Cmd {
 				RunType:    models.RunTypeRun,
 			}
 
+			// Debug logging - check each field individually
+			debugInfo := fmt.Sprintf("DEBUG: Raw field values - [0]='%s', [1]='%s', [2]='%s', [3]='%s', [4]='%s'\n",
+				v.fields[0].Value(), v.fields[1].Value(), v.fields[2].Value(), v.fields[3].Value(), v.fields[4].Value())
+			debugInfo += fmt.Sprintf("DEBUG: Prompt='%s', Context='%s'\n", v.promptArea.Value(), v.contextArea.Value())
+			debugInfo += fmt.Sprintf("DEBUG: Submit values - Title='%s', Repository='%s', Source='%s', Target='%s', Prompt='%s'\n",
+				task.Title, task.Repository, task.Source, task.Target, task.Prompt)
+			if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+				f.WriteString(debugInfo)
+				f.Close()
+			}
+
 			if task.Prompt == "" {
 				return runCreatedMsg{err: fmt.Errorf("prompt is required")}
 			}
 
 			if task.Repository == "" {
+				debugInfo = fmt.Sprintf("DEBUG: Repository field empty, trying git auto-detect\n")
+				if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+					f.WriteString(debugInfo)
+					f.Close()
+				}
 				if repo, _, err := utils.GetGitInfo(); err == nil {
 					task.Repository = repo
 				}
