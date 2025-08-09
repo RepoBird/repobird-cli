@@ -48,6 +48,13 @@ func NewCreateRunView(client *api.Client) *CreateRunView {
 }
 
 func NewCreateRunViewWithCache(client *api.Client, parentRuns []models.RunResponse, parentCached bool, parentCachedAt time.Time, parentDetailsCache map[string]*models.RunResponse) *CreateRunView {
+	// DEBUG: Log cache info when creating create view
+	debugInfo := fmt.Sprintf("DEBUG: Creating CreateView - parentRuns=%d, parentCached=%v, detailsCache=%d\n", 
+		len(parentRuns), parentCached, len(parentDetailsCache))
+	if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+		f.WriteString(debugInfo)
+		f.Close()
+	}
 	titleInput := textinput.New()
 	titleInput.Placeholder = "Brief title for the run"
 	titleInput.Focus()
@@ -147,6 +154,13 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return v, tea.Quit
 		case key.Matches(msg, v.keys.Back):
 			if !v.submitting {
+				// DEBUG: Log cache info when returning to list view
+				debugInfo := fmt.Sprintf("DEBUG: CreateView returning to list - parentRuns=%d, parentCached=%v, detailsCache=%d\n", 
+					len(v.parentRuns), v.parentCached, len(v.parentDetailsCache))
+				if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+					f.WriteString(debugInfo)
+					f.Close()
+				}
 				return NewRunListViewWithCache(v.client, v.parentRuns, v.parentCached, v.parentCachedAt, v.parentDetailsCache), nil
 			}
 		case key.Matches(msg, v.keys.Help):

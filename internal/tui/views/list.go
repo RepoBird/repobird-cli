@@ -13,6 +13,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/repobird/repobird-cli/internal/api"
 	"github.com/repobird/repobird-cli/internal/models"
+	"github.com/repobird/repobird-cli/internal/tui"
 	"github.com/repobird/repobird-cli/internal/tui/components"
 	"github.com/repobird/repobird-cli/internal/tui/styles"
 )
@@ -44,12 +45,28 @@ type RunListView struct {
 }
 
 func NewRunListView(client *api.Client) *RunListView {
-	return NewRunListViewWithCache(client, nil, false, time.Time{}, nil)
+	// Try to get cached data from global cache
+	runs, cached, cachedAt, detailsCache := tui.GetCachedList()
+	return NewRunListViewWithCache(client, runs, cached, cachedAt, detailsCache)
 }
 
 func NewRunListViewWithCache(client *api.Client, runs []models.RunResponse, cached bool, cachedAt time.Time, detailsCache map[string]*models.RunResponse) *RunListView {
+	// Enhanced debugging with more details
 	debugInfo := fmt.Sprintf("DEBUG: Creating RunListViewWithCache - cached=%v, runs=%d, detailsCache=%d\n",
 		cached, len(runs), len(detailsCache))
+	if runs != nil && len(runs) > 0 {
+		debugInfo += fmt.Sprintf("DEBUG: First run ID=%s, repo=%s\n", runs[0].GetIDString(), runs[0].Repository)
+	}
+	if detailsCache != nil && len(detailsCache) > 0 {
+		var cacheKeys []string
+		for k := range detailsCache {
+			cacheKeys = append(cacheKeys, k)
+			if len(cacheKeys) >= 3 { // Only show first 3 keys
+				break
+			}
+		}
+		debugInfo += fmt.Sprintf("DEBUG: Sample cache keys: %v\n", cacheKeys)
+	}
 	if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
 		f.WriteString(debugInfo)
 		f.Close()
@@ -233,6 +250,13 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return NewRunDetailsViewWithCache(v.client, run, v.runs, v.cached, v.cachedAt, v.detailsCache), nil
 			}
 		case key.Matches(msg, v.keys.New):
+			// DEBUG: Log cache info when creating new run view
+			debugInfo := fmt.Sprintf("DEBUG: ListView creating NewCreateRunView - runs=%d, cached=%v, detailsCache=%d\n", 
+				len(v.runs), v.cached, len(v.detailsCache))
+			if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+				f.WriteString(debugInfo)
+				f.Close()
+			}
 			return NewCreateRunViewWithCache(v.client, v.runs, v.cached, v.cachedAt, v.detailsCache), nil
 		case key.Matches(msg, v.keys.Up):
 			v.table.MoveUp()
@@ -309,6 +333,12 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		v.cached = true
 		v.cachedAt = time.Now()
 		v.filterRuns()
+		
+		// Save to global cache
+		if msg.err == nil && len(msg.runs) > 0 {
+			tui.SetCachedList(msg.runs, v.detailsCache)
+		}
+		
 		// Start preloading run details in background
 		if msg.err == nil && len(msg.runs) > 0 {
 			cmds = append(cmds, v.preloadRunDetails())
@@ -327,6 +357,9 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		v.preloading[msg.runID] = false
 		if msg.err == nil && msg.run != nil {
 			v.detailsCache[msg.runID] = msg.run
+			
+			// Also save to global cache
+			tui.AddCachedDetail(msg.runID, msg.run)
 
 			// Debug logging
 			debugInfo := fmt.Sprintf("DEBUG: Successfully cached run with key='%s', actualID='%s', title='%s', cacheSize=%d\n",
