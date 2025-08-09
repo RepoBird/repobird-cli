@@ -7,7 +7,7 @@ MAIN_PATH=./cmd/repobird
 VERSION=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 COMMIT=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 DATE=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
-LDFLAGS=-ldflags "-s -w -X github.com/repobird/repobird-cli/pkg/version.Version=$(VERSION) -X github.com/repobird/repobird-cli/pkg/version.Commit=$(COMMIT) -X github.com/repobird/repobird-cli/pkg/version.Date=$(DATE)"
+LDFLAGS=-ldflags "-s -w -X github.com/repobird/repobird-cli/pkg/version.Version=$(VERSION) -X github.com/repobird/repobird-cli/pkg/version.GitCommit=$(COMMIT) -X github.com/repobird/repobird-cli/pkg/version.BuildDate=$(DATE)"
 
 # Go parameters
 GOCMD=go
@@ -123,6 +123,11 @@ fmt-check:
 lint:
 	@which $(GOLINT) > /dev/null || (echo "golangci-lint not installed. Run 'make init'"; exit 1)
 	$(GOLINT) run --timeout 5m ./...
+
+## lint-fix: Run linter and fix issues where possible
+lint-fix:
+	@which $(GOLINT) > /dev/null || (echo "golangci-lint not installed. Run 'make init'"; exit 1)
+	$(GOLINT) run --fix --timeout 5m ./...
 
 ## vet: Run go vet
 vet:

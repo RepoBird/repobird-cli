@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,7 +13,7 @@ import (
 )
 
 const (
-	DefaultAPIURL = "https://api.repobird.ai"
+	DefaultAPIURL  = "https://api.repobird.ai"
 	DefaultTimeout = 45 * time.Minute
 )
 
@@ -48,7 +49,7 @@ func (c *Client) doRequest(method, path string, body interface{}) (*http.Respons
 		bodyReader = bytes.NewReader(bodyBytes)
 	}
 
-	req, err := http.NewRequest(method, c.baseURL+path, bodyReader)
+	req, err := http.NewRequestWithContext(context.Background(), method, c.baseURL+path, bodyReader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -117,7 +118,7 @@ func (c *Client) GetRun(id string) (*models.RunResponse, error) {
 	return &runResp, nil
 }
 
-func (c *Client) ListRuns(limit int, offset int) ([]*models.RunResponse, error) {
+func (c *Client) ListRuns(limit, offset int) ([]*models.RunResponse, error) {
 	path := fmt.Sprintf("/api/v1/runs?limit=%d&offset=%d", limit, offset)
 	resp, err := c.doRequest("GET", path, nil)
 	if err != nil {

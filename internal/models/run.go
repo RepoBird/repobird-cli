@@ -46,8 +46,8 @@ type RunResponse struct {
 }
 
 type UserInfo struct {
-	Email          string `json:"email"`
-	RemainingRuns  int    `json:"remainingRuns"`
-	TotalRuns      int    `json:"totalRuns"`
-	Tier           string `json:"tier"`
+	Email         string `json:"email"`
+	RemainingRuns int    `json:"remainingRuns"`
+	TotalRuns     int    `json:"totalRuns"`
+	Tier          string `json:"tier"`
 }
