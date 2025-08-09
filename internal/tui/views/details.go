@@ -74,10 +74,12 @@ func NewRunDetailsViewWithCache(client *api.Client, run models.RunResponse, pare
 		parentCached:       parentCached,
 		parentCachedAt:     parentCachedAt,
 		parentDetailsCache: parentDetailsCache,
+		statusHistory:      make([]string, 0),
 	}
 
-	// Update content immediately if we have cached data
+	// Initialize status history with current status if we have cached data
 	if !needsLoading {
+		v.updateStatusHistory(string(run.Status))
 		v.updateContent()
 	}
 
@@ -182,7 +184,7 @@ func (v *RunDetailsView) View() string {
 	s.WriteString(strings.Repeat("─", v.width))
 	s.WriteString("\n")
 
-	if v.loading && len(v.statusHistory) == 0 {
+	if v.loading {
 		s.WriteString(v.spinner.View() + " Loading run details...\n")
 	} else if v.error != nil {
 		s.WriteString(styles.ErrorStyle.Render("Error: "+v.error.Error()) + "\n")
@@ -255,7 +257,11 @@ func (v *RunDetailsView) updateContent() {
 			content.WriteString("No logs available yet...\n")
 		}
 	} else {
-		content.WriteString(fmt.Sprintf("Title: %s\n", v.run.Title))
+		// Display title only if it exists
+		if v.run.Title != "" {
+			content.WriteString(fmt.Sprintf("Title: %s\n", v.run.Title))
+		}
+		content.WriteString(fmt.Sprintf("Run ID: %s\n", v.run.GetIDString()))
 		content.WriteString(fmt.Sprintf("Repository: %s\n", v.run.Repository))
 		content.WriteString(fmt.Sprintf("Source Branch: %s\n", v.run.Source))
 		if v.run.Target != "" && v.run.Target != v.run.Source {
@@ -303,12 +309,16 @@ func (v *RunDetailsView) loadRunDetails() tea.Cmd {
 	
 	return func() tea.Msg {
 		if originalRunID == "" {
-			return runDetailsLoadedMsg{run: originalRun, err: fmt.Errorf("invalid run ID")}
+			return runDetailsLoadedMsg{run: originalRun, err: fmt.Errorf("invalid run ID: empty string")}
 		}
 		
 		runPtr, err := v.client.GetRun(originalRunID)
 		if err != nil {
-			return runDetailsLoadedMsg{run: originalRun, err: err}
+			return runDetailsLoadedMsg{run: originalRun, err: fmt.Errorf("API error for run %s: %w", originalRunID, err)}
+		}
+		
+		if runPtr == nil {
+			return runDetailsLoadedMsg{run: originalRun, err: fmt.Errorf("API returned nil for run %s", originalRunID)}
 		}
 		
 		// Ensure the returned run has the correct ID

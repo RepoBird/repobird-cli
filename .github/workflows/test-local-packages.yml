@@ -1,0 +1,394 @@
+name: Test Local Package Builds
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # Test cross-platform builds and installations
+  test-local-builds:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Test Build Process
+        run: |
+          make build
+          
+      - name: Test Local Installation (Unix)
+        if: matrix.os != 'windows-latest'
+        run: |
+          make install
+          ~/.local/bin/repobird version
+          ~/.local/bin/rb version
+          make uninstall
+
+      - name: Test Cross-Compilation
+        run: |
+          make build-all
+
+      - name: Generate Documentation and Completions
+        run: |
+          ./scripts/generate-completions.sh
+          ./scripts/generate-docs.sh
+
+      - name: Test Shell Completions (Unix)
+        if: matrix.os != 'windows-latest'
+        run: |
+          # Test all completion formats can be generated
+          ./build/repobird completion bash > /tmp/repobird.bash
+          ./build/repobird completion zsh > /tmp/_repobird  
+          ./build/repobird completion fish > /tmp/repobird.fish
+          
+          # Verify files are not empty
+          test -s /tmp/repobird.bash
+          test -s /tmp/_repobird
+          test -s /tmp/repobird.fish
+
+      - name: Test Shell Completions (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: powershell
+        run: |
+          .\build\repobird.exe completion powershell > repobird.ps1
+          # Verify file is not empty
+          if ((Get-Item repobird.ps1).Length -eq 0) { exit 1 }
+
+      - name: Test Documentation Generation
+        run: |
+          # Test man page generation
+          ./build/repobird docs man
+          test -f man/repobird.1
+          
+          # Test markdown docs generation
+          ./build/repobird docs markdown docs/cli
+          test -f docs/cli/repobird.md
+
+      - name: Test CLI Commands
+        shell: bash
+        run: |
+          # Test basic commands work
+          ./build/repobird --help
+          ./build/repobird version
+          ./build/repobird config --help
+          ./build/repobird run --help
+          ./build/repobird status --help
+          ./build/repobird auth --help
+          ./build/repobird completion --help
+          ./build/repobird docs --help
+
+  # Test package format creation
+  test-package-formats:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        format: [deb, rpm, tar.gz, zip]
+        arch: [amd64, arm64]
+        
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Install Package Building Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential devscripts debhelper rpm
+
+      - name: Build Binary
+        run: |
+          GOOS=linux GOARCH=${{ matrix.arch }} make build
+          ./scripts/generate-completions.sh
+          ./scripts/generate-docs.sh
+
+      - name: Test DEB Package Creation
+        if: matrix.format == 'deb'
+        run: |
+          # Create package structure
+          mkdir -p test-package/DEBIAN
+          mkdir -p test-package/usr/bin
+          mkdir -p test-package/usr/share/man/man1
+          mkdir -p test-package/usr/share/bash-completion/completions
+          mkdir -p test-package/usr/share/zsh/site-functions
+          mkdir -p test-package/usr/share/fish/completions
+          
+          # Copy files
+          cp build/repobird test-package/usr/bin/
+          cp man/repobird.1 test-package/usr/share/man/man1/
+          cp completions/repobird.bash test-package/usr/share/bash-completion/completions/repobird
+          cp completions/_repobird test-package/usr/share/zsh/site-functions/
+          cp completions/repobird.fish test-package/usr/share/fish/completions/
+          
+          # Create control file
+          cat > test-package/DEBIAN/control << EOF
+          Package: repobird
+          Version: 0.0.0-test
+          Section: utils
+          Priority: optional
+          Architecture: ${{ matrix.arch }}
+          Maintainer: Test <test@example.com>
+          Description: Test RepoBird CLI package
+          EOF
+          
+          # Build package
+          dpkg-deb --build test-package repobird-test-${{ matrix.arch }}.deb
+          
+          # Verify package
+          dpkg-deb --info repobird-test-${{ matrix.arch }}.deb
+          dpkg-deb --contents repobird-test-${{ matrix.arch }}.deb
+
+      - name: Test RPM Package Creation
+        if: matrix.format == 'rpm'
+        run: |
+          # Create RPM build structure
+          mkdir -p rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+          
+          # Copy files to SOURCES
+          cp build/repobird rpmbuild/SOURCES/
+          cp man/repobird.1 rpmbuild/SOURCES/
+          cp completions/repobird.bash rpmbuild/SOURCES/
+          cp completions/_repobird rpmbuild/SOURCES/
+          cp completions/repobird.fish rpmbuild/SOURCES/
+          
+          # Create spec file
+          cat > rpmbuild/SPECS/repobird.spec << EOF
+          Name:           repobird
+          Version:        0.0.0
+          Release:        1%{?dist}
+          Summary:        Test RepoBird CLI package
+          License:        MIT
+          BuildArch:      ${{ matrix.arch }}
+          
+          %description
+          Test RepoBird CLI package
+          
+          %install
+          mkdir -p %{buildroot}%{_bindir}
+          mkdir -p %{buildroot}%{_mandir}/man1
+          mkdir -p %{buildroot}%{_datarootdir}/bash-completion/completions
+          mkdir -p %{buildroot}%{_datarootdir}/zsh/site-functions
+          mkdir -p %{buildroot}%{_datarootdir}/fish/completions
+          
+          cp %{_builddir}/../SOURCES/repobird %{buildroot}%{_bindir}/
+          cp %{_builddir}/../SOURCES/repobird.1 %{buildroot}%{_mandir}/man1/
+          cp %{_builddir}/../SOURCES/repobird.bash %{buildroot}%{_datarootdir}/bash-completion/completions/repobird
+          cp %{_builddir}/../SOURCES/_repobird %{buildroot}%{_datarootdir}/zsh/site-functions/
+          cp %{_builddir}/../SOURCES/repobird.fish %{buildroot}%{_datarootdir}/fish/completions/
+          
+          %files
+          %{_bindir}/repobird
+          %{_mandir}/man1/repobird.1*
+          %{_datarootdir}/bash-completion/completions/repobird
+          %{_datarootdir}/zsh/site-functions/_repobird
+          %{_datarootdir}/fish/completions/repobird.fish
+          EOF
+          
+          # Build RPM
+          rpmbuild --define "_topdir $(pwd)/rpmbuild" -bb rpmbuild/SPECS/repobird.spec
+          
+          # Verify package
+          rpm -qp --info rpmbuild/RPMS/${{ matrix.arch }}/repobird-0.0.0-1.*.rpm
+          rpm -qp --list rpmbuild/RPMS/${{ matrix.arch }}/repobird-0.0.0-1.*.rpm
+
+      - name: Test Archive Creation
+        if: matrix.format == 'tar.gz' || matrix.format == 'zip'
+        run: |
+          # Create archive structure
+          mkdir -p archive/
+          cp build/repobird archive/
+          cp man/repobird.1 archive/
+          cp completions/* archive/
+          cp LICENSE archive/ || echo "LICENSE not found, skipping"
+          cp README.md archive/ || echo "README.md not found, skipping"
+          
+          if [ "${{ matrix.format }}" = "tar.gz" ]; then
+            tar -czf repobird-test-${{ matrix.arch }}.tar.gz -C archive .
+            tar -tzf repobird-test-${{ matrix.arch }}.tar.gz
+          else
+            cd archive && zip -r ../repobird-test-${{ matrix.arch }}.zip .
+            unzip -l repobird-test-${{ matrix.arch }}.zip
+          fi
+
+      - name: Upload Package Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-packages-${{ matrix.format }}-${{ matrix.arch }}
+          path: |
+            *.deb
+            rpmbuild/RPMS/**/*.rpm
+            *.tar.gz
+            *.zip
+          retention-days: 7
+
+  # Test package manager integration with containers
+  test-container-installation:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        container:
+          - ubuntu:20.04
+          - ubuntu:22.04
+          - debian:bullseye
+          - debian:bookworm
+          - fedora:38
+          - fedora:39
+          - archlinux:latest
+          
+    container: ${{ matrix.container }}
+    
+    steps:
+      - name: Install Git (for checkout)
+        run: |
+          if command -v apt-get >/dev/null 2>&1; then
+            apt-get update && apt-get install -y git curl
+          elif command -v dnf >/dev/null 2>&1; then
+            dnf install -y git curl
+          elif command -v yum >/dev/null 2>&1; then
+            yum install -y git curl
+          elif command -v pacman >/dev/null 2>&1; then
+            pacman -Sy --noconfirm git curl
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Test Local Build and Install
+        run: |
+          make build
+          
+          # Test binary works
+          ./build/repobird version
+          ./build/repobird --help
+
+      - name: Test Install Script Simulation
+        run: |
+          # Simulate the install script steps
+          mkdir -p ~/.local/bin
+          cp build/repobird ~/.local/bin/
+          ln -sf ~/.local/bin/repobird ~/.local/bin/rb
+          
+          # Test installation
+          ~/.local/bin/repobird version
+          ~/.local/bin/rb version
+          
+          # Cleanup
+          rm -f ~/.local/bin/repobird ~/.local/bin/rb
+
+  # Test GoReleaser configuration
+  test-goreleaser:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Test GoReleaser Config
+        uses: goreleaser/goreleaser-action@v5
+        with:
+          distribution: goreleaser
+          version: latest
+          args: check
+
+      - name: Test GoReleaser Build (Snapshot)
+        uses: goreleaser/goreleaser-action@v5
+        with:
+          distribution: goreleaser
+          version: latest
+          args: build --snapshot --clean
+
+      - name: Upload GoReleaser Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: goreleaser-dist
+          path: dist/
+          retention-days: 7
+
+  # Test signing simulation
+  test-signing-simulation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Install GPG
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gnupg
+
+      - name: Generate Test GPG Key
+        run: |
+          # Generate a test key for CI
+          cat > key-params << EOF
+          %no-protection
+          Key-Type: RSA
+          Key-Length: 2048
+          Subkey-Type: RSA
+          Subkey-Length: 2048
+          Name-Real: RepoBird CLI Test
+          Name-Email: test@repobird.ai
+          Expire-Date: 1d
+          %commit
+          EOF
+          
+          gpg --batch --generate-key key-params
+          GPG_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep sec | head -1 | sed 's|.*/||' | sed 's| .*||')
+          echo "GPG_KEY_ID=$GPG_KEY_ID" >> $GITHUB_ENV
+
+      - name: Build and Sign Test Package
+        run: |
+          make build
+          
+          # Create a test package
+          tar -czf repobird-test.tar.gz -C build repobird
+          
+          # Sign the package
+          gpg --batch --local-user "$GPG_KEY_ID" --armor --detach-sign repobird-test.tar.gz
+          
+          # Verify signature
+          gpg --verify repobird-test.tar.gz.asc repobird-test.tar.gz
+          
+          echo "✓ Package signing test passed"
+
+      - name: Test Checksum Generation
+        run: |
+          # Generate checksums
+          sha256sum repobird-test.tar.gz > checksums.txt
+          
+          # Verify checksums
+          sha256sum -c checksums.txt
+          
+          echo "✓ Checksum generation and verification test passed"
