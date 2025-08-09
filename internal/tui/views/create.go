@@ -301,11 +301,29 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			v.error = msg.err
 		} else {
-			// Clear form data on successful submission
-			cache.ClearFormData()
-			v.success = true
-			v.createdRun = &msg.run
-			return NewRunDetailsView(v.client, msg.run), nil
+			// Check if the run has a valid ID
+			runID := msg.run.GetIDString()
+			if runID == "" {
+				v.error = fmt.Errorf("run created but received invalid ID from server")
+				debugInfo := fmt.Sprintf("DEBUG: Run created successfully but runID is empty, not navigating to details\n")
+				if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+					f.WriteString(debugInfo)
+					f.Close()
+				}
+			} else {
+				// Clear form data on successful submission
+				cache.ClearFormData()
+				v.success = true
+				v.createdRun = &msg.run
+				
+				debugInfo := fmt.Sprintf("DEBUG: Run created successfully with ID='%s', navigating to details\n", runID)
+				if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+					f.WriteString(debugInfo)
+					f.Close()
+				}
+				
+				return NewRunDetailsView(v.client, msg.run), nil
+			}
 		}
 	}
 

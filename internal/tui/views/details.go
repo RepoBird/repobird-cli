@@ -12,6 +12,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"golang.design/x/clipboard"
 	"github.com/repobird/repobird-cli/internal/api"
 	"github.com/repobird/repobird-cli/internal/cache"
 	"github.com/repobird/repobird-cli/internal/models"
@@ -44,6 +45,11 @@ type RunDetailsView struct {
 	// Cache retry mechanism
 	cacheRetryCount int
 	maxCacheRetries int
+	// Clipboard feedback
+	copiedMessage     string
+	copiedMessageTime time.Time
+	// Store full content for clipboard operations
+	fullContent string
 }
 
 func NewRunDetailsView(client *api.Client, run models.RunResponse) *RunDetailsView {
@@ -129,6 +135,17 @@ func NewRunDetailsViewWithCache(client *api.Client, run models.RunResponse, pare
 }
 
 func (v *RunDetailsView) Init() tea.Cmd {
+	// Initialize clipboard
+	err := clipboard.Init()
+	if err != nil {
+		// Log error but don't fail - clipboard may not be available in some environments
+		debugInfo := fmt.Sprintf("DEBUG: Failed to initialize clipboard: %v\n", err)
+		if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+			f.WriteString(debugInfo)
+			f.Close()
+		}
+	}
+
 	var cmds []tea.Cmd
 
 	// Only load details if not already loaded from cache
@@ -196,6 +213,22 @@ func (v *RunDetailsView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case msg.String() == "l":
 			v.showLogs = !v.showLogs
 			v.updateContent()
+		case msg.String() == "y":
+			// Copy current line to clipboard
+			if err := v.copyCurrentLine(); err == nil {
+				v.copiedMessage = "✓ Copied current line"
+			} else {
+				v.copiedMessage = "✗ Failed to copy"
+			}
+			v.copiedMessageTime = time.Now()
+		case msg.String() == "Y":
+			// Copy all content to clipboard
+			if err := v.copyAllContent(); err == nil {
+				v.copiedMessage = "✓ Copied all content"
+			} else {
+				v.copiedMessage = "✗ Failed to copy"
+			}
+			v.copiedMessageTime = time.Now()
 		case key.Matches(msg, v.keys.Up):
 			v.viewport.LineUp(1)
 		case key.Matches(msg, v.keys.Down):
@@ -310,10 +343,15 @@ func (v *RunDetailsView) renderHeader() string {
 }
 
 func (v *RunDetailsView) renderStatusBar() string {
-	options := "[b]ack [l]ogs [r]efresh [?]help [q]uit"
+	options := "[b]ack [l]ogs [y]copy line [Y]copy all [r]efresh [?]help [q]uit"
 
 	if v.showLogs {
-		options = "[b]ack [l]details [r]efresh [?]help [q]uit"
+		options = "[b]ack [l]details [y]copy line [Y]copy all [r]efresh [?]help [q]uit"
+	}
+
+	// Show copied message if recent
+	if v.copiedMessage != "" && time.Since(v.copiedMessageTime) < 2*time.Second {
+		options = v.copiedMessage + " | " + options
 	}
 
 	return styles.StatusBarStyle.Width(v.width).Render(options)
@@ -348,8 +386,9 @@ func (v *RunDetailsView) updateContent() {
 		}
 
 		content.WriteString("\n═══ Status History ═══\n")
-		for _, status := range v.statusHistory {
-			content.WriteString(status + "\n")
+		// Display status history in reverse order (most recent first)
+		for i := len(v.statusHistory) - 1; i >= 0; i-- {
+			content.WriteString(v.statusHistory[i] + "\n")
 		}
 
 		if v.run.Context != "" {
@@ -363,7 +402,9 @@ func (v *RunDetailsView) updateContent() {
 		}
 	}
 
-	v.viewport.SetContent(content.String())
+	// Store the full content for clipboard operations
+	v.fullContent = content.String()
+	v.viewport.SetContent(v.fullContent)
 }
 
 func (v *RunDetailsView) updateStatusHistory(status string) {
@@ -382,15 +423,38 @@ func (v *RunDetailsView) loadRunDetails() tea.Cmd {
 
 	return func() tea.Msg {
 		if originalRunID == "" {
+			// Debug: Log empty run ID issue
+			debugInfo := "DEBUG: LoadRunDetails called with empty runID - returning error\n"
+			if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+				f.WriteString(debugInfo)
+				f.Close()
+			}
 			return runDetailsLoadedMsg{run: originalRun, err: fmt.Errorf("invalid run ID: empty string")}
+		}
+
+		// Debug: Log API call for run details
+		debugInfo := fmt.Sprintf("DEBUG: LoadRunDetails calling GetRun for runID='%s'\n", originalRunID)
+		if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+			f.WriteString(debugInfo)
+			f.Close()
 		}
 
 		runPtr, err := v.client.GetRun(originalRunID)
 		if err != nil {
+			debugInfo = fmt.Sprintf("DEBUG: GetRun failed for runID='%s', err=%v\n", originalRunID, err)
+			if f, err2 := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err2 == nil {
+				f.WriteString(debugInfo)
+				f.Close()
+			}
 			return runDetailsLoadedMsg{run: originalRun, err: fmt.Errorf("API error for run %s: %w", originalRunID, err)}
 		}
 
 		if runPtr == nil {
+			debugInfo = fmt.Sprintf("DEBUG: GetRun returned nil for runID='%s'\n", originalRunID)
+			if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+				f.WriteString(debugInfo)
+				f.Close()
+			}
 			return runDetailsLoadedMsg{run: originalRun, err: fmt.Errorf("API returned nil for run %s", originalRunID)}
 		}
 
@@ -398,6 +462,13 @@ func (v *RunDetailsView) loadRunDetails() tea.Cmd {
 		updatedRun := *runPtr
 		if updatedRun.GetIDString() == "" && originalRun.ID != nil {
 			updatedRun.ID = originalRun.ID
+		}
+
+		debugInfo = fmt.Sprintf("DEBUG: LoadRunDetails successful for runID='%s', newID='%s'\n", 
+			originalRunID, updatedRun.GetIDString())
+		if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+			f.WriteString(debugInfo)
+			f.Close()
 		}
 
 		return runDetailsLoadedMsg{run: updatedRun, err: nil}
@@ -450,4 +521,34 @@ func formatDuration(d time.Duration) string {
 type runDetailsLoadedMsg struct {
 	run models.RunResponse
 	err error
+}
+
+// copyCurrentLine copies the current visible line to clipboard
+func (v *RunDetailsView) copyCurrentLine() error {
+	// Get the current line based on viewport position
+	// The viewport tracks the top visible line
+	visibleLines := strings.Split(v.viewport.View(), "\n")
+	if len(visibleLines) > 0 {
+		// Get first visible line (could be partial due to scrolling)
+		currentLine := visibleLines[0]
+		if currentLine != "" {
+			// Write returns a channel that signals when done
+			done := clipboard.Write(clipboard.FmtText, []byte(currentLine))
+			<-done // Wait for completion
+			return nil
+		}
+	}
+	
+	return fmt.Errorf("no line to copy")
+}
+
+// copyAllContent copies all content to clipboard
+func (v *RunDetailsView) copyAllContent() error {
+	if v.fullContent == "" {
+		return fmt.Errorf("no content to copy")
+	}
+	// Write returns a channel that signals when done
+	done := clipboard.Write(clipboard.FmtText, []byte(v.fullContent))
+	<-done // Wait for completion
+	return nil
 }

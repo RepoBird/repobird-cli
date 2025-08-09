@@ -124,12 +124,42 @@ func (c *Client) CreateRunAPI(request *models.APIRunRequest) (*models.RunRespons
 		return nil, errors.ParseAPIError(resp.StatusCode, body)
 	}
 
-	var runResp models.RunResponse
-	if err := json.NewDecoder(resp.Body).Decode(&runResp); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+	// Read the response body for debugging
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	return &runResp, nil
+	if c.debug {
+		fmt.Printf("CreateRunAPI Response Body: %s\n", string(body))
+	}
+
+	// The CreateRun API returns a wrapped response: {data: {id, message, status}}
+	// We need to extract the basic info and create a RunResponse
+	var createResp struct {
+		Data struct {
+			ID      interface{} `json:"id"`
+			Message string      `json:"message"`
+			Status  string      `json:"status"`
+		} `json:"data"`
+	}
+
+	if err := json.Unmarshal(body, &createResp); err != nil {
+		// Fall back to direct RunResponse decoding for backward compatibility
+		var runResp models.RunResponse
+		if err := json.Unmarshal(body, &runResp); err != nil {
+			return nil, fmt.Errorf("failed to decode response: %w", err)
+		}
+		return &runResp, nil
+	}
+
+	// Convert the create response to RunResponse format
+	runResp := &models.RunResponse{
+		ID:     createResp.Data.ID,
+		Status: models.RunStatus(createResp.Data.Status),
+	}
+
+	return runResp, nil
 }
 
 func (c *Client) GetRun(id string) (*models.RunResponse, error) {
