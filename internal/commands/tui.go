@@ -3,10 +3,10 @@ package commands
 import (
 	"fmt"
 
-	"github.com/spf13/cobra"
 	"github.com/repobird/repobird-cli/internal/api"
 	"github.com/repobird/repobird-cli/internal/config"
 	"github.com/repobird/repobird-cli/internal/tui"
+	"github.com/spf13/cobra"
 )
 
 var tuiCmd = &cobra.Command{
@@ -28,7 +28,7 @@ func init() {
 }
 
 func runTUI(cmd *cobra.Command, args []string) error {
-	cfg, err := config.Load()
+	cfg, err := config.LoadConfig()
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
@@ -37,8 +37,8 @@ func runTUI(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("API key not configured. Run 'repobird config set api-key YOUR_KEY' first")
 	}
 
-	client := api.NewClient(cfg.APIKey, cfg.APIURL)
+	client := api.NewClient(cfg.APIKey, cfg.APIURL, cfg.Debug)
 	app := tui.NewApp(client)
-	
+
 	return app.Run()
 }

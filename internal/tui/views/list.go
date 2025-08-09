@@ -162,7 +162,7 @@ func (v *RunListView) View() string {
 	if v.loading {
 		s.WriteString(v.spinner.View() + " Loading runs...\n")
 	} else if v.error != nil {
-		s.WriteString(styles.ErrorStyle.Render("Error: " + v.error.Error()) + "\n")
+		s.WriteString(styles.ErrorStyle.Render("Error: "+v.error.Error()) + "\n")
 	} else {
 		if v.searchMode {
 			s.WriteString("Search: " + v.searchQuery + "_\n")
@@ -228,19 +228,19 @@ func (v *RunListView) updateTable() {
 
 func (v *RunListView) renderStatusBar() string {
 	left := fmt.Sprintf(" %d runs | %s", len(v.filteredRuns), v.table.StatusLine())
-	
+
 	activeCount := 0
 	for _, run := range v.runs {
 		if isActiveStatus(string(run.Status)) {
 			activeCount++
 		}
 	}
-	
+
 	right := ""
 	if activeCount > 0 {
 		right = fmt.Sprintf("⟳ %d active ", activeCount)
 	}
-	
+
 	right += "[n]ew [r]efresh [/]search [?]help [q]uit "
 
 	padding := v.width - len(left) - len(right)
@@ -259,7 +259,7 @@ func (v *RunListView) loadRuns() tea.Cmd {
 		if err != nil {
 			return runsLoadedMsg{runs: nil, err: err}
 		}
-		
+
 		runs := make([]models.RunResponse, len(runPtrs))
 		for i, r := range runPtrs {
 			runs[i] = *r
@@ -314,7 +314,7 @@ func isActiveStatus(status string) bool {
 
 func formatTimeAgo(t time.Time) string {
 	duration := time.Since(t)
-	
+
 	if duration < time.Minute {
 		return fmt.Sprintf("%ds ago", int(duration.Seconds()))
 	} else if duration < time.Hour {

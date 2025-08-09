@@ -1,19 +1,22 @@
 package utils
 
+import "os/exec"
+
 func GetGitInfo() (string, string, error) {
-	if !IsGitRepository() {
+	cmd := exec.Command("git", "rev-parse", "--git-dir")
+	if err := cmd.Run(); err != nil {
 		return "", "", nil
 	}
-	
-	repo, repoErr := GetRepositoryInfo()
+
+	repo, repoErr := DetectRepository()
 	branch, branchErr := GetCurrentBranch()
-	
+
 	if repoErr != nil && branchErr != nil {
 		if repoErr != nil {
 			return "", "", repoErr
 		}
 		return "", "", branchErr
 	}
-	
+
 	return repo, branch, nil
 }

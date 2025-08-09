@@ -74,15 +74,38 @@ build-all:
 run:
 	$(GOCMD) run $(LDFLAGS) $(MAIN_PATH)
 
-## install: Install the binary to $GOPATH/bin
+## install: Install repobird to ~/.local/bin with rb alias
 install: build
-	@cp $(BUILD_DIR)/$(BINARY_NAME) $(GOPATH)/bin/
-	@echo "Installed to $(GOPATH)/bin/$(BINARY_NAME)"
+	@echo "Installing repobird to ~/.local/bin..."
+	@mkdir -p ~/.local/bin
+	@cp $(BUILD_DIR)/$(BINARY_NAME) ~/.local/bin/$(BINARY_NAME)
+	@ln -sf ~/.local/bin/$(BINARY_NAME) ~/.local/bin/rb
+	@echo "✓ Installation complete!"
+	@echo ""
+	@echo "Make sure ~/.local/bin is in your PATH. Add this to your ~/.zshrc or ~/.bashrc:"
+	@echo '  export PATH="$$HOME/.local/bin:$$PATH"'
+	@echo ""
+	@echo "You can now use 'repobird' or 'rb' commands"
 
-## uninstall: Remove the binary from $GOPATH/bin
+## install-global: Install repobird globally to /usr/local/bin (requires sudo)
+install-global: build
+	@echo "Installing repobird globally to /usr/local/bin (requires sudo)..."
+	sudo cp $(BUILD_DIR)/$(BINARY_NAME) /usr/local/bin/$(BINARY_NAME)
+	sudo ln -sf /usr/local/bin/$(BINARY_NAME) /usr/local/bin/rb
+	@echo "✓ Global installation complete!"
+	@echo "You can now use 'repobird' or 'rb' commands from anywhere"
+
+## uninstall: Remove repobird from ~/.local/bin
 uninstall:
-	@rm -f $(GOPATH)/bin/$(BINARY_NAME)
-	@echo "Uninstalled from $(GOPATH)/bin/$(BINARY_NAME)"
+	@echo "Uninstalling repobird from ~/.local/bin..."
+	@rm -f ~/.local/bin/$(BINARY_NAME) ~/.local/bin/rb
+	@echo "✓ Uninstall complete"
+
+## uninstall-global: Uninstall repobird globally from /usr/local/bin (requires sudo)
+uninstall-global:
+	@echo "Uninstalling repobird globally from /usr/local/bin (requires sudo)..."
+	sudo rm -f /usr/local/bin/$(BINARY_NAME) /usr/local/bin/rb
+	@echo "✓ Global uninstall complete"
 
 ## clean: Remove build artifacts
 clean:

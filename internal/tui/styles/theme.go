@@ -8,58 +8,58 @@ var (
 	BaseStyle = lipgloss.NewStyle()
 
 	TitleStyle = lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("255")).
-		Background(lipgloss.Color("63")).
-		Padding(0, 1)
+			Bold(true).
+			Foreground(lipgloss.Color("255")).
+			Background(lipgloss.Color("63")).
+			Padding(0, 1)
 
 	StatusBarStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("240")).
-		Background(lipgloss.Color("235"))
+			Foreground(lipgloss.Color("240")).
+			Background(lipgloss.Color("235"))
 
 	SelectedStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("255")).
-		Background(lipgloss.Color("63"))
+			Foreground(lipgloss.Color("255")).
+			Background(lipgloss.Color("63"))
 
 	HelpStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("241"))
+			Foreground(lipgloss.Color("241"))
 
 	ErrorStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("196")).
-		Bold(true)
+			Foreground(lipgloss.Color("196")).
+			Bold(true)
 
 	SuccessStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("82")).
-		Bold(true)
+			Foreground(lipgloss.Color("82")).
+			Bold(true)
 
 	WarningStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("226")).
-		Bold(true)
+			Foreground(lipgloss.Color("226")).
+			Bold(true)
 
 	ProcessingStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("33")).
-		Bold(true)
+			Foreground(lipgloss.Color("33")).
+			Bold(true)
 
 	QueuedStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("226"))
+			Foreground(lipgloss.Color("226"))
 
 	BorderStyle = lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("240"))
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("240"))
 
 	TableHeaderStyle = lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("255")).
-		Background(lipgloss.Color("235")).
-		Padding(0, 1)
+				Bold(true).
+				Foreground(lipgloss.Color("255")).
+				Background(lipgloss.Color("235")).
+				Padding(0, 1)
 
 	TableRowStyle = lipgloss.NewStyle().
-		Padding(0, 1)
+			Padding(0, 1)
 
 	TableSelectedRowStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("255")).
-		Background(lipgloss.Color("63")).
-		Padding(0, 1)
+				Foreground(lipgloss.Color("255")).
+				Background(lipgloss.Color("63")).
+				Padding(0, 1)
 )
 
 func GetStatusStyle(status string) lipgloss.Style {

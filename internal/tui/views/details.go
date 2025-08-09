@@ -18,21 +18,21 @@ import (
 )
 
 type RunDetailsView struct {
-	client      *api.Client
-	run         models.RunResponse
-	keys        components.KeyMap
-	help        help.Model
-	viewport    viewport.Model
-	width       int
-	height      int
-	loading     bool
-	error       error
-	spinner     spinner.Model
-	pollTicker  *time.Ticker
-	pollStop    chan bool
-	showHelp    bool
-	showLogs    bool
-	logs        string
+	client        *api.Client
+	run           models.RunResponse
+	keys          components.KeyMap
+	help          help.Model
+	viewport      viewport.Model
+	width         int
+	height        int
+	loading       bool
+	error         error
+	spinner       spinner.Model
+	pollTicker    *time.Ticker
+	pollStop      chan bool
+	showHelp      bool
+	showLogs      bool
+	logs          string
 	statusHistory []string
 }
 
@@ -146,7 +146,7 @@ func (v *RunDetailsView) View() string {
 	if v.loading && len(v.statusHistory) == 0 {
 		s.WriteString(v.spinner.View() + " Loading run details...\n")
 	} else if v.error != nil {
-		s.WriteString(styles.ErrorStyle.Render("Error: " + v.error.Error()) + "\n")
+		s.WriteString(styles.ErrorStyle.Render("Error: "+v.error.Error()) + "\n")
 	} else {
 		s.WriteString(v.viewport.View())
 		s.WriteString("\n")
@@ -174,7 +174,7 @@ func (v *RunDetailsView) renderHeader() string {
 	}
 
 	header := styles.TitleStyle.Render(title)
-	
+
 	if isActiveStatus(string(v.run.Status)) {
 		pollingIndicator := styles.ProcessingStyle.Render(" [Polling ⟳]")
 		header += pollingIndicator
@@ -188,7 +188,7 @@ func (v *RunDetailsView) renderHeader() string {
 
 func (v *RunDetailsView) renderStatusBar() string {
 	options := "[b]ack [l]ogs [r]efresh [?]help [q]uit"
-	
+
 	if v.showLogs {
 		options = "[b]ack [l]details [r]efresh [?]help [q]uit"
 	}
@@ -214,7 +214,7 @@ func (v *RunDetailsView) updateContent() {
 			content.WriteString(fmt.Sprintf("Target Branch: %s\n", v.run.Target))
 		}
 		content.WriteString(fmt.Sprintf("Created: %s\n", v.run.CreatedAt.Format(time.RFC3339)))
-		
+
 		if v.run.UpdatedAt.After(v.run.CreatedAt) && (v.run.Status == models.StatusDone || v.run.Status == models.StatusFailed) {
 			duration := v.run.UpdatedAt.Sub(v.run.CreatedAt)
 			content.WriteString(fmt.Sprintf("Duration: %s\n", formatDuration(duration)))
@@ -230,12 +230,10 @@ func (v *RunDetailsView) updateContent() {
 			content.WriteString(v.run.Context + "\n")
 		}
 
-
 		if v.run.Error != "" {
 			content.WriteString("\n═══ Error ═══\n")
 			content.WriteString(styles.ErrorStyle.Render(v.run.Error) + "\n")
 		}
-
 	}
 
 	v.viewport.SetContent(content.String())
