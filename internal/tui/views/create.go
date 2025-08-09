@@ -516,9 +516,9 @@ func (v *CreateRunView) View() string {
 			s.WriteString("INSERT MODE | ESC: normal mode | Tab: next field | Ctrl+S: submit\n")
 		} else {
 			if v.exitRequested {
-				s.WriteString("Press ESC again to exit | Enter: select | j/k: navigate\n")
+				s.WriteString("Press ESC again to exit | Enter: select | j/k: navigate | Ctrl+S: submit\n")
 			} else {
-				s.WriteString("NORMAL MODE | ESC: exit | Enter: select | j/k: navigate\n")
+				s.WriteString("NORMAL MODE | ESC: exit | Enter: select | j/k: navigate | Ctrl+S: submit\n")
 			}
 		}
 	}
@@ -526,6 +526,13 @@ func (v *CreateRunView) View() string {
 	if v.submitting {
 		s.WriteString("\n")
 		s.WriteString(styles.ProcessingStyle.Render("⟳ Creating run..."))
+		s.WriteString("\n")
+	}
+
+	// Show error at bottom if present (make it more prominent)
+	if v.error != nil {
+		s.WriteString("\n")
+		s.WriteString(styles.ErrorStyle.Render("❌ " + v.error.Error()))
 		s.WriteString("\n")
 	}
 
@@ -547,9 +554,9 @@ func (v *CreateRunView) renderStatusBar() string {
 		statusText = "[ESC] normal mode [Tab] next [Ctrl+S] submit [Ctrl+X] clear field [Ctrl+L] clear all"
 	} else {
 		if v.exitRequested {
-			statusText = "[ESC] exit [Enter] select [j/k] navigate [Ctrl+X] clear field [Ctrl+L] clear all"
+			statusText = "[ESC] exit [Enter] select [j/k] navigate [Ctrl+S] submit [Ctrl+X] clear field [Ctrl+L] clear all"
 		} else {
-			statusText = "[ESC] exit [Enter] select [j/k] navigate [Ctrl+X] clear field [?] help"
+			statusText = "[ESC] exit [Enter] select [j/k] navigate [Ctrl+S] submit [Ctrl+X] clear field [?] help"
 		}
 	}
 
@@ -638,7 +645,23 @@ func (v *CreateRunView) submitRun() tea.Cmd {
 			}
 		}
 
+		// Debug: Log the final task object being sent to API
+		debugInfo = fmt.Sprintf("DEBUG: Final task object being sent to API - Title='%s', Repository='%s', Source='%s', Target='%s', Prompt='%s', Context='%s', RunType='%s'\\n",
+			task.Title, task.Repository, task.Source, task.Target, task.Prompt, task.Context, task.RunType)
+		if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+			f.WriteString(debugInfo)
+			f.Close()
+		}
+
 		runPtr, err := v.client.CreateRun(&task)
+		
+		// Debug: Log the API response
+		debugInfo = fmt.Sprintf("DEBUG: API response - err=%v, runPtr!=nil=%v\\n", err, runPtr != nil)
+		if f, err2 := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err2 == nil {
+			f.WriteString(debugInfo)
+			f.Close()
+		}
+		
 		if err != nil {
 			return runCreatedMsg{err: err}
 		}
