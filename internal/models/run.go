@@ -54,15 +54,25 @@ type RunResponse struct {
 
 // GetIDString returns the ID as a string regardless of its actual type
 func (r *RunResponse) GetIDString() string {
+	if r.ID == nil {
+		return ""
+	}
 	switch v := r.ID.(type) {
 	case string:
+		if v == "null" {
+			return ""
+		}
 		return v
 	case float64:
 		return fmt.Sprintf("%.0f", v)
 	case int:
 		return fmt.Sprintf("%d", v)
 	default:
-		return fmt.Sprintf("%v", v)
+		s := fmt.Sprintf("%v", v)
+		if s == "<nil>" || s == "null" {
+			return ""
+		}
+		return s
 	}
 }
 

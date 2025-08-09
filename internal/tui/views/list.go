@@ -165,6 +165,7 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, v.keys.Enter):
 			if idx := v.table.GetSelectedIndex(); idx >= 0 && idx < len(v.filteredRuns) {
 				run := v.filteredRuns[idx]
+				
 				// Use preloaded details if available
 				if detailed, ok := v.detailsCache[run.GetIDString()]; ok {
 					return NewRunDetailsViewWithCache(v.client, *detailed, v.runs, v.cached, v.cachedAt, v.detailsCache), nil
@@ -213,6 +214,7 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Go forward/select (same as Enter)
 			if idx := v.table.GetSelectedIndex(); idx >= 0 && idx < len(v.filteredRuns) {
 				run := v.filteredRuns[idx]
+				
 				if detailed, ok := v.detailsCache[run.GetIDString()]; ok {
 					return NewRunDetailsViewWithCache(v.client, *detailed, v.runs, v.cached, v.cachedAt, v.detailsCache), nil
 				}

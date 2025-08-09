@@ -272,7 +272,12 @@ func (v *RunDetailsView) updateStatusHistory(status string) {
 
 func (v *RunDetailsView) loadRunDetails() tea.Cmd {
 	return func() tea.Msg {
-		runPtr, err := v.client.GetRun(v.run.GetIDString())
+		runID := v.run.GetIDString()
+		if runID == "" {
+			return runDetailsLoadedMsg{run: v.run, err: fmt.Errorf("invalid run ID")}
+		}
+		
+		runPtr, err := v.client.GetRun(runID)
 		if err != nil {
 			return runDetailsLoadedMsg{run: v.run, err: err}
 		}
