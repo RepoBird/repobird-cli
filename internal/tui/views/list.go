@@ -2,7 +2,6 @@ package views
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -15,7 +14,9 @@ import (
 	"github.com/repobird/repobird-cli/internal/cache"
 	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/repobird/repobird-cli/internal/tui/components"
+	"github.com/repobird/repobird-cli/internal/tui/debug"
 	"github.com/repobird/repobird-cli/internal/tui/styles"
+	"github.com/repobird/repobird-cli/internal/utils"
 )
 
 type RunListView struct {
@@ -50,7 +51,14 @@ func NewRunListView(client *api.Client) *RunListView {
 	return NewRunListViewWithCache(client, runs, cached, cachedAt, detailsCache, selectedIndex)
 }
 
-func NewRunListViewWithCache(client *api.Client, runs []models.RunResponse, cached bool, cachedAt time.Time, detailsCache map[string]*models.RunResponse, selectedIndex int) *RunListView {
+func NewRunListViewWithCache(
+	client *api.Client,
+	runs []models.RunResponse,
+	cached bool,
+	cachedAt time.Time,
+	detailsCache map[string]*models.RunResponse,
+	selectedIndex int,
+) *RunListView {
 	// Enhanced debugging with more details
 	debugInfo := fmt.Sprintf("DEBUG: Creating RunListViewWithCache - cached=%v, runs=%d, detailsCache=%d\n",
 		cached, len(runs), len(detailsCache))
@@ -67,10 +75,7 @@ func NewRunListViewWithCache(client *api.Client, runs []models.RunResponse, cach
 		}
 		debugInfo += fmt.Sprintf("DEBUG: Sample cache keys: %v\n", cacheKeys)
 	}
-	if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-		f.WriteString(debugInfo)
-		f.Close()
-	}
+	debug.LogToFile(debugInfo)
 	columns := []components.Column{
 		{Title: "ID", Width: 8},
 		{Title: "Status", Width: 15},
@@ -148,203 +153,235 @@ func (v *RunListView) loadUserInfo() tea.Cmd {
 	}
 }
 
+// handleWindowSizeMsg handles window resize events
+func (v *RunListView) handleWindowSizeMsg(msg tea.WindowSizeMsg) {
+	v.width = msg.Width
+	v.height = msg.Height
+	v.table.SetDimensions(msg.Width, msg.Height-4)
+	v.help.Width = msg.Width
+}
+
+// handleSearchMode handles search mode key input
+func (v *RunListView) handleSearchMode(msg tea.KeyMsg) {
+	switch msg.String() {
+	case "enter":
+		v.searchMode = false
+		v.filterRuns()
+	case "esc":
+		v.searchMode = false
+		v.searchQuery = ""
+		v.filterRuns()
+	case "backspace":
+		if len(v.searchQuery) > 0 {
+			v.searchQuery = v.searchQuery[:len(v.searchQuery)-1]
+		}
+	default:
+		if len(msg.String()) == 1 {
+			v.searchQuery += msg.String()
+		}
+	}
+}
+
+// handleKeyMsg handles normal mode key input
+func (v *RunListView) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if v.searchMode {
+		v.handleSearchMode(msg)
+		return v, nil
+	}
+
+	var cmds []tea.Cmd
+
+	switch {
+	case key.Matches(msg, v.keys.Quit):
+		v.stopPolling()
+		return v, tea.Quit
+	case key.Matches(msg, v.keys.Help):
+		v.showHelp = !v.showHelp
+	case key.Matches(msg, v.keys.Refresh):
+		cmds = append(cmds, v.loadRuns())
+	case key.Matches(msg, v.keys.Search):
+		v.searchMode = true
+		v.searchQuery = ""
+	case key.Matches(msg, v.keys.Enter):
+		return v.handleEnterKey()
+	case key.Matches(msg, v.keys.New):
+		return v.handleNewRunKey()
+	case key.Matches(msg, v.keys.Up):
+		v.table.MoveUp()
+		cmds = append(cmds, v.preloadSelectedRun())
+	case key.Matches(msg, v.keys.Down):
+		v.table.MoveDown()
+		cmds = append(cmds, v.preloadSelectedRun())
+	case msg.String() == "shift+k" || msg.String() == "shift+up":
+		v.table.PageUp()
+	case msg.String() == "shift+j" || msg.String() == "shift+down":
+		v.table.PageDown()
+	case key.Matches(msg, v.keys.PageUp):
+		v.table.PageUp()
+	case key.Matches(msg, v.keys.PageDown):
+		v.table.PageDown()
+	case key.Matches(msg, v.keys.Home):
+		v.table.GoToTop()
+	case key.Matches(msg, v.keys.End):
+		v.table.GoToBottom()
+	}
+
+	return v, tea.Batch(cmds...)
+}
+
+// handleEnterKey handles Enter key press to navigate to run details
+func (v *RunListView) handleEnterKey() (tea.Model, tea.Cmd) {
+	idx := v.table.GetSelectedIndex()
+	if idx < 0 || idx >= len(v.filteredRuns) {
+		return v, nil
+	}
+
+	run := v.filteredRuns[idx]
+	runID := run.GetIDString()
+
+	// Save cursor position to cache before navigating
+	cache.SetSelectedIndex(idx)
+
+	// Debug logging for Enter key press
+	debugInfo := fmt.Sprintf("DEBUG: Enter pressed for run idx=%d, runID='%s', repo='%s'\n",
+		idx, runID, run.Repository)
+	debugInfo += fmt.Sprintf("DEBUG: Cache size=%d, runID in cache=%v, preloading=%v\n",
+		len(v.detailsCache), v.detailsCache[runID] != nil, v.preloading[runID])
+	debug.LogToFile(debugInfo)
+
+	// Check if this run is currently being preloaded
+	if v.preloading[runID] {
+		debug.LogToFilef("DEBUG: Run %s is still preloading, adding small delay...\n", runID)
+		return v, func() tea.Msg {
+			time.Sleep(100 * time.Millisecond)
+			return retryNavigationMsg{runIndex: idx}
+		}
+	}
+
+	// Use preloaded details if available
+	if detailed, ok := v.detailsCache[runID]; ok {
+		debug.LogToFilef("DEBUG: Using cached data for runID='%s' - NAVIGATING TO DETAILS VIEW\n", runID)
+
+		// Fix: Ensure the cached run has the correct ID
+		cachedRun := *detailed
+		if cachedRun.GetIDString() == "" && run.ID != "" {
+			cachedRun.ID = run.ID
+		}
+
+		debug.LogToFilef("DEBUG: Fixed cached run ID from '%s' to '%s'\n", detailed.GetIDString(), cachedRun.GetIDString())
+		return NewRunDetailsView(v.client, cachedRun), nil
+	}
+
+	debug.LogToFilef("DEBUG: No cached data for runID='%s', loading fresh - NAVIGATING TO DETAILS VIEW\n", runID)
+	return NewRunDetailsView(v.client, run), nil
+}
+
+// handleNewRunKey handles the New key press to create a new run
+func (v *RunListView) handleNewRunKey() (tea.Model, tea.Cmd) {
+	debug.LogToFilef("DEBUG: ListView creating NewCreateRunView - runs=%d, cached=%v, detailsCache=%d\n",
+		len(v.runs), v.cached, len(v.detailsCache))
+	return NewCreateRunViewWithCache(v.client, v.runs, v.cached, v.cachedAt, v.detailsCache), nil
+}
+
+// handleRunsLoaded handles the runsLoadedMsg message
+func (v *RunListView) handleRunsLoaded(msg runsLoadedMsg) []tea.Cmd {
+	var cmds []tea.Cmd
+
+	debug.LogToFilef("DEBUG: ENTERED runsLoadedMsg case - %d runs loaded\n", len(msg.runs))
+
+	v.loading = false
+	v.runs = msg.runs
+	v.error = msg.err
+	v.cached = true
+	v.cachedAt = time.Now()
+	v.filterRuns()
+
+	// Save to global cache
+	if msg.err == nil && len(msg.runs) > 0 {
+		cache.SetCachedList(msg.runs, v.detailsCache)
+	}
+
+	// Start preloading run details in background
+	if msg.err == nil && len(msg.runs) > 0 {
+		cmds = append(cmds, v.preloadRunDetails())
+	}
+
+	return cmds
+}
+
+// handleRunDetailsPreloaded handles the runDetailsPreloadedMsg message
+func (v *RunListView) handleRunDetailsPreloaded(msg runDetailsPreloadedMsg) {
+	debug.LogToFilef("DEBUG: ENTERED runDetailsPreloadedMsg case for runID='%s', err=%v, run!=nil=%v\n",
+		msg.runID, msg.err, msg.run != nil)
+
+	// Cache the loaded run details
+	v.preloading[msg.runID] = false
+	if msg.err == nil && msg.run != nil {
+		v.detailsCache[msg.runID] = msg.run
+
+		// Also save to global cache
+		cache.AddCachedDetail(msg.runID, msg.run)
+
+		// Debug logging
+		debug.LogToFilef("DEBUG: Successfully cached run with key='%s', actualID='%s', title='%s', cacheSize=%d\n",
+			msg.runID, msg.run.GetIDString(), msg.run.Title, len(v.detailsCache))
+	} else {
+		// Log errors too
+		debug.LogToFilef("DEBUG: Failed to cache run with key='%s', err=%v\n", msg.runID, msg.err)
+	}
+}
+
+// handleRetryNavigation handles the retryNavigationMsg message
+func (v *RunListView) handleRetryNavigation(msg retryNavigationMsg) (tea.Model, tea.Cmd) {
+	debug.LogToFilef("DEBUG: ENTERED retryNavigationMsg case for runIndex=%d\n", msg.runIndex)
+
+	// Retry navigation after a small delay
+	idx := msg.runIndex
+	if idx >= 0 && idx < len(v.filteredRuns) {
+		run := v.filteredRuns[idx]
+		runID := run.GetIDString()
+
+		debug.LogToFilef("DEBUG: Retrying navigation for runID='%s', cache size=%d, in cache=%v\n",
+			runID, len(v.detailsCache), v.detailsCache[runID] != nil)
+
+		// Use cached data if available now
+		if detailed, ok := v.detailsCache[runID]; ok {
+			debug.LogToFilef("DEBUG: Retry successful - using cached data for runID='%s' - NAVIGATING TO DETAILS VIEW\n", runID)
+			return NewRunDetailsViewWithCache(v.client, *detailed, v.runs, v.cached, v.cachedAt, v.detailsCache), nil
+		}
+
+		// Still not cached, load fresh
+		debug.LogToFilef("DEBUG: Retry - still no cached data for runID='%s', loading fresh - NAVIGATING TO DETAILS VIEW\n", runID)
+		return NewRunDetailsViewWithCache(v.client, run, v.runs, v.cached, v.cachedAt, v.detailsCache), nil
+	}
+
+	return v, nil
+}
+
+// handlePolling handles the pollTickMsg message
+func (v *RunListView) handlePolling(msg pollTickMsg) []tea.Cmd {
+	var cmds []tea.Cmd
+	if v.hasActiveRuns() {
+		cmds = append(cmds, v.loadRuns())
+	}
+	return cmds
+}
+
 func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		v.width = msg.Width
-		v.height = msg.Height
-		v.table.SetDimensions(msg.Width, msg.Height-4)
-		v.help.Width = msg.Width
+		v.handleWindowSizeMsg(msg)
 
 	case tea.KeyMsg:
-		if v.searchMode {
-			switch msg.String() {
-			case "enter":
-				v.searchMode = false
-				v.filterRuns()
-			case "esc":
-				v.searchMode = false
-				v.searchQuery = ""
-				v.filterRuns()
-			case "backspace":
-				if len(v.searchQuery) > 0 {
-					v.searchQuery = v.searchQuery[:len(v.searchQuery)-1]
-				}
-			default:
-				if len(msg.String()) == 1 {
-					v.searchQuery += msg.String()
-				}
-			}
-			return v, nil
-		}
-
-		switch {
-		case key.Matches(msg, v.keys.Quit):
-			v.stopPolling()
-			return v, tea.Quit
-		case key.Matches(msg, v.keys.Help):
-			v.showHelp = !v.showHelp
-		case key.Matches(msg, v.keys.Refresh):
-			cmds = append(cmds, v.loadRuns())
-		case key.Matches(msg, v.keys.Search):
-			v.searchMode = true
-			v.searchQuery = ""
-		case key.Matches(msg, v.keys.Enter):
-			if idx := v.table.GetSelectedIndex(); idx >= 0 && idx < len(v.filteredRuns) {
-				run := v.filteredRuns[idx]
-				runID := run.GetIDString()
-
-				// Save cursor position to cache before navigating
-				cache.SetSelectedIndex(idx)
-
-				// Debug logging for Enter key press
-				debugInfo := fmt.Sprintf("DEBUG: Enter pressed for run idx=%d, runID='%s', repo='%s'\n",
-					idx, runID, run.Repository)
-				debugInfo += fmt.Sprintf("DEBUG: Cache size=%d, runID in cache=%v, preloading=%v\n",
-					len(v.detailsCache), v.detailsCache[runID] != nil, v.preloading[runID])
-
-				if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-					f.WriteString(debugInfo)
-					f.Close()
-				}
-
-				// Check if this run is currently being preloaded
-				if v.preloading[runID] {
-					debugInfo = fmt.Sprintf("DEBUG: Run %s is still preloading, adding small delay...\n", runID)
-					if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-						f.WriteString(debugInfo)
-						f.Close()
-					}
-
-					// Add a command that will wait a bit then retry navigation
-					cmds = append(cmds, func() tea.Msg {
-						time.Sleep(100 * time.Millisecond) // Small delay
-						return retryNavigationMsg{runIndex: idx}
-					})
-					return v, tea.Batch(cmds...)
-				}
-
-				// Use preloaded details if available
-				if detailed, ok := v.detailsCache[runID]; ok {
-					debugInfo = fmt.Sprintf("DEBUG: Using cached data for runID='%s' - NAVIGATING TO DETAILS VIEW\n", runID)
-					if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-						f.WriteString(debugInfo)
-						f.Close()
-					}
-
-					// Fix: Ensure the cached run has the correct ID
-					cachedRun := *detailed
-					if cachedRun.GetIDString() == "" && run.ID != nil {
-						cachedRun.ID = run.ID
-					}
-
-					debugInfo = fmt.Sprintf("DEBUG: Fixed cached run ID from '%s' to '%s'\n", detailed.GetIDString(), cachedRun.GetIDString())
-					if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-						f.WriteString(debugInfo)
-						f.Close()
-					}
-
-					return NewRunDetailsView(v.client, cachedRun), nil
-				}
-
-				debugInfo = fmt.Sprintf("DEBUG: No cached data for runID='%s', loading fresh - NAVIGATING TO DETAILS VIEW\n", runID)
-				if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-					f.WriteString(debugInfo)
-					f.Close()
-				}
-				return NewRunDetailsView(v.client, run), nil
-			}
-		case key.Matches(msg, v.keys.New):
-			// DEBUG: Log cache info when creating new run view
-			debugInfo := fmt.Sprintf("DEBUG: ListView creating NewCreateRunView - runs=%d, cached=%v, detailsCache=%d\n",
-				len(v.runs), v.cached, len(v.detailsCache))
-			if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-				f.WriteString(debugInfo)
-				f.Close()
-			}
-			return NewCreateRunViewWithCache(v.client, v.runs, v.cached, v.cachedAt, v.detailsCache), nil
-		case key.Matches(msg, v.keys.Up):
-			v.table.MoveUp()
-			// Prioritize preloading the newly selected run
-			cmds = append(cmds, v.preloadSelectedRun())
-		case key.Matches(msg, v.keys.Down):
-			v.table.MoveDown()
-			// Prioritize preloading the newly selected run
-			cmds = append(cmds, v.preloadSelectedRun())
-		case msg.String() == "shift+k" || msg.String() == "shift+up":
-			// Page up with Shift+K or Shift+Up
-			v.table.PageUp()
-		case msg.String() == "shift+j" || msg.String() == "shift+down":
-			// Page down with Shift+J or Shift+Down
-			v.table.PageDown()
-		case key.Matches(msg, v.keys.PageUp):
-			v.table.PageUp()
-		case key.Matches(msg, v.keys.PageDown):
-			v.table.PageDown()
-		case key.Matches(msg, v.keys.Home):
-			v.table.GoToTop()
-		case key.Matches(msg, v.keys.End):
-			v.table.GoToBottom()
-		}
+		return v.handleKeyMsg(msg)
 
 	case runsLoadedMsg:
-		debugInfo := fmt.Sprintf("DEBUG: ENTERED runsLoadedMsg case - %d runs loaded\n", len(msg.runs))
-		if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-			f.WriteString(debugInfo)
-			f.Close()
-		}
-
-		v.loading = false
-		v.runs = msg.runs
-		v.error = msg.err
-		v.cached = true
-		v.cachedAt = time.Now()
-		v.filterRuns()
-
-		// Save to global cache
-		if msg.err == nil && len(msg.runs) > 0 {
-			cache.SetCachedList(msg.runs, v.detailsCache)
-		}
-
-		// Start preloading run details in background
-		if msg.err == nil && len(msg.runs) > 0 {
-			cmds = append(cmds, v.preloadRunDetails())
-		}
+		cmds = append(cmds, v.handleRunsLoaded(msg)...)
 
 	case runDetailsPreloadedMsg:
-		// Debug: Message received
-		debugInfo := fmt.Sprintf("DEBUG: ENTERED runDetailsPreloadedMsg case for runID='%s', err=%v, run!=nil=%v\n",
-			msg.runID, msg.err, msg.run != nil)
-		if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-			f.WriteString(debugInfo)
-			f.Close()
-		}
-
-		// Cache the loaded run details
-		v.preloading[msg.runID] = false
-		if msg.err == nil && msg.run != nil {
-			v.detailsCache[msg.runID] = msg.run
-
-			// Also save to global cache
-			cache.AddCachedDetail(msg.runID, msg.run)
-
-			// Debug logging
-			debugInfo := fmt.Sprintf("DEBUG: Successfully cached run with key='%s', actualID='%s', title='%s', cacheSize=%d\n",
-				msg.runID, msg.run.GetIDString(), msg.run.Title, len(v.detailsCache))
-			if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-				f.WriteString(debugInfo)
-				f.Close()
-			}
-		} else {
-			// Log errors too
-			debugInfo := fmt.Sprintf("DEBUG: Failed to cache run with key='%s', err=%v\n", msg.runID, msg.err)
-			if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-				f.WriteString(debugInfo)
-				f.Close()
-			}
-		}
+		v.handleRunDetailsPreloaded(msg)
 
 	case userInfoLoadedMsg:
 		if msg.err == nil && msg.userInfo != nil {
@@ -352,48 +389,10 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case retryNavigationMsg:
-		debugInfo := fmt.Sprintf("DEBUG: ENTERED retryNavigationMsg case for runIndex=%d\n", msg.runIndex)
-		if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-			f.WriteString(debugInfo)
-			f.Close()
-		}
-
-		// Retry navigation after a small delay
-		idx := msg.runIndex
-		if idx >= 0 && idx < len(v.filteredRuns) {
-			run := v.filteredRuns[idx]
-			runID := run.GetIDString()
-
-			debugInfo := fmt.Sprintf("DEBUG: Retrying navigation for runID='%s', cache size=%d, in cache=%v\n",
-				runID, len(v.detailsCache), v.detailsCache[runID] != nil)
-			if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-				f.WriteString(debugInfo)
-				f.Close()
-			}
-
-			// Use cached data if available now
-			if detailed, ok := v.detailsCache[runID]; ok {
-				debugInfo = fmt.Sprintf("DEBUG: Retry successful - using cached data for runID='%s' - NAVIGATING TO DETAILS VIEW\n", runID)
-				if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-					f.WriteString(debugInfo)
-					f.Close()
-				}
-				return NewRunDetailsViewWithCache(v.client, *detailed, v.runs, v.cached, v.cachedAt, v.detailsCache), nil
-			}
-
-			// Still not cached, load fresh
-			debugInfo = fmt.Sprintf("DEBUG: Retry - still no cached data for runID='%s', loading fresh - NAVIGATING TO DETAILS VIEW\n", runID)
-			if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-				f.WriteString(debugInfo)
-				f.Close()
-			}
-			return NewRunDetailsViewWithCache(v.client, run, v.runs, v.cached, v.cachedAt, v.detailsCache), nil
-		}
+		return v.handleRetryNavigation(msg)
 
 	case pollTickMsg:
-		if v.hasActiveRuns() {
-			cmds = append(cmds, v.loadRuns())
-		}
+		cmds = append(cmds, v.handlePolling(msg)...)
 
 	case spinner.TickMsg:
 		if v.loading {
@@ -576,27 +575,11 @@ func (v *RunListView) hasActiveRuns() bool {
 }
 
 func isActiveStatus(status string) bool {
-	activeStatuses := []string{"QUEUED", "INITIALIZING", "PROCESSING", "POST_PROCESS"}
-	for _, s := range activeStatuses {
-		if status == s {
-			return true
-		}
-	}
-	return false
+	return models.IsActiveStatus(status)
 }
 
 func formatTimeAgo(t time.Time) string {
-	duration := time.Since(t)
-
-	if duration < time.Minute {
-		return fmt.Sprintf("%ds ago", int(duration.Seconds()))
-	} else if duration < time.Hour {
-		return fmt.Sprintf("%dm ago", int(duration.Minutes()))
-	} else if duration < 24*time.Hour {
-		return fmt.Sprintf("%dh ago", int(duration.Hours()))
-	} else {
-		return fmt.Sprintf("%dd ago", int(duration.Hours()/24))
-	}
+	return utils.FormatTimeAgo(t)
 }
 
 type runsLoadedMsg struct {
@@ -621,28 +604,16 @@ type retryNavigationMsg struct {
 	runIndex int
 }
 
-func (v *RunListView) preloadRunDetails() tea.Cmd {
-	// Debug logging
-	debugInfo := fmt.Sprintf("DEBUG: preloadRunDetails called - runs=%d, filteredRuns=%d, cacheSize=%d\n",
-		len(v.runs), len(v.filteredRuns), len(v.detailsCache))
-	if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-		f.WriteString(debugInfo)
-		f.Close()
-	}
-
-	// Collect runs to preload
+// selectRunsToPreload determines which runs should be preloaded
+func (v *RunListView) selectRunsToPreload() []string {
 	var toPreload []string
 
 	// Start with the selected run
 	if idx := v.table.GetSelectedIndex(); idx >= 0 && idx < len(v.filteredRuns) {
 		run := v.filteredRuns[idx]
 		runID := run.GetIDString()
-		debugInfo = fmt.Sprintf("DEBUG: Selected run runID='%s', cached=%v, preloading=%v\n",
+		debug.LogToFilef("DEBUG: Selected run runID='%s', cached=%v, preloading=%v\n",
 			runID, v.detailsCache[runID] != nil, v.preloading[runID])
-		if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-			f.WriteString(debugInfo)
-			f.Close()
-		}
 
 		if _, cached := v.detailsCache[runID]; !cached && !v.preloading[runID] {
 			toPreload = append(toPreload, runID)
@@ -668,48 +639,51 @@ func (v *RunListView) preloadRunDetails() tea.Cmd {
 		}
 	}
 
-	// Return batch of commands to load each run
+	return toPreload
+}
+
+// createSinglePreloadCmd creates a command to preload a single run
+func (v *RunListView) createSinglePreloadCmd(runID string) tea.Cmd {
+	v.preloading[runID] = true
+	return func() tea.Msg {
+		debug.LogToFilef("DEBUG: Starting API call for runID='%s'\n", runID)
+
+		detailed, err := v.client.GetRun(runID)
+
+		debug.LogToFilef("DEBUG: API call completed for runID='%s', err=%v, run!=nil=%v - SENDING runDetailsPreloadedMsg\n",
+			runID, err, detailed != nil)
+
+		msg := runDetailsPreloadedMsg{
+			runID: runID,
+			run:   detailed,
+			err:   err,
+		}
+
+		debug.LogToFilef("DEBUG: About to return runDetailsPreloadedMsg for runID='%s'\n", runID)
+		return msg
+	}
+}
+
+// createPreloadCommands creates commands for preloading multiple runs
+func (v *RunListView) createPreloadCommands(runIDs []string) []tea.Cmd {
 	var cmds []tea.Cmd
-	debugInfo = fmt.Sprintf("DEBUG: Will preload %d runs: %v\n", len(toPreload), toPreload)
-	if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-		f.WriteString(debugInfo)
-		f.Close()
+	for _, runID := range runIDs {
+		cmds = append(cmds, v.createSinglePreloadCmd(runID))
 	}
+	return cmds
+}
 
-	for _, runID := range toPreload {
-		v.preloading[runID] = true
-		id := runID // Capture for closure
-		cmds = append(cmds, func() tea.Msg {
-			debugInfo := fmt.Sprintf("DEBUG: Starting API call for runID='%s'\n", id)
-			if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-				f.WriteString(debugInfo)
-				f.Close()
-			}
+func (v *RunListView) preloadRunDetails() tea.Cmd {
+	debug.LogToFilef("DEBUG: preloadRunDetails called - runs=%d, filteredRuns=%d, cacheSize=%d\n",
+		len(v.runs), len(v.filteredRuns), len(v.detailsCache))
 
-			detailed, err := v.client.GetRun(id)
+	// Select runs to preload
+	toPreload := v.selectRunsToPreload()
 
-			debugInfo = fmt.Sprintf("DEBUG: API call completed for runID='%s', err=%v, run!=nil=%v - SENDING runDetailsPreloadedMsg\n",
-				id, err, detailed != nil)
-			if f, err2 := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err2 == nil {
-				f.WriteString(debugInfo)
-				f.Close()
-			}
+	debug.LogToFilef("DEBUG: Will preload %d runs: %v\n", len(toPreload), toPreload)
 
-			msg := runDetailsPreloadedMsg{
-				runID: id,
-				run:   detailed,
-				err:   err,
-			}
-
-			debugInfo = fmt.Sprintf("DEBUG: About to return runDetailsPreloadedMsg for runID='%s'\n", id)
-			if f, err2 := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err2 == nil {
-				f.WriteString(debugInfo)
-				f.Close()
-			}
-
-			return msg
-		})
-	}
+	// Create commands for preloading
+	cmds := v.createPreloadCommands(toPreload)
 
 	return tea.Batch(cmds...)
 }

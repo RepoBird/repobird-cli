@@ -16,6 +16,7 @@ import (
 	"github.com/repobird/repobird-cli/internal/cache"
 	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/repobird/repobird-cli/internal/tui/components"
+	"github.com/repobird/repobird-cli/internal/tui/debug"
 	"github.com/repobird/repobird-cli/internal/tui/styles"
 	"github.com/repobird/repobird-cli/pkg/utils"
 )
@@ -53,14 +54,35 @@ func NewCreateRunView(client *api.Client) *CreateRunView {
 	return NewCreateRunViewWithCache(client, nil, false, time.Time{}, nil)
 }
 
-func NewCreateRunViewWithCache(client *api.Client, parentRuns []models.RunResponse, parentCached bool, parentCachedAt time.Time, parentDetailsCache map[string]*models.RunResponse) *CreateRunView {
-	// DEBUG: Log cache info when creating create view
-	debugInfo := fmt.Sprintf("DEBUG: Creating CreateView - parentRuns=%d, parentCached=%v, detailsCache=%d\n",
-		len(parentRuns), parentCached, len(parentDetailsCache))
-	if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-		f.WriteString(debugInfo)
-		f.Close()
+// CreateRunViewConfig holds configuration for creating a new CreateRunView
+type CreateRunViewConfig struct {
+	Client             *api.Client
+	ParentRuns         []models.RunResponse
+	ParentCached       bool
+	ParentCachedAt     time.Time
+	ParentDetailsCache map[string]*models.RunResponse
+}
+
+// NewCreateRunViewWithConfig creates a new CreateRunView with the given configuration
+func NewCreateRunViewWithConfig(config CreateRunViewConfig) *CreateRunView {
+	v := &CreateRunView{
+		client:             config.Client,
+		keys:               components.DefaultKeyMap,
+		help:               help.New(),
+		inputMode:          components.InsertMode,
+		parentRuns:         config.ParentRuns,
+		parentCached:       config.ParentCached,
+		parentCachedAt:     config.ParentCachedAt,
+		parentDetailsCache: config.ParentDetailsCache,
 	}
+
+	v.initializeInputFields()
+	v.loadFormData()
+	return v
+}
+
+// initializeInputFields sets up all the input fields
+func (v *CreateRunView) initializeInputFields() {
 	titleInput := textinput.New()
 	titleInput.Placeholder = "Brief title for the run"
 	titleInput.Focus()
@@ -106,40 +128,53 @@ func NewCreateRunViewWithCache(client *api.Client, parentRuns []models.RunRespon
 
 	autoDetectGit(repoInput, sourceInput)
 
-	// Load saved form data if available
+	v.fields = []textinput.Model{
+		titleInput,
+		repoInput,
+		sourceInput,
+		targetInput,
+		issueInput,
+	}
+	v.promptArea = promptArea
+	v.contextArea = contextArea
+	v.filePathInput = filePathInput
+	v.focusIndex = 0
+}
+
+// loadFormData loads saved form data from cache
+func (v *CreateRunView) loadFormData() {
 	savedData := cache.GetFormData()
-	if savedData != nil {
-		titleInput.SetValue(savedData.Title)
-		repoInput.SetValue(savedData.Repository)
-		sourceInput.SetValue(savedData.Source)
-		targetInput.SetValue(savedData.Target)
-		issueInput.SetValue(savedData.Issue)
-		promptArea.SetValue(savedData.Prompt)
-		contextArea.SetValue(savedData.Context)
+	if savedData != nil && len(v.fields) >= 5 {
+		v.fields[0].SetValue(savedData.Title)
+		v.fields[1].SetValue(savedData.Repository)
+		v.fields[2].SetValue(savedData.Source)
+		v.fields[3].SetValue(savedData.Target)
+		v.fields[4].SetValue(savedData.Issue)
+		v.promptArea.SetValue(savedData.Prompt)
+		v.contextArea.SetValue(savedData.Context)
+	}
+}
+
+// NewCreateRunViewWithCache maintains backward compatibility
+func NewCreateRunViewWithCache(
+	client *api.Client,
+	parentRuns []models.RunResponse,
+	parentCached bool,
+	parentCachedAt time.Time,
+	parentDetailsCache map[string]*models.RunResponse,
+) *CreateRunView {
+	debug.LogToFilef("DEBUG: Creating CreateView - parentRuns=%d, parentCached=%v, detailsCache=%d\n",
+		len(parentRuns), parentCached, len(parentDetailsCache))
+
+	config := CreateRunViewConfig{
+		Client:             client,
+		ParentRuns:         parentRuns,
+		ParentCached:       parentCached,
+		ParentCachedAt:     parentCachedAt,
+		ParentDetailsCache: parentDetailsCache,
 	}
 
-	return &CreateRunView{
-		client: client,
-		keys:   components.DefaultKeyMap,
-		help:   help.New(),
-		fields: []textinput.Model{
-			titleInput,
-			repoInput,
-			sourceInput,
-			targetInput,
-			issueInput,
-		},
-		promptArea:         promptArea,
-		contextArea:        contextArea,
-		filePathInput:      filePathInput,
-		focusIndex:         0,
-		inputMode:          components.InsertMode, // Start in insert mode
-		exitRequested:      false,
-		parentRuns:         parentRuns,
-		parentCached:       parentCached,
-		parentCachedAt:     parentCachedAt,
-		parentDetailsCache: parentDetailsCache,
-	}
+	return NewCreateRunViewWithConfig(config)
 }
 
 func autoDetectGit(repoInput, sourceInput textinput.Model) {
@@ -157,174 +192,159 @@ func (v *CreateRunView) Init() tea.Cmd {
 	return textinput.Blink
 }
 
+// handleWindowSizeMsg handles window resize events
+func (v *CreateRunView) handleWindowSizeMsg(msg tea.WindowSizeMsg) {
+	v.width = msg.Width
+	v.height = msg.Height
+	v.help.Width = msg.Width
+	v.promptArea.SetWidth(min(60, msg.Width-10))
+	v.contextArea.SetWidth(min(60, msg.Width-10))
+}
+
+// handleInsertMode handles keyboard input in insert mode
+func (v *CreateRunView) handleInsertMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	var cmds []tea.Cmd
+
+	// In insert mode, handle ESC to enter normal mode
+	if msg.String() == "esc" {
+		v.inputMode = components.NormalMode
+		v.exitRequested = false
+		v.blurAllFields()
+		return v, nil
+	}
+
+	// In insert mode, handle text input and field navigation
+	switch {
+	case msg.String() == "ctrl+f":
+		v.useFileInput = !v.useFileInput
+		if v.useFileInput {
+			v.filePathInput.Focus()
+		} else {
+			v.fields[0].Focus()
+			v.focusIndex = 0
+		}
+	case msg.String() == "ctrl+s" || msg.String() == "ctrl+enter":
+		if !v.submitting {
+			debug.LogToFile("DEBUG: Ctrl+S pressed in INSERT MODE - submitting run\n")
+			return v, v.submitRun()
+		}
+	case key.Matches(msg, v.keys.Tab):
+		v.nextField()
+	case key.Matches(msg, v.keys.ShiftTab):
+		v.prevField()
+	default:
+		// Handle text input
+		if v.useFileInput {
+			var cmd tea.Cmd
+			v.filePathInput, cmd = v.filePathInput.Update(msg)
+			cmds = append(cmds, cmd)
+		} else {
+			cmds = append(cmds, v.updateFields(msg)...)
+		}
+	}
+
+	return v, tea.Batch(cmds...)
+}
+
+// handleNormalMode handles keyboard input in normal mode
+func (v *CreateRunView) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, v.keys.Quit):
+		return v, tea.Quit
+	case key.Matches(msg, v.keys.Back) || msg.String() == "esc":
+		if v.exitRequested {
+			// Second ESC - actually exit
+			if !v.submitting {
+				v.saveFormData()
+				debug.LogToFile("DEBUG: CreateView double ESC - returning to list view\n")
+				return NewRunListView(v.client), nil
+			}
+		} else {
+			// First ESC in normal mode - prepare to exit
+			v.exitRequested = true
+		}
+	case key.Matches(msg, v.keys.Help):
+		v.showHelp = !v.showHelp
+	case msg.String() == "i" || msg.String() == "enter":
+		if v.backButtonFocused {
+			v.saveFormData()
+			debug.LogToFile("DEBUG: Back button pressed - returning to list view\n")
+			return NewRunListView(v.client), nil
+		} else {
+			v.inputMode = components.InsertMode
+			v.exitRequested = false
+			v.updateFocus()
+		}
+	case key.Matches(msg, v.keys.Up) || msg.String() == "k":
+		v.prevField()
+	case key.Matches(msg, v.keys.Down) || msg.String() == "j":
+		v.nextField()
+	case msg.String() == "ctrl+s":
+		if !v.submitting {
+			debug.LogToFile("DEBUG: Ctrl+S pressed in NORMAL MODE - submitting run\n")
+			return v, v.submitRun()
+		}
+	case msg.String() == "ctrl+l":
+		v.clearAllFields()
+	case msg.String() == "ctrl+x":
+		v.clearCurrentField()
+	default:
+		// Block vim navigation keys from doing anything else
+	}
+
+	return v, nil
+}
+
+// handleRunCreated handles the runCreatedMsg message
+func (v *CreateRunView) handleRunCreated(msg runCreatedMsg) (tea.Model, tea.Cmd) {
+	debug.LogToFilef("DEBUG: runCreatedMsg received - err=%v, runID='%s'\n",
+		msg.err, func() string {
+			if msg.err == nil {
+				return msg.run.GetIDString()
+			}
+			return "N/A"
+		}())
+
+	v.submitting = false
+	if msg.err != nil {
+		v.error = msg.err
+		return v, nil
+	}
+
+	// Check if the run has a valid ID
+	runID := msg.run.GetIDString()
+	if runID == "" {
+		v.error = fmt.Errorf("run created but received invalid ID from server")
+		debug.LogToFile("DEBUG: Run created successfully but runID is empty, not navigating to details\n")
+		return v, nil
+	}
+
+	// Clear form data on successful submission
+	cache.ClearFormData()
+	v.success = true
+	v.createdRun = &msg.run
+
+	debug.LogToFilef("DEBUG: Run created successfully with ID='%s', navigating to details\n", runID)
+	return NewRunDetailsView(v.client, msg.run), nil
+}
+
 func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		v.width = msg.Width
-		v.height = msg.Height
-		v.help.Width = msg.Width
-		v.promptArea.SetWidth(min(60, msg.Width-10))
-		v.contextArea.SetWidth(min(60, msg.Width-10))
+		v.handleWindowSizeMsg(msg)
 
 	case tea.KeyMsg:
-		// Handle modal input logic
 		switch v.inputMode {
 		case components.InsertMode:
-			// In insert mode, handle ESC to enter normal mode
-			if msg.String() == "esc" {
-				v.inputMode = components.NormalMode
-				v.exitRequested = false
-				// Blur current field to show we're in normal mode
-				v.blurAllFields()
-				return v, nil
-			}
-
-			// In insert mode, handle text input and field navigation
-			switch {
-			case msg.String() == "ctrl+f":
-				v.useFileInput = !v.useFileInput
-				if v.useFileInput {
-					v.filePathInput.Focus()
-				} else {
-					v.fields[0].Focus()
-					v.focusIndex = 0
-				}
-			case msg.String() == "ctrl+s" || msg.String() == "ctrl+enter":
-				if !v.submitting {
-					// Debug: Log when Ctrl+S is pressed
-					debugInfo := "DEBUG: Ctrl+S pressed in INSERT MODE - submitting run\n"
-					if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-						f.WriteString(debugInfo)
-						f.Close()
-					}
-					return v, v.submitRun()
-				}
-			case key.Matches(msg, v.keys.Tab):
-				v.nextField()
-			case key.Matches(msg, v.keys.ShiftTab):
-				v.prevField()
-			default:
-				// Handle text input
-				if v.useFileInput {
-					var cmd tea.Cmd
-					v.filePathInput, cmd = v.filePathInput.Update(msg)
-					cmds = append(cmds, cmd)
-				} else {
-					cmds = append(cmds, v.updateFields(msg)...)
-				}
-			}
-
+			return v.handleInsertMode(msg)
 		case components.NormalMode:
-			// In normal mode, handle navigation and commands
-			switch {
-			case key.Matches(msg, v.keys.Quit):
-				return v, tea.Quit
-			case key.Matches(msg, v.keys.Back) || msg.String() == "esc":
-				if v.exitRequested {
-					// Second ESC - actually exit
-					if !v.submitting {
-						// Save form data before exiting
-						v.saveFormData()
-						// DEBUG: Log when returning from create view
-						debugInfo := "DEBUG: CreateView double ESC - returning to list view\n"
-						if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-							f.WriteString(debugInfo)
-							f.Close()
-						}
-						return NewRunListView(v.client), nil
-					}
-				} else {
-					// First ESC in normal mode - prepare to exit
-					v.exitRequested = true
-				}
-			case key.Matches(msg, v.keys.Help):
-				v.showHelp = !v.showHelp
-			case msg.String() == "i" || msg.String() == "enter":
-				if v.backButtonFocused {
-					// Enter pressed on back button - save form and go back
-					v.saveFormData()
-					debugInfo := "DEBUG: Back button pressed - returning to list view\n"
-					if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-						f.WriteString(debugInfo)
-						f.Close()
-					}
-					return NewRunListView(v.client), nil
-				} else {
-					// Enter insert mode and focus current field
-					v.inputMode = components.InsertMode
-					v.exitRequested = false
-					v.updateFocus()
-				}
-			case key.Matches(msg, v.keys.Up) || msg.String() == "k":
-				v.prevField()
-			case key.Matches(msg, v.keys.Down) || msg.String() == "j":
-				v.nextField()
-			case msg.String() == "ctrl+s":
-				if !v.submitting {
-					// Debug: Log when Ctrl+S is pressed
-					debugInfo := "DEBUG: Ctrl+S pressed in NORMAL MODE - submitting run\n"
-					if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-						f.WriteString(debugInfo)
-						f.Close()
-					}
-					return v, v.submitRun()
-				}
-			case msg.String() == "ctrl+l":
-				// Clear entire form
-				v.clearAllFields()
-			case msg.String() == "ctrl+x":
-				// Clear current field/area
-				v.clearCurrentField()
-			default:
-				// Block vim navigation keys from doing anything else
-				// This prevents 'b' from accidentally triggering actions
-			}
+			return v.handleNormalMode(msg)
 		}
 
 	case runCreatedMsg:
-		// Debug: Log when run creation response is received
-		debugInfo := fmt.Sprintf("DEBUG: runCreatedMsg received - err=%v, runID='%s'\n",
-			msg.err, func() string {
-				if msg.err == nil {
-					return msg.run.GetIDString()
-				}
-				return "N/A"
-			}())
-		if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-			f.WriteString(debugInfo)
-			f.Close()
-		}
-
-		v.submitting = false
-		if msg.err != nil {
-			v.error = msg.err
-		} else {
-			// Check if the run has a valid ID
-			runID := msg.run.GetIDString()
-			if runID == "" {
-				v.error = fmt.Errorf("run created but received invalid ID from server")
-				debugInfo := fmt.Sprintf("DEBUG: Run created successfully but runID is empty, not navigating to details\n")
-				if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-					f.WriteString(debugInfo)
-					f.Close()
-				}
-			} else {
-				// Clear form data on successful submission
-				cache.ClearFormData()
-				v.success = true
-				v.createdRun = &msg.run
-				
-				debugInfo := fmt.Sprintf("DEBUG: Run created successfully with ID='%s', navigating to details\n", runID)
-				if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-					f.WriteString(debugInfo)
-					f.Close()
-				}
-				
-				return NewRunDetailsView(v.client, msg.run), nil
-			}
-		}
+		return v.handleRunCreated(msg)
 	}
 
 	return v, tea.Batch(cmds...)
@@ -581,112 +601,142 @@ func (v *CreateRunView) renderStatusBar() string {
 	return styles.StatusBarStyle.Width(v.width).Render(statusText)
 }
 
+// prepareTaskFromFile loads and parses task from a JSON file
+func (v *CreateRunView) prepareTaskFromFile(filePath string) (models.RunRequest, error) {
+	if filePath == "" {
+		return models.RunRequest{}, fmt.Errorf("file path is required")
+	}
+
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return models.RunRequest{}, fmt.Errorf("failed to read file: %w", err)
+	}
+
+	var task models.RunRequest
+	if err := json.Unmarshal(data, &task); err != nil {
+		return models.RunRequest{}, fmt.Errorf("invalid JSON: %w", err)
+	}
+
+	return task, nil
+}
+
+// prepareTaskFromForm creates a task from form fields
+func (v *CreateRunView) prepareTaskFromForm() models.RunRequest {
+	task := models.RunRequest{
+		Title:      v.fields[0].Value(),
+		Repository: v.fields[1].Value(),
+		Source:     v.fields[2].Value(),
+		Target:     v.fields[3].Value(),
+		Prompt:     v.promptArea.Value(),
+		Context:    v.contextArea.Value(),
+		RunType:    models.RunTypeRun,
+	}
+
+	// Debug logging - check each field individually
+	debugInfo := fmt.Sprintf("DEBUG: Raw field values - [0]='%s', [1]='%s', [2]='%s', [3]='%s', [4]='%s'\n",
+		v.fields[0].Value(), v.fields[1].Value(), v.fields[2].Value(), v.fields[3].Value(), v.fields[4].Value())
+	debugInfo += fmt.Sprintf("DEBUG: Prompt='%s', Context='%s'\n", v.promptArea.Value(), v.contextArea.Value())
+	debugInfo += fmt.Sprintf(
+		"DEBUG: Submit values - Title='%s', Repository='%s', Source='%s', Target='%s', Prompt='%s'\n",
+		task.Title, task.Repository, task.Source, task.Target, task.Prompt)
+	debug.LogToFile(debugInfo)
+
+	return task
+}
+
+// validateTask validates required fields in the task
+func (v *CreateRunView) validateTask(task *models.RunRequest) error {
+	if task.Prompt == "" {
+		return fmt.Errorf("prompt is required")
+	}
+
+	if task.Repository == "" {
+		return fmt.Errorf("repository is required")
+	}
+
+	return nil
+}
+
+// autoDetectGitInfo fills in missing repository and branch information from git
+func (v *CreateRunView) autoDetectGitInfo(task *models.RunRequest) {
+	if task.Repository == "" {
+		debug.LogToFile("DEBUG: Repository field empty, trying git auto-detect\n")
+		if repo, _, err := utils.GetGitInfo(); err == nil {
+			task.Repository = repo
+		}
+	}
+
+	if task.Source == "" {
+		if _, branch, err := utils.GetGitInfo(); err == nil {
+			task.Source = branch
+		}
+		if task.Source == "" {
+			task.Source = "main"
+		}
+	}
+
+	if task.Target == "" {
+		task.Target = fmt.Sprintf("repobird/%d", time.Now().Unix())
+	}
+}
+
+// submitToAPI converts the task to API format and submits it
+func (v *CreateRunView) submitToAPI(task models.RunRequest) (models.RunResponse, error) {
+	// Convert to API-compatible format
+	apiTask := task.ToAPIRequest()
+
+	// Debug: Log the final task object being sent to API
+	debug.LogToFilef(
+		"DEBUG: Final API task object - Title='%s', RepositoryName='%s', SourceBranch='%s', "+
+			"TargetBranch='%s', Prompt='%s', Context='%s', RunType='%s'\\n",
+		apiTask.Title, apiTask.RepositoryName, apiTask.SourceBranch,
+		apiTask.TargetBranch, apiTask.Prompt, apiTask.Context, apiTask.RunType)
+
+	runPtr, err := v.client.CreateRunAPI(apiTask)
+
+	// Debug: Log the API response
+	debug.LogToFilef("DEBUG: API response - err=%v, runPtr!=nil=%v\\n", err, runPtr != nil)
+
+	if err != nil {
+		return models.RunResponse{}, err
+	}
+	if runPtr == nil {
+		return models.RunResponse{}, fmt.Errorf("API returned nil response")
+	}
+
+	return *runPtr, nil
+}
+
 func (v *CreateRunView) submitRun() tea.Cmd {
 	return func() tea.Msg {
-		// Debug: Log entry into submitRun
-		debugInfo := "DEBUG: submitRun() called - starting submission process\n"
-		if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-			f.WriteString(debugInfo)
-			f.Close()
-		}
+		debug.LogToFile("DEBUG: submitRun() called - starting submission process\n")
 
 		// Save form data before submitting in case submission fails
 		v.saveFormData()
 
 		var task models.RunRequest
+		var err error
 
 		if v.useFileInput {
-			filePath := v.filePathInput.Value()
-			if filePath == "" {
-				return runCreatedMsg{err: fmt.Errorf("file path is required")}
-			}
-
-			data, err := os.ReadFile(filePath)
+			task, err = v.prepareTaskFromFile(v.filePathInput.Value())
 			if err != nil {
-				return runCreatedMsg{err: fmt.Errorf("failed to read file: %w", err)}
-			}
-
-			if err := json.Unmarshal(data, &task); err != nil {
-				return runCreatedMsg{err: fmt.Errorf("invalid JSON: %w", err)}
+				return runCreatedMsg{err: err}
 			}
 		} else {
-			task = models.RunRequest{
-				Title:      v.fields[0].Value(),
-				Repository: v.fields[1].Value(),
-				Source:     v.fields[2].Value(),
-				Target:     v.fields[3].Value(),
-				Prompt:     v.promptArea.Value(),
-				Context:    v.contextArea.Value(),
-				RunType:    models.RunTypeRun,
-			}
+			task = v.prepareTaskFromForm()
+			v.autoDetectGitInfo(&task)
 
-			// Debug logging - check each field individually
-			debugInfo := fmt.Sprintf("DEBUG: Raw field values - [0]='%s', [1]='%s', [2]='%s', [3]='%s', [4]='%s'\n",
-				v.fields[0].Value(), v.fields[1].Value(), v.fields[2].Value(), v.fields[3].Value(), v.fields[4].Value())
-			debugInfo += fmt.Sprintf("DEBUG: Prompt='%s', Context='%s'\n", v.promptArea.Value(), v.contextArea.Value())
-			debugInfo += fmt.Sprintf("DEBUG: Submit values - Title='%s', Repository='%s', Source='%s', Target='%s', Prompt='%s'\n",
-				task.Title, task.Repository, task.Source, task.Target, task.Prompt)
-			if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-				f.WriteString(debugInfo)
-				f.Close()
-			}
-
-			if task.Prompt == "" {
-				return runCreatedMsg{err: fmt.Errorf("prompt is required")}
-			}
-
-			if task.Repository == "" {
-				debugInfo = "DEBUG: Repository field empty, trying git auto-detect\n"
-				if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-					f.WriteString(debugInfo)
-					f.Close()
-				}
-				if repo, _, err := utils.GetGitInfo(); err == nil {
-					task.Repository = repo
-				}
-				if task.Repository == "" {
-					return runCreatedMsg{err: fmt.Errorf("repository is required")}
-				}
-			}
-
-			if task.Source == "" {
-				if _, branch, err := utils.GetGitInfo(); err == nil {
-					task.Source = branch
-				}
-				if task.Source == "" {
-					task.Source = "main"
-				}
-			}
-
-			if task.Target == "" {
-				task.Target = fmt.Sprintf("repobird/%d", time.Now().Unix())
+			if err := v.validateTask(&task); err != nil {
+				return runCreatedMsg{err: err}
 			}
 		}
 
-		// Convert to API-compatible format
-		apiTask := task.ToAPIRequest()
-
-		// Debug: Log the final task object being sent to API
-		debugInfo = fmt.Sprintf("DEBUG: Final API task object - Title='%s', RepositoryName='%s', SourceBranch='%s', TargetBranch='%s', Prompt='%s', Context='%s', RunType='%s'\\n",
-			apiTask.Title, apiTask.RepositoryName, apiTask.SourceBranch, apiTask.TargetBranch, apiTask.Prompt, apiTask.Context, apiTask.RunType)
-		if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-			f.WriteString(debugInfo)
-			f.Close()
-		}
-
-		runPtr, err := v.client.CreateRunAPI(apiTask)
-
-		// Debug: Log the API response
-		debugInfo = fmt.Sprintf("DEBUG: API response - err=%v, runPtr!=nil=%v\\n", err, runPtr != nil)
-		if f, err2 := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err2 == nil {
-			f.WriteString(debugInfo)
-			f.Close()
-		}
-
+		run, err := v.submitToAPI(task)
 		if err != nil {
 			return runCreatedMsg{err: err}
 		}
-		return runCreatedMsg{run: *runPtr, err: nil}
+
+		return runCreatedMsg{run: run, err: nil}
 	}
 }
 

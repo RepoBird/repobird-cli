@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/repobird/repobird-cli/internal/config"
 	"github.com/stretchr/testify/require"
 )
 
@@ -92,12 +93,12 @@ func SetupTestEnvironment(t *testing.T) (cleanup func()) {
 
 	// Set environment variables
 	origHome := os.Getenv("HOME")
-	origAPIKey := os.Getenv("REPOBIRD_API_KEY")
-	origAPIURL := os.Getenv("REPOBIRD_API_URL")
+	origAPIKey := os.Getenv(config.EnvAPIKey)
+	origAPIURL := os.Getenv(config.EnvAPIURL)
 
 	os.Setenv("HOME", tempDir)
-	os.Unsetenv("REPOBIRD_API_KEY")
-	os.Unsetenv("REPOBIRD_API_URL")
+	os.Unsetenv(config.EnvAPIKey)
+	os.Unsetenv(config.EnvAPIURL)
 
 	return func() {
 		os.RemoveAll(tempDir)
@@ -105,10 +106,10 @@ func SetupTestEnvironment(t *testing.T) (cleanup func()) {
 			os.Setenv("HOME", origHome)
 		}
 		if origAPIKey != "" {
-			os.Setenv("REPOBIRD_API_KEY", origAPIKey)
+			os.Setenv(config.EnvAPIKey, origAPIKey)
 		}
 		if origAPIURL != "" {
-			os.Setenv("REPOBIRD_API_URL", origAPIURL)
+			os.Setenv(config.EnvAPIURL, origAPIURL)
 		}
 	}
 }

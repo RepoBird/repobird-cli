@@ -28,7 +28,10 @@ func LoadConfig() (*Config, error) {
 	homeDir, err := os.UserHomeDir()
 	if err == nil {
 		configDir := filepath.Join(homeDir, ".repobird")
-		_ = os.MkdirAll(configDir, 0755)
+		if err := os.MkdirAll(configDir, 0755); err != nil {
+			// Log error but continue - config can still work from current directory
+			fmt.Fprintf(os.Stderr, "Warning: failed to create config directory %s: %v\n", configDir, err)
+		}
 		viper.AddConfigPath(configDir)
 	}
 
@@ -51,16 +54,16 @@ func LoadConfig() (*Config, error) {
 		return nil, fmt.Errorf("unable to decode config: %w", err)
 	}
 
-	if config.APIKey == "" && os.Getenv("REPOBIRD_API_KEY") != "" {
-		config.APIKey = os.Getenv("REPOBIRD_API_KEY")
+	if config.APIKey == "" && os.Getenv(EnvAPIKey) != "" {
+		config.APIKey = os.Getenv(EnvAPIKey)
 	}
 
 	if config.APIURL == "" {
 		config.APIURL = defaultConfig.APIURL
 	}
 
-	if os.Getenv("REPOBIRD_API_URL") != "" {
-		config.APIURL = os.Getenv("REPOBIRD_API_URL")
+	if os.Getenv(EnvAPIURL) != "" {
+		config.APIURL = os.Getenv(EnvAPIURL)
 	}
 
 	return &config, nil

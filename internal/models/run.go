@@ -1,7 +1,9 @@
 package models
 
 import (
+	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 )
 
@@ -61,45 +63,60 @@ func (r *RunRequest) ToAPIRequest() *APIRunRequest {
 }
 
 type RunResponse struct {
-	ID          interface{} `json:"id"` // Can be string or int from API
-	Status      RunStatus   `json:"status"`
-	Repository  string      `json:"repository"`
-	RepoId      int         `json:"repoId,omitempty"`
-	Source      string      `json:"source"`
-	Target      string      `json:"target"`
-	CreatedAt   time.Time   `json:"createdAt"`
-	UpdatedAt   time.Time   `json:"updatedAt"`
-	Prompt      string      `json:"prompt"`
-	Title       string      `json:"title,omitempty"`
-	Description string      `json:"description,omitempty"`
-	Context     string      `json:"context,omitempty"`
-	Error       string      `json:"error,omitempty"`
-	PrUrl       *string     `json:"prUrl,omitempty"`
-	RunType     string      `json:"runType,omitempty"`
+	ID          string    `json:"id"` // Now stored as string internally
+	Status      RunStatus `json:"status"`
+	Repository  string    `json:"repository"`
+	RepoID      int       `json:"repoId,omitempty"`
+	Source      string    `json:"source"`
+	Target      string    `json:"target"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+	Prompt      string    `json:"prompt"`
+	Title       string    `json:"title,omitempty"`
+	Description string    `json:"description,omitempty"`
+	Context     string    `json:"context,omitempty"`
+	Error       string    `json:"error,omitempty"`
+	PrURL       *string   `json:"prUrl,omitempty"`
+	RunType     string    `json:"runType,omitempty"`
 }
 
-// GetIDString returns the ID as a string regardless of its actual type
+// GetIDString returns the ID as a string
 func (r *RunResponse) GetIDString() string {
-	if r.ID == nil {
+	if r.ID == "" || r.ID == "null" {
 		return ""
 	}
-	switch v := r.ID.(type) {
-	case string:
-		if v == "null" {
-			return ""
-		}
-		return v
-	case float64:
-		return fmt.Sprintf("%.0f", v)
-	case int:
-		return fmt.Sprintf("%d", v)
-	default:
-		s := fmt.Sprintf("%v", v)
-		if s == "<nil>" || s == "null" {
-			return ""
-		}
-		return s
+	return r.ID
+}
+
+// UnmarshalJSON custom unmarshaler to handle ID field that can be string or number
+func (r *RunResponse) UnmarshalJSON(data []byte) error {
+	type Alias RunResponse
+	aux := &struct {
+		ID interface{} `json:"id"`
+		*Alias
+	}{
+		Alias: (*Alias)(r),
 	}
+
+	if err := json.Unmarshal(data, aux); err != nil {
+		return err
+	}
+
+	// Convert ID to string regardless of its type
+	if aux.ID != nil {
+		switch v := aux.ID.(type) {
+		case string:
+			r.ID = v
+		case float64:
+			r.ID = strconv.FormatFloat(v, 'f', 0, 64)
+		case int:
+			r.ID = strconv.Itoa(v)
+		default:
+			r.ID = fmt.Sprintf("%v", v)
+		}
+	}
+
+	return nil
 }
 
 type UserInfo struct {

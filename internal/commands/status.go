@@ -121,7 +121,9 @@ func listRuns(client *api.Client) error {
 		)
 	}
 
-	_ = w.Flush()
+	if err := w.Flush(); err != nil {
+		return fmt.Errorf("failed to flush output: %w", err)
+	}
 	return nil
 }
 

@@ -53,32 +53,32 @@ func TestLoadConfig_EnvironmentVariables(t *testing.T) {
 	_ = setupTempHome(t)
 
 	// Set environment variables
-	originalAPIURL := os.Getenv("REPOBIRD_API_URL")
-	originalAPIKey := os.Getenv("REPOBIRD_API_KEY")
-	originalDebug := os.Getenv("REPOBIRD_DEBUG")
+	originalAPIURL := os.Getenv(EnvAPIURL)
+	originalAPIKey := os.Getenv(EnvAPIKey)
+	originalDebug := os.Getenv(EnvDebug)
 
 	defer func() {
 		// Restore original values
 		if originalAPIURL != "" {
-			os.Setenv("REPOBIRD_API_URL", originalAPIURL)
+			os.Setenv(EnvAPIURL, originalAPIURL)
 		} else {
-			os.Unsetenv("REPOBIRD_API_URL")
+			os.Unsetenv(EnvAPIURL)
 		}
 		if originalAPIKey != "" {
-			os.Setenv("REPOBIRD_API_KEY", originalAPIKey)
+			os.Setenv(EnvAPIKey, originalAPIKey)
 		} else {
-			os.Unsetenv("REPOBIRD_API_KEY")
+			os.Unsetenv(EnvAPIKey)
 		}
 		if originalDebug != "" {
-			os.Setenv("REPOBIRD_DEBUG", originalDebug)
+			os.Setenv(EnvDebug, originalDebug)
 		} else {
-			os.Unsetenv("REPOBIRD_DEBUG")
+			os.Unsetenv(EnvDebug)
 		}
 	}()
 
-	os.Setenv("REPOBIRD_API_URL", "https://env.api.com")
-	os.Setenv("REPOBIRD_API_KEY", "env-key-456")
-	os.Setenv("REPOBIRD_DEBUG", "true")
+	os.Setenv(EnvAPIURL, "https://env.api.com")
+	os.Setenv(EnvAPIKey, "env-key-456")
+	os.Setenv(EnvDebug, "true")
 
 	config, err := LoadConfig()
 	require.NoError(t, err)
@@ -108,24 +108,24 @@ debug: false
 	require.NoError(t, err)
 
 	// Set environment variables (should override file)
-	originalAPIURL := os.Getenv("REPOBIRD_API_URL")
-	originalDebug := os.Getenv("REPOBIRD_DEBUG")
+	originalAPIURL := os.Getenv(EnvAPIURL)
+	originalDebug := os.Getenv(EnvDebug)
 
 	defer func() {
 		if originalAPIURL != "" {
-			os.Setenv("REPOBIRD_API_URL", originalAPIURL)
+			os.Setenv(EnvAPIURL, originalAPIURL)
 		} else {
-			os.Unsetenv("REPOBIRD_API_URL")
+			os.Unsetenv(EnvAPIURL)
 		}
 		if originalDebug != "" {
-			os.Setenv("REPOBIRD_DEBUG", originalDebug)
+			os.Setenv(EnvDebug, originalDebug)
 		} else {
-			os.Unsetenv("REPOBIRD_DEBUG")
+			os.Unsetenv(EnvDebug)
 		}
 	}()
 
-	os.Setenv("REPOBIRD_API_URL", "https://env-override.api.com")
-	os.Setenv("REPOBIRD_DEBUG", "true")
+	os.Setenv(EnvAPIURL, "https://env-override.api.com")
+	os.Setenv(EnvDebug, "true")
 
 	config, err := LoadConfig()
 	require.NoError(t, err)
@@ -155,11 +155,10 @@ structure
 	require.NoError(t, err)
 
 	config, err := LoadConfig()
-	// Should still work with defaults despite invalid file
-	require.NoError(t, err)
-	require.NotNil(t, config)
-
-	assert.Equal(t, "https://api.repobird.ai", config.APIURL)
+	// Should return an error for invalid YAML
+	require.Error(t, err)
+	require.Nil(t, config)
+	assert.Contains(t, err.Error(), "error reading config file")
 }
 
 func TestSaveConfig(t *testing.T) {

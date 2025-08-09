@@ -2,7 +2,6 @@ package views
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -12,12 +11,13 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"golang.design/x/clipboard"
 	"github.com/repobird/repobird-cli/internal/api"
 	"github.com/repobird/repobird-cli/internal/cache"
 	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/repobird/repobird-cli/internal/tui/components"
+	"github.com/repobird/repobird-cli/internal/tui/debug"
 	"github.com/repobird/repobird-cli/internal/tui/styles"
+	"golang.design/x/clipboard"
 )
 
 type RunDetailsView struct {
@@ -58,7 +58,18 @@ func NewRunDetailsView(client *api.Client, run models.RunResponse) *RunDetailsVi
 	return NewRunDetailsViewWithCache(client, run, runs, cached, cachedAt, detailsCache)
 }
 
-func NewRunDetailsViewWithCache(client *api.Client, run models.RunResponse, parentRuns []models.RunResponse, parentCached bool, parentCachedAt time.Time, parentDetailsCache map[string]*models.RunResponse) *RunDetailsView {
+// RunDetailsViewConfig holds configuration for creating a new RunDetailsView
+type RunDetailsViewConfig struct {
+	Client             *api.Client
+	Run                models.RunResponse
+	ParentRuns         []models.RunResponse
+	ParentCached       bool
+	ParentCachedAt     time.Time
+	ParentDetailsCache map[string]*models.RunResponse
+}
+
+// NewRunDetailsViewWithConfig creates a new RunDetailsView with the given configuration
+func NewRunDetailsViewWithConfig(config RunDetailsViewConfig) *RunDetailsView {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("63"))
@@ -67,42 +78,22 @@ func NewRunDetailsViewWithCache(client *api.Client, run models.RunResponse, pare
 
 	// Check if we have preloaded data for this run
 	needsLoading := true
+	run := config.Run
 	runID := run.GetIDString()
 
-	// Debug logging to file (since we can't use stdout in TUI)
-	debugInfo := fmt.Sprintf("DEBUG: NewRunDetailsViewWithCache - runID='%s', cacheSize=%d\n",
-		runID, len(parentDetailsCache))
-
-	if parentDetailsCache != nil {
-		// List all cache keys for debugging
-		cacheKeys := make([]string, 0, len(parentDetailsCache))
-		for k := range parentDetailsCache {
-			cacheKeys = append(cacheKeys, fmt.Sprintf("'%s'", k))
-		}
-		debugInfo += fmt.Sprintf("DEBUG: Cache keys: [%s]\n", strings.Join(cacheKeys, ", "))
-
-		if cachedRun, exists := parentDetailsCache[runID]; exists && cachedRun != nil {
-			debugInfo += fmt.Sprintf("DEBUG: Cache HIT for runID='%s'\n", runID)
-			debugInfo += fmt.Sprintf("DEBUG: Cached run data - ID='%s', Title='%s', Repository='%s', Status='%s', Source='%s'\n",
-				cachedRun.GetIDString(), cachedRun.Title, cachedRun.Repository, cachedRun.Status, cachedRun.Source)
+	// Check cache for preloaded data
+	if config.ParentDetailsCache != nil {
+		if cachedRun, exists := config.ParentDetailsCache[runID]; exists && cachedRun != nil {
+			debug.LogToFilef("DEBUG: Cache HIT for runID='%s'\n", runID)
 			run = *cachedRun
 			needsLoading = false
 		} else {
-			debugInfo += fmt.Sprintf("DEBUG: Cache MISS for runID='%s' (exists=%v, cachedRun!=nil=%v)\n",
-				runID, exists, cachedRun != nil)
+			debug.LogToFilef("DEBUG: Cache MISS for runID='%s'\n", runID)
 		}
-	} else {
-		debugInfo += "DEBUG: parentDetailsCache is nil\n"
-	}
-
-	// Write debug info to a temporary file
-	if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-		f.WriteString(debugInfo)
-		f.Close()
 	}
 
 	v := &RunDetailsView{
-		client:             client,
+		client:             config.Client,
 		run:                run,
 		keys:               components.DefaultKeyMap,
 		help:               help.New(),
@@ -110,19 +101,13 @@ func NewRunDetailsViewWithCache(client *api.Client, run models.RunResponse, pare
 		spinner:            s,
 		loading:            needsLoading,
 		showLogs:           false,
-		parentRuns:         parentRuns,
-		parentCached:       parentCached,
-		parentCachedAt:     parentCachedAt,
-		parentDetailsCache: parentDetailsCache,
+		parentRuns:         config.ParentRuns,
+		parentCached:       config.ParentCached,
+		parentCachedAt:     config.ParentCachedAt,
+		parentDetailsCache: config.ParentDetailsCache,
 		statusHistory:      make([]string, 0),
 		cacheRetryCount:    0,
 		maxCacheRetries:    3,
-	}
-
-	debugInfo += fmt.Sprintf("DEBUG: Created view with loading=%v\n", needsLoading)
-	if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-		f.WriteString(debugInfo)
-		f.Close()
 	}
 
 	// Initialize status history with current status if we have cached data
@@ -134,16 +119,33 @@ func NewRunDetailsViewWithCache(client *api.Client, run models.RunResponse, pare
 	return v
 }
 
+// NewRunDetailsViewWithCache maintains backward compatibility
+func NewRunDetailsViewWithCache(
+	client *api.Client,
+	run models.RunResponse,
+	parentRuns []models.RunResponse,
+	parentCached bool,
+	parentCachedAt time.Time,
+	parentDetailsCache map[string]*models.RunResponse,
+) *RunDetailsView {
+	config := RunDetailsViewConfig{
+		Client:             client,
+		Run:                run,
+		ParentRuns:         parentRuns,
+		ParentCached:       parentCached,
+		ParentCachedAt:     parentCachedAt,
+		ParentDetailsCache: parentDetailsCache,
+	}
+
+	return NewRunDetailsViewWithConfig(config)
+}
+
 func (v *RunDetailsView) Init() tea.Cmd {
 	// Initialize clipboard
 	err := clipboard.Init()
 	if err != nil {
 		// Log error but don't fail - clipboard may not be available in some environments
-		debugInfo := fmt.Sprintf("DEBUG: Failed to initialize clipboard: %v\n", err)
-		if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-			f.WriteString(debugInfo)
-			f.Close()
-		}
+		debug.LogToFilef("DEBUG: Failed to initialize clipboard: %v\n", err)
 	}
 
 	var cmds []tea.Cmd
@@ -155,11 +157,7 @@ func (v *RunDetailsView) Init() tea.Cmd {
 			runID := v.run.GetIDString()
 			if cachedRun, exists := v.parentDetailsCache[runID]; exists && cachedRun != nil {
 				// Cache hit on retry!
-				debugInfo := fmt.Sprintf("DEBUG: Cache retry successful for runID='%s'\n", runID)
-				if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-					f.WriteString(debugInfo)
-					f.Close()
-				}
+				debug.LogToFilef("DEBUG: Cache retry successful for runID='%s'\n", runID)
 
 				v.run = *cachedRun
 				v.loading = false
@@ -184,87 +182,132 @@ func (v *RunDetailsView) Init() tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
+// handleWindowSizeMsg handles window resize events
+func (v *RunDetailsView) handleWindowSizeMsg(msg tea.WindowSizeMsg) {
+	v.width = msg.Width
+	v.height = msg.Height
+	v.viewport.Width = msg.Width
+	v.viewport.Height = msg.Height - 8
+	v.help.Width = msg.Width
+}
+
+// handleKeyInput handles all key input events
+func (v *RunDetailsView) handleKeyInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	var cmds []tea.Cmd
+
+	switch {
+	case key.Matches(msg, v.keys.Quit):
+		v.stopPolling()
+		return v, tea.Quit
+	case key.Matches(msg, v.keys.Back):
+		v.stopPolling()
+		return NewRunListView(v.client), nil
+	case key.Matches(msg, v.keys.Help):
+		v.showHelp = !v.showHelp
+	case key.Matches(msg, v.keys.Refresh):
+		v.loading = true
+		v.error = nil
+		cmds = append(cmds, v.loadRunDetails())
+		cmds = append(cmds, v.spinner.Tick)
+	case msg.String() == "l":
+		v.showLogs = !v.showLogs
+		v.updateContent()
+	default:
+		// Handle clipboard operations
+		if cmd := v.handleClipboardOperations(msg.String()); cmd != nil {
+			cmds = append(cmds, cmd)
+		} else {
+			// Handle viewport navigation
+			v.handleViewportNavigation(msg)
+		}
+	}
+
+	return v, tea.Batch(cmds...)
+}
+
+// handleClipboardOperations handles clipboard-related key presses
+func (v *RunDetailsView) handleClipboardOperations(key string) tea.Cmd {
+	switch key {
+	case "y":
+		// Copy current line to clipboard
+		if err := v.copyCurrentLine(); err == nil {
+			v.copiedMessage = "✓ Copied current line"
+		} else {
+			v.copiedMessage = "✗ Failed to copy"
+		}
+		v.copiedMessageTime = time.Now()
+		return nil
+	case "Y":
+		// Copy all content to clipboard
+		if err := v.copyAllContent(); err == nil {
+			v.copiedMessage = "✓ Copied all content"
+		} else {
+			v.copiedMessage = "✗ Failed to copy"
+		}
+		v.copiedMessageTime = time.Now()
+		return nil
+	}
+	return nil
+}
+
+// handleViewportNavigation handles viewport scrolling keys
+func (v *RunDetailsView) handleViewportNavigation(msg tea.KeyMsg) {
+	switch {
+	case key.Matches(msg, v.keys.Up):
+		v.viewport.ScrollUp(1)
+	case key.Matches(msg, v.keys.Down):
+		v.viewport.ScrollDown(1)
+	case key.Matches(msg, v.keys.PageUp):
+		v.viewport.HalfPageUp()
+	case key.Matches(msg, v.keys.PageDown):
+		v.viewport.HalfPageDown()
+	case key.Matches(msg, v.keys.Home):
+		v.viewport.GotoTop()
+	case key.Matches(msg, v.keys.End):
+		v.viewport.GotoBottom()
+	}
+}
+
+// handleRunDetailsLoaded handles the runDetailsLoadedMsg message
+func (v *RunDetailsView) handleRunDetailsLoaded(msg runDetailsLoadedMsg) {
+	v.loading = false
+	v.run = msg.run
+	v.error = msg.err
+	if msg.err == nil {
+		v.updateStatusHistory(string(msg.run.Status))
+	}
+	v.updateContent()
+
+	// Debug logging for successful load
+	debug.LogToFilef("DEBUG: Successfully loaded run details for '%s'\n", msg.run.GetIDString())
+}
+
+// handlePolling handles the pollTickMsg message
+func (v *RunDetailsView) handlePolling(msg pollTickMsg) []tea.Cmd {
+	var cmds []tea.Cmd
+	if models.IsActiveStatus(string(v.run.Status)) {
+		cmds = append(cmds, v.loadRunDetails())
+	} else {
+		v.stopPolling()
+	}
+	return cmds
+}
+
 func (v *RunDetailsView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		v.width = msg.Width
-		v.height = msg.Height
-		v.viewport.Width = msg.Width
-		v.viewport.Height = msg.Height - 8
-		v.help.Width = msg.Width
+		v.handleWindowSizeMsg(msg)
 
 	case tea.KeyMsg:
-		switch {
-		case key.Matches(msg, v.keys.Quit):
-			v.stopPolling()
-			return v, tea.Quit
-		case key.Matches(msg, v.keys.Back):
-			v.stopPolling()
-			return NewRunListView(v.client), nil
-		case key.Matches(msg, v.keys.Help):
-			v.showHelp = !v.showHelp
-		case key.Matches(msg, v.keys.Refresh):
-			v.loading = true
-			v.error = nil
-			cmds = append(cmds, v.loadRunDetails())
-			cmds = append(cmds, v.spinner.Tick)
-		case msg.String() == "l":
-			v.showLogs = !v.showLogs
-			v.updateContent()
-		case msg.String() == "y":
-			// Copy current line to clipboard
-			if err := v.copyCurrentLine(); err == nil {
-				v.copiedMessage = "✓ Copied current line"
-			} else {
-				v.copiedMessage = "✗ Failed to copy"
-			}
-			v.copiedMessageTime = time.Now()
-		case msg.String() == "Y":
-			// Copy all content to clipboard
-			if err := v.copyAllContent(); err == nil {
-				v.copiedMessage = "✓ Copied all content"
-			} else {
-				v.copiedMessage = "✗ Failed to copy"
-			}
-			v.copiedMessageTime = time.Now()
-		case key.Matches(msg, v.keys.Up):
-			v.viewport.LineUp(1)
-		case key.Matches(msg, v.keys.Down):
-			v.viewport.LineDown(1)
-		case key.Matches(msg, v.keys.PageUp):
-			v.viewport.HalfViewUp()
-		case key.Matches(msg, v.keys.PageDown):
-			v.viewport.HalfViewDown()
-		case key.Matches(msg, v.keys.Home):
-			v.viewport.GotoTop()
-		case key.Matches(msg, v.keys.End):
-			v.viewport.GotoBottom()
-		}
+		return v.handleKeyInput(msg)
 
 	case runDetailsLoadedMsg:
-		v.loading = false
-		v.run = msg.run
-		v.error = msg.err
-		if msg.err == nil {
-			v.updateStatusHistory(string(msg.run.Status))
-		}
-		v.updateContent()
-
-		// Debug logging for successful load
-		debugInfo := fmt.Sprintf("DEBUG: Successfully loaded run details for '%s'\n", msg.run.GetIDString())
-		if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-			f.WriteString(debugInfo)
-			f.Close()
-		}
+		v.handleRunDetailsLoaded(msg)
 
 	case pollTickMsg:
-		if isActiveStatus(string(v.run.Status)) {
-			cmds = append(cmds, v.loadRunDetails())
-		} else {
-			v.stopPolling()
-		}
+		cmds = append(cmds, v.handlePolling(msg)...)
 
 	case spinner.TickMsg:
 		if v.loading {
@@ -331,7 +374,7 @@ func (v *RunDetailsView) renderHeader() string {
 
 	header := styles.TitleStyle.MaxWidth(v.width).Render(title)
 
-	if isActiveStatus(string(v.run.Status)) {
+	if models.IsActiveStatus(string(v.run.Status)) {
 		pollingIndicator := styles.ProcessingStyle.Render(" [Polling ⟳]")
 		header += pollingIndicator
 	}
@@ -424,59 +467,39 @@ func (v *RunDetailsView) loadRunDetails() tea.Cmd {
 	return func() tea.Msg {
 		if originalRunID == "" {
 			// Debug: Log empty run ID issue
-			debugInfo := "DEBUG: LoadRunDetails called with empty runID - returning error\n"
-			if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-				f.WriteString(debugInfo)
-				f.Close()
-			}
+			debug.LogToFile("DEBUG: LoadRunDetails called with empty runID - returning error\n")
 			return runDetailsLoadedMsg{run: originalRun, err: fmt.Errorf("invalid run ID: empty string")}
 		}
 
 		// Debug: Log API call for run details
-		debugInfo := fmt.Sprintf("DEBUG: LoadRunDetails calling GetRun for runID='%s'\n", originalRunID)
-		if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-			f.WriteString(debugInfo)
-			f.Close()
-		}
+		debug.LogToFilef("DEBUG: LoadRunDetails calling GetRun for runID='%s'\n", originalRunID)
 
 		runPtr, err := v.client.GetRun(originalRunID)
 		if err != nil {
-			debugInfo = fmt.Sprintf("DEBUG: GetRun failed for runID='%s', err=%v\n", originalRunID, err)
-			if f, err2 := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err2 == nil {
-				f.WriteString(debugInfo)
-				f.Close()
-			}
+			debug.LogToFilef("DEBUG: GetRun failed for runID='%s', err=%v\n", originalRunID, err)
 			return runDetailsLoadedMsg{run: originalRun, err: fmt.Errorf("API error for run %s: %w", originalRunID, err)}
 		}
 
 		if runPtr == nil {
-			debugInfo = fmt.Sprintf("DEBUG: GetRun returned nil for runID='%s'\n", originalRunID)
-			if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-				f.WriteString(debugInfo)
-				f.Close()
-			}
+			debug.LogToFilef("DEBUG: GetRun returned nil for runID='%s'\n", originalRunID)
 			return runDetailsLoadedMsg{run: originalRun, err: fmt.Errorf("API returned nil for run %s", originalRunID)}
 		}
 
 		// Ensure the returned run has the correct ID
 		updatedRun := *runPtr
-		if updatedRun.GetIDString() == "" && originalRun.ID != nil {
+		if updatedRun.GetIDString() == "" && originalRun.ID != "" {
 			updatedRun.ID = originalRun.ID
 		}
 
-		debugInfo = fmt.Sprintf("DEBUG: LoadRunDetails successful for runID='%s', newID='%s'\n", 
+		debug.LogToFilef("DEBUG: LoadRunDetails successful for runID='%s', newID='%s'\n",
 			originalRunID, updatedRun.GetIDString())
-		if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-			f.WriteString(debugInfo)
-			f.Close()
-		}
 
 		return runDetailsLoadedMsg{run: updatedRun, err: nil}
 	}
 }
 
 func (v *RunDetailsView) startPolling() tea.Cmd {
-	if !isActiveStatus(string(v.run.Status)) {
+	if !models.IsActiveStatus(string(v.run.Status)) {
 		return nil
 	}
 
@@ -538,7 +561,7 @@ func (v *RunDetailsView) copyCurrentLine() error {
 			return nil
 		}
 	}
-	
+
 	return fmt.Errorf("no line to copy")
 }
 

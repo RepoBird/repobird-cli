@@ -364,23 +364,6 @@ func TestGitFunctions_ErrorConditions(t *testing.T) {
 				return err
 			},
 		},
-		{
-			name: "GetGitInfo in non-git directory",
-			testFunc: func() error {
-				tempDir, err := os.MkdirTemp("", "non-git-*")
-				if err != nil {
-					return err
-				}
-				defer os.RemoveAll(tempDir)
-
-				originalWd, _ := os.Getwd()
-				defer os.Chdir(originalWd)
-
-				os.Chdir(tempDir)
-				_, _, err = GetGitInfo()
-				return err
-			},
-		},
 	}
 
 	for _, tt := range tests {

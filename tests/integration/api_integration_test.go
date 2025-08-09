@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/repobird/repobird-cli/internal/api"
+	"github.com/repobird/repobird-cli/internal/config"
 	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/repobird/repobird-cli/tests/helpers"
 )
@@ -151,29 +152,29 @@ func TestAPIClient_WithEnvironment(t *testing.T) {
 	mockServer := helpers.NewMockAPIServer(t)
 
 	// Set up environment
-	originalAPIURL := os.Getenv("REPOBIRD_API_URL")
-	originalAPIKey := os.Getenv("REPOBIRD_API_KEY")
+	originalAPIURL := os.Getenv(config.EnvAPIURL)
+	originalAPIKey := os.Getenv(config.EnvAPIKey)
 
 	defer func() {
 		if originalAPIURL != "" {
-			os.Setenv("REPOBIRD_API_URL", originalAPIURL)
+			os.Setenv(config.EnvAPIURL, originalAPIURL)
 		} else {
-			os.Unsetenv("REPOBIRD_API_URL")
+			os.Unsetenv(config.EnvAPIURL)
 		}
 		if originalAPIKey != "" {
-			os.Setenv("REPOBIRD_API_KEY", originalAPIKey)
+			os.Setenv(config.EnvAPIKey, originalAPIKey)
 		} else {
-			os.Unsetenv("REPOBIRD_API_KEY")
+			os.Unsetenv(config.EnvAPIKey)
 		}
 	}()
 
-	os.Setenv("REPOBIRD_API_URL", mockServer.URL())
-	os.Setenv("REPOBIRD_API_KEY", "env-test-key")
+	os.Setenv(config.EnvAPIURL, mockServer.URL())
+	os.Setenv(config.EnvAPIKey, "env-test-key")
 
 	mockServer.SetAuthVerifyResponse(true)
 
 	// Client should use environment variables
-	client := api.NewClient(os.Getenv("REPOBIRD_API_KEY"), os.Getenv("REPOBIRD_API_URL"), false)
+	client := api.NewClient(os.Getenv(config.EnvAPIKey), os.Getenv(config.EnvAPIURL), false)
 
 	userInfo, err := client.VerifyAuth()
 	require.NoError(t, err)

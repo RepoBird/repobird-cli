@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/repobird/repobird-cli/internal/errors"
@@ -66,12 +68,16 @@ func (c *Client) doRequest(method, path string, body interface{}) (*http.Respons
 	req.Header.Set("Accept", "application/json")
 
 	if c.debug {
-		fmt.Printf("Request: %s %s\n", method, req.URL.String())
-		// Mask the Authorization header for security
-		fmt.Printf("Authorization: %s\n", utils.RedactAuthHeader(req.Header.Get("Authorization")))
+		logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
+		logger.Debug("API request",
+			"method", method,
+			"url", req.URL.String(),
+			"authorization", utils.RedactAuthHeader(req.Header.Get("Authorization")),
+			"has_body", body != nil,
+		)
 		if body != nil {
 			b, _ := json.MarshalIndent(body, "", "  ")
-			fmt.Printf("Body: %s\n", string(b))
+			logger.Debug("Request body", "body", string(b))
 		}
 	}
 
@@ -86,22 +92,22 @@ func (c *Client) doRequest(method, path string, body interface{}) (*http.Respons
 	}
 
 	if c.debug {
-		fmt.Printf("Response Status: %s\n", resp.Status)
+		logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
+		logger.Debug("API response", "status", resp.Status)
 	}
 
 	return resp, nil
 }
 
 func (c *Client) CreateRun(request *models.RunRequest) (*models.RunResponse, error) {
-	resp, err := c.doRequest("POST", "/api/v1/runs", request)
+	resp, err := c.doRequest("POST", EndpointRuns, request)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, errors.ParseAPIError(resp.StatusCode, body)
+	if err := ValidateResponseOKOrCreated(resp); err != nil {
+		return nil, err
 	}
 
 	var runResp models.RunResponse
@@ -113,15 +119,14 @@ func (c *Client) CreateRun(request *models.RunRequest) (*models.RunResponse, err
 }
 
 func (c *Client) CreateRunAPI(request *models.APIRunRequest) (*models.RunResponse, error) {
-	resp, err := c.doRequest("POST", "/api/v1/runs", request)
+	resp, err := c.doRequest("POST", EndpointRuns, request)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, errors.ParseAPIError(resp.StatusCode, body)
+	if err := ValidateResponseOKOrCreated(resp); err != nil {
+		return nil, err
 	}
 
 	// Read the response body for debugging
@@ -131,7 +136,8 @@ func (c *Client) CreateRunAPI(request *models.APIRunRequest) (*models.RunRespons
 	}
 
 	if c.debug {
-		fmt.Printf("CreateRunAPI Response Body: %s\n", string(body))
+		logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
+		logger.Debug("CreateRunAPI response", "body", string(body))
 	}
 
 	// The CreateRun API returns a wrapped response: {data: {id, message, status}}
@@ -154,8 +160,20 @@ func (c *Client) CreateRunAPI(request *models.APIRunRequest) (*models.RunRespons
 	}
 
 	// Convert the create response to RunResponse format
+	var idStr string
+	switch v := createResp.Data.ID.(type) {
+	case string:
+		idStr = v
+	case float64:
+		idStr = fmt.Sprintf("%.0f", v)
+	case int:
+		idStr = fmt.Sprintf("%d", v)
+	default:
+		idStr = fmt.Sprintf("%v", v)
+	}
+
 	runResp := &models.RunResponse{
-		ID:     createResp.Data.ID,
+		ID:     idStr,
 		Status: models.RunStatus(createResp.Data.Status),
 	}
 
@@ -163,15 +181,14 @@ func (c *Client) CreateRunAPI(request *models.APIRunRequest) (*models.RunRespons
 }
 
 func (c *Client) GetRun(id string) (*models.RunResponse, error) {
-	resp, err := c.doRequest("GET", fmt.Sprintf("/api/v1/runs/%s", id), nil)
+	resp, err := c.doRequest("GET", RunDetailsURL(id), nil)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, errors.ParseAPIError(resp.StatusCode, body)
+	if err := ValidateResponseOK(resp); err != nil {
+		return nil, err
 	}
 
 	// Read the response body for debugging if needed
@@ -181,7 +198,8 @@ func (c *Client) GetRun(id string) (*models.RunResponse, error) {
 	}
 
 	if c.debug {
-		fmt.Printf("GetRun Response Body: %s\n", string(body))
+		logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
+		logger.Debug("GetRun response", "body", string(body))
 	}
 
 	// Try to decode as SingleRunResponse first (wrapped response)
@@ -194,7 +212,8 @@ func (c *Client) GetRun(id string) (*models.RunResponse, error) {
 	var runResp models.RunResponse
 	if err := json.Unmarshal(body, &runResp); err != nil {
 		if c.debug {
-			fmt.Printf("Failed to decode GetRun response: %v\n", err)
+			logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
+			logger.Debug("Failed to decode GetRun response", "error", err)
 		}
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
@@ -203,16 +222,15 @@ func (c *Client) GetRun(id string) (*models.RunResponse, error) {
 }
 
 func (c *Client) ListRuns(limit, offset int) ([]*models.RunResponse, error) {
-	path := fmt.Sprintf("/api/v1/runs?limit=%d&offset=%d", limit, offset)
+	path := RunsListURL(limit, offset)
 	resp, err := c.doRequest("GET", path, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, errors.ParseAPIError(resp.StatusCode, body)
+	if err := ValidateResponseOK(resp); err != nil {
+		return nil, err
 	}
 
 	// Read the response body for debugging if needed
@@ -222,7 +240,8 @@ func (c *Client) ListRuns(limit, offset int) ([]*models.RunResponse, error) {
 	}
 
 	if c.debug {
-		fmt.Printf("Response Body: %s\n", string(body))
+		logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
+		logger.Debug("ListRuns response", "body", string(body))
 	}
 
 	// Try to decode as ListRunsResponse first (paginated response)
@@ -235,7 +254,8 @@ func (c *Client) ListRuns(limit, offset int) ([]*models.RunResponse, error) {
 	var runs []*models.RunResponse
 	if err := json.Unmarshal(body, &runs); err != nil {
 		if c.debug {
-			fmt.Printf("Failed to decode as array: %v\n", err)
+			logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
+			logger.Debug("Failed to decode as array", "error", err)
 		}
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
@@ -244,15 +264,14 @@ func (c *Client) ListRuns(limit, offset int) ([]*models.RunResponse, error) {
 }
 
 func (c *Client) VerifyAuth() (*models.UserInfo, error) {
-	resp, err := c.doRequest("GET", "/api/v1/auth/verify", nil)
+	resp, err := c.doRequest("GET", EndpointAuthVerify, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, errors.ParseAPIError(resp.StatusCode, body)
+	if err := ValidateResponseOK(resp); err != nil {
+		return nil, err
 	}
 
 	var userInfo models.UserInfo
@@ -276,8 +295,8 @@ func (c *Client) doRequestWithRetry(ctx context.Context, method, path string, bo
 
 			// Check if response indicates a retryable error
 			if resp.StatusCode >= 500 || resp.StatusCode == 429 || resp.StatusCode == 408 {
+				defer func() { _ = resp.Body.Close() }()
 				bodyBytes, _ := io.ReadAll(resp.Body)
-				resp.Body.Close()
 				return errors.ParseAPIError(resp.StatusCode, bodyBytes)
 			}
 
@@ -293,15 +312,14 @@ func (c *Client) doRequestWithRetry(ctx context.Context, method, path string, bo
 }
 
 func (c *Client) CreateRunWithRetry(ctx context.Context, request *models.RunRequest) (*models.RunResponse, error) {
-	resp, err := c.doRequestWithRetry(ctx, "POST", "/api/v1/runs", request)
+	resp, err := c.doRequestWithRetry(ctx, "POST", EndpointRuns, request)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, errors.ParseAPIError(resp.StatusCode, body)
+	if err := ValidateResponseOKOrCreated(resp); err != nil {
+		return nil, err
 	}
 
 	var runResp models.RunResponse
@@ -313,15 +331,14 @@ func (c *Client) CreateRunWithRetry(ctx context.Context, request *models.RunRequ
 }
 
 func (c *Client) GetRunWithRetry(ctx context.Context, id string) (*models.RunResponse, error) {
-	resp, err := c.doRequestWithRetry(ctx, "GET", fmt.Sprintf("/api/v1/runs/%s", id), nil)
+	resp, err := c.doRequestWithRetry(ctx, "GET", RunDetailsURL(id), nil)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, errors.ParseAPIError(resp.StatusCode, body)
+	if err := ValidateResponseOK(resp); err != nil {
+		return nil, err
 	}
 
 	// Read the response body for debugging if needed
@@ -331,7 +348,8 @@ func (c *Client) GetRunWithRetry(ctx context.Context, id string) (*models.RunRes
 	}
 
 	if c.debug {
-		fmt.Printf("GetRunWithRetry Response Body: %s\n", string(body))
+		logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
+		logger.Debug("GetRunWithRetry response", "body", string(body))
 	}
 
 	// Try to decode as SingleRunResponse first (wrapped response)
@@ -344,7 +362,8 @@ func (c *Client) GetRunWithRetry(ctx context.Context, id string) (*models.RunRes
 	var runResp models.RunResponse
 	if err := json.Unmarshal(body, &runResp); err != nil {
 		if c.debug {
-			fmt.Printf("Failed to decode GetRunWithRetry response: %v\n", err)
+			logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
+			logger.Debug("Failed to decode GetRunWithRetry response", "error", err)
 		}
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}

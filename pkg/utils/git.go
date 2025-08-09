@@ -31,20 +31,110 @@ func DetectRepository() (string, error) {
 
 func parseGitURL(url string) string {
 	url = strings.TrimSpace(url)
-
-	if strings.HasPrefix(url, "git@github.com:") {
-		repo := strings.TrimPrefix(url, "git@github.com:")
-		repo = strings.TrimSuffix(repo, ".git")
-		return repo
+	if url == "" {
+		return ""
 	}
 
-	if strings.Contains(url, "github.com/") {
-		parts := strings.Split(url, "github.com/")
-		if len(parts) > 1 {
-			repo := parts[1]
-			repo = strings.TrimSuffix(repo, ".git")
-			return repo
+	// Handle SSH URLs with ssh:// protocol
+	if strings.HasPrefix(url, "ssh://") {
+		// Format: ssh://git@host:port/path or ssh://git@host/path
+		url = strings.TrimPrefix(url, "ssh://")
+		// Remove git@ prefix if present
+		url = strings.TrimPrefix(url, "git@")
+
+		// Now we have host:port/path or host/path
+		// Find the path part (after the first /)
+		idx := strings.Index(url, "/")
+		if idx == -1 {
+			return ""
 		}
+
+		path := url[idx+1:]
+		path = strings.TrimSuffix(path, ".git")
+		path = strings.Trim(path, "/")
+
+		// Validate we have at least org/repo
+		pathParts := strings.Split(path, "/")
+		if len(pathParts) < 2 {
+			return ""
+		}
+
+		return path
+	}
+
+	// Handle SSH URLs (git@host:path format)
+	if strings.HasPrefix(url, "git@") {
+		// Format: git@host:org/repo.git or git@host:port:org/repo.git
+		parts := strings.SplitN(url, ":", 2)
+		if len(parts) < 2 {
+			return ""
+		}
+
+		// Get the path part after the colon
+		path := parts[1]
+
+		// Handle SSH with custom port (git@host:port:path)
+		// This would have 3 parts when split by colon
+		if strings.Contains(parts[0], ":") || strings.Contains(path, ":") {
+			// Re-split to handle port
+			allParts := strings.Split(url, ":")
+			if len(allParts) >= 3 {
+				// Last part is the path
+				path = allParts[len(allParts)-1]
+			}
+		}
+
+		// Clean up the path
+		path = strings.TrimSuffix(path, ".git")
+		path = strings.Trim(path, "/")
+
+		// Validate we have at least org/repo
+		pathParts := strings.Split(path, "/")
+		if len(pathParts) < 2 {
+			return ""
+		}
+
+		return path
+	}
+
+	// Handle HTTPS URLs
+	if strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://") {
+		// Remove query parameters and fragments
+		if idx := strings.Index(url, "?"); idx != -1 {
+			url = url[:idx]
+		}
+		if idx := strings.Index(url, "#"); idx != -1 {
+			url = url[:idx]
+		}
+
+		// Parse the URL to extract the path
+		// Remove protocol
+		url = strings.TrimPrefix(url, "https://")
+		url = strings.TrimPrefix(url, "http://")
+
+		// Remove credentials if present (user:pass@host)
+		if idx := strings.Index(url, "@"); idx != -1 {
+			url = url[idx+1:]
+		}
+
+		// Split by first slash to separate host from path
+		parts := strings.SplitN(url, "/", 2)
+		if len(parts) < 2 {
+			return ""
+		}
+
+		// Get the path part
+		path := parts[1]
+		path = strings.TrimSuffix(path, ".git")
+		path = strings.Trim(path, "/")
+
+		// Validate we have at least org/repo
+		pathParts := strings.Split(path, "/")
+		if len(pathParts) < 2 {
+			return ""
+		}
+
+		return path
 	}
 
 	return ""

@@ -73,7 +73,7 @@ func (s *SecureStorage) SaveAPIKey(apiKey string) error {
 // GetAPIKey retrieves the API key from secure storage
 func (s *SecureStorage) GetAPIKey() (string, error) {
 	// Check environment variable first (highest priority)
-	if envKey := os.Getenv("REPOBIRD_API_KEY"); envKey != "" {
+	if envKey := os.Getenv(EnvAPIKey); envKey != "" {
 		return envKey, nil
 	}
 
@@ -95,7 +95,10 @@ func (s *SecureStorage) GetAPIKey() (string, error) {
 	apiKey = s.getPlainTextAPIKey()
 	if apiKey != "" {
 		// Migrate to secure storage
-		_ = s.SaveAPIKey(apiKey)
+		if err := s.SaveAPIKey(apiKey); err != nil {
+			// Log migration failure but continue - API key is still available
+			fmt.Fprintf(os.Stderr, "Warning: failed to migrate API key to secure storage: %v\n", err)
+		}
 		return apiKey, nil
 	}
 
@@ -254,7 +257,10 @@ func (s *SecureStorage) removeAPIKeyFromConfig() {
 	}
 
 	// Rewrite config without API key
-	_ = os.WriteFile(configFile, []byte(joinLines(newLines)), 0644)
+	if err := os.WriteFile(configFile, []byte(joinLines(newLines)), 0644); err != nil {
+		// Log error but don't fail - API key might already be removed from memory
+		fmt.Fprintf(os.Stderr, "Warning: failed to update config file %s: %v\n", configFile, err)
+	}
 }
 
 // isKeyringAvailable checks if system keyring is available
@@ -411,7 +417,7 @@ func (sc *SecureConfig) GetStorageInfo() map[string]interface{} {
 	info := make(map[string]interface{})
 
 	// Check environment variable
-	if os.Getenv("REPOBIRD_API_KEY") != "" {
+	if os.Getenv(EnvAPIKey) != "" {
 		info["source"] = "environment"
 		info["secure"] = true
 		return info

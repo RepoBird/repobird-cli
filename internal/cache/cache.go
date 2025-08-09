@@ -44,16 +44,52 @@ type GlobalCache struct {
 
 	// Form persistence
 	formData *FormData
+
+	// Persistent file cache
+	persistentCache *PersistentCache
 }
 
-var globalCache = &GlobalCache{
-	details:         make(map[string]*models.RunResponse),
-	detailsAt:       make(map[string]time.Time),
-	terminalDetails: make(map[string]*models.RunResponse),
+var globalCache *GlobalCache
+
+// Initialize cache on package initialization
+func init() {
+	initializeCache()
+}
+
+func initializeCache() {
+	pc, err := NewPersistentCache()
+	if err != nil {
+		// Fall back to memory-only cache if persistent cache fails
+		pc = nil
+	}
+
+	globalCache = &GlobalCache{
+		details:         make(map[string]*models.RunResponse),
+		detailsAt:       make(map[string]time.Time),
+		terminalDetails: make(map[string]*models.RunResponse),
+		persistentCache: pc,
+	}
+
+	// Load persisted terminal runs on startup
+	if pc != nil {
+		if terminalRuns, err := pc.LoadAllTerminalRuns(); err == nil {
+			globalCache.terminalDetails = terminalRuns
+		}
+		// Clean up old cache entries (older than 30 days)
+		go func() {
+			_ = pc.CleanOldCache(30 * 24 * time.Hour)
+		}()
+	}
 }
 
 // GetCachedList returns the cached run list if it's still valid (< 30 seconds old)
-func GetCachedList() (runs []models.RunResponse, cached bool, cachedAt time.Time, details map[string]*models.RunResponse, selectedIndex int) {
+func GetCachedList() (
+	runs []models.RunResponse,
+	cached bool,
+	cachedAt time.Time,
+	details map[string]*models.RunResponse,
+	selectedIndex int,
+) {
 	globalCache.mu.RLock()
 	defer globalCache.mu.RUnlock()
 
@@ -119,6 +155,12 @@ func SetCachedList(runs []models.RunResponse, details map[string]*models.RunResp
 				if isTerminalStatus(v.Status) {
 					// Store terminal runs permanently
 					globalCache.terminalDetails[k] = v
+					// Also persist to disk if available
+					if globalCache.persistentCache != nil {
+						go func(run *models.RunResponse) {
+							_ = globalCache.persistentCache.SaveRun(run)
+						}(v)
+					}
 				} else {
 					// Store active runs temporarily
 					globalCache.details[k] = v
@@ -152,6 +194,12 @@ func AddCachedDetail(runID string, run *models.RunResponse) {
 			// Remove from active cache if it was there
 			delete(globalCache.details, runID)
 			delete(globalCache.detailsAt, runID)
+			// Also persist to disk if available
+			if globalCache.persistentCache != nil {
+				go func(r *models.RunResponse) {
+					_ = globalCache.persistentCache.SaveRun(r)
+				}(run)
+			}
 		} else {
 			// Store active runs temporarily
 			globalCache.details[runID] = run

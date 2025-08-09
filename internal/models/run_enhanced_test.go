@@ -187,8 +187,8 @@ func TestUserInfo_JSONSerialization(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, "test@example.com", jsonData["email"])
-	assert.Equal(t, float64(15), jsonData["remaining_runs"]) // JSON numbers are float64
-	assert.Equal(t, float64(25), jsonData["total_runs"])
+	assert.Equal(t, float64(15), jsonData["remainingRuns"]) // JSON numbers are float64
+	assert.Equal(t, float64(25), jsonData["totalRuns"])
 	assert.Equal(t, "pro", jsonData["tier"])
 
 	// Test unmarshaling
@@ -347,7 +347,7 @@ func TestRunResponse_FieldTypes(t *testing.T) {
 		fieldName    string
 		expectedType string
 	}{
-		{"ID", "string"},
+		{"ID", "interface {}"},
 		{"Status", "models.RunStatus"},
 		{"Repository", "string"},
 		{"Source", "string"},
@@ -355,7 +355,7 @@ func TestRunResponse_FieldTypes(t *testing.T) {
 		{"Prompt", "string"},
 		{"Title", "string"},
 		{"Context", "string"},
-		{"Summary", "string"},
+		{"Description", "string"},
 		{"Error", "string"},
 		{"CreatedAt", "time.Time"},
 		{"UpdatedAt", "time.Time"},

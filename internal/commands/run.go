@@ -10,11 +10,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/repobird/repobird-cli/internal/api"
+	"github.com/repobird/repobird-cli/internal/domain"
 	"github.com/repobird/repobird-cli/internal/errors"
 	"github.com/repobird/repobird-cli/internal/models"
-	"github.com/repobird/repobird-cli/internal/utils"
-	gitutils "github.com/repobird/repobird-cli/pkg/utils"
 )
 
 var (
@@ -62,51 +60,68 @@ func runCommand(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("validation failed: %w", err)
 	}
 
-	if runReq.Repository == "" {
-		repo, err := gitutils.DetectRepository()
+	// Convert to domain request
+	createReq := domain.CreateRunRequest{
+		Prompt:         runReq.Prompt,
+		RepositoryName: runReq.Repository,
+		SourceBranch:   runReq.Source,
+		TargetBranch:   runReq.Target,
+		RunType:        string(runReq.RunType),
+		Title:          runReq.Title,
+		Context:        runReq.Context,
+		Files:          runReq.Files,
+	}
+
+	// Auto-detect git info if needed
+	container := getContainer()
+	gitService := container.GitService()
+
+	if createReq.RepositoryName == "" && gitService.IsGitRepository() {
+		repo, err := gitService.GetRepositoryName()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: Could not auto-detect repository: %v\n", err)
 		} else {
-			runReq.Repository = repo
+			createReq.RepositoryName = repo
 			fmt.Printf("Auto-detected repository: %s\n", repo)
 		}
 	}
 
-	if runReq.Source == "" {
-		branch, err := gitutils.GetCurrentBranch()
+	if createReq.SourceBranch == "" && gitService.IsGitRepository() {
+		branch, err := gitService.GetCurrentBranch()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: Could not auto-detect branch: %v\n", err)
 		} else {
-			runReq.Source = branch
+			createReq.SourceBranch = branch
 			fmt.Printf("Auto-detected source branch: %s\n", branch)
 		}
 	}
 
 	if dryRun {
 		fmt.Println("Validation successful. Run would be created with:")
-		b, _ := json.MarshalIndent(runReq, "", "  ")
+		b, _ := json.MarshalIndent(createReq, "", "  ")
 		fmt.Println(string(b))
 		return nil
 	}
 
-	client := api.NewClient(cfg.APIKey, cfg.APIURL, cfg.Debug)
+	// Use service layer to create run
+	runService := container.RunService()
+	ctx := context.Background()
 
 	fmt.Println("Creating run...")
-	ctx := context.Background()
-	runResp, err := client.CreateRunWithRetry(ctx, &runReq)
+	run, err := runService.CreateRun(ctx, createReq)
 	if err != nil {
 		return fmt.Errorf("failed to create run: %s", errors.FormatUserError(err))
 	}
 
 	fmt.Printf("Run created successfully!\n")
-	fmt.Printf("ID: %s\n", runResp.GetIDString())
-	fmt.Printf("Status: %s\n", runResp.Status)
-	fmt.Printf("Repository: %s\n", runResp.Repository)
-	fmt.Printf("Source: %s → Target: %s\n", runResp.Source, runResp.Target)
+	fmt.Printf("ID: %s\n", run.ID)
+	fmt.Printf("Status: %s\n", run.Status)
+	fmt.Printf("Repository: %s\n", run.RepositoryName)
+	fmt.Printf("Source: %s → Target: %s\n", run.SourceBranch, run.TargetBranch)
 
 	if follow {
 		fmt.Println("\nFollowing run status...")
-		return followRunStatus(client, runResp.GetIDString())
+		return followRunStatus(runService, run.ID)
 	}
 
 	return nil
@@ -132,39 +147,53 @@ func validateRunRequest(req *models.RunRequest) error {
 	return nil
 }
 
-func followRunStatus(client *api.Client, runID string) error {
+func followRunStatus(runService domain.RunService, runID string) error {
 	ctx := context.Background()
-	config := utils.DefaultPollConfig()
-	config.Debug = cfg.Debug
-	poller := utils.NewPoller(config)
-
 	startTime := time.Now()
 	lastStatus := ""
 
-	pollFunc := func(ctx context.Context) (*models.RunResponse, error) {
-		return client.GetRunWithRetry(ctx, runID)
-	}
-
-	onUpdate := func(run *models.RunResponse) {
-		if string(run.Status) != lastStatus {
-			utils.ClearLine()
-			fmt.Printf("[%s] Status: %s\n", time.Now().Format("15:04:05"), run.Status)
-			lastStatus = string(run.Status)
+	callback := func(status string, message string) {
+		if status != lastStatus {
+			fmt.Printf("\r\033[K") // Clear line
+			fmt.Printf("[%s] Status: %s\n", time.Now().Format("15:04:05"), status)
+			lastStatus = status
 		} else {
-			utils.ShowPollingProgress(startTime, string(run.Status), run.Error)
+			elapsed := time.Since(startTime)
+			if message != "" {
+				fmt.Printf("\r[%s] %s - %s", formatDuration(elapsed), status, message)
+			} else {
+				fmt.Printf("\r[%s] %s", formatDuration(elapsed), status)
+			}
 		}
 	}
 
-	finalRun, err := poller.Poll(ctx, pollFunc, onUpdate)
+	finalRun, err := runService.WaitForCompletion(ctx, runID, callback)
 	if err != nil {
 		return fmt.Errorf("failed to follow run status: %s", errors.FormatUserError(err))
 	}
 
-	utils.ClearLine()
-	if finalRun.Status == models.StatusFailed && finalRun.Error != "" {
+	fmt.Printf("\r\033[K") // Clear line
+	if finalRun.Status == domain.StatusFailed && finalRun.Error != "" {
 		fmt.Printf("Run failed: %s\n", finalRun.Error)
 	} else {
 		fmt.Printf("Run completed with status: %s\n", finalRun.Status)
 	}
 	return nil
+}
+
+func formatDuration(d time.Duration) string {
+	d = d.Round(time.Second)
+	h := d / time.Hour
+	d -= h * time.Hour
+	m := d / time.Minute
+	d -= m * time.Minute
+	s := d / time.Second
+
+	if h > 0 {
+		return fmt.Sprintf("%dh%dm%ds", h, m, s)
+	}
+	if m > 0 {
+		return fmt.Sprintf("%dm%ds", m, s)
+	}
+	return fmt.Sprintf("%ds", s)
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/repobird/repobird-cli/internal/config"
 	"github.com/repobird/repobird-cli/internal/models"
 )
 
@@ -381,7 +382,7 @@ title: "New Feature"
 				"prompt": "Test",
 				"repository": "test/repo",
 				"source": "main",
-				"target": "feature", 
+				"target": "feature",
 				"runType": "invalid"
 			}`,
 			expectError: false, // JSON will accept any string
@@ -488,12 +489,12 @@ func setupTestEnvironment(t *testing.T) func() {
 	tempDir := setupTempHome(t)
 
 	originalHome := os.Getenv("HOME")
-	originalAPIKey := os.Getenv("REPOBIRD_API_KEY")
-	originalAPIURL := os.Getenv("REPOBIRD_API_URL")
+	originalAPIKey := os.Getenv(config.EnvAPIKey)
+	originalAPIURL := os.Getenv(config.EnvAPIURL)
 
 	os.Setenv("HOME", tempDir)
-	os.Unsetenv("REPOBIRD_API_KEY")
-	os.Unsetenv("REPOBIRD_API_URL")
+	os.Unsetenv(config.EnvAPIKey)
+	os.Unsetenv(config.EnvAPIURL)
 
 	return func() {
 		os.RemoveAll(tempDir)
@@ -501,10 +502,10 @@ func setupTestEnvironment(t *testing.T) func() {
 			os.Setenv("HOME", originalHome)
 		}
 		if originalAPIKey != "" {
-			os.Setenv("REPOBIRD_API_KEY", originalAPIKey)
+			os.Setenv(config.EnvAPIKey, originalAPIKey)
 		}
 		if originalAPIURL != "" {
-			os.Setenv("REPOBIRD_API_URL", originalAPIURL)
+			os.Setenv(config.EnvAPIURL, originalAPIURL)
 		}
 	}
 }

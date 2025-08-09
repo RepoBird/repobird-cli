@@ -13,7 +13,6 @@ var tuiCmd = &cobra.Command{
 	Use:   "tui",
 	Short: "Launch the interactive Terminal User Interface",
 	Long: `Launch the RepoBird TUI for an interactive experience.
-	
 The TUI provides:
 - Visual run management with real-time status updates
 - Vim-style keybindings for efficient navigation

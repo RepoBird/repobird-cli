@@ -84,14 +84,14 @@ func TestFilterRuns_PreservesRunIDs(t *testing.T) {
 			CreatedAt:  time.Now().Add(-1 * time.Hour),
 		},
 		{
-			ID:         456, // int ID
+			ID:         "456", // int ID converted to string
 			Status:     models.StatusProcessing,
 			Repository: "acme/backend",
 			Source:     "dev",
 			CreatedAt:  time.Now().Add(-30 * time.Minute),
 		},
 		{
-			ID:         789.0, // float64 ID
+			ID:         "789", // float64 ID converted to string
 			Status:     models.StatusFailed,
 			Repository: "other/service",
 			Source:     "main",
@@ -132,9 +132,9 @@ func TestFilterRuns_HandlesMixedIDTypes(t *testing.T) {
 
 	runs := []models.RunResponse{
 		{ID: "string-id-123", Repository: "test/string", Status: models.StatusDone},
-		{ID: 456, Repository: "test/int", Status: models.StatusProcessing},
-		{ID: 789.0, Repository: "test/float", Status: models.StatusFailed},
-		{ID: nil, Repository: "test/nil", Status: models.StatusQueued}, // edge case
+		{ID: "456", Repository: "test/int", Status: models.StatusProcessing},
+		{ID: "789", Repository: "test/float", Status: models.StatusFailed},
+		{ID: "", Repository: "test/nil", Status: models.StatusQueued}, // edge case
 	}
 
 	view := NewRunListViewWithCache(client, runs, true, time.Now(), nil, 0)
@@ -157,12 +157,12 @@ func TestFilterRuns_HandlesMixedIDTypes(t *testing.T) {
 func TestRunResponse_GetIDString_HandlesNilAndInvalidValues(t *testing.T) {
 	tests := []struct {
 		name     string
-		id       interface{}
+		id       string
 		expected string
 	}{
 		{
-			name:     "nil ID",
-			id:       nil,
+			name:     "empty ID",
+			id:       "",
 			expected: "",
 		},
 		{
@@ -176,19 +176,14 @@ func TestRunResponse_GetIDString_HandlesNilAndInvalidValues(t *testing.T) {
 			expected: "run-123",
 		},
 		{
-			name:     "valid int ID",
-			id:       456,
+			name:     "numeric string ID",
+			id:       "456",
 			expected: "456",
 		},
 		{
-			name:     "valid float64 ID",
-			id:       789.0,
+			name:     "float string ID",
+			id:       "789",
 			expected: "789",
-		},
-		{
-			name:     "invalid type results in empty",
-			id:       []string{"invalid"},
-			expected: "[invalid]", // fmt.Sprintf will format this
 		},
 	}
 
@@ -196,15 +191,7 @@ func TestRunResponse_GetIDString_HandlesNilAndInvalidValues(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			run := models.RunResponse{ID: tt.id}
 			result := run.GetIDString()
-
-			switch tt.name {
-			case "nil ID", "string null":
-				assert.Empty(t, result, "Should return empty string for nil/null ID")
-			case "invalid type results in empty":
-				assert.NotEmpty(t, result, "Should return formatted string for invalid types")
-			default:
-				assert.Equal(t, tt.expected, result, "Should return correct string representation")
-			}
+			assert.Equal(t, tt.expected, result, "Should return correct string representation")
 		})
 	}
 }

@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -79,9 +78,13 @@ func TestClient_doRequest_ErrorHandling(t *testing.T) {
 
 			client := NewClient("test-key", server.URL, false)
 
-			_, err := client.doRequest("GET", "/test", nil)
-			assert.Error(t, err)
-			assert.Contains(t, err.Error(), fmt.Sprintf("status %d", tt.statusCode))
+			resp, err := client.doRequest("GET", "/test", nil)
+			assert.NoError(t, err)
+			assert.NotNil(t, resp)
+			if resp != nil {
+				defer resp.Body.Close()
+			}
+			assert.Equal(t, tt.statusCode, resp.StatusCode)
 		})
 	}
 }
@@ -96,7 +99,10 @@ func TestClient_doRequest_DebugMode(t *testing.T) {
 	// Capture debug output
 	client := NewClient("test-key", server.URL, true)
 
-	_, err := client.doRequest("GET", "/test", nil)
+	resp, err := client.doRequest("GET", "/test", nil)
+	if resp != nil {
+		defer resp.Body.Close()
+	}
 	assert.NoError(t, err)
 
 	// Note: In real implementation, debug output would go to a logger
@@ -479,19 +485,19 @@ func TestClient_Timeouts(t *testing.T) {
 	defer server.Close()
 
 	client := NewClient("test-key", server.URL, false)
+	// Set a very short timeout on the client
+	client.httpClient.Timeout = 50 * time.Millisecond
 
-	// Create request with short timeout
-	req, err := http.NewRequest("GET", server.URL+"/test", nil)
-	require.NoError(t, err)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
-	defer cancel()
-	req = req.WithContext(ctx)
-
-	_, err = client.doRequest("GET", "/timeout", nil)
+	resp, err := client.doRequest("GET", "/timeout", nil)
+	if resp != nil {
+		defer resp.Body.Close()
+	}
 	// Should timeout
 	assert.Error(t, err)
-	assert.True(t, strings.Contains(err.Error(), "timeout") || strings.Contains(err.Error(), "context deadline exceeded"))
+	assert.Nil(t, resp)
+	if err != nil {
+		assert.True(t, strings.Contains(err.Error(), "timeout") || strings.Contains(err.Error(), "context deadline exceeded"))
+	}
 }
 
 func TestClient_RequestHeaders(t *testing.T) {

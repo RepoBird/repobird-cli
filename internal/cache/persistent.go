@@ -1,0 +1,259 @@
+package cache
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sync"
+	"time"
+
+	"github.com/repobird/repobird-cli/internal/models"
+)
+
+// PersistentCache handles file-based caching for terminal status runs
+type PersistentCache struct {
+	mu       sync.RWMutex
+	cacheDir string
+}
+
+// CachedRun wraps a RunResponse with metadata
+type CachedRun struct {
+	Run      *models.RunResponse `json:"run"`
+	CachedAt time.Time           `json:"cachedAt"`
+	Version  int                 `json:"version"` // For future schema changes
+}
+
+const (
+	cacheVersion = 1
+	appName      = "repobird"
+)
+
+// NewPersistentCache creates a new persistent cache instance
+func NewPersistentCache() (*PersistentCache, error) {
+	dir, err := getCacheDir()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cache directory: %w", err)
+	}
+
+	return &PersistentCache{
+		cacheDir: dir,
+	}, nil
+}
+
+// getCacheDir returns the appropriate cache directory for the platform
+func getCacheDir() (string, error) {
+	// Use os.UserCacheDir for cross-platform compatibility
+	baseDir, err := os.UserCacheDir()
+	if err != nil {
+		return "", err
+	}
+
+	cacheDir := filepath.Join(baseDir, appName, "runs")
+
+	// Create directory if it doesn't exist
+	if err := os.MkdirAll(cacheDir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create cache directory: %w", err)
+	}
+
+	return cacheDir, nil
+}
+
+// getCacheFilePath returns the file path for a specific run ID
+func (pc *PersistentCache) getCacheFilePath(runID string) string {
+	// Use simple naming: runID.json
+	// For better organization with many files, could use subdirectories based on ID prefix
+	return filepath.Join(pc.cacheDir, fmt.Sprintf("%s.json", runID))
+}
+
+// SaveRun saves a terminal status run to persistent cache
+func (pc *PersistentCache) SaveRun(run *models.RunResponse) error {
+	// Only cache terminal status runs
+	if !isTerminalStatus(run.Status) {
+		return nil
+	}
+
+	pc.mu.Lock()
+	defer pc.mu.Unlock()
+
+	cached := CachedRun{
+		Run:      run,
+		CachedAt: time.Now(),
+		Version:  cacheVersion,
+	}
+
+	filePath := pc.getCacheFilePath(run.GetIDString())
+	return writeJSONAtomic(filePath, cached)
+}
+
+// LoadRun loads a cached run by ID
+func (pc *PersistentCache) LoadRun(runID string) (*models.RunResponse, error) {
+	pc.mu.RLock()
+	defer pc.mu.RUnlock()
+
+	filePath := pc.getCacheFilePath(runID)
+
+	var cached CachedRun
+	if err := readJSON(filePath, &cached); err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil // Cache miss
+		}
+		// If file is corrupted, remove it
+		_ = os.Remove(filePath)
+		return nil, nil
+	}
+
+	// Check version for future compatibility
+	if cached.Version != cacheVersion {
+		// Handle version mismatch if needed in future
+		os.Remove(filePath)
+		return nil, nil
+	}
+
+	return cached.Run, nil
+}
+
+// LoadAllTerminalRuns loads all cached terminal runs
+func (pc *PersistentCache) LoadAllTerminalRuns() (map[string]*models.RunResponse, error) {
+	pc.mu.RLock()
+	defer pc.mu.RUnlock()
+
+	runs := make(map[string]*models.RunResponse)
+
+	// Read all .json files in cache directory
+	files, err := os.ReadDir(pc.cacheDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return runs, nil // Empty cache
+		}
+		return nil, err
+	}
+
+	for _, file := range files {
+		if filepath.Ext(file.Name()) != ".json" {
+			continue
+		}
+
+		filePath := filepath.Join(pc.cacheDir, file.Name())
+		var cached CachedRun
+
+		if err := readJSON(filePath, &cached); err != nil {
+			// Remove corrupted file
+			_ = os.Remove(filePath)
+			continue
+		}
+
+		// Check version
+		if cached.Version != cacheVersion {
+			_ = os.Remove(filePath)
+			continue
+		}
+
+		// Only include if it's still a terminal status
+		if cached.Run != nil && isTerminalStatus(cached.Run.Status) {
+			runID := cached.Run.GetIDString()
+			if runID != "" {
+				runs[runID] = cached.Run
+			}
+		}
+	}
+
+	return runs, nil
+}
+
+// DeleteRun removes a run from the cache
+func (pc *PersistentCache) DeleteRun(runID string) error {
+	pc.mu.Lock()
+	defer pc.mu.Unlock()
+
+	filePath := pc.getCacheFilePath(runID)
+	err := os.Remove(filePath)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}
+
+// CleanOldCache removes cache files older than specified duration
+func (pc *PersistentCache) CleanOldCache(maxAge time.Duration) error {
+	pc.mu.Lock()
+	defer pc.mu.Unlock()
+
+	files, err := os.ReadDir(pc.cacheDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+
+	cutoff := time.Now().Add(-maxAge)
+
+	for _, file := range files {
+		if filepath.Ext(file.Name()) != ".json" {
+			continue
+		}
+
+		filePath := filepath.Join(pc.cacheDir, file.Name())
+		info, err := file.Info()
+		if err != nil {
+			continue
+		}
+
+		// Remove files older than cutoff
+		if info.ModTime().Before(cutoff) {
+			_ = os.Remove(filePath)
+		}
+	}
+
+	return nil
+}
+
+// writeJSONAtomic writes JSON data atomically using temp file + rename
+func writeJSONAtomic(filePath string, data interface{}) error {
+	// Write to temp file first
+	tempPath := filePath + ".tmp"
+
+	file, err := os.Create(tempPath)
+	if err != nil {
+		return fmt.Errorf("failed to create temp file: %w", err)
+	}
+
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "  ") // Pretty print for debugging
+
+	if err := encoder.Encode(data); err != nil {
+		_ = file.Close()
+		_ = os.Remove(tempPath)
+		return fmt.Errorf("failed to encode JSON: %w", err)
+	}
+
+	if err := file.Close(); err != nil {
+		_ = os.Remove(tempPath)
+		return fmt.Errorf("failed to close temp file: %w", err)
+	}
+
+	// Atomic rename
+	if err := os.Rename(tempPath, filePath); err != nil {
+		_ = os.Remove(tempPath)
+		return fmt.Errorf("failed to rename temp file: %w", err)
+	}
+
+	return nil
+}
+
+// readJSON reads and decodes JSON from a file
+func readJSON(filePath string, dst interface{}) error {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	decoder := json.NewDecoder(file)
+	if err := decoder.Decode(dst); err != nil {
+		return fmt.Errorf("failed to decode JSON: %w", err)
+	}
+
+	return nil
+}

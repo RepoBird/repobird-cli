@@ -57,7 +57,7 @@ func TestNewClient(t *testing.T) {
 
 func TestCreateRun(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/v1/runs" {
+		if r.URL.Path != EndpointRuns {
 			t.Errorf("expected path /api/v1/runs, got %s", r.URL.Path)
 		}
 		if r.Method != "POST" {
@@ -110,7 +110,7 @@ func TestCreateRun(t *testing.T) {
 
 func TestGetRun(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/v1/runs/"+testRunID {
+		if r.URL.Path != RunDetailsURL(testRunID) {
 			t.Errorf("expected path /api/v1/runs/%s, got %s", testRunID, r.URL.Path)
 		}
 		if r.Method != httpMethodGET {
@@ -190,7 +190,7 @@ func TestListRuns(t *testing.T) {
 
 func TestVerifyAuth(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/v1/auth/verify" {
+		if r.URL.Path != EndpointAuthVerify {
 			t.Errorf("expected path /api/v1/auth/verify, got %s", r.URL.Path)
 		}
 		if r.Method != httpMethodGET {
