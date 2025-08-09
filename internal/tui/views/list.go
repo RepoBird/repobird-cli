@@ -685,18 +685,26 @@ func (v *RunListView) preloadRunDetails() tea.Cmd {
 			
 			detailed, err := v.client.GetRun(id)
 			
-			debugInfo = fmt.Sprintf("DEBUG: API call completed for runID='%s', err=%v, run!=nil=%v\n", 
+			debugInfo = fmt.Sprintf("DEBUG: API call completed for runID='%s', err=%v, run!=nil=%v - SENDING runDetailsPreloadedMsg\n", 
 				id, err, detailed != nil)
 			if f, err2 := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err2 == nil {
 				f.WriteString(debugInfo)
 				f.Close()
 			}
 			
-			return runDetailsPreloadedMsg{
+			msg := runDetailsPreloadedMsg{
 				runID: id,
 				run:   detailed,
 				err:   err,
 			}
+			
+			debugInfo = fmt.Sprintf("DEBUG: About to return runDetailsPreloadedMsg for runID='%s'\n", id)
+			if f, err2 := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err2 == nil {
+				f.WriteString(debugInfo)
+				f.Close()
+			}
+			
+			return msg
 		})
 	}
 
