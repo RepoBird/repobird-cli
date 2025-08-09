@@ -527,6 +527,14 @@ type userInfoLoadedMsg struct {
 }
 
 func (v *RunListView) preloadRunDetails() tea.Cmd {
+	// Debug logging
+	debugInfo := fmt.Sprintf("DEBUG: preloadRunDetails called - runs=%d, filteredRuns=%d, cacheSize=%d\n", 
+		len(v.runs), len(v.filteredRuns), len(v.detailsCache))
+	if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+		f.WriteString(debugInfo)
+		f.Close()
+	}
+	
 	// Collect runs to preload
 	var toPreload []string
 
@@ -534,6 +542,13 @@ func (v *RunListView) preloadRunDetails() tea.Cmd {
 	if idx := v.table.GetSelectedIndex(); idx >= 0 && idx < len(v.filteredRuns) {
 		run := v.filteredRuns[idx]
 		runID := run.GetIDString()
+		debugInfo = fmt.Sprintf("DEBUG: Selected run runID='%s', cached=%v, preloading=%v\n", 
+			runID, v.detailsCache[runID] != nil, v.preloading[runID])
+		if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+			f.WriteString(debugInfo)
+			f.Close()
+		}
+		
 		if _, cached := v.detailsCache[runID]; !cached && !v.preloading[runID] {
 			toPreload = append(toPreload, runID)
 		}
@@ -560,11 +575,31 @@ func (v *RunListView) preloadRunDetails() tea.Cmd {
 
 	// Return batch of commands to load each run
 	var cmds []tea.Cmd
+	debugInfo = fmt.Sprintf("DEBUG: Will preload %d runs: %v\n", len(toPreload), toPreload)
+	if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+		f.WriteString(debugInfo)
+		f.Close()
+	}
+	
 	for _, runID := range toPreload {
 		v.preloading[runID] = true
 		id := runID // Capture for closure
 		cmds = append(cmds, func() tea.Msg {
+			debugInfo := fmt.Sprintf("DEBUG: Starting API call for runID='%s'\n", id)
+			if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+				f.WriteString(debugInfo)
+				f.Close()
+			}
+			
 			detailed, err := v.client.GetRun(id)
+			
+			debugInfo = fmt.Sprintf("DEBUG: API call completed for runID='%s', err=%v, run!=nil=%v\n", 
+				id, err, detailed != nil)
+			if f, err2 := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err2 == nil {
+				f.WriteString(debugInfo)
+				f.Close()
+			}
+			
 			return runDetailsPreloadedMsg{
 				runID: id,
 				run:   detailed,
