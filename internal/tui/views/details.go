@@ -119,6 +119,30 @@ func NewRunDetailsViewWithConfig(config RunDetailsViewConfig) *RunDetailsView {
 	return v
 }
 
+// NewRunDetailsViewWithCacheAndDimensions creates a new details view with cache and dimensions
+func NewRunDetailsViewWithCacheAndDimensions(
+	client *api.Client,
+	run models.RunResponse,
+	parentRuns []models.RunResponse,
+	parentCached bool,
+	parentCachedAt time.Time,
+	parentDetailsCache map[string]*models.RunResponse,
+	width int,
+	height int,
+) *RunDetailsView {
+	v := NewRunDetailsViewWithCache(client, run, parentRuns, parentCached, parentCachedAt, parentDetailsCache)
+
+	// Set dimensions immediately if provided
+	if width > 0 && height > 0 {
+		v.width = width
+		v.height = height
+		// Apply dimensions to viewport immediately
+		v.handleWindowSizeMsg(tea.WindowSizeMsg{Width: width, Height: height})
+	}
+
+	return v
+}
+
 // NewRunDetailsViewWithCache maintains backward compatibility
 func NewRunDetailsViewWithCache(
 	client *api.Client,
@@ -362,26 +386,43 @@ func (v *RunDetailsView) View() string {
 		return ""
 	}
 
+	// For very small terminals, render minimal content
+	if v.height < 3 || v.width < 10 {
+		return "Run ID: " + v.run.GetIDString()
+	}
+
 	// Pre-allocate array for exactly terminal height lines
 	lines := make([]string, v.height)
 	lineIdx := 0
 
 	// Header
 	header := v.renderHeader()
-	lines[lineIdx] = header
-	lineIdx++
+	if lineIdx < len(lines) {
+		lines[lineIdx] = header
+		lineIdx++
+	}
 
 	// Separator line
-	lines[lineIdx] = strings.Repeat("─", v.width)
-	lineIdx++
+	if lineIdx < len(lines) {
+		separatorWidth := v.width
+		if separatorWidth > 80 {
+			separatorWidth = 80 // Reasonable max width
+		}
+		lines[lineIdx] = strings.Repeat("─", separatorWidth)
+		lineIdx++
+	}
 
 	// Content area
 	if v.loading {
-		lines[lineIdx] = v.spinner.View() + " Loading run details..."
-		lineIdx++
+		if lineIdx < len(lines) {
+			lines[lineIdx] = v.spinner.View() + " Loading run details..."
+			lineIdx++
+		}
 	} else if v.error != nil {
-		lines[lineIdx] = styles.ErrorStyle.Render("Error: " + v.error.Error())
-		lineIdx++
+		if lineIdx < len(lines) {
+			lines[lineIdx] = styles.ErrorStyle.Render("Error: " + v.error.Error())
+			lineIdx++
+		}
 	} else {
 		// Viewport content
 		viewportContent := v.viewport.View()
@@ -389,7 +430,7 @@ func (v *RunDetailsView) View() string {
 			// Split viewport content into lines
 			viewportLines := strings.Split(strings.TrimRight(viewportContent, "\n"), "\n")
 			for _, line := range viewportLines {
-				if lineIdx < v.height-1 { // Leave room for status bar
+				if lineIdx < len(lines)-1 { // Leave room for status bar
 					lines[lineIdx] = line
 					lineIdx++
 				}
@@ -408,15 +449,18 @@ func (v *RunDetailsView) View() string {
 				helpStart = lineIdx
 			}
 			for i, line := range helpLines {
-				if helpStart+i < v.height-1 {
-					lines[helpStart+i] = line
+				helpIdx := helpStart + i
+				if helpIdx < len(lines)-1 && helpIdx >= 0 {
+					lines[helpIdx] = line
 				}
 			}
 		}
 	}
 
 	// Status bar always goes in the last line
-	lines[v.height-1] = v.renderStatusBar()
+	if len(lines) > 0 {
+		lines[len(lines)-1] = v.renderStatusBar()
+	}
 
 	// Join all lines with newlines
 	// This creates exactly height-1 newlines, which is correct
@@ -438,8 +482,11 @@ func (v *RunDetailsView) renderHeader() string {
 	}
 
 	// Truncate title if too long for terminal width
-	if v.width > 0 && len(title) > v.width-20 {
-		title = title[:v.width-23] + "..."
+	if v.width > 25 && len(title) > v.width-20 {
+		maxLen := v.width - 23
+		if maxLen > 0 && maxLen < len(title) {
+			title = title[:maxLen] + "..."
+		}
 	}
 
 	header := styles.TitleStyle.MaxWidth(v.width).Render(title)

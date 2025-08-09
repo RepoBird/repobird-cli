@@ -594,6 +594,276 @@ func TestTUIMessages(t *testing.T) {
 }
 ```
 
+## Bubble Tea Layout Testing
+
+RepoBird CLI uses Bubble Tea for its TUI. Testing layout rendering and preventing black screen issues requires specific patterns to simulate terminal dimensions and validate view output.
+
+### Dependencies
+
+Install the testing libraries:
+```bash
+go get github.com/charmbracelet/bubbletea/teatest
+```
+
+### Window Size Testing
+
+Test that views handle different terminal sizes correctly:
+
+```go
+import (
+    "strings"
+    "testing"
+    tea "github.com/charmbracelet/bubbletea"
+    "github.com/charmbracelet/bubbletea/teatest"
+)
+
+func TestView_RendersAtDifferentSizes(t *testing.T) {
+    tests := []struct {
+        name   string
+        width  int
+        height int
+        want   []string // Expected content in view
+    }{
+        {
+            name:   "standard terminal",
+            width:  80,
+            height: 24,
+            want:   []string{"RepoBird CLI", "Create New Run"},
+        },
+        {
+            name:   "wide terminal", 
+            width:  120,
+            height: 30,
+            want:   []string{"RepoBird CLI", "Create New Run"},
+        },
+        {
+            name:   "narrow terminal",
+            width:  40,
+            height: 20,
+            want:   []string{"RepoBird", "Create"},
+        },
+        {
+            name:   "very small terminal",
+            width:  20,
+            height: 10,
+            want:   []string{"CLI"}, // Should still render something
+        },
+    }
+    
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            model := NewCreateRunView(mockClient)
+            
+            // Simulate window size message
+            updatedModel, _ := model.Update(tea.WindowSizeMsg{
+                Width:  tt.width,
+                Height: tt.height,
+            })
+            
+            view := updatedModel.View()
+            
+            // Check that view is not empty (prevents black screen)
+            if strings.TrimSpace(view) == "" {
+                t.Errorf("view is empty at size %dx%d", tt.width, tt.height)
+            }
+            
+            // Check for expected content
+            for _, want := range tt.want {
+                if !strings.Contains(view, want) {
+                    t.Errorf("view missing expected content %q at size %dx%d\nView:\n%s", 
+                        want, tt.width, tt.height, view)
+                }
+            }
+        })
+    }
+}
+```
+
+### Layout Dimension Testing
+
+Test that components properly store and use dimensions:
+
+```go
+func TestView_StoreDimensions(t *testing.T) {
+    model := NewCreateRunView(mockClient)
+    
+    // Send window size message
+    updatedModel, _ := model.Update(tea.WindowSizeMsg{
+        Width:  100,
+        Height: 40,
+    })
+    
+    createView := updatedModel.(*CreateRunView)
+    
+    // Verify dimensions are stored
+    if createView.width != 100 {
+        t.Errorf("width = %d, want 100", createView.width)
+    }
+    if createView.height != 40 {
+        t.Errorf("height = %d, want 40", createView.height)
+    }
+    
+    // Test that view renders with stored dimensions
+    view := createView.View()
+    if strings.TrimSpace(view) == "" {
+        t.Error("view should not be empty after setting dimensions")
+    }
+}
+```
+
+### View Transition Testing
+
+Test that dimensions are preserved when transitioning between views:
+
+```go
+func TestView_PreserveDimensionsOnTransition(t *testing.T) {
+    // Start with create view
+    createView := NewCreateRunView(mockClient)
+    
+    // Set dimensions
+    updatedCreateView, _ := createView.Update(tea.WindowSizeMsg{
+        Width:  80,
+        Height: 24,
+    })
+    
+    // Simulate successful run creation
+    mockRun := models.RunResponse{ID: "test-123"}
+    msg := runCreatedMsg{run: mockRun, err: nil}
+    
+    // Transition to details view
+    detailsView, _ := updatedCreateView.Update(msg)
+    
+    // Verify details view received dimensions
+    details := detailsView.(*RunDetailsView)
+    if details.width != 80 {
+        t.Errorf("details view width = %d, want 80", details.width)
+    }
+    if details.height != 24 {
+        t.Errorf("details view height = %d, want 24", details.height)
+    }
+    
+    // Verify details view renders properly
+    view := details.View()
+    if strings.TrimSpace(view) == "" {
+        t.Error("details view should not be empty after transition")
+    }
+}
+```
+
+### Using teatest for Integration Testing
+
+For more complex TUI testing scenarios:
+
+```go
+func TestTUI_FullFlow(t *testing.T) {
+    model := NewCreateRunView(mockClient)
+    
+    tm := teatest.NewTestModel(
+        t, model,
+        teatest.WithInitialTermSize(80, 24),
+    )
+    
+    // Send keystrokes to fill form
+    tea.Send(tm, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("Test run")})
+    tea.Send(tm, tea.KeyMsg{Type: tea.KeyTab})
+    tea.Send(tm, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("org/repo")})
+    
+    // Submit form
+    tea.Send(tm, tea.KeyMsg{Type: tea.KeyCtrlS})
+    
+    // Get final model and verify state
+    fm := tm.FinalModel(t)
+    
+    // Verify view output
+    output := fm.View()
+    if strings.TrimSpace(output) == "" {
+        t.Error("final view should not be empty")
+    }
+}
+```
+
+### Black Screen Prevention Tests
+
+Specifically test for conditions that could cause black screens:
+
+```go
+func TestView_PreventBlackScreen(t *testing.T) {
+    tests := []struct {
+        name      string
+        setupFunc func(*CreateRunView) *CreateRunView
+    }{
+        {
+            name: "zero dimensions",
+            setupFunc: func(v *CreateRunView) *CreateRunView {
+                // Don't send window size message - should still render
+                return v
+            },
+        },
+        {
+            name: "minimal dimensions",
+            setupFunc: func(v *CreateRunView) *CreateRunView {
+                updatedView, _ := v.Update(tea.WindowSizeMsg{Width: 1, Height: 1})
+                return updatedView.(*CreateRunView)
+            },
+        },
+        {
+            name: "after submission",
+            setupFunc: func(v *CreateRunView) *CreateRunView {
+                // Set dimensions first
+                updatedView, _ := v.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+                v = updatedView.(*CreateRunView)
+                
+                // Start submission
+                v.submitting = true
+                return v
+            },
+        },
+    }
+    
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            model := NewCreateRunView(mockClient)
+            model = tt.setupFunc(model)
+            
+            view := model.View()
+            
+            // Should always render something, never empty
+            if strings.TrimSpace(view) == "" {
+                t.Errorf("view is empty in scenario: %s", tt.name)
+            }
+            
+            // Should contain some basic UI elements
+            if !strings.Contains(view, "Create") && !strings.Contains(view, "Run") {
+                t.Errorf("view missing basic UI elements in scenario: %s\nView:\n%s", 
+                    tt.name, view)
+            }
+        })
+    }
+}
+```
+
+### Best Practices for TUI Testing
+
+1. **Always Test Multiple Sizes**: Test your views at different terminal dimensions
+2. **Test Edge Cases**: Zero dimensions, very small terminals, very large terminals
+3. **Test State Transitions**: Ensure dimensions are preserved across view changes
+4. **Mock External Dependencies**: Use mock API clients to control test scenarios
+5. **Use Table-Driven Tests**: Test multiple scenarios systematically
+6. **Check for Non-Empty Output**: Always verify views render something to prevent black screens
+7. **Test Interactive Elements**: Verify keyboard navigation and input handling works correctly
+
+### Testing Checklist for New Views
+
+For every new TUI view, ensure tests cover:
+
+- [ ] Handles `tea.WindowSizeMsg` correctly
+- [ ] Stores width/height in model
+- [ ] View() returns non-empty content at different sizes
+- [ ] Dimensions are passed to child views
+- [ ] Layout adapts to terminal size constraints
+- [ ] No black screen at minimum terminal sizes
+- [ ] Interactive elements work with different layouts
+
 ## Testing Best Practices
 
 ### 1. Test Naming

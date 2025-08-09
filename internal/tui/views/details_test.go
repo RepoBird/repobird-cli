@@ -2,9 +2,11 @@ package views
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/repobird/repobird-cli/internal/api"
 	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/stretchr/testify/assert"
@@ -180,5 +182,251 @@ func TestRunDetailsView_TitleDisplayHandling(t *testing.T) {
 			// Should always show Run ID
 			assert.Contains(t, content, "Run ID:", "Should always show run ID")
 		})
+	}
+}
+
+func TestRunDetailsView_HandleWindowSizeMsg(t *testing.T) {
+	client := api.NewClient("test-key", "http://localhost:8080", false)
+	run := models.RunResponse{
+		ID:     "test-123",
+		Status: models.StatusDone,
+		Title:  "Test Run",
+	}
+	view := NewRunDetailsView(client, run)
+
+	tests := []struct {
+		name   string
+		width  int
+		height int
+	}{
+		{"standard terminal", 80, 24},
+		{"wide terminal", 120, 30},
+		{"narrow terminal", 40, 20},
+		{"small terminal", 20, 10},
+		{"minimal terminal", 10, 5},
+		{"zero width", 0, 24},
+		{"zero height", 80, 0},
+		{"both zero", 0, 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Send window size message
+			updatedView, _ := view.Update(tea.WindowSizeMsg{
+				Width:  tt.width,
+				Height: tt.height,
+			})
+
+			detailsView := updatedView.(*RunDetailsView)
+
+			// Verify dimensions are stored correctly
+			if detailsView.width != tt.width {
+				t.Errorf("width = %d, want %d", detailsView.width, tt.width)
+			}
+			if detailsView.height != tt.height {
+				t.Errorf("height = %d, want %d", detailsView.height, tt.height)
+			}
+
+			// Test that view renders and is not empty (prevents black screen)
+			viewOutput := detailsView.View()
+			if strings.TrimSpace(viewOutput) == "" {
+				t.Errorf("view is empty at size %dx%d", tt.width, tt.height)
+			}
+
+			// Should contain basic UI elements even at small sizes
+			if !strings.Contains(viewOutput, "Run") && !strings.Contains(viewOutput, "ID") {
+				t.Errorf("view missing basic UI elements at size %dx%d\nView:\n%s",
+					tt.width, tt.height, viewOutput)
+			}
+		})
+	}
+}
+
+func TestRunDetailsView_PreventBlackScreen(t *testing.T) {
+	client := api.NewClient("test-key", "http://localhost:8080", false)
+	run := models.RunResponse{
+		ID:     "test-123",
+		Status: models.StatusDone,
+		Title:  "Test Run",
+	}
+
+	tests := []struct {
+		name      string
+		setupFunc func(*RunDetailsView) *RunDetailsView
+	}{
+		{
+			name: "uninitialized dimensions",
+			setupFunc: func(v *RunDetailsView) *RunDetailsView {
+				// Don't send window size message - this will return empty string
+				// which is acceptable for uninitialized views
+				v.loading = false
+				return v
+			},
+		},
+		{
+			name: "minimal dimensions",
+			setupFunc: func(v *RunDetailsView) *RunDetailsView {
+				updatedView, _ := v.Update(tea.WindowSizeMsg{Width: 1, Height: 1})
+				return updatedView.(*RunDetailsView)
+			},
+		},
+		{
+			name: "loading state",
+			setupFunc: func(v *RunDetailsView) *RunDetailsView {
+				updatedView, _ := v.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+				v = updatedView.(*RunDetailsView)
+
+				// Set loading state
+				v.loading = true
+				return v
+			},
+		},
+		{
+			name: "error state",
+			setupFunc: func(v *RunDetailsView) *RunDetailsView {
+				updatedView, _ := v.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+				v = updatedView.(*RunDetailsView)
+
+				// Set error
+				v.error = fmt.Errorf("test error")
+				return v
+			},
+		},
+		{
+			name: "show logs mode",
+			setupFunc: func(v *RunDetailsView) *RunDetailsView {
+				updatedView, _ := v.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+				v = updatedView.(*RunDetailsView)
+
+				// Enable logs view
+				v.showLogs = true
+				v.logs = "Sample log content"
+				return v
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			view := NewRunDetailsView(client, run)
+			view = tt.setupFunc(view)
+
+			viewOutput := view.View()
+
+			// Special case: uninitialized dimensions can return empty string
+			if tt.name == "uninitialized dimensions" {
+				// Empty string is acceptable for uninitialized views
+				// as they haven't received window size yet
+				return
+			}
+
+			// For all other cases, should never render empty (prevents black screen)
+			if strings.TrimSpace(viewOutput) == "" {
+				t.Errorf("view is empty in scenario: %s", tt.name)
+			}
+
+			// Should contain some basic UI elements
+			hasBasicElements := strings.Contains(viewOutput, "Run") ||
+				strings.Contains(viewOutput, "ID") ||
+				strings.Contains(viewOutput, "Status") ||
+				strings.Contains(viewOutput, "Loading") ||
+				strings.Contains(viewOutput, "Error")
+
+			if !hasBasicElements {
+				t.Errorf("view missing basic UI elements in scenario: %s\nView:\n%s",
+					tt.name, viewOutput)
+			}
+		})
+	}
+}
+
+func TestRunDetailsView_ViewportRespectsDimensions(t *testing.T) {
+	client := api.NewClient("test-key", "http://localhost:8080", false)
+	run := models.RunResponse{
+		ID:     "test-123",
+		Status: models.StatusDone,
+		Title:  "Test Run",
+	}
+	view := NewRunDetailsView(client, run)
+
+	tests := []struct {
+		name   string
+		width  int
+		height int
+	}{
+		{"standard", 80, 24},
+		{"wide", 120, 30},
+		{"narrow", 40, 20},
+		{"tall narrow", 30, 40},
+		{"wide short", 100, 15},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			updatedView, _ := view.Update(tea.WindowSizeMsg{
+				Width:  tt.width,
+				Height: tt.height,
+			})
+
+			detailsView := updatedView.(*RunDetailsView)
+
+			// Check viewport dimensions
+			vpWidth, vpHeight := detailsView.viewport.Width, detailsView.viewport.Height
+
+			// Viewport should be reasonable relative to terminal size
+			if vpWidth > tt.width {
+				t.Errorf("viewport width %d exceeds terminal width %d", vpWidth, tt.width)
+			}
+			if vpHeight > tt.height {
+				t.Errorf("viewport height %d exceeds terminal height %d", vpHeight, tt.height)
+			}
+
+			// Viewport should have reasonable minimum size if terminal is large enough
+			if tt.width > 20 && vpWidth < 10 {
+				t.Errorf("viewport width %d too small for terminal width %d", vpWidth, tt.width)
+			}
+			if tt.height > 10 && vpHeight < 5 {
+				t.Errorf("viewport height %d too small for terminal height %d", vpHeight, tt.height)
+			}
+
+			// View should render without issues
+			viewOutput := detailsView.View()
+			if strings.TrimSpace(viewOutput) == "" {
+				t.Errorf("view is empty at size %dx%d", tt.width, tt.height)
+			}
+		})
+	}
+}
+
+func TestRunDetailsViewWithCacheAndDimensions_PreservesDimensions(t *testing.T) {
+	client := api.NewClient("test-key", "http://localhost:8080", false)
+	run := models.RunResponse{
+		ID:     "test-123",
+		Status: models.StatusDone,
+		Title:  "Test Run",
+	}
+
+	// Create view with specific dimensions
+	view := NewRunDetailsViewWithCacheAndDimensions(
+		client, run, nil, false, time.Time{}, nil, 100, 30,
+	)
+
+	// Verify dimensions are set immediately
+	if view.width != 100 {
+		t.Errorf("width = %d, want 100", view.width)
+	}
+	if view.height != 30 {
+		t.Errorf("height = %d, want 30", view.height)
+	}
+
+	// Verify view renders properly with set dimensions
+	viewOutput := view.View()
+	if strings.TrimSpace(viewOutput) == "" {
+		t.Error("view should not be empty with set dimensions")
+	}
+
+	// Verify viewport was sized appropriately
+	if view.viewport.Width == 0 && view.viewport.Height == 0 {
+		t.Error("viewport should be sized when dimensions are provided")
 	}
 }

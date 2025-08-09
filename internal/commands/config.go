@@ -15,6 +15,12 @@ const (
 	configKeyDebug  = "debug"
 )
 
+const availableKeysHelp = `
+Available keys:
+  api-key    API authentication key
+  api-url    API endpoint URL
+  debug      Enable debug output (true/false)`
+
 var configCmd = &cobra.Command{
 	Use:   "config",
 	Short: "Manage RepoBird configuration",
@@ -24,7 +30,13 @@ var configCmd = &cobra.Command{
 var configSetCmd = &cobra.Command{
 	Use:   "set [key] [value]",
 	Short: "Set a configuration value",
-	Args:  cobra.ExactArgs(2),
+	Long:  `Set a configuration value.` + availableKeysHelp,
+	Args: func(cmd *cobra.Command, args []string) error {
+		if len(args) != 2 {
+			return fmt.Errorf("accepts 2 arg(s), received %d%s", len(args), availableKeysHelp)
+		}
+		return nil
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		key := args[0]
 		value := args[1]
@@ -75,7 +87,7 @@ var configSetCmd = &cobra.Command{
 			}
 
 		default:
-			return fmt.Errorf("unknown configuration key: %s", key)
+			return fmt.Errorf("unknown configuration key: %s%s", key, availableKeysHelp)
 		}
 
 		return nil
@@ -85,7 +97,16 @@ var configSetCmd = &cobra.Command{
 var configGetCmd = &cobra.Command{
 	Use:   "get [key]",
 	Short: "Get a configuration value",
-	Args:  cobra.MaximumNArgs(1),
+	Long: `Get a configuration value.
+
+Available keys:
+  api-key       API authentication key (masked)
+  api-url       API endpoint URL
+  debug         Debug output setting
+  storage-info  API key storage information
+
+If no key is specified, shows all configuration values.`,
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		secureCfg, err := config.LoadSecureConfig()
 		if err != nil {
@@ -147,7 +168,7 @@ var configGetCmd = &cobra.Command{
 				fmt.Printf("  %s: %v\n", k, v)
 			}
 		default:
-			return fmt.Errorf("unknown configuration key: %s", key)
+			return fmt.Errorf("unknown configuration key: %s%s", key, availableKeysHelp)
 		}
 
 		return nil
@@ -157,7 +178,12 @@ var configGetCmd = &cobra.Command{
 var configDeleteCmd = &cobra.Command{
 	Use:   "delete [key]",
 	Short: "Delete a configuration value",
-	Args:  cobra.ExactArgs(1),
+	Args: func(cmd *cobra.Command, args []string) error {
+		if len(args) != 1 {
+			return fmt.Errorf("accepts 1 arg, received %d\n\nOnly 'api-key' can be deleted", len(args))
+		}
+		return nil
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		key := args[0]
 
@@ -172,7 +198,7 @@ var configDeleteCmd = &cobra.Command{
 			return nil
 
 		default:
-			return fmt.Errorf("cannot delete configuration key: %s", key)
+			return fmt.Errorf("cannot delete configuration key: %s\n\nOnly 'api-key' can be deleted", key)
 		}
 	},
 }

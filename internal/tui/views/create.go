@@ -370,8 +370,8 @@ func (v *CreateRunView) handleRunCreated(msg runCreatedMsg) (tea.Model, tea.Cmd)
 	v.createdRun = &msg.run
 
 	debug.LogToFilef("DEBUG: Run created successfully with ID='%s', navigating to details\n", runID)
-	// Pass the cache data to the details view
-	return NewRunDetailsViewWithCache(v.client, msg.run, v.parentRuns, v.parentCached, v.parentCachedAt, v.parentDetailsCache), nil
+	// Pass the cache data and current dimensions to the details view
+	return NewRunDetailsViewWithCacheAndDimensions(v.client, msg.run, v.parentRuns, v.parentCached, v.parentCachedAt, v.parentDetailsCache, v.width, v.height), nil
 }
 
 func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
