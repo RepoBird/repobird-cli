@@ -33,7 +33,7 @@ type CreateRunView struct {
 	submitting    bool
 	error         error
 	success       bool
-	createdRun    *models.Run
+	createdRun    *models.RunResponse
 	showHelp      bool
 	useFileInput  bool
 	filePathInput textinput.Model
@@ -330,7 +330,7 @@ func (v *CreateRunView) renderStatusBar() string {
 
 func (v *CreateRunView) submitRun() tea.Cmd {
 	return func() tea.Msg {
-		var task models.TaskRequest
+		var task models.RunRequest
 
 		if v.useFileInput {
 			filePath := v.filePathInput.Value()
@@ -347,15 +347,14 @@ func (v *CreateRunView) submitRun() tea.Cmd {
 				return runCreatedMsg{err: fmt.Errorf("invalid JSON: %w", err)}
 			}
 		} else {
-			task = models.TaskRequest{
-				Title:        v.fields[0].Value(),
-				Repository:   v.fields[1].Value(),
-				SourceBranch: v.fields[2].Value(),
-				TargetBranch: v.fields[3].Value(),
-				Issue:        v.fields[4].Value(),
-				Prompt:       v.promptArea.Value(),
-				Context:      v.contextArea.Value(),
-				RunType:      "run",
+			task = models.RunRequest{
+				Title:      v.fields[0].Value(),
+				Repository: v.fields[1].Value(),
+				Source:     v.fields[2].Value(),
+				Target:     v.fields[3].Value(),
+				Prompt:     v.promptArea.Value(),
+				Context:    v.contextArea.Value(),
+				RunType:    models.RunTypeRun,
 			}
 
 			if task.Prompt == "" {
@@ -372,18 +371,18 @@ func (v *CreateRunView) submitRun() tea.Cmd {
 				}
 			}
 
-			if task.SourceBranch == "" {
+			if task.Source == "" {
 				if utils.IsGitRepository() {
 					branch, _ := utils.GetCurrentBranch()
-					task.SourceBranch = branch
+					task.Source = branch
 				}
-				if task.SourceBranch == "" {
-					task.SourceBranch = "main"
+				if task.Source == "" {
+					task.Source = "main"
 				}
 			}
 
-			if task.TargetBranch == "" {
-				task.TargetBranch = fmt.Sprintf("repobird/%d", time.Now().Unix())
+			if task.Target == "" {
+				task.Target = fmt.Sprintf("repobird/%d", time.Now().Unix())
 			}
 		}
 
@@ -400,6 +399,6 @@ func min(a, b int) int {
 }
 
 type runCreatedMsg struct {
-	run models.Run
+	run models.RunResponse
 	err error
 }

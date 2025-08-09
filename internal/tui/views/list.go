@@ -207,12 +207,12 @@ func (v *RunListView) filterRuns() {
 func (v *RunListView) updateTable() {
 	rows := make([]components.Row, len(v.filteredRuns))
 	for i, run := range v.filteredRuns {
-		statusIcon := styles.GetStatusIcon(run.Status)
+		statusIcon := styles.GetStatusIcon(string(run.Status))
 		statusText := fmt.Sprintf("%s %s", statusIcon, run.Status)
 		timeAgo := formatTimeAgo(run.CreatedAt)
-		branch := run.SourceBranch
-		if run.TargetBranch != "" && run.TargetBranch != run.SourceBranch {
-			branch = fmt.Sprintf("%s→%s", run.SourceBranch, run.TargetBranch)
+		branch := run.Source
+		if run.Target != "" && run.Target != run.Source {
+			branch = fmt.Sprintf("%s→%s", run.Source, run.Target)
 		}
 
 		rows[i] = components.Row{
@@ -231,7 +231,7 @@ func (v *RunListView) renderStatusBar() string {
 	
 	activeCount := 0
 	for _, run := range v.runs {
-		if isActiveStatus(run.Status) {
+		if isActiveStatus(string(run.Status)) {
 			activeCount++
 		}
 	}
@@ -287,7 +287,7 @@ func (v *RunListView) stopPolling() {
 
 func (v *RunListView) hasActiveRuns() bool {
 	for _, run := range v.runs {
-		if isActiveStatus(run.Status) {
+		if isActiveStatus(string(run.Status)) {
 			return true
 		}
 	}

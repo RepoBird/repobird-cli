@@ -19,7 +19,7 @@ import (
 
 type RunDetailsView struct {
 	client      *api.Client
-	run         models.Run
+	run         models.RunResponse
 	keys        components.KeyMap
 	help        help.Model
 	viewport    viewport.Model
@@ -36,7 +36,7 @@ type RunDetailsView struct {
 	statusHistory []string
 }
 
-func NewRunDetailsView(client *api.Client, run models.Run) *RunDetailsView {
+func NewRunDetailsView(client *api.Client, run models.RunResponse) *RunDetailsView {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("63"))
@@ -113,7 +113,7 @@ func (v *RunDetailsView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		v.updateContent()
 
 	case pollTickMsg:
-		if isActiveStatus(v.run.Status) {
+		if isActiveStatus(string(v.run.Status)) {
 			cmds = append(cmds, v.loadRunDetails())
 		} else {
 			v.stopPolling()
@@ -163,8 +163,8 @@ func (v *RunDetailsView) View() string {
 }
 
 func (v *RunDetailsView) renderHeader() string {
-	statusIcon := styles.GetStatusIcon(v.run.Status)
-	statusStyle := styles.GetStatusStyle(v.run.Status)
+	statusIcon := styles.GetStatusIcon(string(v.run.Status))
+	statusStyle := styles.GetStatusStyle(string(v.run.Status))
 	status := statusStyle.Render(fmt.Sprintf("%s %s", statusIcon, v.run.Status))
 
 	title := fmt.Sprintf("Run #%s", v.run.ID[:8])
@@ -174,7 +174,7 @@ func (v *RunDetailsView) renderHeader() string {
 
 	header := styles.TitleStyle.Render(title)
 	
-	if isActiveStatus(v.run.Status) {
+	if isActiveStatus(string(v.run.Status)) {
 		pollingIndicator := styles.ProcessingStyle.Render(" [Polling ⟳]")
 		header += pollingIndicator
 	}
@@ -208,20 +208,14 @@ func (v *RunDetailsView) updateContent() {
 	} else {
 		content.WriteString(fmt.Sprintf("Title: %s\n", v.run.Title))
 		content.WriteString(fmt.Sprintf("Repository: %s\n", v.run.Repository))
-		content.WriteString(fmt.Sprintf("Source Branch: %s\n", v.run.SourceBranch))
-		if v.run.TargetBranch != "" && v.run.TargetBranch != v.run.SourceBranch {
-			content.WriteString(fmt.Sprintf("Target Branch: %s\n", v.run.TargetBranch))
-		}
-		if v.run.Issue != "" {
-			content.WriteString(fmt.Sprintf("Issue: %s\n", v.run.Issue))
-		}
-		if v.run.PullRequestURL != "" {
-			content.WriteString(fmt.Sprintf("Pull Request: %s\n", v.run.PullRequestURL))
+		content.WriteString(fmt.Sprintf("Source Branch: %s\n", v.run.Source))
+		if v.run.Target != "" && v.run.Target != v.run.Source {
+			content.WriteString(fmt.Sprintf("Target Branch: %s\n", v.run.Target))
 		}
 		content.WriteString(fmt.Sprintf("Created: %s\n", v.run.CreatedAt.Format(time.RFC3339)))
 		
-		if v.run.CompletedAt != nil && !v.run.CompletedAt.IsZero() {
-			duration := v.run.CompletedAt.Sub(v.run.CreatedAt)
+		if v.run.UpdatedAt.After(v.run.CreatedAt) && (v.run.Status == models.StatusDone || v.run.Status == models.StatusFailed) {
+			duration := v.run.UpdatedAt.Sub(v.run.CreatedAt)
 			content.WriteString(fmt.Sprintf("Duration: %s\n", formatDuration(duration)))
 		}
 
@@ -235,22 +229,12 @@ func (v *RunDetailsView) updateContent() {
 			content.WriteString(v.run.Context + "\n")
 		}
 
-		if len(v.run.Files) > 0 {
-			content.WriteString("\n═══ Files ═══\n")
-			for _, file := range v.run.Files {
-				content.WriteString("• " + file + "\n")
-			}
-		}
 
 		if v.run.Error != "" {
 			content.WriteString("\n═══ Error ═══\n")
 			content.WriteString(styles.ErrorStyle.Render(v.run.Error) + "\n")
 		}
 
-		if v.run.Plan != "" {
-			content.WriteString("\n═══ Plan ═══\n")
-			content.WriteString(v.run.Plan + "\n")
-		}
 	}
 
 	v.viewport.SetContent(content.String())
@@ -316,6 +300,6 @@ func formatDuration(d time.Duration) string {
 }
 
 type runDetailsLoadedMsg struct {
-	run models.Run
+	run models.RunResponse
 	err error
 }
