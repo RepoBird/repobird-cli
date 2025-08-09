@@ -26,22 +26,22 @@ type FormData struct {
 // Global cache for run list and details to persist across view transitions
 type GlobalCache struct {
 	mu sync.RWMutex
-	
+
 	// List cache
-	runs       []models.RunResponse
-	cached     bool
-	cachedAt   time.Time
-	
+	runs     []models.RunResponse
+	cached   bool
+	cachedAt time.Time
+
 	// Details cache - temporary cache for active runs
-	details    map[string]*models.RunResponse
-	detailsAt  map[string]time.Time
-	
+	details   map[string]*models.RunResponse
+	detailsAt map[string]time.Time
+
 	// Persistent cache for terminal status runs (DONE/FAILED) - never expires
 	terminalDetails map[string]*models.RunResponse
-	
+
 	// UI state
 	selectedIndex int
-	
+
 	// Form persistence
 	formData *FormData
 }
@@ -56,23 +56,23 @@ var globalCache = &GlobalCache{
 func GetCachedList() (runs []models.RunResponse, cached bool, cachedAt time.Time, details map[string]*models.RunResponse, selectedIndex int) {
 	globalCache.mu.RLock()
 	defer globalCache.mu.RUnlock()
-	
+
 	if globalCache.cached && len(globalCache.runs) > 0 {
 		// Always return cached data if available, regardless of age
 		// Only auto-refresh on explicit refresh action or poll for active runs
 		runsCopy := make([]models.RunResponse, len(globalCache.runs))
 		copy(runsCopy, globalCache.runs)
-		
+
 		// Merge terminal (permanent) and active (temporary) details caches
 		detailsCopy := make(map[string]*models.RunResponse)
-		
+
 		// First add terminal runs (these never expire)
 		for k, v := range globalCache.terminalDetails {
 			if v != nil {
 				detailsCopy[k] = v
 			}
 		}
-		
+
 		// Then add active runs (with 30-second expiry)
 		now := time.Now()
 		for k, v := range globalCache.details {
@@ -83,10 +83,10 @@ func GetCachedList() (runs []models.RunResponse, cached bool, cachedAt time.Time
 				}
 			}
 		}
-		
+
 		return runsCopy, true, globalCache.cachedAt, detailsCopy, globalCache.selectedIndex
 	}
-	
+
 	return nil, false, time.Time{}, make(map[string]*models.RunResponse), 0
 }
 
@@ -94,12 +94,12 @@ func GetCachedList() (runs []models.RunResponse, cached bool, cachedAt time.Time
 func SetCachedList(runs []models.RunResponse, details map[string]*models.RunResponse) {
 	globalCache.mu.Lock()
 	defer globalCache.mu.Unlock()
-	
+
 	globalCache.runs = make([]models.RunResponse, len(runs))
 	copy(globalCache.runs, runs)
 	globalCache.cached = true
 	globalCache.cachedAt = time.Now()
-	
+
 	// Initialize maps if needed
 	if globalCache.details == nil {
 		globalCache.details = make(map[string]*models.RunResponse)
@@ -110,7 +110,7 @@ func SetCachedList(runs []models.RunResponse, details map[string]*models.RunResp
 	if globalCache.terminalDetails == nil {
 		globalCache.terminalDetails = make(map[string]*models.RunResponse)
 	}
-	
+
 	// Merge the existing details with new ones, separating terminal vs active
 	now := time.Now()
 	if details != nil {
@@ -133,7 +133,7 @@ func SetCachedList(runs []models.RunResponse, details map[string]*models.RunResp
 func AddCachedDetail(runID string, run *models.RunResponse) {
 	globalCache.mu.Lock()
 	defer globalCache.mu.Unlock()
-	
+
 	if run != nil {
 		// Initialize maps if needed
 		if globalCache.details == nil {
@@ -145,7 +145,7 @@ func AddCachedDetail(runID string, run *models.RunResponse) {
 		if globalCache.terminalDetails == nil {
 			globalCache.terminalDetails = make(map[string]*models.RunResponse)
 		}
-		
+
 		if isTerminalStatus(run.Status) {
 			// Store terminal runs permanently
 			globalCache.terminalDetails[runID] = run
@@ -164,7 +164,7 @@ func AddCachedDetail(runID string, run *models.RunResponse) {
 func SetSelectedIndex(index int) {
 	globalCache.mu.Lock()
 	defer globalCache.mu.Unlock()
-	
+
 	globalCache.selectedIndex = index
 }
 
@@ -172,7 +172,7 @@ func SetSelectedIndex(index int) {
 func SaveFormData(data *FormData) {
 	globalCache.mu.Lock()
 	defer globalCache.mu.Unlock()
-	
+
 	globalCache.formData = data
 }
 
@@ -180,7 +180,7 @@ func SaveFormData(data *FormData) {
 func GetFormData() *FormData {
 	globalCache.mu.RLock()
 	defer globalCache.mu.RUnlock()
-	
+
 	return globalCache.formData
 }
 
@@ -188,7 +188,7 @@ func GetFormData() *FormData {
 func ClearFormData() {
 	globalCache.mu.Lock()
 	defer globalCache.mu.Unlock()
-	
+
 	globalCache.formData = nil
 }
 
@@ -196,7 +196,7 @@ func ClearFormData() {
 func ClearCache() {
 	globalCache.mu.Lock()
 	defer globalCache.mu.Unlock()
-	
+
 	globalCache.runs = nil
 	globalCache.cached = false
 	globalCache.cachedAt = time.Time{}
@@ -211,7 +211,7 @@ func ClearCache() {
 func ClearActiveCache() {
 	globalCache.mu.Lock()
 	defer globalCache.mu.Unlock()
-	
+
 	globalCache.runs = nil
 	globalCache.cached = false
 	globalCache.cachedAt = time.Time{}

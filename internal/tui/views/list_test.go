@@ -37,7 +37,7 @@ func TestNewRunListViewWithCache_UsesCachedData(t *testing.T) {
 	}
 
 	// Act
-	view := NewRunListViewWithCache(client, runs, true, cachedAt, detailsCache)
+	view := NewRunListViewWithCache(client, runs, true, cachedAt, detailsCache, 0)
 
 	// Assert
 	assert.False(t, view.loading, "Should not be loading with recent cached data")
@@ -65,7 +65,7 @@ func TestNewRunListViewWithCache_LoadsWhenCacheExpired(t *testing.T) {
 	detailsCache := map[string]*models.RunResponse{}
 
 	// Act
-	view := NewRunListViewWithCache(client, runs, true, cachedAt, detailsCache)
+	view := NewRunListViewWithCache(client, runs, true, cachedAt, detailsCache, 0)
 
 	// Assert
 	assert.True(t, view.loading, "Should be loading with expired cache")
@@ -99,7 +99,7 @@ func TestFilterRuns_PreservesRunIDs(t *testing.T) {
 		},
 	}
 
-	view := NewRunListViewWithCache(client, runs, true, time.Now(), nil)
+	view := NewRunListViewWithCache(client, runs, true, time.Now(), nil, 0)
 	view.searchQuery = "acme"
 
 	// Act
@@ -137,7 +137,7 @@ func TestFilterRuns_HandlesMixedIDTypes(t *testing.T) {
 		{ID: nil, Repository: "test/nil", Status: models.StatusQueued}, // edge case
 	}
 
-	view := NewRunListViewWithCache(client, runs, true, time.Now(), nil)
+	view := NewRunListViewWithCache(client, runs, true, time.Now(), nil, 0)
 
 	// Test filtering by ID
 	view.searchQuery = "456"

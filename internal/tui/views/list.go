@@ -151,7 +151,6 @@ func (v *RunListView) loadUserInfo() tea.Cmd {
 func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
-
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		v.width = msg.Width
@@ -196,7 +195,7 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if idx := v.table.GetSelectedIndex(); idx >= 0 && idx < len(v.filteredRuns) {
 				run := v.filteredRuns[idx]
 				runID := run.GetIDString()
-				
+
 				// Save cursor position to cache before navigating
 				cache.SetSelectedIndex(idx)
 
@@ -259,7 +258,7 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case key.Matches(msg, v.keys.New):
 			// DEBUG: Log cache info when creating new run view
-			debugInfo := fmt.Sprintf("DEBUG: ListView creating NewCreateRunView - runs=%d, cached=%v, detailsCache=%d\n", 
+			debugInfo := fmt.Sprintf("DEBUG: ListView creating NewCreateRunView - runs=%d, cached=%v, detailsCache=%d\n",
 				len(v.runs), v.cached, len(v.detailsCache))
 			if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
 				f.WriteString(debugInfo)
@@ -284,7 +283,6 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			v.table.GoToBottom()
 		}
 
-
 	case runsLoadedMsg:
 		debugInfo := fmt.Sprintf("DEBUG: ENTERED runsLoadedMsg case - %d runs loaded\n", len(msg.runs))
 		if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
@@ -298,12 +296,12 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		v.cached = true
 		v.cachedAt = time.Now()
 		v.filterRuns()
-		
+
 		// Save to global cache
 		if msg.err == nil && len(msg.runs) > 0 {
 			cache.SetCachedList(msg.runs, v.detailsCache)
 		}
-		
+
 		// Start preloading run details in background
 		if msg.err == nil && len(msg.runs) > 0 {
 			cmds = append(cmds, v.preloadRunDetails())
@@ -322,7 +320,7 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		v.preloading[msg.runID] = false
 		if msg.err == nil && msg.run != nil {
 			v.detailsCache[msg.runID] = msg.run
-			
+
 			// Also save to global cache
 			cache.AddCachedDetail(msg.runID, msg.run)
 

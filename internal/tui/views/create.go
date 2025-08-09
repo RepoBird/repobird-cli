@@ -20,7 +20,6 @@ import (
 	"github.com/repobird/repobird-cli/pkg/utils"
 )
 
-
 type CreateRunView struct {
 	client        *api.Client
 	keys          components.KeyMap
@@ -56,7 +55,7 @@ func NewCreateRunView(client *api.Client) *CreateRunView {
 
 func NewCreateRunViewWithCache(client *api.Client, parentRuns []models.RunResponse, parentCached bool, parentCachedAt time.Time, parentDetailsCache map[string]*models.RunResponse) *CreateRunView {
 	// DEBUG: Log cache info when creating create view
-	debugInfo := fmt.Sprintf("DEBUG: Creating CreateView - parentRuns=%d, parentCached=%v, detailsCache=%d\n", 
+	debugInfo := fmt.Sprintf("DEBUG: Creating CreateView - parentRuns=%d, parentCached=%v, detailsCache=%d\n",
 		len(parentRuns), parentCached, len(parentDetailsCache))
 	if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
 		f.WriteString(debugInfo)
@@ -181,7 +180,7 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				v.blurAllFields()
 				return v, nil
 			}
-			
+
 			// In insert mode, handle text input and field navigation
 			switch {
 			case msg.String() == "ctrl+f":
@@ -194,6 +193,12 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			case msg.String() == "ctrl+s" || msg.String() == "ctrl+enter":
 				if !v.submitting {
+					// Debug: Log when Ctrl+S is pressed
+					debugInfo := "DEBUG: Ctrl+S pressed in INSERT MODE - submitting run\n"
+					if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+						f.WriteString(debugInfo)
+						f.Close()
+					}
 					return v, v.submitRun()
 				}
 			case key.Matches(msg, v.keys.Tab):
@@ -210,7 +215,7 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					cmds = append(cmds, v.updateFields(msg)...)
 				}
 			}
-			
+
 		case components.NormalMode:
 			// In normal mode, handle navigation and commands
 			switch {
@@ -258,6 +263,12 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				v.nextField()
 			case msg.String() == "ctrl+s":
 				if !v.submitting {
+					// Debug: Log when Ctrl+S is pressed
+					debugInfo := "DEBUG: Ctrl+S pressed in NORMAL MODE - submitting run\n"
+					if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+						f.WriteString(debugInfo)
+						f.Close()
+					}
 					return v, v.submitRun()
 				}
 			case msg.String() == "ctrl+l":
@@ -273,6 +284,19 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case runCreatedMsg:
+		// Debug: Log when run creation response is received
+		debugInfo := fmt.Sprintf("DEBUG: runCreatedMsg received - err=%v, runID='%s'\n", 
+			msg.err, func() string {
+				if msg.err == nil {
+					return msg.run.GetIDString()
+				}
+				return "N/A"
+			}())
+		if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+			f.WriteString(debugInfo)
+			f.Close()
+		}
+		
 		v.submitting = false
 		if msg.err != nil {
 			v.error = msg.err
@@ -398,7 +422,7 @@ func (v *CreateRunView) clearCurrentField() {
 	if v.backButtonFocused {
 		return // Can't clear back button
 	}
-	
+
 	if v.useFileInput {
 		v.filePathInput.SetValue("")
 	} else if v.focusIndex < len(v.fields) {
@@ -528,7 +552,7 @@ func (v *CreateRunView) renderStatusBar() string {
 			statusText = "[ESC] exit [Enter] select [j/k] navigate [Ctrl+X] clear field [?] help"
 		}
 	}
-	
+
 	return styles.StatusBarStyle.Width(v.width).Render(statusText)
 }
 
@@ -536,7 +560,7 @@ func (v *CreateRunView) submitRun() tea.Cmd {
 	return func() tea.Msg {
 		// Save form data before submitting in case submission fails
 		v.saveFormData()
-		
+
 		var task models.RunRequest
 
 		if v.useFileInput {
@@ -580,7 +604,7 @@ func (v *CreateRunView) submitRun() tea.Cmd {
 			}
 
 			if task.Repository == "" {
-				debugInfo = fmt.Sprintf("DEBUG: Repository field empty, trying git auto-detect\n")
+				debugInfo = "DEBUG: Repository field empty, trying git auto-detect\n"
 				if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
 					f.WriteString(debugInfo)
 					f.Close()
