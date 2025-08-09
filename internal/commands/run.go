@@ -14,7 +14,7 @@ import (
 	"github.com/repobird/repobird-cli/internal/errors"
 	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/repobird/repobird-cli/internal/utils"
-	"github.com/repobird/repobird-cli/pkg/utils"
+	gitutils "github.com/repobird/repobird-cli/pkg/utils"
 )
 
 var (
@@ -63,7 +63,7 @@ func runCommand(cmd *cobra.Command, args []string) error {
 	}
 
 	if runReq.Repository == "" {
-		repo, err := utils.DetectRepository()
+		repo, err := gitutils.DetectRepository()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: Could not auto-detect repository: %v\n", err)
 		} else {
@@ -73,7 +73,7 @@ func runCommand(cmd *cobra.Command, args []string) error {
 	}
 
 	if runReq.Source == "" {
-		branch, err := utils.GetCurrentBranch()
+		branch, err := gitutils.GetCurrentBranch()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: Could not auto-detect branch: %v\n", err)
 		} else {

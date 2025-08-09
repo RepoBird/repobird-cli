@@ -134,9 +134,33 @@ clean:
 test:
 	$(GOTEST) -v -race -timeout 30s ./...
 
+## test-unit: Run unit tests only
+test-unit:
+	$(GOTEST) -v -race -timeout 30s -short ./internal/... ./pkg/...
+
+## test-integration: Run integration tests only
+test-integration:
+	$(GOTEST) -v -race -timeout 2m -tags=integration ./tests/integration/...
+
+## test-commands: Run command tests only
+test-commands:
+	$(GOTEST) -v -race -timeout 30s ./internal/commands/...
+
+## test-api: Run API tests only
+test-api:
+	$(GOTEST) -v -race -timeout 30s ./internal/api/...
+
+## test-config: Run config tests only
+test-config:
+	$(GOTEST) -v -race -timeout 30s ./internal/config/...
+
 ## test-short: Run short tests only
 test-short:
 	$(GOTEST) -v -short ./...
+
+## test-verbose: Run tests with verbose output
+test-verbose:
+	$(GOTEST) -v -race -timeout 30s -count=1 ./...
 
 ## coverage: Run tests with coverage
 coverage:
@@ -145,9 +169,25 @@ coverage:
 	@echo "Coverage report: coverage.html"
 	@$(GOCMD) tool cover -func=coverage.out | grep total | awk '{print "Total coverage: " $$3}'
 
+## coverage-unit: Generate coverage for unit tests only
+coverage-unit:
+	$(GOTEST) -v -race -coverprofile=coverage-unit.out -covermode=atomic -short ./internal/... ./pkg/...
+	$(GOCMD) tool cover -html=coverage-unit.out -o coverage-unit.html
+	@echo "Unit test coverage report: coverage-unit.html"
+	@$(GOCMD) tool cover -func=coverage-unit.out | grep total | awk '{print "Unit test coverage: " $$3}'
+
 ## benchmark: Run benchmarks
 benchmark:
 	$(GOTEST) -bench=. -benchmem ./...
+
+## benchmark-api: Run API benchmarks only
+benchmark-api:
+	$(GOTEST) -bench=. -benchmem ./internal/api/...
+
+## fuzz: Run fuzz tests
+fuzz:
+	$(GOTEST) -fuzz=. -fuzztime=30s ./internal/models/...
+	$(GOTEST) -fuzz=. -fuzztime=30s ./pkg/utils/...
 
 ## fmt: Format code
 fmt:

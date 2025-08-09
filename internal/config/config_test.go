@@ -11,7 +11,7 @@ import (
 
 func TestLoadConfig_Default(t *testing.T) {
 	// Setup temporary home directory
-	tempDir := setupTempHome(t)
+	_ = setupTempHome(t)
 
 	config, err := LoadConfig()
 	require.NoError(t, err)
@@ -50,7 +50,7 @@ debug: true
 }
 
 func TestLoadConfig_EnvironmentVariables(t *testing.T) {
-	tempDir := setupTempHome(t)
+	_ = setupTempHome(t)
 
 	// Set environment variables
 	originalAPIURL := os.Getenv("REPOBIRD_API_URL")
@@ -269,7 +269,7 @@ func TestConfig_Validation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Test saving and loading config
-			tempDir := setupTempHome(t)
+			_ = setupTempHome(t)
 
 			err := SaveConfig(&tt.config)
 			if tt.isValid {
@@ -288,7 +288,7 @@ func TestConfig_Validation(t *testing.T) {
 
 func TestConfig_EdgeCases(t *testing.T) {
 	t.Run("Config with very long API key", func(t *testing.T) {
-		tempDir := setupTempHome(t)
+		_ = setupTempHome(t)
 
 		longKey := make([]byte, 1000)
 		for i := range longKey {
@@ -310,7 +310,7 @@ func TestConfig_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("Config with special characters in API key", func(t *testing.T) {
-		tempDir := setupTempHome(t)
+		_ = setupTempHome(t)
 
 		config := &Config{
 			APIURL: "https://api.repobird.ai",
@@ -327,7 +327,7 @@ func TestConfig_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("Config with non-standard API URL", func(t *testing.T) {
-		tempDir := setupTempHome(t)
+		_ = setupTempHome(t)
 
 		config := &Config{
 			APIURL: "http://localhost:8080/api/v2",

@@ -1,11 +1,9 @@
 package api
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -81,10 +79,7 @@ func TestClient_doRequest_ErrorHandling(t *testing.T) {
 
 			client := NewClient("test-key", server.URL, false)
 
-			req, err := http.NewRequest("GET", server.URL+"/test", nil)
-			require.NoError(t, err)
-
-			_, err = client.doRequest(req)
+			_, err := client.doRequest("GET", "/test", nil)
 			assert.Error(t, err)
 			assert.Contains(t, err.Error(), fmt.Sprintf("status %d", tt.statusCode))
 		})
@@ -99,14 +94,9 @@ func TestClient_doRequest_DebugMode(t *testing.T) {
 	defer server.Close()
 
 	// Capture debug output
-	var debugOutput bytes.Buffer
-
 	client := NewClient("test-key", server.URL, true)
 
-	req, err := http.NewRequest("GET", server.URL+"/test", nil)
-	require.NoError(t, err)
-
-	_, err = client.doRequest(req)
+	_, err := client.doRequest("GET", "/test", nil)
 	assert.NoError(t, err)
 
 	// Note: In real implementation, debug output would go to a logger
@@ -240,12 +230,12 @@ func TestClient_GetRun_EdgeCases(t *testing.T) {
 			runID: "completed-123",
 			serverResp: func(w http.ResponseWriter, r *http.Request) {
 				resp := models.RunResponse{
-					ID:        "completed-123",
-					Status:    models.StatusDone,
-					Title:     "Test Run",
-					Summary:   "Run completed successfully",
-					CreatedAt: time.Now().Add(-5 * time.Minute),
-					UpdatedAt: time.Now(),
+					ID:          "completed-123",
+					Status:      models.StatusDone,
+					Title:       "Test Run",
+					Description: "Run completed successfully",
+					CreatedAt:   time.Now().Add(-5 * time.Minute),
+					UpdatedAt:   time.Now(),
 				}
 				w.WriteHeader(http.StatusOK)
 				json.NewEncoder(w).Encode(resp)
@@ -254,7 +244,7 @@ func TestClient_GetRun_EdgeCases(t *testing.T) {
 			validate: func(t *testing.T, resp *models.RunResponse) {
 				assert.Equal(t, models.StatusDone, resp.Status)
 				assert.Equal(t, "Test Run", resp.Title)
-				assert.NotEmpty(t, resp.Summary)
+				assert.NotEmpty(t, resp.Description)
 			},
 		},
 		{
@@ -498,7 +488,7 @@ func TestClient_Timeouts(t *testing.T) {
 	defer cancel()
 	req = req.WithContext(ctx)
 
-	_, err = client.doRequest(req)
+	_, err = client.doRequest("GET", "/timeout", nil)
 	// Should timeout
 	assert.Error(t, err)
 	assert.True(t, strings.Contains(err.Error(), "timeout") || strings.Contains(err.Error(), "context deadline exceeded"))
@@ -519,10 +509,6 @@ func TestClient_RequestHeaders(t *testing.T) {
 	client := NewClient("test-key", server.URL, false)
 
 	// Test with POST request (should have Content-Type)
-	body := bytes.NewReader([]byte(`{"test": true}`))
-	req, err := http.NewRequest("POST", server.URL+"/test", body)
-	require.NoError(t, err)
-
-	_, err = client.doRequest(req)
+	_, err := client.doRequest("POST", "/test", map[string]bool{"test": true})
 	assert.NoError(t, err)
 }

@@ -92,18 +92,18 @@ func TestRunRequest_Validation(t *testing.T) {
 func TestRunResponse_JSONSerialization(t *testing.T) {
 	now := time.Now()
 	response := RunResponse{
-		ID:         "test-123",
-		Status:     StatusProcessing,
-		Repository: "user/repo",
-		Source:     "main",
-		Target:     "feature",
-		Prompt:     "Test prompt",
-		Title:      "Test Run",
-		Context:    "Test context",
-		Summary:    "Run in progress",
-		Error:      "",
-		CreatedAt:  now,
-		UpdatedAt:  now,
+		ID:          "test-123",
+		Status:      StatusProcessing,
+		Repository:  "user/repo",
+		Source:      "main",
+		Target:      "feature",
+		Prompt:      "Test prompt",
+		Title:       "Test Run",
+		Context:     "Test context",
+		Description: "Run in progress",
+		Error:       "",
+		CreatedAt:   now,
+		UpdatedAt:   now,
 	}
 
 	// Test marshaling
@@ -124,7 +124,7 @@ func TestRunResponse_JSONSerialization(t *testing.T) {
 	assert.Equal(t, response.Prompt, unmarshaled.Prompt)
 	assert.Equal(t, response.Title, unmarshaled.Title)
 	assert.Equal(t, response.Context, unmarshaled.Context)
-	assert.Equal(t, response.Summary, unmarshaled.Summary)
+	assert.Equal(t, response.Description, unmarshaled.Description)
 	assert.Equal(t, response.Error, unmarshaled.Error)
 
 	// Time comparison with tolerance for JSON precision

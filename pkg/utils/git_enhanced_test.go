@@ -30,12 +30,12 @@ func TestDetectRepository_Integration(t *testing.T) {
 	if err != nil && strings.Contains(err.Error(), "not a git repository") {
 		t.Skip("Git not available or not a git repository")
 	}
-	
+
 	require.NoError(t, err)
 	assert.NotEmpty(t, repo)
-	
+
 	// Should detect repository format like owner/repo
-	assert.True(t, strings.Contains(repo, "/") || repo == "unknown/repo", 
+	assert.True(t, strings.Contains(repo, "/") || repo == "unknown/repo",
 		"Expected repository format 'owner/repo', got: %s", repo)
 }
 
@@ -63,7 +63,7 @@ func TestDetectRepository_SubDirectory(t *testing.T) {
 	if err != nil && strings.Contains(err.Error(), "not a git repository") {
 		t.Skip("Git not available")
 	}
-	
+
 	require.NoError(t, err)
 	assert.NotEmpty(t, repo)
 }
@@ -104,10 +104,10 @@ func TestGetCurrentBranch_Integration(t *testing.T) {
 	if err != nil && strings.Contains(err.Error(), "not a git repository") {
 		t.Skip("Git not available")
 	}
-	
+
 	require.NoError(t, err)
 	assert.NotEmpty(t, branch)
-	
+
 	// Should be main or master (default branch names)
 	assert.True(t, branch == "main" || branch == "master" || strings.HasPrefix(branch, "HEAD"),
 		"Expected main, master, or HEAD, got: %s", branch)
@@ -183,7 +183,7 @@ func TestGetCurrentBranch_DetachedHead(t *testing.T) {
 
 	branch, err := GetCurrentBranch()
 	require.NoError(t, err)
-	
+
 	// Should indicate detached HEAD state
 	assert.True(t, strings.Contains(branch, "HEAD") || strings.Contains(branch, commitHash[:7]),
 		"Expected HEAD or commit hash in branch name, got: %s", branch)
@@ -214,7 +214,7 @@ func TestGetGitInfo_Integration(t *testing.T) {
 
 	// Validate repository format
 	assert.True(t, strings.Contains(repo, "/") || repo == "unknown/repo")
-	
+
 	// Validate branch name
 	assert.True(t, branch == "main" || branch == "master" || strings.HasPrefix(branch, "HEAD"))
 }
@@ -314,13 +314,11 @@ func TestParseGitURL_EdgeCases(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := parseGitURL(tt.url)
+			result := parseGitURL(tt.url)
 
 			if tt.expectError {
-				assert.Error(t, err)
 				assert.Empty(t, result)
 			} else {
-				assert.NoError(t, err)
 				assert.Equal(t, tt.expected, result)
 			}
 		})
@@ -343,7 +341,7 @@ func TestGitFunctions_ErrorConditions(t *testing.T) {
 
 				originalWd, _ := os.Getwd()
 				defer os.Chdir(originalWd)
-				
+
 				os.Chdir(tempDir)
 				_, err = DetectRepository()
 				return err
@@ -360,7 +358,7 @@ func TestGitFunctions_ErrorConditions(t *testing.T) {
 
 				originalWd, _ := os.Getwd()
 				defer os.Chdir(originalWd)
-				
+
 				os.Chdir(tempDir)
 				_, err = GetCurrentBranch()
 				return err
@@ -377,7 +375,7 @@ func TestGitFunctions_ErrorConditions(t *testing.T) {
 
 				originalWd, _ := os.Getwd()
 				defer os.Chdir(originalWd)
-				
+
 				os.Chdir(tempDir)
 				_, _, err = GetGitInfo()
 				return err

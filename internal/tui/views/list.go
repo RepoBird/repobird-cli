@@ -196,9 +196,11 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "j":
 			v.table.MoveDown()
 			cmds = append(cmds, v.preloadSelectedRun())
+			return v, tea.Batch(cmds...)
 		case "k":
 			v.table.MoveUp()
 			cmds = append(cmds, v.preloadSelectedRun())
+			return v, tea.Batch(cmds...)
 		case "h":
 			// Go back (same as ESC)
 			if v.searchMode {
@@ -206,6 +208,7 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				v.searchQuery = ""
 				v.filterRuns()
 			}
+			return v, tea.Batch(cmds...)
 		case "l":
 			// Go forward/select (same as Enter)
 			if idx := v.table.GetSelectedIndex(); idx >= 0 && idx < len(v.filteredRuns) {
@@ -215,16 +218,20 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return NewRunDetailsViewWithCache(v.client, run, v.runs, v.cached, v.cachedAt, v.detailsCache), nil
 			}
+			return v, tea.Batch(cmds...)
 		case "g":
 			// Check for 'gg' combination - go to top
 			v.table.GoToTop()
+			return v, tea.Batch(cmds...)
 		case "G":
 			// Go to bottom
 			v.table.GoToBottom()
+			return v, tea.Batch(cmds...)
 		case "/":
 			// Start search
 			v.searchMode = true
 			v.searchQuery = ""
+			return v, tea.Batch(cmds...)
 		}
 
 	case runsLoadedMsg:
@@ -239,7 +246,7 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, v.preloadRunDetails())
 		}
 
-	case runDetailsLoadedMsg:
+	case runDetailsPreloadedMsg:
 		// Cache the loaded run details
 		v.preloading[msg.runID] = false
 		if msg.err == nil && msg.run != nil {
@@ -517,7 +524,7 @@ func (v *RunListView) preloadRunDetails() tea.Cmd {
 		id := runID // Capture for closure
 		cmds = append(cmds, func() tea.Msg {
 			detailed, err := v.client.GetRun(id)
-			return runDetailsLoadedMsg{
+			return runDetailsPreloadedMsg{
 				runID: id,
 				run:   detailed,
 				err:   err,
@@ -541,7 +548,7 @@ func (v *RunListView) preloadSelectedRun() tea.Cmd {
 		v.preloading[runID] = true
 		return func() tea.Msg {
 			detailed, err := v.client.GetRun(runID)
-			return runDetailsLoadedMsg{
+			return runDetailsPreloadedMsg{
 				runID: runID,
 				run:   detailed,
 				err:   err,

@@ -58,7 +58,7 @@ or in an encrypted file as a fallback.`,
 		}
 
 		// Verify the API key first
-		client := api.NewClient(apiKey, cfg.APIEndpoint, cfg.Debug)
+		client := api.NewClient(apiKey, cfg.APIURL, cfg.Debug)
 		userInfo, err := client.VerifyAuth()
 		if err != nil {
 			return fmt.Errorf("invalid API key: %w", err)
@@ -106,7 +106,7 @@ var logoutCmd = &cobra.Command{
 	Short: "Remove stored API key",
 	Long:  `Remove the stored API key from all secure storage locations.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		secureConfig, err := config.LoadSecureConfig()
+		_, err := config.LoadSecureConfig()
 		if err != nil {
 			return fmt.Errorf("failed to load config: %w", err)
 		}
@@ -148,7 +148,7 @@ var verifyCmd = &cobra.Command{
 		}
 
 		// Verify with API
-		client := api.NewClient(secureConfig.APIKey, secureConfig.APIEndpoint, secureConfig.Debug)
+		client := api.NewClient(secureConfig.APIKey, secureConfig.APIURL, secureConfig.Debug)
 		userInfo, err := client.VerifyAuth()
 		if err != nil {
 			return fmt.Errorf("API key verification failed: %w", err)
@@ -220,7 +220,7 @@ var infoCmd = &cobra.Command{
 		// Try to get user info if API key is available
 		if secureConfig.APIKey != "" {
 			fmt.Println()
-			client := api.NewClient(secureConfig.APIKey, secureConfig.APIEndpoint, secureConfig.Debug)
+			client := api.NewClient(secureConfig.APIKey, secureConfig.APIURL, secureConfig.Debug)
 			if userInfo, err := client.VerifyAuth(); err == nil {
 				fmt.Println("Account Information:")
 				fmt.Printf("  Email: %s\n", userInfo.Email)
