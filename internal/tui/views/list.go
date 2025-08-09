@@ -269,11 +269,11 @@ func (v *RunListView) handleEnterKey() (tea.Model, tea.Cmd) {
 		}
 
 		debug.LogToFilef("DEBUG: Fixed cached run ID from '%s' to '%s'\n", detailed.GetIDString(), cachedRun.GetIDString())
-		return NewRunDetailsView(v.client, cachedRun), nil
+		return NewRunDetailsViewWithCache(v.client, cachedRun, v.runs, v.cached, v.cachedAt, v.detailsCache), nil
 	}
 
 	debug.LogToFilef("DEBUG: No cached data for runID='%s', loading fresh - NAVIGATING TO DETAILS VIEW\n", runID)
-	return NewRunDetailsView(v.client, run), nil
+	return NewRunDetailsViewWithCache(v.client, run, v.runs, v.cached, v.cachedAt, v.detailsCache), nil
 }
 
 // handleNewRunKey handles the New key press to create a new run

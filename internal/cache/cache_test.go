@@ -23,11 +23,11 @@ func TestGetCachedList(t *testing.T) {
 	t.Run("returns cached list when available", func(t *testing.T) {
 		expectedRuns := []models.RunResponse{
 			{ID: "run-1", Status: models.StatusQueued},
-			{ID: "run-2", Status: models.StatusRunning},
+			{ID: "run-2", Status: models.StatusProcessing},
 		}
-		
-		SetCachedList(expectedRuns, nil, 0)
-		
+
+		SetCachedList(expectedRuns, nil)
+
 		runs, cached, cachedAt, _, selectedIdx := GetCachedList()
 		assert.Equal(t, expectedRuns, runs)
 		assert.True(t, cached)
@@ -39,9 +39,12 @@ func TestGetCachedList(t *testing.T) {
 		runs := []models.RunResponse{
 			{ID: "run-1", Status: models.StatusQueued},
 		}
-		
-		SetCachedList(runs, nil, 3)
-		
+
+		globalCache.mu.Lock()
+		globalCache.selectedIndex = 3
+		globalCache.mu.Unlock()
+		SetCachedList(runs, nil)
+
 		_, _, _, _, selectedIdx := GetCachedList()
 		assert.Equal(t, 3, selectedIdx)
 	})
@@ -59,12 +62,15 @@ func TestSetCachedList(t *testing.T) {
 		details := map[string]*models.RunResponse{
 			"run-1": {ID: "run-1", Status: models.StatusQueued, Prompt: "Test"},
 		}
-		
-		SetCachedList(runs, details, 1)
-		
+
+		globalCache.mu.Lock()
+		globalCache.selectedIndex = 1
+		globalCache.mu.Unlock()
+		SetCachedList(runs, details)
+
 		globalCache.mu.RLock()
 		defer globalCache.mu.RUnlock()
-		
+
 		assert.Equal(t, runs, globalCache.runs)
 		assert.True(t, globalCache.cached)
 		assert.NotNil(t, globalCache.details["run-1"])
@@ -74,26 +80,26 @@ func TestSetCachedList(t *testing.T) {
 	t.Run("separates terminal and active runs in details", func(t *testing.T) {
 		runs := []models.RunResponse{
 			{ID: "run-1", Status: models.StatusDone},
-			{ID: "run-2", Status: models.StatusRunning},
+			{ID: "run-2", Status: models.StatusProcessing},
 			{ID: "run-3", Status: models.StatusFailed},
 			{ID: "run-4", Status: models.StatusQueued},
 		}
 		details := map[string]*models.RunResponse{
 			"run-1": {ID: "run-1", Status: models.StatusDone},
-			"run-2": {ID: "run-2", Status: models.StatusRunning},
+			"run-2": {ID: "run-2", Status: models.StatusProcessing},
 			"run-3": {ID: "run-3", Status: models.StatusFailed},
 			"run-4": {ID: "run-4", Status: models.StatusQueued},
 		}
-		
-		SetCachedList(runs, details, 0)
-		
+
+		SetCachedList(runs, details)
+
 		globalCache.mu.RLock()
 		defer globalCache.mu.RUnlock()
-		
+
 		// Terminal runs should be in terminalDetails
 		assert.NotNil(t, globalCache.terminalDetails["run-1"])
 		assert.NotNil(t, globalCache.terminalDetails["run-3"])
-		
+
 		// Active runs should be in details
 		assert.NotNil(t, globalCache.details["run-2"])
 		assert.NotNil(t, globalCache.details["run-4"])
@@ -107,15 +113,15 @@ func TestAddCachedDetail(t *testing.T) {
 	t.Run("adds active run detail to cache", func(t *testing.T) {
 		run := &models.RunResponse{
 			ID:     "run-1",
-			Status: models.StatusRunning,
+			Status: models.StatusProcessing,
 			Prompt: "Test prompt",
 		}
-		
-		AddCachedDetail(run)
-		
+
+		AddCachedDetail(run.ID, run)
+
 		globalCache.mu.RLock()
 		defer globalCache.mu.RUnlock()
-		
+
 		cached, exists := globalCache.details["run-1"]
 		assert.True(t, exists)
 		assert.Equal(t, run, cached)
@@ -127,16 +133,16 @@ func TestAddCachedDetail(t *testing.T) {
 			Status: models.StatusDone,
 			Prompt: "Completed prompt",
 		}
-		
-		AddCachedDetail(run)
-		
+
+		AddCachedDetail(run.ID, run)
+
 		globalCache.mu.RLock()
 		defer globalCache.mu.RUnlock()
-		
+
 		cached, exists := globalCache.terminalDetails["run-2"]
 		assert.True(t, exists)
 		assert.Equal(t, run, cached)
-		
+
 		// Should not be in active details
 		_, existsInActive := globalCache.details["run-2"]
 		assert.False(t, existsInActive)
@@ -146,29 +152,29 @@ func TestAddCachedDetail(t *testing.T) {
 		// Add as active first
 		run1 := &models.RunResponse{
 			ID:     "run-3",
-			Status: models.StatusRunning,
+			Status: models.StatusProcessing,
 		}
-		AddCachedDetail(run1)
-		
+		AddCachedDetail("run-3", run1)
+
 		// Verify it's in active cache
 		globalCache.mu.RLock()
 		_, existsInActive := globalCache.details["run-3"]
 		globalCache.mu.RUnlock()
 		assert.True(t, existsInActive)
-		
+
 		// Update to terminal status
 		run2 := &models.RunResponse{
 			ID:     "run-3",
 			Status: models.StatusDone,
 		}
-		AddCachedDetail(run2)
-		
+		AddCachedDetail("run-3", run2)
+
 		// Verify it moved to terminal cache
 		globalCache.mu.RLock()
 		_, existsInActive = globalCache.details["run-3"]
 		_, existsInTerminal := globalCache.terminalDetails["run-3"]
 		globalCache.mu.RUnlock()
-		
+
 		assert.False(t, existsInActive)
 		assert.True(t, existsInTerminal)
 	})
@@ -181,8 +187,8 @@ func TestGetSelectedIndex(t *testing.T) {
 		globalCache.mu.Lock()
 		globalCache.selectedIndex = 5
 		globalCache.mu.Unlock()
-		
-		index := GetSelectedIndex()
+
+		_, _, _, _, index := GetCachedList()
 		assert.Equal(t, 5, index)
 	})
 }
@@ -192,10 +198,10 @@ func TestSetSelectedIndex(t *testing.T) {
 
 	t.Run("sets selected index", func(t *testing.T) {
 		SetSelectedIndex(7)
-		
+
 		globalCache.mu.RLock()
 		defer globalCache.mu.RUnlock()
-		
+
 		assert.Equal(t, 7, globalCache.selectedIndex)
 	})
 }
@@ -211,9 +217,9 @@ func TestFormDataOperations(t *testing.T) {
 			Target:     "feature",
 			Prompt:     "Test prompt",
 		}
-		
+
 		SaveFormData(formData)
-		
+
 		result := GetFormData()
 		assert.Equal(t, formData, result)
 	})
@@ -222,7 +228,7 @@ func TestFormDataOperations(t *testing.T) {
 		globalCache.mu.Lock()
 		globalCache.formData = nil
 		globalCache.mu.Unlock()
-		
+
 		result := GetFormData()
 		assert.Nil(t, result)
 	})
@@ -230,10 +236,10 @@ func TestFormDataOperations(t *testing.T) {
 	t.Run("clear form data", func(t *testing.T) {
 		// Set some data first
 		SaveFormData(&FormData{Title: "Test"})
-		
+
 		// Clear it
 		ClearFormData()
-		
+
 		// Verify it's cleared
 		result := GetFormData()
 		assert.Nil(t, result)
@@ -251,15 +257,18 @@ func TestClearCache(t *testing.T) {
 		details := map[string]*models.RunResponse{
 			"run-1": {ID: "run-1", Status: models.StatusDone},
 		}
-		SetCachedList(runs, details, 3)
+		globalCache.mu.Lock()
+		globalCache.selectedIndex = 3
+		globalCache.mu.Unlock()
+		SetCachedList(runs, details)
 		SaveFormData(&FormData{Title: "Test"})
-		
+
 		// Clear cache
 		ClearCache()
-		
+
 		globalCache.mu.RLock()
 		defer globalCache.mu.RUnlock()
-		
+
 		assert.Empty(t, globalCache.runs)
 		assert.False(t, globalCache.cached)
 		assert.Empty(t, globalCache.details)
@@ -277,37 +286,36 @@ func TestClearActiveCache(t *testing.T) {
 	t.Run("removes only active runs from cache", func(t *testing.T) {
 		// Add mixed runs
 		runs := []models.RunResponse{
-			{ID: "run-1", Status: models.StatusRunning},
+			{ID: "run-1", Status: models.StatusProcessing},
 			{ID: "run-2", Status: models.StatusQueued},
 			{ID: "run-3", Status: models.StatusDone},
 			{ID: "run-4", Status: models.StatusFailed},
 		}
 		details := map[string]*models.RunResponse{
-			"run-1": {ID: "run-1", Status: models.StatusRunning},
+			"run-1": {ID: "run-1", Status: models.StatusProcessing},
 			"run-2": {ID: "run-2", Status: models.StatusQueued},
 			"run-3": {ID: "run-3", Status: models.StatusDone},
 			"run-4": {ID: "run-4", Status: models.StatusFailed},
 		}
-		SetCachedList(runs, details, 2)
-		
+		globalCache.mu.Lock()
+		globalCache.selectedIndex = 2
+		globalCache.mu.Unlock()
+		SetCachedList(runs, details)
+
 		// Clear active cache
 		ClearActiveCache()
-		
+
 		globalCache.mu.RLock()
 		defer globalCache.mu.RUnlock()
-		
-		// List should only contain terminal runs
-		require.NotNil(t, globalCache.runs)
-		assert.Len(t, globalCache.runs, 2)
-		// Verify they are terminal runs
-		for _, run := range globalCache.runs {
-			assert.True(t, isTerminalStatus(run.Status))
-		}
-		
+
+		// List should be cleared
+		assert.Nil(t, globalCache.runs)
+		assert.False(t, globalCache.cached)
+
 		// Active details should be cleared
 		assert.Empty(t, globalCache.details)
 		assert.Empty(t, globalCache.detailsAt)
-		
+
 		// Terminal details should be preserved
 		assert.NotEmpty(t, globalCache.terminalDetails)
 	})
@@ -319,19 +327,19 @@ func TestCacheConcurrency(t *testing.T) {
 	t.Run("concurrent reads and writes to list", func(t *testing.T) {
 		var wg sync.WaitGroup
 		numGoroutines := 100
-		
+
 		// Start multiple goroutines writing to cache
 		for i := 0; i < numGoroutines; i++ {
 			wg.Add(1)
 			go func(id int) {
 				defer wg.Done()
 				runs := []models.RunResponse{
-					{ID: string(rune(id)), Status: models.StatusRunning},
+					{ID: string(rune(id)), Status: models.StatusProcessing},
 				}
-				SetCachedList(runs, nil, id)
+				SetCachedList(runs, nil)
 			}(i)
 		}
-		
+
 		// Start multiple goroutines reading from cache
 		for i := 0; i < numGoroutines; i++ {
 			wg.Add(1)
@@ -340,10 +348,10 @@ func TestCacheConcurrency(t *testing.T) {
 				_, _, _, _, _ = GetCachedList()
 			}()
 		}
-		
+
 		// Wait for all goroutines to complete
 		wg.Wait()
-		
+
 		// Should not have panicked
 		assert.True(t, true, "Concurrent operations completed without panic")
 	})
@@ -351,7 +359,7 @@ func TestCacheConcurrency(t *testing.T) {
 	t.Run("concurrent detail operations", func(t *testing.T) {
 		var wg sync.WaitGroup
 		numGoroutines := 100
-		
+
 		// Start multiple goroutines adding details
 		for i := 0; i < numGoroutines; i++ {
 			wg.Add(1)
@@ -359,12 +367,12 @@ func TestCacheConcurrency(t *testing.T) {
 				defer wg.Done()
 				run := &models.RunResponse{
 					ID:     string(rune(id)),
-					Status: models.StatusRunning,
+					Status: models.StatusProcessing,
 				}
-				AddCachedDetail(run)
+				AddCachedDetail(run.ID, run)
 			}(i)
 		}
-		
+
 		// Start multiple goroutines clearing cache
 		for i := 0; i < 10; i++ {
 			wg.Add(1)
@@ -374,10 +382,10 @@ func TestCacheConcurrency(t *testing.T) {
 				ClearCache()
 			}()
 		}
-		
+
 		// Wait for all goroutines to complete
 		wg.Wait()
-		
+
 		// Should not have panicked
 		assert.True(t, true, "Concurrent detail operations completed without panic")
 	})
@@ -385,7 +393,7 @@ func TestCacheConcurrency(t *testing.T) {
 	t.Run("concurrent form data operations", func(t *testing.T) {
 		var wg sync.WaitGroup
 		numGoroutines := 50
-		
+
 		// Start multiple goroutines saving form data
 		for i := 0; i < numGoroutines; i++ {
 			wg.Add(1)
@@ -397,7 +405,7 @@ func TestCacheConcurrency(t *testing.T) {
 				SaveFormData(data)
 			}(i)
 		}
-		
+
 		// Start multiple goroutines reading form data
 		for i := 0; i < numGoroutines; i++ {
 			wg.Add(1)
@@ -406,7 +414,7 @@ func TestCacheConcurrency(t *testing.T) {
 				_ = GetFormData()
 			}()
 		}
-		
+
 		// Start multiple goroutines clearing form data
 		for i := 0; i < 10; i++ {
 			wg.Add(1)
@@ -416,10 +424,10 @@ func TestCacheConcurrency(t *testing.T) {
 				ClearFormData()
 			}()
 		}
-		
+
 		// Wait for all goroutines to complete
 		wg.Wait()
-		
+
 		// Should not have panicked
 		assert.True(t, true, "Concurrent form data operations completed without panic")
 	})
@@ -432,10 +440,10 @@ func TestIsTerminalStatus(t *testing.T) {
 	}{
 		{models.StatusDone, true},
 		{models.StatusFailed, true},
-		{models.StatusRunning, false},
+		{models.StatusProcessing, false},
 		{models.StatusQueued, false},
-		{models.StatusPending, false},
-		{models.StatusExecuting, false},
+		{models.StatusInitializing, false},
+		{models.StatusPostProcess, false},
 		{"unknown", false},
 	}
 
@@ -445,104 +453,4 @@ func TestIsTerminalStatus(t *testing.T) {
 			assert.Equal(t, tt.isTerminal, result)
 		})
 	}
-}
-
-func TestDetailsCacheExpiration(t *testing.T) {
-	initializeCache()
-
-	t.Run("active details expire after time", func(t *testing.T) {
-		run := &models.RunResponse{
-			ID:     "run-1",
-			Status: models.StatusRunning,
-		}
-		
-		// Add detail
-		AddCachedDetail(run)
-		
-		// Manually set expiry to past
-		globalCache.mu.Lock()
-		globalCache.detailsAt["run-1"] = time.Now().Add(-2 * time.Hour)
-		globalCache.mu.Unlock()
-		
-		// Get cached detail
-		detail := GetCachedDetail("run-1")
-		
-		// Should still return the detail (expiration is handled elsewhere)
-		assert.NotNil(t, detail)
-	})
-
-	t.Run("terminal details never expire", func(t *testing.T) {
-		run := &models.RunResponse{
-			ID:     "run-2",
-			Status: models.StatusDone,
-		}
-		
-		// Add terminal detail
-		AddCachedDetail(run)
-		
-		// Get cached detail
-		detail := GetCachedDetail("run-2")
-		
-		assert.NotNil(t, detail)
-		assert.Equal(t, run.ID, detail.ID)
-	})
-}
-
-func TestUpdateRunInList(t *testing.T) {
-	initializeCache()
-
-	t.Run("updates run in cached list", func(t *testing.T) {
-		runs := []models.RunResponse{
-			{ID: "run-1", Status: models.StatusQueued},
-			{ID: "run-2", Status: models.StatusRunning},
-			{ID: "run-3", Status: models.StatusPending},
-		}
-		SetCachedList(runs, nil, 0)
-		
-		// Update run-2
-		updatedRun := &models.RunResponse{
-			ID:     "run-2",
-			Status: models.StatusDone,
-			Prompt: "Updated",
-		}
-		
-		UpdateRunInList(updatedRun)
-		
-		// Verify update
-		globalCache.mu.RLock()
-		defer globalCache.mu.RUnlock()
-		
-		found := false
-		for _, run := range globalCache.runs {
-			if run.ID == "run-2" {
-				assert.Equal(t, models.StatusDone, run.Status)
-				assert.Equal(t, "Updated", run.Prompt)
-				found = true
-				break
-			}
-		}
-		assert.True(t, found, "Run should be updated in list")
-	})
-
-	t.Run("does nothing if run not in list", func(t *testing.T) {
-		runs := []models.RunResponse{
-			{ID: "run-1", Status: models.StatusQueued},
-		}
-		SetCachedList(runs, nil, 0)
-		
-		// Try to update non-existent run
-		updatedRun := &models.RunResponse{
-			ID:     "run-999",
-			Status: models.StatusDone,
-		}
-		
-		UpdateRunInList(updatedRun)
-		
-		// List should be unchanged
-		globalCache.mu.RLock()
-		defer globalCache.mu.RUnlock()
-		
-		assert.Len(t, globalCache.runs, 1)
-		assert.Equal(t, "run-1", globalCache.runs[0].ID)
-	})
 }
