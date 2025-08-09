@@ -12,8 +12,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/repobird/repobird-cli/internal/api"
+	"github.com/repobird/repobird-cli/internal/cache"
 	"github.com/repobird/repobird-cli/internal/models"
-	"github.com/repobird/repobird-cli/internal/tui"
 	"github.com/repobird/repobird-cli/internal/tui/components"
 	"github.com/repobird/repobird-cli/internal/tui/styles"
 )
@@ -46,11 +46,11 @@ type RunListView struct {
 
 func NewRunListView(client *api.Client) *RunListView {
 	// Try to get cached data from global cache
-	runs, cached, cachedAt, detailsCache := tui.GetCachedList()
-	return NewRunListViewWithCache(client, runs, cached, cachedAt, detailsCache)
+	runs, cached, cachedAt, detailsCache, selectedIndex := cache.GetCachedList()
+	return NewRunListViewWithCache(client, runs, cached, cachedAt, detailsCache, selectedIndex)
 }
 
-func NewRunListViewWithCache(client *api.Client, runs []models.RunResponse, cached bool, cachedAt time.Time, detailsCache map[string]*models.RunResponse) *RunListView {
+func NewRunListViewWithCache(client *api.Client, runs []models.RunResponse, cached bool, cachedAt time.Time, detailsCache map[string]*models.RunResponse, selectedIndex int) *RunListView {
 	// Enhanced debugging with more details
 	debugInfo := fmt.Sprintf("DEBUG: Creating RunListViewWithCache - cached=%v, runs=%d, detailsCache=%d\n",
 		cached, len(runs), len(detailsCache))
@@ -336,7 +336,7 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		
 		// Save to global cache
 		if msg.err == nil && len(msg.runs) > 0 {
-			tui.SetCachedList(msg.runs, v.detailsCache)
+			cache.SetCachedList(msg.runs, v.detailsCache)
 		}
 		
 		// Start preloading run details in background
@@ -359,7 +359,7 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			v.detailsCache[msg.runID] = msg.run
 			
 			// Also save to global cache
-			tui.AddCachedDetail(msg.runID, msg.run)
+			cache.AddCachedDetail(msg.runID, msg.run)
 
 			// Debug logging
 			debugInfo := fmt.Sprintf("DEBUG: Successfully cached run with key='%s', actualID='%s', title='%s', cacheSize=%d\n",

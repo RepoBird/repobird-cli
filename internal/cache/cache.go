@@ -1,4 +1,4 @@
-package tui
+package cache
 
 import (
 	"sync"
@@ -18,6 +18,9 @@ type GlobalCache struct {
 	
 	// Details cache
 	details    map[string]*models.RunResponse
+	
+	// UI state
+	selectedIndex int
 }
 
 var globalCache = &GlobalCache{
@@ -25,7 +28,7 @@ var globalCache = &GlobalCache{
 }
 
 // GetCachedList returns the cached run list if it's still valid (< 30 seconds old)
-func GetCachedList() (runs []models.RunResponse, cached bool, cachedAt time.Time, details map[string]*models.RunResponse) {
+func GetCachedList() (runs []models.RunResponse, cached bool, cachedAt time.Time, details map[string]*models.RunResponse, selectedIndex int) {
 	globalCache.mu.RLock()
 	defer globalCache.mu.RUnlock()
 	
@@ -41,10 +44,10 @@ func GetCachedList() (runs []models.RunResponse, cached bool, cachedAt time.Time
 			}
 		}
 		
-		return runsCopy, true, globalCache.cachedAt, detailsCopy
+		return runsCopy, true, globalCache.cachedAt, detailsCopy, globalCache.selectedIndex
 	}
 	
-	return nil, false, time.Time{}, make(map[string]*models.RunResponse)
+	return nil, false, time.Time{}, make(map[string]*models.RunResponse), 0
 }
 
 // SetCachedList updates the global run list cache
@@ -85,6 +88,14 @@ func AddCachedDetail(runID string, run *models.RunResponse) {
 	}
 }
 
+// SetSelectedIndex updates the selected index in the cache
+func SetSelectedIndex(index int) {
+	globalCache.mu.Lock()
+	defer globalCache.mu.Unlock()
+	
+	globalCache.selectedIndex = index
+}
+
 // ClearCache clears all cached data (useful for testing)
 func ClearCache() {
 	globalCache.mu.Lock()
@@ -94,4 +105,5 @@ func ClearCache() {
 	globalCache.cached = false
 	globalCache.cachedAt = time.Time{}
 	globalCache.details = make(map[string]*models.RunResponse)
+	globalCache.selectedIndex = 0
 }

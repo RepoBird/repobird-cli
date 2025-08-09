@@ -13,6 +13,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/repobird/repobird-cli/internal/api"
+	"github.com/repobird/repobird-cli/internal/cache"
 	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/repobird/repobird-cli/internal/tui/components"
 	"github.com/repobird/repobird-cli/internal/tui/styles"
@@ -46,7 +47,9 @@ type RunDetailsView struct {
 }
 
 func NewRunDetailsView(client *api.Client, run models.RunResponse) *RunDetailsView {
-	return NewRunDetailsViewWithCache(client, run, nil, false, time.Time{}, nil)
+	// Get the current global cache
+	runs, cached, cachedAt, detailsCache := cache.GetCachedList()
+	return NewRunDetailsViewWithCache(client, run, runs, cached, cachedAt, detailsCache)
 }
 
 func NewRunDetailsViewWithCache(client *api.Client, run models.RunResponse, parentRuns []models.RunResponse, parentCached bool, parentCachedAt time.Time, parentDetailsCache map[string]*models.RunResponse) *RunDetailsView {
@@ -182,7 +185,7 @@ func (v *RunDetailsView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return v, tea.Quit
 		case key.Matches(msg, v.keys.Back):
 			v.stopPolling()
-			return NewRunListViewWithCache(v.client, v.parentRuns, v.parentCached, v.parentCachedAt, v.parentDetailsCache), nil
+			return NewRunListView(v.client), nil
 		case key.Matches(msg, v.keys.Help):
 			v.showHelp = !v.showHelp
 		case key.Matches(msg, v.keys.Refresh):
