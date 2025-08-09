@@ -171,23 +171,27 @@ func (v *RunListView) handleWindowSizeMsg(msg tea.WindowSizeMsg) {
 	v.width = msg.Width
 	v.height = msg.Height
 
-	// Calculate actual height needed for non-table elements:
-	// - Title: 2 lines (title + blank line)
-	// - Search/filter line: 1 line (when active)
+	// Calculate height for the table
+	// We need to account for:
+	// - Title: 1 line
+	// - Blank line after title: 1 line
+	// - Search/filter (if active): 1 line
 	// - Status bar: 1 line
-	// - Help (when shown): varies, but we'll account for it dynamically
-	nonTableHeight := 4 // Title (2) + blank line after table (1) + status bar (1)
+	// - Help (if shown): ~4 lines
+	nonTableHeight := 3 // Title (1) + blank after title (1) + status bar (1)
+
 	if v.searchMode || v.searchQuery != "" {
-		nonTableHeight++ // Add line for search/filter display
-	}
-	if v.showHelp {
-		// Help takes additional lines, estimate 3-4 lines
-		nonTableHeight += 4
+		nonTableHeight++ // Search/filter line
 	}
 
+	if v.showHelp {
+		nonTableHeight += 4 // Help text
+	}
+
+	// Give the rest to the table
 	tableHeight := msg.Height - nonTableHeight
-	if tableHeight < 3 {
-		tableHeight = 3 // Minimum height for header + separator + at least one row
+	if tableHeight < 5 {
+		tableHeight = 5 // Minimum for header + separator + a few rows
 	}
 
 	v.table.SetDimensions(msg.Width, tableHeight)
@@ -461,38 +465,89 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (v *RunListView) View() string {
-	var s strings.Builder
+	if v.height == 0 {
+		// Terminal dimensions not yet known
+		return ""
+	}
 
-	// Render title using full terminal width
+	var lines []string
+
+	// Line 1: Title
 	titleText := "RepoBird CLI - Runs"
 	title := styles.TitleStyle.Width(v.width).Render(titleText)
-	s.WriteString(title)
-	s.WriteString("\n\n")
+	lines = append(lines, title)
 
+	// Line 2: Blank line after title
+	lines = append(lines, "")
+
+	// Track how many lines we've used so far
+	linesUsed := 2
+
+	// Handle loading/error states or normal view
 	if v.loading {
-		s.WriteString(v.spinner.View() + " Loading runs...\n")
+		lines = append(lines, v.spinner.View()+" Loading runs...")
+		linesUsed++
 	} else if v.error != nil {
-		s.WriteString(styles.ErrorStyle.Render("Error: "+v.error.Error()) + "\n")
+		lines = append(lines, styles.ErrorStyle.Render("Error: "+v.error.Error()))
+		linesUsed++
 	} else {
+		// Search/filter line (if active)
 		if v.searchMode {
-			s.WriteString("Search: " + v.searchQuery + "_\n")
+			lines = append(lines, "Search: "+v.searchQuery+"_")
+			linesUsed++
 		} else if v.searchQuery != "" {
-			s.WriteString("Filter: " + v.searchQuery + "\n")
+			lines = append(lines, "Filter: "+v.searchQuery)
+			linesUsed++
 		}
 
-		s.WriteString(v.table.View())
-		s.WriteString("\n")
-
-		statusBar := v.renderStatusBar()
-		s.WriteString(statusBar)
+		// Table view
+		tableContent := v.table.View()
+		if tableContent != "" {
+			lines = append(lines, tableContent)
+			// Count lines in table content
+			tableLines := strings.Count(tableContent, "\n") + 1
+			linesUsed += tableLines
+		}
 	}
 
+	// Calculate how many blank lines we need before the status bar
+	// Reserve lines for: status bar (1) and help (if shown)
+	reservedBottomLines := 1 // status bar
+	if v.showHelp {
+		// Help takes about 3-4 lines
+		reservedBottomLines += 4
+	}
+
+	// Fill remaining space with blank lines
+	totalContentLines := linesUsed + reservedBottomLines
+	if totalContentLines < v.height {
+		blankLines := v.height - totalContentLines
+		for i := 0; i < blankLines; i++ {
+			lines = append(lines, "")
+		}
+	}
+
+	// Add help if shown
 	if v.showHelp {
 		helpView := v.help.View(v.keys)
-		s.WriteString("\n" + helpView)
+		lines = append(lines, strings.Split(helpView, "\n")...)
 	}
 
-	return s.String()
+	// Status bar (always last)
+	statusBar := v.renderStatusBar()
+	lines = append(lines, statusBar)
+
+	// Join all lines and ensure we don't exceed terminal height
+	result := strings.Join(lines, "\n")
+
+	// Trim to exact height if we somehow exceeded it
+	resultLines := strings.Split(result, "\n")
+	if len(resultLines) > v.height {
+		resultLines = resultLines[:v.height]
+		result = strings.Join(resultLines, "\n")
+	}
+
+	return result
 }
 
 func (v *RunListView) filterRuns() {

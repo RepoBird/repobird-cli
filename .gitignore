@@ -33,6 +33,7 @@ go.work.sum
 
 # Build output directory
 build/
+man/
 
 # Go linting config (environment-specific)
 .golangci.yml

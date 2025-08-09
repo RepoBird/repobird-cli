@@ -276,7 +276,6 @@ func getCachedUserInfo(apiKey, apiEndpoint string, debug bool) (*models.UserInfo
 }
 
 func init() {
-	rootCmd.AddCommand(authCmd)
 	authCmd.AddCommand(loginCmd)
 	authCmd.AddCommand(logoutCmd)
 	authCmd.AddCommand(verifyCmd)
