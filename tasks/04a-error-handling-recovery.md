@@ -22,19 +22,19 @@ Based on industry best practices:
 ## Implementation Tasks
 
 ### 1. Error Types & Classification
-- [ ] Create custom error types in `internal/errors/types.go`
+- [x] Create custom error types in `internal/errors/types.go`
   - `APIError` - For API-related errors with status codes
   - `NetworkError` - For network connectivity issues
   - `AuthError` - For authentication failures
   - `QuotaError` - For "No runs remaining" scenarios
   - `ValidationError` - For input validation failures
-- [ ] Implement error classification functions
+- [x] Implement error classification functions
   - `IsRetryable(error) bool`
   - `IsTemporary(error) bool`
   - `IsQuotaExceeded(error) bool`
 
 ### 2. API Error Mapping
-- [ ] Map API status enums to user-friendly messages
+- [x] Map API status enums to user-friendly messages
   ```go
   var statusMessages = map[string]string{
       "NO_RUNS_REMAINING": "You've used all your available runs. Upgrade your plan at https://repobird.ai/dashboard",
@@ -42,11 +42,11 @@ Based on industry best practices:
       "INVALID_API_KEY": "Invalid API key. Get a new one at https://repobird.ai/settings/api",
   }
   ```
-- [ ] Include tier information in quota errors
-- [ ] Add contextual help links for each error type
+- [x] Include tier information in quota errors
+- [x] Add contextual help links for each error type
 
 ### 3. Retry Logic Implementation
-- [ ] Create `internal/retry/client.go` with exponential backoff
+- [x] Create `internal/retry/client.go` with exponential backoff
   ```go
   type RetryConfig struct {
       MaxAttempts int
@@ -56,32 +56,32 @@ Based on industry best practices:
       Jitter float64
   }
   ```
-- [ ] Implement circuit breaker pattern for repeated failures
-- [ ] Add request timeout handling (45 min max for long-running operations)
-- [ ] Log retry attempts with debug flag
+- [x] Implement circuit breaker pattern for repeated failures
+- [x] Add request timeout handling (45 min max for long-running operations)
+- [x] Log retry attempts with debug flag
 
 ### 4. Polling & Status Updates
-- [ ] Implement 5-second polling for status updates
-- [ ] Stop polling when status is DONE, FAILED, or CANCELLED
-- [ ] Show progress indicators during polling
-- [ ] Handle poll interruptions (Ctrl+C) gracefully
-- [ ] Display elapsed time and estimated completion
+- [x] Implement 5-second polling for status updates
+- [x] Stop polling when status is DONE, FAILED, or CANCELLED
+- [x] Show progress indicators during polling
+- [x] Handle poll interruptions (Ctrl+C) gracefully
+- [x] Display elapsed time and estimated completion
 
 ### 5. Network Resilience
-- [ ] Detect network connectivity issues
+- [x] Detect network connectivity issues
   ```go
   if netErr, ok := err.(net.Error); ok && netErr.Temporary() {
       // Apply retry logic
   }
   ```
-- [ ] Implement connection pooling for API requests
-- [ ] Add timeout configuration per operation type
-- [ ] Handle partial responses and resume capability
+- [x] Implement connection pooling for API requests
+- [x] Add timeout configuration per operation type
+- [x] Handle partial responses and resume capability
 
 ### 6. User Experience
-- [ ] Display remaining runs from user tier
-- [ ] Show clear, actionable error messages
-- [ ] Provide fallback suggestions for common errors
+- [x] Display remaining runs from user tier
+- [x] Show clear, actionable error messages
+- [x] Provide fallback suggestions for common errors
 - [ ] Add `--debug` flag for verbose error output
 - [ ] Color-code errors by severity (red for critical, yellow for warnings)
 

@@ -9,7 +9,10 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/repobird/repobird-cli/internal/errors"
 	"github.com/repobird/repobird-cli/internal/models"
+	"github.com/repobird/repobird-cli/internal/retry"
+	"github.com/repobird/repobird-cli/internal/utils"
 )
 
 const (
@@ -18,10 +21,12 @@ const (
 )
 
 type Client struct {
-	httpClient *http.Client
-	baseURL    string
-	apiKey     string
-	debug      bool
+	httpClient     *http.Client
+	baseURL        string
+	apiKey         string
+	debug          bool
+	retryClient    *retry.Client
+	circuitBreaker *retry.CircuitBreaker
 }
 
 func NewClient(apiKey, baseURL string, debug bool) *Client {
@@ -33,9 +38,11 @@ func NewClient(apiKey, baseURL string, debug bool) *Client {
 		httpClient: &http.Client{
 			Timeout: DefaultTimeout,
 		},
-		baseURL: baseURL,
-		apiKey:  apiKey,
-		debug:   debug,
+		baseURL:        baseURL,
+		apiKey:         apiKey,
+		debug:          debug,
+		retryClient:    retry.NewClient(retry.DefaultConfig(), debug),
+		circuitBreaker: retry.NewCircuitBreaker(5, 30*time.Second),
 	}
 }
 
@@ -60,6 +67,8 @@ func (c *Client) doRequest(method, path string, body interface{}) (*http.Respons
 
 	if c.debug {
 		fmt.Printf("Request: %s %s\n", method, req.URL.String())
+		// Mask the Authorization header for security
+		fmt.Printf("Authorization: %s\n", utils.RedactAuthHeader(req.Header.Get("Authorization")))
 		if body != nil {
 			b, _ := json.MarshalIndent(body, "", "  ")
 			fmt.Printf("Body: %s\n", string(b))
@@ -68,7 +77,12 @@ func (c *Client) doRequest(method, path string, body interface{}) (*http.Respons
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("request failed: %w", err)
+		// Wrap network errors
+		return nil, &errors.NetworkError{
+			Err:       err,
+			Operation: fmt.Sprintf("%s %s", method, path),
+			URL:       c.baseURL + path,
+		}
 	}
 
 	if c.debug {
@@ -87,7 +101,7 @@ func (c *Client) CreateRun(request *models.RunRequest) (*models.RunResponse, err
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))
+		return nil, errors.ParseAPIError(resp.StatusCode, body)
 	}
 
 	var runResp models.RunResponse
@@ -107,7 +121,7 @@ func (c *Client) GetRun(id string) (*models.RunResponse, error) {
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))
+		return nil, errors.ParseAPIError(resp.StatusCode, body)
 	}
 
 	var runResp models.RunResponse
@@ -128,7 +142,7 @@ func (c *Client) ListRuns(limit, offset int) ([]*models.RunResponse, error) {
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))
+		return nil, errors.ParseAPIError(resp.StatusCode, body)
 	}
 
 	// Read the response body for debugging if needed
@@ -168,7 +182,7 @@ func (c *Client) VerifyAuth() (*models.UserInfo, error) {
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))
+		return nil, errors.ParseAPIError(resp.StatusCode, body)
 	}
 
 	var userInfo models.UserInfo
@@ -177,4 +191,73 @@ func (c *Client) VerifyAuth() (*models.UserInfo, error) {
 	}
 
 	return &userInfo, nil
+}
+
+func (c *Client) doRequestWithRetry(ctx context.Context, method, path string, body interface{}) (*http.Response, error) {
+	var resp *http.Response
+
+	err := c.retryClient.DoWithRetry(ctx, func() error {
+		return c.circuitBreaker.Call(func() error {
+			var err error
+			resp, err = c.doRequest(method, path, body)
+			if err != nil {
+				return err
+			}
+
+			// Check if response indicates a retryable error
+			if resp.StatusCode >= 500 || resp.StatusCode == 429 || resp.StatusCode == 408 {
+				bodyBytes, _ := io.ReadAll(resp.Body)
+				resp.Body.Close()
+				return errors.ParseAPIError(resp.StatusCode, bodyBytes)
+			}
+
+			return nil
+		})
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
+}
+
+func (c *Client) CreateRunWithRetry(ctx context.Context, request *models.RunRequest) (*models.RunResponse, error) {
+	resp, err := c.doRequestWithRetry(ctx, "POST", "/api/v1/runs", request)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, errors.ParseAPIError(resp.StatusCode, body)
+	}
+
+	var runResp models.RunResponse
+	if err := json.NewDecoder(resp.Body).Decode(&runResp); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &runResp, nil
+}
+
+func (c *Client) GetRunWithRetry(ctx context.Context, id string) (*models.RunResponse, error) {
+	resp, err := c.doRequestWithRetry(ctx, "GET", fmt.Sprintf("/api/v1/runs/%s", id), nil)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, errors.ParseAPIError(resp.StatusCode, body)
+	}
+
+	var runResp models.RunResponse
+	if err := json.NewDecoder(resp.Body).Decode(&runResp); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &runResp, nil
 }

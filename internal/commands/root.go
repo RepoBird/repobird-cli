@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/repobird/repobird-cli/internal/config"
+	"github.com/repobird/repobird-cli/internal/errors"
 	"github.com/repobird/repobird-cli/pkg/version"
 )
 
@@ -41,7 +42,19 @@ manage runs, and integrate with the RepoBird platform.`,
 
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		// Format error message for better user experience
+		errorMsg := errors.FormatUserError(err)
+		fmt.Fprintf(os.Stderr, "Error: %s\n", errorMsg)
+
+		// Add helpful hints for common errors
+		if errors.IsAuthError(err) {
+			fmt.Fprintf(os.Stderr, "\nHint: Run 'repobird config set api-key YOUR_API_KEY' to configure authentication\n")
+		} else if errors.IsQuotaExceeded(err) {
+			fmt.Fprintf(os.Stderr, "\nHint: Check your usage at https://repobird.ai/dashboard\n")
+		} else if errors.IsNetworkError(err) {
+			fmt.Fprintf(os.Stderr, "\nHint: Check your internet connection and try again\n")
+		}
+
 		os.Exit(1)
 	}
 }

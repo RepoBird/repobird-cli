@@ -35,9 +35,16 @@ type RunListView struct {
 	filteredRuns []models.RunResponse
 	cached       bool
 	cachedAt     time.Time
+	// Preloaded run details cache
+	detailsCache map[string]*models.RunResponse
+	preloading   map[string]bool
 }
 
 func NewRunListView(client *api.Client) *RunListView {
+	return NewRunListViewWithCache(client, nil, false, time.Time{}, nil)
+}
+
+func NewRunListViewWithCache(client *api.Client, runs []models.RunResponse, cached bool, cachedAt time.Time, detailsCache map[string]*models.RunResponse) *RunListView {
 	columns := []components.Column{
 		{Title: "ID", Width: 8},
 		{Title: "Status", Width: 15},
@@ -50,27 +57,54 @@ func NewRunListView(client *api.Client) *RunListView {
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("63"))
 
-	return &RunListView{
-		client:  client,
-		table:   components.NewTable(columns),
-		keys:    components.DefaultKeyMap,
-		help:    help.New(),
-		spinner: s,
-		loading: true,
+	// Determine initial loading state based on cache
+	shouldLoad := !cached || runs == nil || len(runs) == 0 || time.Since(cachedAt) >= 30*time.Second
+
+	// Use provided details cache or create new one
+	if detailsCache == nil {
+		detailsCache = make(map[string]*models.RunResponse)
 	}
+
+	v := &RunListView{
+		client:       client,
+		table:        components.NewTable(columns),
+		keys:         components.DefaultKeyMap,
+		help:         help.New(),
+		spinner:      s,
+		loading:      shouldLoad,
+		runs:         runs,
+		filteredRuns: runs,
+		cached:       cached,
+		cachedAt:     cachedAt,
+		detailsCache: detailsCache,
+		preloading:   make(map[string]bool),
+	}
+
+	// If we have cached data, update the table
+	if !shouldLoad && runs != nil && len(runs) > 0 {
+		v.updateTable()
+	}
+
+	return v
 }
 
 func (v *RunListView) Init() tea.Cmd {
-	// If we have cached data and it's recent (< 30 seconds), don't reload
+	var cmds []tea.Cmd
+
+	// If we have cached data and it's recent (< 30 seconds), use it
 	if v.cached && time.Since(v.cachedAt) < 30*time.Second {
+		// Don't show loading, data is already displayed
 		v.loading = false
-		return v.startPolling()
+		cmds = append(cmds, v.startPolling())
+	} else {
+		// Need to load data
+		v.loading = true
+		cmds = append(cmds, v.loadRuns())
+		cmds = append(cmds, v.spinner.Tick)
+		cmds = append(cmds, v.startPolling())
 	}
-	return tea.Batch(
-		v.loadRuns(),
-		v.spinner.Tick,
-		v.startPolling(),
-	)
+
+	return tea.Batch(cmds...)
 }
 
 func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -119,14 +153,22 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, v.keys.Enter):
 			if idx := v.table.GetSelectedIndex(); idx >= 0 && idx < len(v.filteredRuns) {
 				run := v.filteredRuns[idx]
-				return NewRunDetailsView(v.client, run), nil
+				// Use preloaded details if available
+				if detailed, ok := v.detailsCache[run.GetIDString()]; ok {
+					return NewRunDetailsViewWithCache(v.client, *detailed, v.runs, v.cached, v.cachedAt, v.detailsCache), nil
+				}
+				return NewRunDetailsViewWithCache(v.client, run, v.runs, v.cached, v.cachedAt, v.detailsCache), nil
 			}
 		case key.Matches(msg, v.keys.New):
 			return NewCreateRunView(v.client), nil
 		case key.Matches(msg, v.keys.Up):
 			v.table.MoveUp()
+			// Prioritize preloading the newly selected run
+			cmds = append(cmds, v.preloadSelectedRun())
 		case key.Matches(msg, v.keys.Down):
 			v.table.MoveDown()
+			// Prioritize preloading the newly selected run
+			cmds = append(cmds, v.preloadSelectedRun())
 		case key.Matches(msg, v.keys.PageUp):
 			v.table.PageUp()
 		case key.Matches(msg, v.keys.PageDown):
@@ -144,6 +186,17 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		v.cached = true
 		v.cachedAt = time.Now()
 		v.filterRuns()
+		// Start preloading run details in background
+		if msg.err == nil && len(msg.runs) > 0 {
+			cmds = append(cmds, v.preloadRunDetails())
+		}
+
+	case runDetailsLoadedMsg:
+		// Cache the loaded run details
+		v.preloading[msg.runID] = false
+		if msg.err == nil && msg.run != nil {
+			v.detailsCache[msg.runID] = msg.run
+		}
 
 	case pollTickMsg:
 		if v.hasActiveRuns() {
@@ -350,3 +403,82 @@ type runsLoadedMsg struct {
 }
 
 type pollTickMsg struct{}
+
+type runDetailsLoadedMsg struct {
+	runID string
+	run   *models.RunResponse
+	err   error
+}
+
+func (v *RunListView) preloadRunDetails() tea.Cmd {
+	// Collect runs to preload
+	var toPreload []string
+
+	// Start with the selected run
+	if idx := v.table.GetSelectedIndex(); idx >= 0 && idx < len(v.filteredRuns) {
+		run := v.filteredRuns[idx]
+		runID := run.GetIDString()
+		if _, cached := v.detailsCache[runID]; !cached && !v.preloading[runID] {
+			toPreload = append(toPreload, runID)
+		}
+	}
+
+	// Then add the first 10 runs
+	maxPreload := 10
+	for i := 0; i < len(v.runs) && len(toPreload) < maxPreload; i++ {
+		runID := v.runs[i].GetIDString()
+		if _, cached := v.detailsCache[runID]; !cached && !v.preloading[runID] {
+			// Check if not already in toPreload
+			found := false
+			for _, id := range toPreload {
+				if id == runID {
+					found = true
+					break
+				}
+			}
+			if !found {
+				toPreload = append(toPreload, runID)
+			}
+		}
+	}
+
+	// Return batch of commands to load each run
+	var cmds []tea.Cmd
+	for _, runID := range toPreload {
+		v.preloading[runID] = true
+		id := runID // Capture for closure
+		cmds = append(cmds, func() tea.Msg {
+			detailed, err := v.client.GetRun(id)
+			return runDetailsLoadedMsg{
+				runID: id,
+				run:   detailed,
+				err:   err,
+			}
+		})
+	}
+
+	return tea.Batch(cmds...)
+}
+
+func (v *RunListView) preloadSelectedRun() tea.Cmd {
+	if idx := v.table.GetSelectedIndex(); idx >= 0 && idx < len(v.filteredRuns) {
+		run := v.filteredRuns[idx]
+		runID := run.GetIDString()
+
+		// Check if already cached or being loaded
+		if _, cached := v.detailsCache[runID]; cached || v.preloading[runID] {
+			return nil
+		}
+
+		v.preloading[runID] = true
+		return func() tea.Msg {
+			detailed, err := v.client.GetRun(runID)
+			return runDetailsLoadedMsg{
+				runID: runID,
+				run:   detailed,
+				err:   err,
+			}
+		}
+	}
+	return nil
+}

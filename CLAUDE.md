@@ -19,7 +19,10 @@ RepoBird CLI is a Go-based command-line tool for interacting with the RepoBird A
   /api/             - API client implementation
   /commands/        - Cobra command implementations
   /config/          - Configuration management
+  /errors/          - Error handling and recovery
   /models/          - Data models and types
+  /retry/           - Retry logic with exponential backoff
+  /utils/           - Utility functions (git, polling, security)
 /pkg/               - Public library code
   /utils/           - Utility functions (git helpers)
   /version/         - Version information
@@ -134,10 +137,12 @@ repobird version
 - Support environment variable: `REPOBIRD_API_KEY`
 
 ### Error Handling
-- Handle rate limiting gracefully
-- Retry on network failures (with exponential backoff)
-- Display user-friendly error messages
-- Log debug information when `--debug` flag is set
+- **Custom Error Types**: Use `internal/errors` package for structured errors
+- **User-Friendly Messages**: Call `errors.FormatUserError(err)` for CLI output
+- **Error Classification**: Use `errors.IsRetryable()`, `errors.IsAuthError()`, etc.
+- **Retry Logic**: Import `internal/retry` for exponential backoff with circuit breaker
+- **API Errors**: Use `client.CreateRunWithRetry()` and `client.GetRunWithRetry()` methods
+- **Polling**: Use `utils.NewPoller()` for status updates with graceful interruption
 
 ## Configuration
 

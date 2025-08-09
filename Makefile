@@ -1,6 +1,10 @@
 # RepoBird CLI Makefile
 # Common commands for development, testing, and building
 
+# Load .env file if it exists
+-include .env
+export
+
 # Variables
 BINARY_NAME=repobird
 MAIN_PATH=./cmd/repobird
@@ -73,6 +77,18 @@ build-all:
 ## run: Run the application
 run:
 	$(GOCMD) run $(LDFLAGS) $(MAIN_PATH)
+
+## tui: Build and run the TUI interface
+tui: build
+	./$(BUILD_DIR)/$(BINARY_NAME) tui
+
+## status: Build and run status command
+status: build
+	./$(BUILD_DIR)/$(BINARY_NAME) status
+
+## status-debug: Build and run status command with debug output
+status-debug: build
+	./$(BUILD_DIR)/$(BINARY_NAME) status --debug
 
 ## install: Install repobird to ~/.local/bin with rb alias
 install: build

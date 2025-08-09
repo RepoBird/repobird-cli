@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,7 +11,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/repobird/repobird-cli/internal/api"
+	"github.com/repobird/repobird-cli/internal/errors"
 	"github.com/repobird/repobird-cli/internal/models"
+	"github.com/repobird/repobird-cli/internal/utils"
 	"github.com/repobird/repobird-cli/pkg/utils"
 )
 
@@ -89,9 +92,10 @@ func runCommand(cmd *cobra.Command, args []string) error {
 	client := api.NewClient(cfg.APIKey, cfg.APIURL, cfg.Debug)
 
 	fmt.Println("Creating run...")
-	runResp, err := client.CreateRun(&runReq)
+	ctx := context.Background()
+	runResp, err := client.CreateRunWithRetry(ctx, &runReq)
 	if err != nil {
-		return fmt.Errorf("failed to create run: %w", err)
+		return fmt.Errorf("failed to create run: %s", errors.FormatUserError(err))
 	}
 
 	fmt.Printf("Run created successfully!\n")
@@ -129,24 +133,38 @@ func validateRunRequest(req *models.RunRequest) error {
 }
 
 func followRunStatus(client *api.Client, runID string) error {
-	ticker := time.NewTicker(5 * time.Second)
-	defer ticker.Stop()
+	ctx := context.Background()
+	config := utils.DefaultPollConfig()
+	config.Debug = cfg.Debug
+	poller := utils.NewPoller(config)
 
-	for range ticker.C {
-		run, err := client.GetRun(runID)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error checking status: %v\n", err)
-			continue
+	startTime := time.Now()
+	lastStatus := ""
+
+	pollFunc := func(ctx context.Context) (*models.RunResponse, error) {
+		return client.GetRunWithRetry(ctx, runID)
+	}
+
+	onUpdate := func(run *models.RunResponse) {
+		if string(run.Status) != lastStatus {
+			utils.ClearLine()
+			fmt.Printf("[%s] Status: %s\n", time.Now().Format("15:04:05"), run.Status)
+			lastStatus = string(run.Status)
+		} else {
+			utils.ShowPollingProgress(startTime, string(run.Status), run.Error)
 		}
+	}
 
-		fmt.Printf("[%s] Status: %s\n", time.Now().Format("15:04:05"), run.Status)
+	finalRun, err := poller.Poll(ctx, pollFunc, onUpdate)
+	if err != nil {
+		return fmt.Errorf("failed to follow run status: %s", errors.FormatUserError(err))
+	}
 
-		if run.Status == models.StatusDone || run.Status == models.StatusFailed {
-			if run.Status == models.StatusFailed && run.Error != "" {
-				fmt.Printf("Run failed: %s\n", run.Error)
-			}
-			return nil
-		}
+	utils.ClearLine()
+	if finalRun.Status == models.StatusFailed && finalRun.Error != "" {
+		fmt.Printf("Run failed: %s\n", finalRun.Error)
+	} else {
+		fmt.Printf("Run completed with status: %s\n", finalRun.Status)
 	}
 	return nil
 }

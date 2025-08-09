@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -10,7 +11,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/repobird/repobird-cli/internal/api"
+	"github.com/repobird/repobird-cli/internal/errors"
 	"github.com/repobird/repobird-cli/internal/models"
+	"github.com/repobird/repobird-cli/internal/utils"
 )
 
 var (
@@ -55,9 +58,10 @@ func getRunStatus(client *api.Client, runID string) error {
 		return followSingleRun(client, runID)
 	}
 
-	run, err := client.GetRun(runID)
+	ctx := context.Background()
+	run, err := client.GetRunWithRetry(ctx, runID)
 	if err != nil {
-		return fmt.Errorf("failed to get run status: %w", err)
+		return fmt.Errorf("failed to get run status: %s", errors.FormatUserError(err))
 	}
 
 	if statusJSON {
@@ -73,14 +77,14 @@ func getRunStatus(client *api.Client, runID string) error {
 func listRuns(client *api.Client) error {
 	userInfo, err := client.VerifyAuth()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: Could not fetch user info: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Warning: Could not fetch user info: %s\n", errors.FormatUserError(err))
 	} else {
 		fmt.Printf("Remaining runs: %d/%d (%s tier)\n\n", userInfo.RemainingRuns, userInfo.TotalRuns, userInfo.Tier)
 	}
 
 	runs, err := client.ListRuns(statusLimit, 0)
 	if err != nil {
-		return fmt.Errorf("failed to list runs: %w", err)
+		return fmt.Errorf("failed to list runs: %s", errors.FormatUserError(err))
 	}
 
 	if len(runs) == 0 {
@@ -122,37 +126,37 @@ func listRuns(client *api.Client) error {
 }
 
 func followSingleRun(client *api.Client, runID string) error {
-	ticker := time.NewTicker(5 * time.Second)
-	defer ticker.Stop()
+	ctx := context.Background()
+	config := utils.DefaultPollConfig()
+	config.Debug = cfg.Debug
+	poller := utils.NewPoller(config)
 
-	run, err := client.GetRun(runID)
-	if err != nil {
-		return fmt.Errorf("failed to get run status: %w", err)
+	startTime := time.Now()
+	lastStatus := ""
+
+	pollFunc := func(ctx context.Context) (*models.RunResponse, error) {
+		return client.GetRunWithRetry(ctx, runID)
 	}
 
-	printRunDetails(run)
-
-	if run.Status == models.StatusDone || run.Status == models.StatusFailed {
-		return nil
-	}
-
-	fmt.Println("\nFollowing run status...")
-
-	for range ticker.C {
-		run, err := client.GetRun(runID)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error checking status: %v\n", err)
-			continue
-		}
-
-		fmt.Printf("[%s] Status: %s\n", time.Now().Format("15:04:05"), run.Status)
-
-		if run.Status == models.StatusDone || run.Status == models.StatusFailed {
-			fmt.Println("\nFinal status:")
+	onUpdate := func(run *models.RunResponse) {
+		if string(run.Status) != lastStatus {
+			utils.ClearLine()
 			printRunDetails(run)
-			return nil
+			lastStatus = string(run.Status)
+			fmt.Println("\nFollowing run status...")
+		} else {
+			utils.ShowPollingProgress(startTime, string(run.Status), run.Error)
 		}
 	}
+
+	finalRun, err := poller.Poll(ctx, pollFunc, onUpdate)
+	if err != nil {
+		return fmt.Errorf("failed to follow run status: %s", errors.FormatUserError(err))
+	}
+
+	utils.ClearLine()
+	fmt.Println("\nFinal status:")
+	printRunDetails(finalRun)
 	return nil
 }
 

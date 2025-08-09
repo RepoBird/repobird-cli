@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/repobird/repobird-cli/internal/config"
+	"github.com/repobird/repobird-cli/internal/utils"
 )
 
 const (
@@ -95,7 +96,7 @@ var configGetCmd = &cobra.Command{
 			// Show all configuration
 			fmt.Printf("API URL: %s\n", secureCfg.APIURL)
 			if secureCfg.APIKey != "" {
-				fmt.Printf("API Key: %s...%s\n", secureCfg.APIKey[:4], secureCfg.APIKey[len(secureCfg.APIKey)-4:])
+				fmt.Printf("API Key: %s\n", utils.MaskAPIKey(secureCfg.APIKey))
 			} else {
 				fmt.Println("API Key: (not set)")
 			}
@@ -130,7 +131,7 @@ var configGetCmd = &cobra.Command{
 		switch key {
 		case configKeyAPIKey, "api_key":
 			if secureCfg.APIKey != "" {
-				fmt.Printf("%s...%s\n", secureCfg.APIKey[:4], secureCfg.APIKey[len(secureCfg.APIKey)-4:])
+				fmt.Println(utils.MaskAPIKey(secureCfg.APIKey))
 			} else {
 				fmt.Println("(not set)")
 			}

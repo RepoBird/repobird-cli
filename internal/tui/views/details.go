@@ -34,9 +34,18 @@ type RunDetailsView struct {
 	showLogs      bool
 	logs          string
 	statusHistory []string
+	// Cache from parent list view
+	parentRuns         []models.RunResponse
+	parentCached       bool
+	parentCachedAt     time.Time
+	parentDetailsCache map[string]*models.RunResponse
 }
 
 func NewRunDetailsView(client *api.Client, run models.RunResponse) *RunDetailsView {
+	return NewRunDetailsViewWithCache(client, run, nil, false, time.Time{}, nil)
+}
+
+func NewRunDetailsViewWithCache(client *api.Client, run models.RunResponse, parentRuns []models.RunResponse, parentCached bool, parentCachedAt time.Time, parentDetailsCache map[string]*models.RunResponse) *RunDetailsView {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("63"))
@@ -44,14 +53,18 @@ func NewRunDetailsView(client *api.Client, run models.RunResponse) *RunDetailsVi
 	vp := viewport.New(80, 20)
 
 	return &RunDetailsView{
-		client:   client,
-		run:      run,
-		keys:     components.DefaultKeyMap,
-		help:     help.New(),
-		viewport: vp,
-		spinner:  s,
-		loading:  true,
-		showLogs: false,
+		client:             client,
+		run:                run,
+		keys:               components.DefaultKeyMap,
+		help:               help.New(),
+		viewport:           vp,
+		spinner:            s,
+		loading:            true,
+		showLogs:           false,
+		parentRuns:         parentRuns,
+		parentCached:       parentCached,
+		parentCachedAt:     parentCachedAt,
+		parentDetailsCache: parentDetailsCache,
 	}
 }
 
@@ -81,7 +94,7 @@ func (v *RunDetailsView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return v, tea.Quit
 		case key.Matches(msg, v.keys.Back):
 			v.stopPolling()
-			return NewRunListView(v.client), nil
+			return NewRunListViewWithCache(v.client, v.parentRuns, v.parentCached, v.parentCachedAt, v.parentDetailsCache), nil
 		case key.Matches(msg, v.keys.Help):
 			v.showHelp = !v.showHelp
 		case key.Matches(msg, v.keys.Refresh):
