@@ -283,52 +283,6 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			v.table.GoToBottom()
 		}
 
-		// Additional vim keybindings
-		switch msg.String() {
-		case "j":
-			v.table.MoveDown()
-			cmds = append(cmds, v.preloadSelectedRun())
-			return v, tea.Batch(cmds...)
-		case "k":
-			v.table.MoveUp()
-			cmds = append(cmds, v.preloadSelectedRun())
-			return v, tea.Batch(cmds...)
-		case "h":
-			// Go back (same as ESC)
-			if v.searchMode {
-				v.searchMode = false
-				v.searchQuery = ""
-				v.filterRuns()
-			}
-			return v, tea.Batch(cmds...)
-		case "l":
-			// Go forward/select (same as Enter)
-			if idx := v.table.GetSelectedIndex(); idx >= 0 && idx < len(v.filteredRuns) {
-				run := v.filteredRuns[idx]
-				
-				// Save cursor position to cache before navigating
-				cache.SetSelectedIndex(idx)
-
-				if detailed, ok := v.detailsCache[run.GetIDString()]; ok {
-					return NewRunDetailsView(v.client, *detailed), nil
-				}
-				return NewRunDetailsView(v.client, run), nil
-			}
-			return v, tea.Batch(cmds...)
-		case "g":
-			// Check for 'gg' combination - go to top
-			v.table.GoToTop()
-			return v, tea.Batch(cmds...)
-		case "G":
-			// Go to bottom
-			v.table.GoToBottom()
-			return v, tea.Batch(cmds...)
-		case "/":
-			// Start search
-			v.searchMode = true
-			v.searchQuery = ""
-			return v, tea.Batch(cmds...)
-		}
 
 	case runsLoadedMsg:
 		debugInfo := fmt.Sprintf("DEBUG: ENTERED runsLoadedMsg case - %d runs loaded\n", len(msg.runs))
