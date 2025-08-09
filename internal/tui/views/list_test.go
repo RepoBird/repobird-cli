@@ -12,7 +12,7 @@ import (
 func TestNewRunListViewWithCache_UsesCachedData(t *testing.T) {
 	// Arrange
 	client := api.NewClient("test-key", "http://localhost:8080", false)
-	
+
 	runs := []models.RunResponse{
 		{
 			ID:         "run-1",
@@ -22,23 +22,23 @@ func TestNewRunListViewWithCache_UsesCachedData(t *testing.T) {
 			CreatedAt:  time.Now().Add(-1 * time.Hour),
 		},
 		{
-			ID:         "run-2", 
+			ID:         "run-2",
 			Status:     models.StatusProcessing,
 			Repository: "test/repo2",
 			Source:     "dev",
 			CreatedAt:  time.Now().Add(-30 * time.Minute),
 		},
 	}
-	
+
 	cachedAt := time.Now().Add(-10 * time.Second) // 10 seconds ago, within 30s threshold
 	detailsCache := map[string]*models.RunResponse{
 		"run-1": &runs[0],
 		"run-2": &runs[1],
 	}
-	
+
 	// Act
 	view := NewRunListViewWithCache(client, runs, true, cachedAt, detailsCache)
-	
+
 	// Assert
 	assert.False(t, view.loading, "Should not be loading with recent cached data")
 	assert.Equal(t, runs, view.runs, "Should use cached runs")
@@ -50,7 +50,7 @@ func TestNewRunListViewWithCache_UsesCachedData(t *testing.T) {
 func TestNewRunListViewWithCache_LoadsWhenCacheExpired(t *testing.T) {
 	// Arrange
 	client := api.NewClient("test-key", "http://localhost:8080", false)
-	
+
 	runs := []models.RunResponse{
 		{
 			ID:         "run-1",
@@ -60,13 +60,13 @@ func TestNewRunListViewWithCache_LoadsWhenCacheExpired(t *testing.T) {
 			CreatedAt:  time.Now().Add(-1 * time.Hour),
 		},
 	}
-	
+
 	cachedAt := time.Now().Add(-45 * time.Second) // 45 seconds ago, beyond 30s threshold
 	detailsCache := map[string]*models.RunResponse{}
-	
+
 	// Act
 	view := NewRunListViewWithCache(client, runs, true, cachedAt, detailsCache)
-	
+
 	// Assert
 	assert.True(t, view.loading, "Should be loading with expired cache")
 }
@@ -74,7 +74,7 @@ func TestNewRunListViewWithCache_LoadsWhenCacheExpired(t *testing.T) {
 func TestFilterRuns_PreservesRunIDs(t *testing.T) {
 	// Arrange
 	client := api.NewClient("test-key", "http://localhost:8080", false)
-	
+
 	runs := []models.RunResponse{
 		{
 			ID:         "run-123",
@@ -98,20 +98,20 @@ func TestFilterRuns_PreservesRunIDs(t *testing.T) {
 			CreatedAt:  time.Now().Add(-2 * time.Hour),
 		},
 	}
-	
+
 	view := NewRunListViewWithCache(client, runs, true, time.Now(), nil)
 	view.searchQuery = "acme"
-	
+
 	// Act
 	view.filterRuns()
-	
+
 	// Assert
 	assert.Len(t, view.filteredRuns, 2, "Should filter to 2 runs matching 'acme'")
-	
+
 	// Check that IDs are preserved correctly
 	for _, run := range view.filteredRuns {
 		assert.NotEmpty(t, run.GetIDString(), "Filtered run should have valid ID string")
-		
+
 		// Find original run and verify ID matches
 		var originalRun models.RunResponse
 		for _, orig := range runs {
@@ -120,8 +120,8 @@ func TestFilterRuns_PreservesRunIDs(t *testing.T) {
 				break
 			}
 		}
-		
-		assert.Equal(t, originalRun.GetIDString(), run.GetIDString(), 
+
+		assert.Equal(t, originalRun.GetIDString(), run.GetIDString(),
 			"Filtered run ID should match original run ID")
 	}
 }
@@ -129,28 +129,28 @@ func TestFilterRuns_PreservesRunIDs(t *testing.T) {
 func TestFilterRuns_HandlesMixedIDTypes(t *testing.T) {
 	// Arrange
 	client := api.NewClient("test-key", "http://localhost:8080", false)
-	
+
 	runs := []models.RunResponse{
 		{ID: "string-id-123", Repository: "test/string", Status: models.StatusDone},
 		{ID: 456, Repository: "test/int", Status: models.StatusProcessing},
 		{ID: 789.0, Repository: "test/float", Status: models.StatusFailed},
 		{ID: nil, Repository: "test/nil", Status: models.StatusQueued}, // edge case
 	}
-	
+
 	view := NewRunListViewWithCache(client, runs, true, time.Now(), nil)
-	
+
 	// Test filtering by ID
 	view.searchQuery = "456"
 	view.filterRuns()
-	
+
 	// Assert
 	assert.Len(t, view.filteredRuns, 1, "Should find the run with int ID 456")
 	assert.Equal(t, "test/int", view.filteredRuns[0].Repository, "Should match the correct run")
-	
+
 	// Test empty search returns all runs
 	view.searchQuery = ""
 	view.filterRuns()
-	
+
 	assert.Len(t, view.filteredRuns, 4, "Empty search should return all runs")
 }
 
@@ -196,12 +196,13 @@ func TestRunResponse_GetIDString_HandlesNilAndInvalidValues(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			run := models.RunResponse{ID: tt.id}
 			result := run.GetIDString()
-			
-			if tt.name == "nil ID" || tt.name == "string null" {
+
+			switch tt.name {
+			case "nil ID", "string null":
 				assert.Empty(t, result, "Should return empty string for nil/null ID")
-			} else if tt.name == "invalid type results in empty" {
+			case "invalid type results in empty":
 				assert.NotEmpty(t, result, "Should return formatted string for invalid types")
-			} else {
+			default:
 				assert.Equal(t, tt.expected, result, "Should return correct string representation")
 			}
 		})

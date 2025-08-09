@@ -44,7 +44,7 @@ type RunListView struct {
 }
 
 func NewRunListView(client *api.Client) *RunListView {
-	debugInfo := fmt.Sprintf("DEBUG: Creating new RunListView\n")
+	debugInfo := "DEBUG: Creating new RunListView\n"
 	if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
 		f.WriteString(debugInfo)
 		f.Close()
@@ -53,7 +53,7 @@ func NewRunListView(client *api.Client) *RunListView {
 }
 
 func NewRunListViewWithCache(client *api.Client, runs []models.RunResponse, cached bool, cachedAt time.Time, detailsCache map[string]*models.RunResponse) *RunListView {
-	debugInfo := fmt.Sprintf("DEBUG: Creating RunListViewWithCache - cached=%v, runs=%d, detailsCache=%d\n", 
+	debugInfo := fmt.Sprintf("DEBUG: Creating RunListViewWithCache - cached=%v, runs=%d, detailsCache=%d\n",
 		cached, len(runs), len(detailsCache))
 	if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
 		f.WriteString(debugInfo)
@@ -186,18 +186,18 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if idx := v.table.GetSelectedIndex(); idx >= 0 && idx < len(v.filteredRuns) {
 				run := v.filteredRuns[idx]
 				runID := run.GetIDString()
-				
+
 				// Debug logging for Enter key press
-				debugInfo := fmt.Sprintf("DEBUG: Enter pressed for run idx=%d, runID='%s', repo='%s'\n", 
+				debugInfo := fmt.Sprintf("DEBUG: Enter pressed for run idx=%d, runID='%s', repo='%s'\n",
 					idx, runID, run.Repository)
-				debugInfo += fmt.Sprintf("DEBUG: Cache size=%d, runID in cache=%v, preloading=%v\n", 
+				debugInfo += fmt.Sprintf("DEBUG: Cache size=%d, runID in cache=%v, preloading=%v\n",
 					len(v.detailsCache), v.detailsCache[runID] != nil, v.preloading[runID])
-				
+
 				if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
 					f.WriteString(debugInfo)
 					f.Close()
 				}
-				
+
 				// Check if this run is currently being preloaded
 				if v.preloading[runID] {
 					debugInfo = fmt.Sprintf("DEBUG: Run %s is still preloading, adding small delay...\n", runID)
@@ -205,7 +205,7 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						f.WriteString(debugInfo)
 						f.Close()
 					}
-					
+
 					// Add a command that will wait a bit then retry navigation
 					cmds = append(cmds, func() tea.Msg {
 						time.Sleep(100 * time.Millisecond) // Small delay
@@ -213,7 +213,7 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					})
 					return v, tea.Batch(cmds...)
 				}
-				
+
 				// Use preloaded details if available
 				if detailed, ok := v.detailsCache[runID]; ok {
 					debugInfo = fmt.Sprintf("DEBUG: Using cached data for runID='%s' - NAVIGATING TO DETAILS VIEW\n", runID)
@@ -221,9 +221,22 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						f.WriteString(debugInfo)
 						f.Close()
 					}
-					return NewRunDetailsViewWithCache(v.client, *detailed, v.runs, v.cached, v.cachedAt, v.detailsCache), nil
+
+					// Fix: Ensure the cached run has the correct ID
+					cachedRun := *detailed
+					if cachedRun.GetIDString() == "" && run.ID != nil {
+						cachedRun.ID = run.ID
+					}
+
+					debugInfo = fmt.Sprintf("DEBUG: Fixed cached run ID from '%s' to '%s'\n", detailed.GetIDString(), cachedRun.GetIDString())
+					if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+						f.WriteString(debugInfo)
+						f.Close()
+					}
+
+					return NewRunDetailsViewWithCache(v.client, cachedRun, v.runs, v.cached, v.cachedAt, v.detailsCache), nil
 				}
-				
+
 				debugInfo = fmt.Sprintf("DEBUG: No cached data for runID='%s', loading fresh - NAVIGATING TO DETAILS VIEW\n", runID)
 				if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
 					f.WriteString(debugInfo)
@@ -273,7 +286,7 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Go forward/select (same as Enter)
 			if idx := v.table.GetSelectedIndex(); idx >= 0 && idx < len(v.filteredRuns) {
 				run := v.filteredRuns[idx]
-				
+
 				if detailed, ok := v.detailsCache[run.GetIDString()]; ok {
 					return NewRunDetailsViewWithCache(v.client, *detailed, v.runs, v.cached, v.cachedAt, v.detailsCache), nil
 				}
@@ -301,7 +314,7 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			f.WriteString(debugInfo)
 			f.Close()
 		}
-		
+
 		v.loading = false
 		v.runs = msg.runs
 		v.error = msg.err
@@ -315,20 +328,20 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case runDetailsPreloadedMsg:
 		// Debug: Message received
-		debugInfo := fmt.Sprintf("DEBUG: ENTERED runDetailsPreloadedMsg case for runID='%s', err=%v, run!=nil=%v\n", 
+		debugInfo := fmt.Sprintf("DEBUG: ENTERED runDetailsPreloadedMsg case for runID='%s', err=%v, run!=nil=%v\n",
 			msg.runID, msg.err, msg.run != nil)
 		if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
 			f.WriteString(debugInfo)
 			f.Close()
 		}
-		
+
 		// Cache the loaded run details
 		v.preloading[msg.runID] = false
 		if msg.err == nil && msg.run != nil {
 			v.detailsCache[msg.runID] = msg.run
-			
+
 			// Debug logging
-			debugInfo := fmt.Sprintf("DEBUG: Successfully cached run with key='%s', actualID='%s', title='%s', cacheSize=%d\n", 
+			debugInfo := fmt.Sprintf("DEBUG: Successfully cached run with key='%s', actualID='%s', title='%s', cacheSize=%d\n",
 				msg.runID, msg.run.GetIDString(), msg.run.Title, len(v.detailsCache))
 			if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
 				f.WriteString(debugInfo)
@@ -354,20 +367,20 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			f.WriteString(debugInfo)
 			f.Close()
 		}
-		
+
 		// Retry navigation after a small delay
 		idx := msg.runIndex
 		if idx >= 0 && idx < len(v.filteredRuns) {
 			run := v.filteredRuns[idx]
 			runID := run.GetIDString()
-			
-			debugInfo := fmt.Sprintf("DEBUG: Retrying navigation for runID='%s', cache size=%d, in cache=%v\n", 
+
+			debugInfo := fmt.Sprintf("DEBUG: Retrying navigation for runID='%s', cache size=%d, in cache=%v\n",
 				runID, len(v.detailsCache), v.detailsCache[runID] != nil)
 			if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
 				f.WriteString(debugInfo)
 				f.Close()
 			}
-			
+
 			// Use cached data if available now
 			if detailed, ok := v.detailsCache[runID]; ok {
 				debugInfo = fmt.Sprintf("DEBUG: Retry successful - using cached data for runID='%s' - NAVIGATING TO DETAILS VIEW\n", runID)
@@ -377,7 +390,7 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return NewRunDetailsViewWithCache(v.client, *detailed, v.runs, v.cached, v.cachedAt, v.detailsCache), nil
 			}
-			
+
 			// Still not cached, load fresh
 			debugInfo = fmt.Sprintf("DEBUG: Retry - still no cached data for runID='%s', loading fresh - NAVIGATING TO DETAILS VIEW\n", runID)
 			if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
@@ -620,13 +633,13 @@ type retryNavigationMsg struct {
 
 func (v *RunListView) preloadRunDetails() tea.Cmd {
 	// Debug logging
-	debugInfo := fmt.Sprintf("DEBUG: preloadRunDetails called - runs=%d, filteredRuns=%d, cacheSize=%d\n", 
+	debugInfo := fmt.Sprintf("DEBUG: preloadRunDetails called - runs=%d, filteredRuns=%d, cacheSize=%d\n",
 		len(v.runs), len(v.filteredRuns), len(v.detailsCache))
 	if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
 		f.WriteString(debugInfo)
 		f.Close()
 	}
-	
+
 	// Collect runs to preload
 	var toPreload []string
 
@@ -634,13 +647,13 @@ func (v *RunListView) preloadRunDetails() tea.Cmd {
 	if idx := v.table.GetSelectedIndex(); idx >= 0 && idx < len(v.filteredRuns) {
 		run := v.filteredRuns[idx]
 		runID := run.GetIDString()
-		debugInfo = fmt.Sprintf("DEBUG: Selected run runID='%s', cached=%v, preloading=%v\n", 
+		debugInfo = fmt.Sprintf("DEBUG: Selected run runID='%s', cached=%v, preloading=%v\n",
 			runID, v.detailsCache[runID] != nil, v.preloading[runID])
 		if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
 			f.WriteString(debugInfo)
 			f.Close()
 		}
-		
+
 		if _, cached := v.detailsCache[runID]; !cached && !v.preloading[runID] {
 			toPreload = append(toPreload, runID)
 		}
@@ -672,7 +685,7 @@ func (v *RunListView) preloadRunDetails() tea.Cmd {
 		f.WriteString(debugInfo)
 		f.Close()
 	}
-	
+
 	for _, runID := range toPreload {
 		v.preloading[runID] = true
 		id := runID // Capture for closure
@@ -682,28 +695,28 @@ func (v *RunListView) preloadRunDetails() tea.Cmd {
 				f.WriteString(debugInfo)
 				f.Close()
 			}
-			
+
 			detailed, err := v.client.GetRun(id)
-			
-			debugInfo = fmt.Sprintf("DEBUG: API call completed for runID='%s', err=%v, run!=nil=%v - SENDING runDetailsPreloadedMsg\n", 
+
+			debugInfo = fmt.Sprintf("DEBUG: API call completed for runID='%s', err=%v, run!=nil=%v - SENDING runDetailsPreloadedMsg\n",
 				id, err, detailed != nil)
 			if f, err2 := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err2 == nil {
 				f.WriteString(debugInfo)
 				f.Close()
 			}
-			
+
 			msg := runDetailsPreloadedMsg{
 				runID: id,
 				run:   detailed,
 				err:   err,
 			}
-			
+
 			debugInfo = fmt.Sprintf("DEBUG: About to return runDetailsPreloadedMsg for runID='%s'\n", id)
 			if f, err2 := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err2 == nil {
 				f.WriteString(debugInfo)
 				f.Close()
 			}
-			
+
 			return msg
 		})
 	}
