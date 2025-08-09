@@ -12,7 +12,6 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/repobird/repobird-cli/internal/api"
 	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/repobird/repobird-cli/internal/tui/components"
@@ -104,10 +103,7 @@ func NewCreateRunView(client *api.Client) *CreateRunView {
 }
 
 func autoDetectGit(repoInput, sourceInput textinput.Model) {
-	if utils.IsGitRepository() {
-		repo, _ := utils.GetRepositoryInfo()
-		branch, _ := utils.GetCurrentBranch()
-		
+	if repo, branch, err := utils.GetGitInfo(); err == nil {
 		if repo != "" {
 			repoInput.SetValue(repo)
 		}
@@ -184,8 +180,6 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (v *CreateRunView) updateFields(msg tea.KeyMsg) []tea.Cmd {
 	var cmds []tea.Cmd
-
-	totalFields := len(v.fields) + 2
 
 	if v.focusIndex < len(v.fields) {
 		var cmd tea.Cmd
@@ -362,8 +356,7 @@ func (v *CreateRunView) submitRun() tea.Cmd {
 			}
 
 			if task.Repository == "" {
-				if utils.IsGitRepository() {
-					repo, _ := utils.GetRepositoryInfo()
+				if repo, _, err := utils.GetGitInfo(); err == nil {
 					task.Repository = repo
 				}
 				if task.Repository == "" {
@@ -372,8 +365,7 @@ func (v *CreateRunView) submitRun() tea.Cmd {
 			}
 
 			if task.Source == "" {
-				if utils.IsGitRepository() {
-					branch, _ := utils.GetCurrentBranch()
+				if _, branch, err := utils.GetGitInfo(); err == nil {
 					task.Source = branch
 				}
 				if task.Source == "" {
@@ -386,8 +378,11 @@ func (v *CreateRunView) submitRun() tea.Cmd {
 			}
 		}
 
-		run, err := v.client.CreateRun(task)
-		return runCreatedMsg{run: run, err: err}
+		runPtr, err := v.client.CreateRun(&task)
+		if err != nil {
+			return runCreatedMsg{err: err}
+		}
+		return runCreatedMsg{run: *runPtr, err: nil}
 	}
 }
 

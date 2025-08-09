@@ -108,7 +108,7 @@ func (v *RunDetailsView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		v.run = msg.run
 		v.error = msg.err
 		if msg.err == nil {
-			v.updateStatusHistory(msg.run.Status)
+			v.updateStatusHistory(string(msg.run.Status))
 		}
 		v.updateContent()
 
@@ -127,7 +127,8 @@ func (v *RunDetailsView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	vpCmd := v.viewport.Update(msg)
+	var vpCmd tea.Cmd
+	v.viewport, vpCmd = v.viewport.Update(msg)
 	cmds = append(cmds, vpCmd)
 
 	return v, tea.Batch(cmds...)
@@ -251,13 +252,16 @@ func (v *RunDetailsView) updateStatusHistory(status string) {
 
 func (v *RunDetailsView) loadRunDetails() tea.Cmd {
 	return func() tea.Msg {
-		run, err := v.client.GetRun(v.run.ID)
-		return runDetailsLoadedMsg{run: run, err: err}
+		runPtr, err := v.client.GetRun(v.run.ID)
+		if err != nil {
+			return runDetailsLoadedMsg{run: v.run, err: err}
+		}
+		return runDetailsLoadedMsg{run: *runPtr, err: nil}
 	}
 }
 
 func (v *RunDetailsView) startPolling() tea.Cmd {
-	if !isActiveStatus(v.run.Status) {
+	if !isActiveStatus(string(v.run.Status)) {
 		return nil
 	}
 

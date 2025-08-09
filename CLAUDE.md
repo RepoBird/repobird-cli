@@ -212,14 +212,8 @@ When working on this codebase:
 5. Update CLI help text when adding new features
 6. Keep dependencies minimal - prefer standard library
 7. Ensure cross-platform compatibility (Linux, macOS, Windows)
-8. Run linting and formatting before suggesting code: `make lint-fix fmt`
-9. Consider rate limiting and API quotas in implementation
-10. Document any non-obvious design decisions in code comments
-
-## Contact & Support
-- Repository: github.com/repobird/repobird-cli
-- API Documentation: https://api.repobird.ai/docs
-- Issues: GitHub Issues tracker
+8. create final todo list item of run linting and formatting after all other todo changes: `make lint-fix fmt`
+9. Document any non-obvious design decisions in code comments in docs/ markdown files.
 
 ## Quick Troubleshooting
 

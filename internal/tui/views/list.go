@@ -255,8 +255,16 @@ func (v *RunListView) renderStatusBar() string {
 
 func (v *RunListView) loadRuns() tea.Cmd {
 	return func() tea.Msg {
-		runs, err := v.client.ListRuns()
-		return runsLoadedMsg{runs: runs, err: err}
+		runPtrs, err := v.client.ListRuns(100, 0)
+		if err != nil {
+			return runsLoadedMsg{runs: nil, err: err}
+		}
+		
+		runs := make([]models.RunResponse, len(runPtrs))
+		for i, r := range runPtrs {
+			runs[i] = *r
+		}
+		return runsLoadedMsg{runs: runs, err: nil}
 	}
 }
 
