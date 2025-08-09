@@ -189,7 +189,17 @@ func autoDetectGit(repoInput, sourceInput textinput.Model) {
 }
 
 func (v *CreateRunView) Init() tea.Cmd {
-	return textinput.Blink
+	var cmds []tea.Cmd
+
+	// Send a window size message with stored dimensions if we have them
+	if v.width > 0 && v.height > 0 {
+		cmds = append(cmds, func() tea.Msg {
+			return tea.WindowSizeMsg{Width: v.width, Height: v.height}
+		})
+	}
+
+	cmds = append(cmds, textinput.Blink)
+	return tea.Batch(cmds...)
 }
 
 // handleWindowSizeMsg handles window resize events
@@ -286,8 +296,11 @@ func (v *CreateRunView) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if !v.submitting {
 				v.saveFormData()
 				debug.LogToFile("DEBUG: CreateView double ESC - returning to list view\n")
-				// Return to list view with cached data
-				return NewRunListViewWithCache(v.client, v.parentRuns, v.parentCached, v.parentCachedAt, v.parentDetailsCache, -1), nil
+				// Return to list view with cached data and current dimensions
+				listView := NewRunListViewWithCache(v.client, v.parentRuns, v.parentCached, v.parentCachedAt, v.parentDetailsCache, -1)
+				listView.width = v.width
+				listView.height = v.height
+				return listView, nil
 			}
 		} else {
 			// First ESC in normal mode - prepare to exit
@@ -299,8 +312,11 @@ func (v *CreateRunView) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if v.backButtonFocused {
 			v.saveFormData()
 			debug.LogToFile("DEBUG: Back button pressed - returning to list view\n")
-			// Return to list view with cached data
-			return NewRunListViewWithCache(v.client, v.parentRuns, v.parentCached, v.parentCachedAt, v.parentDetailsCache, -1), nil
+			// Return to list view with cached data and current dimensions
+			listView := NewRunListViewWithCache(v.client, v.parentRuns, v.parentCached, v.parentCachedAt, v.parentDetailsCache, -1)
+			listView.width = v.width
+			listView.height = v.height
+			return listView, nil
 		} else {
 			v.inputMode = components.InsertMode
 			v.exitRequested = false

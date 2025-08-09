@@ -127,6 +127,13 @@ func NewRunListViewWithCache(
 func (v *RunListView) Init() tea.Cmd {
 	var cmds []tea.Cmd
 
+	// Send a window size message with stored dimensions if we have them
+	if v.width > 0 && v.height > 0 {
+		cmds = append(cmds, func() tea.Msg {
+			return tea.WindowSizeMsg{Width: v.width, Height: v.height}
+		})
+	}
+
 	// If we have cached data, use it - don't auto-refresh
 	if v.cached && v.runs != nil && len(v.runs) > 0 {
 		// Don't show loading, data is already displayed
@@ -289,18 +296,27 @@ func (v *RunListView) handleEnterKey() (tea.Model, tea.Cmd) {
 		}
 
 		debug.LogToFilef("DEBUG: Fixed cached run ID from '%s' to '%s'\n", detailed.GetIDString(), cachedRun.GetIDString())
-		return NewRunDetailsViewWithCache(v.client, cachedRun, v.runs, v.cached, v.cachedAt, v.detailsCache), nil
+		detailsView := NewRunDetailsViewWithCache(v.client, cachedRun, v.runs, v.cached, v.cachedAt, v.detailsCache)
+		detailsView.width = v.width
+		detailsView.height = v.height
+		return detailsView, nil
 	}
 
 	debug.LogToFilef("DEBUG: No cached data for runID='%s', loading fresh - NAVIGATING TO DETAILS VIEW\n", runID)
-	return NewRunDetailsViewWithCache(v.client, run, v.runs, v.cached, v.cachedAt, v.detailsCache), nil
+	detailsView := NewRunDetailsViewWithCache(v.client, run, v.runs, v.cached, v.cachedAt, v.detailsCache)
+	detailsView.width = v.width
+	detailsView.height = v.height
+	return detailsView, nil
 }
 
 // handleNewRunKey handles the New key press to create a new run
 func (v *RunListView) handleNewRunKey() (tea.Model, tea.Cmd) {
 	debug.LogToFilef("DEBUG: ListView creating NewCreateRunView - runs=%d, cached=%v, detailsCache=%d\n",
 		len(v.runs), v.cached, len(v.detailsCache))
-	return NewCreateRunViewWithCache(v.client, v.runs, v.cached, v.cachedAt, v.detailsCache), nil
+	createView := NewCreateRunViewWithCache(v.client, v.runs, v.cached, v.cachedAt, v.detailsCache)
+	createView.width = v.width
+	createView.height = v.height
+	return createView, nil
 }
 
 // handleRunsLoaded handles the runsLoadedMsg message
@@ -367,12 +383,18 @@ func (v *RunListView) handleRetryNavigation(msg retryNavigationMsg) (tea.Model, 
 		// Use cached data if available now
 		if detailed, ok := v.detailsCache[runID]; ok {
 			debug.LogToFilef("DEBUG: Retry successful - using cached data for runID='%s' - NAVIGATING TO DETAILS VIEW\n", runID)
-			return NewRunDetailsViewWithCache(v.client, *detailed, v.runs, v.cached, v.cachedAt, v.detailsCache), nil
+			detailsView := NewRunDetailsViewWithCache(v.client, *detailed, v.runs, v.cached, v.cachedAt, v.detailsCache)
+			detailsView.width = v.width
+			detailsView.height = v.height
+			return detailsView, nil
 		}
 
 		// Still not cached, load fresh
 		debug.LogToFilef("DEBUG: Retry - still no cached data for runID='%s', loading fresh - NAVIGATING TO DETAILS VIEW\n", runID)
-		return NewRunDetailsViewWithCache(v.client, run, v.runs, v.cached, v.cachedAt, v.detailsCache), nil
+		detailsView := NewRunDetailsViewWithCache(v.client, run, v.runs, v.cached, v.cachedAt, v.detailsCache)
+		detailsView.width = v.width
+		detailsView.height = v.height
+		return detailsView, nil
 	}
 
 	return v, nil

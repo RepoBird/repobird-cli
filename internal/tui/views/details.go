@@ -150,6 +150,13 @@ func (v *RunDetailsView) Init() tea.Cmd {
 
 	var cmds []tea.Cmd
 
+	// Send a window size message with stored dimensions if we have them
+	if v.width > 0 && v.height > 0 {
+		cmds = append(cmds, func() tea.Msg {
+			return tea.WindowSizeMsg{Width: v.width, Height: v.height}
+		})
+	}
+
 	// Only load details if not already loaded from cache
 	if v.loading {
 		// Try cache one more time before making API call
@@ -223,8 +230,12 @@ func (v *RunDetailsView) handleKeyInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return v, tea.Quit
 	case key.Matches(msg, v.keys.Back):
 		v.stopPolling()
-		// Return to list view with cached data
-		return NewRunListViewWithCache(v.client, v.parentRuns, v.parentCached, v.parentCachedAt, v.parentDetailsCache, -1), nil
+		// Return to list view with cached data and current dimensions
+		listView := NewRunListViewWithCache(v.client, v.parentRuns, v.parentCached, v.parentCachedAt, v.parentDetailsCache, -1)
+		// Pass current window dimensions
+		listView.width = v.width
+		listView.height = v.height
+		return listView, nil
 	case key.Matches(msg, v.keys.Help):
 		v.showHelp = !v.showHelp
 	case key.Matches(msg, v.keys.Refresh):
