@@ -273,6 +273,12 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			v.table.MoveDown()
 			// Prioritize preloading the newly selected run
 			cmds = append(cmds, v.preloadSelectedRun())
+		case msg.String() == "shift+k" || msg.String() == "shift+up":
+			// Page up with Shift+K or Shift+Up
+			v.table.PageUp()
+		case msg.String() == "shift+j" || msg.String() == "shift+down":
+			// Page down with Shift+J or Shift+Down
+			v.table.PageDown()
 		case key.Matches(msg, v.keys.PageUp):
 			v.table.PageUp()
 		case key.Matches(msg, v.keys.PageDown):

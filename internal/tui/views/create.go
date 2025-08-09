@@ -558,6 +558,13 @@ func (v *CreateRunView) renderStatusBar() string {
 
 func (v *CreateRunView) submitRun() tea.Cmd {
 	return func() tea.Msg {
+		// Debug: Log entry into submitRun
+		debugInfo := "DEBUG: submitRun() called - starting submission process\n"
+		if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+			f.WriteString(debugInfo)
+			f.Close()
+		}
+		
 		// Save form data before submitting in case submission fails
 		v.saveFormData()
 
