@@ -9,6 +9,16 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// initializeCacheForTesting creates a cache without persistent storage for testing
+func initializeCacheForTesting() {
+	globalCache = &GlobalCache{
+		details:         make(map[string]*models.RunResponse),
+		detailsAt:       make(map[string]time.Time),
+		terminalDetails: make(map[string]*models.RunResponse),
+		persistentCache: nil, // Disable persistent cache for tests
+	}
+}
+
 func TestGetCachedList(t *testing.T) {
 	// Reset global cache before each test
 	initializeCache()
@@ -457,4 +467,62 @@ func TestIsTerminalStatus(t *testing.T) {
 			assert.Equal(t, tt.isTerminal, result)
 		})
 	}
+}
+
+func TestRepositoryHistory(t *testing.T) {
+	t.Run("returns empty history when cache is empty", func(t *testing.T) {
+		// Use test-specific cache initialization
+		initializeCacheForTesting()
+		history, err := GetRepositoryHistory()
+		assert.NoError(t, err)
+		assert.Empty(t, history)
+	})
+
+	t.Run("adds repository to history", func(t *testing.T) {
+		initializeCacheForTesting()
+		err := AddRepositoryToHistory("owner/repo1")
+		assert.NoError(t, err)
+
+		history, err := GetRepositoryHistory()
+		assert.NoError(t, err)
+		assert.Equal(t, []string{"owner/repo1"}, history)
+	})
+
+	t.Run("moves existing repository to front", func(t *testing.T) {
+		initializeCacheForTesting()
+		// Add multiple repositories
+		_ = AddRepositoryToHistory("owner/repo1")
+		_ = AddRepositoryToHistory("owner/repo2")
+		_ = AddRepositoryToHistory("owner/repo3")
+
+		// Add repo1 again - should move to front
+		_ = AddRepositoryToHistory("owner/repo1")
+
+		history, err := GetRepositoryHistory()
+		assert.NoError(t, err)
+		assert.Equal(t, []string{"owner/repo1", "owner/repo3", "owner/repo2"}, history)
+	})
+
+	t.Run("gets most recent repository", func(t *testing.T) {
+		initializeCacheForTesting()
+		_ = AddRepositoryToHistory("owner/repo1")
+		_ = AddRepositoryToHistory("owner/repo2")
+
+		mostRecent, err := GetMostRecentRepository()
+		assert.NoError(t, err)
+		assert.Equal(t, "owner/repo2", mostRecent)
+	})
+
+	t.Run("handles empty string repositories", func(t *testing.T) {
+		initializeCacheForTesting()
+		err := AddRepositoryToHistory("")
+		assert.NoError(t, err) // Should not error, but also should not add
+
+		err = AddRepositoryToHistory("owner/repo1")
+		assert.NoError(t, err)
+
+		history, err := GetRepositoryHistory()
+		assert.NoError(t, err)
+		assert.Equal(t, []string{"owner/repo1"}, history)
+	})
 }

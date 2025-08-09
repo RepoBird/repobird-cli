@@ -17,6 +17,13 @@ type PersistentCache struct {
 	cacheDir string
 }
 
+// RepositoryHistory tracks repositories used in runs
+type RepositoryHistory struct {
+	Repositories []string  `json:"repositories"`
+	LastUsed     time.Time `json:"lastUsed"`
+	Version      int       `json:"version"`
+}
+
 // CachedRun wraps a RunResponse with metadata
 type CachedRun struct {
 	Run      *models.RunResponse `json:"run"`
@@ -25,8 +32,11 @@ type CachedRun struct {
 }
 
 const (
-	cacheVersion = 1
-	appName      = "repobird"
+	cacheVersion         = 1
+	repoHistoryVersion   = 1
+	appName              = "repobird"
+	repoHistoryFile      = "repository_history.json"
+	maxRepositoryHistory = 50 // Keep last 50 repositories
 )
 
 // NewPersistentCache creates a new persistent cache instance
@@ -256,4 +266,98 @@ func readJSON(filePath string, dst interface{}) error {
 	}
 
 	return nil
+}
+
+// getRepositoryHistoryPath returns the path to repository history file
+func (pc *PersistentCache) getRepositoryHistoryPath() string {
+	return filepath.Join(pc.cacheDir, repoHistoryFile)
+}
+
+// AddRepository adds a repository to the history, moving it to front if already exists
+func (pc *PersistentCache) AddRepository(repo string) error {
+	if repo == "" {
+		return nil
+	}
+
+	pc.mu.Lock()
+	defer pc.mu.Unlock()
+
+	history, err := pc.loadRepositoryHistory()
+	if err != nil {
+		// If load fails, start with empty history
+		history = &RepositoryHistory{
+			Repositories: []string{},
+			Version:      repoHistoryVersion,
+		}
+	}
+
+	// Remove repo if it already exists to avoid duplicates
+	for i, existing := range history.Repositories {
+		if existing == repo {
+			history.Repositories = append(history.Repositories[:i], history.Repositories[i+1:]...)
+			break
+		}
+	}
+
+	// Add to front
+	history.Repositories = append([]string{repo}, history.Repositories...)
+
+	// Limit history size
+	if len(history.Repositories) > maxRepositoryHistory {
+		history.Repositories = history.Repositories[:maxRepositoryHistory]
+	}
+
+	history.LastUsed = time.Now()
+
+	// Save back to file
+	return writeJSONAtomic(pc.getRepositoryHistoryPath(), history)
+}
+
+// GetRepositoryHistory returns the repository history, most recent first
+func (pc *PersistentCache) GetRepositoryHistory() ([]string, error) {
+	pc.mu.RLock()
+	defer pc.mu.RUnlock()
+
+	history, err := pc.loadRepositoryHistory()
+	if err != nil {
+		return []string{}, nil // Return empty list if no history found
+	}
+
+	return history.Repositories, nil
+}
+
+// GetMostRecentRepository returns the most recently used repository
+func (pc *PersistentCache) GetMostRecentRepository() (string, error) {
+	repos, err := pc.GetRepositoryHistory()
+	if err != nil || len(repos) == 0 {
+		return "", err
+	}
+	return repos[0], nil
+}
+
+// loadRepositoryHistory loads repository history from file
+func (pc *PersistentCache) loadRepositoryHistory() (*RepositoryHistory, error) {
+	filePath := pc.getRepositoryHistoryPath()
+
+	var history RepositoryHistory
+	if err := readJSON(filePath, &history); err != nil {
+		if os.IsNotExist(err) {
+			return &RepositoryHistory{
+				Repositories: []string{},
+				Version:      repoHistoryVersion,
+			}, nil
+		}
+		return nil, err
+	}
+
+	// Handle version compatibility
+	if history.Version != repoHistoryVersion {
+		// For now, just reset on version mismatch
+		return &RepositoryHistory{
+			Repositories: []string{},
+			Version:      repoHistoryVersion,
+		}, nil
+	}
+
+	return &history, nil
 }

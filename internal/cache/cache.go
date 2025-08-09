@@ -47,6 +47,9 @@ type GlobalCache struct {
 
 	// Persistent file cache
 	persistentCache *PersistentCache
+
+	// In-memory repository history for testing
+	repoHistory []string
 }
 
 var globalCache *GlobalCache
@@ -267,4 +270,81 @@ func ClearActiveCache() {
 	globalCache.detailsAt = make(map[string]time.Time)
 	// Keep terminalDetails - these never expire
 	globalCache.selectedIndex = 0
+}
+
+// AddRepositoryToHistory adds a repository to persistent history
+func AddRepositoryToHistory(repo string) error {
+	globalCache.mu.Lock()
+	defer globalCache.mu.Unlock()
+
+	if repo == "" {
+		return nil
+	}
+
+	// Try persistent cache first
+	if globalCache.persistentCache != nil {
+		err := globalCache.persistentCache.AddRepository(repo)
+		if err == nil {
+			return nil
+		}
+		// Fall through to in-memory if persistent fails
+	}
+
+	// Use in-memory storage as fallback
+	if globalCache.repoHistory == nil {
+		globalCache.repoHistory = []string{}
+	}
+
+	// Remove repo if it already exists to avoid duplicates
+	for i, existing := range globalCache.repoHistory {
+		if existing == repo {
+			globalCache.repoHistory = append(globalCache.repoHistory[:i], globalCache.repoHistory[i+1:]...)
+			break
+		}
+	}
+
+	// Add to front
+	globalCache.repoHistory = append([]string{repo}, globalCache.repoHistory...)
+
+	// Limit history size
+	const maxRepositoryHistory = 50
+	if len(globalCache.repoHistory) > maxRepositoryHistory {
+		globalCache.repoHistory = globalCache.repoHistory[:maxRepositoryHistory]
+	}
+
+	return nil
+}
+
+// GetRepositoryHistory returns the repository history, most recent first
+func GetRepositoryHistory() ([]string, error) {
+	globalCache.mu.RLock()
+	defer globalCache.mu.RUnlock()
+
+	// Try persistent cache first
+	if globalCache.persistentCache != nil {
+		history, err := globalCache.persistentCache.GetRepositoryHistory()
+		if err == nil && len(history) > 0 {
+			return history, nil
+		}
+		// Fall through to in-memory if persistent fails or is empty
+	}
+
+	// Use in-memory storage as fallback
+	if globalCache.repoHistory == nil {
+		return []string{}, nil
+	}
+
+	// Return a copy to prevent external modification
+	history := make([]string, len(globalCache.repoHistory))
+	copy(history, globalCache.repoHistory)
+	return history, nil
+}
+
+// GetMostRecentRepository returns the most recently used repository
+func GetMostRecentRepository() (string, error) {
+	repos, err := GetRepositoryHistory()
+	if err != nil || len(repos) == 0 {
+		return "", err
+	}
+	return repos[0], nil
 }

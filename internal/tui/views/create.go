@@ -48,6 +48,8 @@ type CreateRunView struct {
 	parentCached       bool
 	parentCachedAt     time.Time
 	parentDetailsCache map[string]*models.RunResponse
+	// Repository selector
+	repoSelector *components.RepositorySelector
 }
 
 func NewCreateRunView(client *api.Client) *CreateRunView {
@@ -76,8 +78,10 @@ func NewCreateRunViewWithConfig(config CreateRunViewConfig) *CreateRunView {
 		parentDetailsCache: config.ParentDetailsCache,
 	}
 
+	v.repoSelector = components.NewRepositorySelector()
 	v.initializeInputFields()
 	v.loadFormData()
+	v.autofillRepository()
 	return v
 }
 
@@ -152,6 +156,17 @@ func (v *CreateRunView) loadFormData() {
 		v.fields[4].SetValue(savedData.Issue)
 		v.promptArea.SetValue(savedData.Prompt)
 		v.contextArea.SetValue(savedData.Context)
+	}
+}
+
+// autofillRepository sets the repository field with the most appropriate default
+func (v *CreateRunView) autofillRepository() {
+	// Only autofill if the repository field is empty
+	if len(v.fields) >= 2 && v.fields[1].Value() == "" {
+		defaultRepo := v.repoSelector.GetDefaultRepository()
+		if defaultRepo != "" {
+			v.fields[1].SetValue(defaultRepo)
+		}
 	}
 }
 
@@ -261,6 +276,11 @@ func (v *CreateRunView) handleInsertMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		} else {
 			v.fields[0].Focus()
 			v.focusIndex = 0
+		}
+	case msg.String() == "ctrl+r":
+		// Trigger repository selector when repository field is focused
+		if !v.useFileInput && v.focusIndex == 1 {
+			return v, v.selectRepository()
 		}
 	case msg.String() == "ctrl+s" || msg.String() == "ctrl+enter":
 		if !v.submitting {
@@ -374,6 +394,26 @@ func (v *CreateRunView) handleRunCreated(msg runCreatedMsg) (tea.Model, tea.Cmd)
 	return NewRunDetailsViewWithCacheAndDimensions(v.client, msg.run, v.parentRuns, v.parentCached, v.parentCachedAt, v.parentDetailsCache, v.width, v.height), nil
 }
 
+// handleRepositorySelected handles the repositorySelectedMsg message
+func (v *CreateRunView) handleRepositorySelected(msg repositorySelectedMsg) (tea.Model, tea.Cmd) {
+	if msg.err != nil {
+		debug.LogToFilef("DEBUG: Repository selection error: %v\n", msg.err)
+		v.error = msg.err
+		return v, nil
+	}
+
+	// Set the selected repository in the repository field
+	if len(v.fields) >= 2 && msg.repository != "" {
+		v.fields[1].SetValue(msg.repository)
+		debug.LogToFilef("DEBUG: Repository field updated to: %s\n", msg.repository)
+
+		// Add to manual repository list for future use
+		v.repoSelector.AddManualRepository(msg.repository)
+	}
+
+	return v, nil
+}
+
 func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
@@ -391,6 +431,9 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case runCreatedMsg:
 		return v.handleRunCreated(msg)
+
+	case repositorySelectedMsg:
+		return v.handleRepositorySelected(msg)
 	}
 
 	return v, tea.Batch(cmds...)
@@ -635,7 +678,12 @@ func (v *CreateRunView) View() string {
 func (v *CreateRunView) renderStatusBar() string {
 	var statusText string
 	if v.inputMode == components.InsertMode {
-		statusText = "[ESC] normal mode [Tab] next [Ctrl+S] submit [Ctrl+X] clear field [Ctrl+L] clear all"
+		if !v.useFileInput && v.focusIndex == 1 {
+			// When repository field is focused, show Ctrl+R option
+			statusText = "[ESC] normal mode [Tab] next [Ctrl+R] select repo [Ctrl+S] submit [Ctrl+X] clear field [Ctrl+L] clear all"
+		} else {
+			statusText = "[ESC] normal mode [Tab] next [Ctrl+S] submit [Ctrl+X] clear field [Ctrl+L] clear all"
+		}
 	} else {
 		if v.exitRequested {
 			statusText = "[ESC] exit [Enter] select [j/k] navigate [Ctrl+S] submit [Ctrl+X] clear field [Ctrl+L] clear all"
@@ -753,6 +801,21 @@ func (v *CreateRunView) submitToAPI(task models.RunRequest) (models.RunResponse,
 	return *runPtr, nil
 }
 
+// selectRepository triggers the repository selector
+func (v *CreateRunView) selectRepository() tea.Cmd {
+	return func() tea.Msg {
+		// Suspend Bubble Tea temporarily and show fzf selector
+		selectedRepo, err := v.repoSelector.SelectRepository()
+		if err != nil {
+			debug.LogToFilef("DEBUG: Repository selection failed: %v\n", err)
+			return repositorySelectedMsg{repository: "", err: err}
+		}
+
+		debug.LogToFilef("DEBUG: Repository selected: %s\n", selectedRepo)
+		return repositorySelectedMsg{repository: selectedRepo, err: nil}
+	}
+}
+
 func (v *CreateRunView) submitRun() tea.Cmd {
 	return func() tea.Msg {
 		debug.LogToFile("DEBUG: submitRun() called - starting submission process\n")
@@ -774,6 +837,13 @@ func (v *CreateRunView) submitRun() tea.Cmd {
 
 			if err := v.validateTask(&task); err != nil {
 				return runCreatedMsg{err: err}
+			}
+
+			// Add repository to history after successful validation
+			if task.Repository != "" {
+				go func() {
+					_ = cache.AddRepositoryToHistory(task.Repository)
+				}()
 			}
 		}
 
@@ -803,4 +873,9 @@ func max(a, b int) int {
 type runCreatedMsg struct {
 	run models.RunResponse
 	err error
+}
+
+type repositorySelectedMsg struct {
+	repository string
+	err        error
 }
