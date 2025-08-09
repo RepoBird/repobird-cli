@@ -36,6 +36,9 @@ type CreateRunView struct {
 	showHelp      bool
 	useFileInput  bool
 	filePathInput textinput.Model
+	// Input mode tracking
+	inputMode     components.InputMode
+	exitRequested bool
 	// Cache from parent list view
 	parentRuns         []models.RunResponse
 	parentCached       bool
@@ -115,6 +118,8 @@ func NewCreateRunViewWithCache(client *api.Client, parentRuns []models.RunRespon
 		contextArea:        contextArea,
 		filePathInput:      filePathInput,
 		focusIndex:         0,
+		inputMode:          components.InsertMode, // Start in insert mode
+		exitRequested:      false,
 		parentRuns:         parentRuns,
 		parentCached:       parentCached,
 		parentCachedAt:     parentCachedAt,
@@ -149,46 +154,87 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		v.contextArea.SetWidth(min(60, msg.Width-10))
 
 	case tea.KeyMsg:
-		switch {
-		case key.Matches(msg, v.keys.Quit):
-			return v, tea.Quit
-		case key.Matches(msg, v.keys.Back):
-			if !v.submitting {
-				// DEBUG: Log when returning from create view
-				debugInfo := "DEBUG: CreateView ESC pressed - returning to list view\n"
-				if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-					f.WriteString(debugInfo)
-					f.Close()
+		// Handle modal input logic
+		switch v.inputMode {
+		case components.InsertMode:
+			// In insert mode, handle ESC to enter normal mode
+			if msg.String() == "esc" {
+				v.inputMode = components.NormalMode
+				v.exitRequested = false
+				// Blur current field to show we're in normal mode
+				v.blurAllFields()
+				return v, nil
+			}
+			
+			// In insert mode, handle text input and field navigation
+			switch {
+			case msg.String() == "ctrl+f":
+				v.useFileInput = !v.useFileInput
+				if v.useFileInput {
+					v.filePathInput.Focus()
+				} else {
+					v.fields[0].Focus()
+					v.focusIndex = 0
 				}
-				// Return a fresh list view that will automatically load from global cache
-				return NewRunListView(v.client), nil
+			case msg.String() == "ctrl+s" || msg.String() == "ctrl+enter":
+				if !v.submitting {
+					return v, v.submitRun()
+				}
+			case key.Matches(msg, v.keys.Tab):
+				v.nextField()
+			case key.Matches(msg, v.keys.ShiftTab):
+				v.prevField()
+			default:
+				// Handle text input
+				if v.useFileInput {
+					var cmd tea.Cmd
+					v.filePathInput, cmd = v.filePathInput.Update(msg)
+					cmds = append(cmds, cmd)
+				} else {
+					cmds = append(cmds, v.updateFields(msg)...)
+				}
 			}
-		case key.Matches(msg, v.keys.Help):
-			v.showHelp = !v.showHelp
-		case msg.String() == "ctrl+f":
-			v.useFileInput = !v.useFileInput
-			if v.useFileInput {
-				v.filePathInput.Focus()
-			} else {
-				v.fields[0].Focus()
-				v.focusIndex = 0
+			
+		case components.NormalMode:
+			// In normal mode, handle navigation and commands
+			switch {
+			case key.Matches(msg, v.keys.Quit):
+				return v, tea.Quit
+			case key.Matches(msg, v.keys.Back) || msg.String() == "esc":
+				if v.exitRequested {
+					// Second ESC - actually exit
+					if !v.submitting {
+						// DEBUG: Log when returning from create view
+						debugInfo := "DEBUG: CreateView double ESC - returning to list view\n"
+						if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+							f.WriteString(debugInfo)
+							f.Close()
+						}
+						return NewRunListView(v.client), nil
+					}
+				} else {
+					// First ESC in normal mode - prepare to exit
+					v.exitRequested = true
+				}
+			case key.Matches(msg, v.keys.Help):
+				v.showHelp = !v.showHelp
+			case msg.String() == "i" || msg.String() == "enter":
+				// Enter insert mode and focus current field
+				v.inputMode = components.InsertMode
+				v.exitRequested = false
+				v.updateFocus()
+			case key.Matches(msg, v.keys.Up) || msg.String() == "k":
+				v.prevField()
+			case key.Matches(msg, v.keys.Down) || msg.String() == "j":
+				v.nextField()
+			case msg.String() == "ctrl+s":
+				if !v.submitting {
+					return v, v.submitRun()
+				}
+			default:
+				// Block vim navigation keys from doing anything else
+				// This prevents 'b' from accidentally triggering actions
 			}
-		case msg.String() == "ctrl+s" || msg.String() == "ctrl+enter":
-			if !v.submitting {
-				return v, v.submitRun()
-			}
-		case key.Matches(msg, v.keys.Tab):
-			v.nextField()
-		case key.Matches(msg, v.keys.ShiftTab):
-			v.prevField()
-		}
-
-		if v.useFileInput {
-			var cmd tea.Cmd
-			v.filePathInput, cmd = v.filePathInput.Update(msg)
-			cmds = append(cmds, cmd)
-		} else {
-			cmds = append(cmds, v.updateFields(msg)...)
 		}
 
 	case runCreatedMsg:
@@ -243,24 +289,39 @@ func (v *CreateRunView) prevField() {
 }
 
 func (v *CreateRunView) updateFocus() {
-	for i := range v.fields {
-		if i == v.focusIndex {
-			v.fields[i].Focus()
-		} else {
-			v.fields[i].Blur()
+	// Only focus fields when in insert mode
+	if v.inputMode == components.InsertMode {
+		for i := range v.fields {
+			if i == v.focusIndex {
+				v.fields[i].Focus()
+			} else {
+				v.fields[i].Blur()
+			}
 		}
-	}
 
-	if v.focusIndex == len(v.fields) {
-		v.promptArea.Focus()
-		v.contextArea.Blur()
-	} else if v.focusIndex == len(v.fields)+1 {
-		v.promptArea.Blur()
-		v.contextArea.Focus()
+		if v.focusIndex == len(v.fields) {
+			v.promptArea.Focus()
+			v.contextArea.Blur()
+		} else if v.focusIndex == len(v.fields)+1 {
+			v.promptArea.Blur()
+			v.contextArea.Focus()
+		} else {
+			v.promptArea.Blur()
+			v.contextArea.Blur()
+		}
 	} else {
-		v.promptArea.Blur()
-		v.contextArea.Blur()
+		// In normal mode, blur all fields
+		v.blurAllFields()
 	}
+}
+
+func (v *CreateRunView) blurAllFields() {
+	for i := range v.fields {
+		v.fields[i].Blur()
+	}
+	v.promptArea.Blur()
+	v.contextArea.Blur()
+	v.filePathInput.Blur()
 }
 
 func (v *CreateRunView) View() string {
@@ -295,8 +356,10 @@ func (v *CreateRunView) View() string {
 
 		for i, label := range fieldLabels {
 			s.WriteString(label)
-			if i == v.focusIndex {
+			if i == v.focusIndex && v.inputMode == components.InsertMode {
 				s.WriteString(styles.SelectedStyle.Render("▶ "))
+			} else if i == v.focusIndex {
+				s.WriteString(styles.ProcessingStyle.Render("● "))
 			} else {
 				s.WriteString("  ")
 			}
@@ -305,8 +368,10 @@ func (v *CreateRunView) View() string {
 		}
 
 		s.WriteString("\nPrompt:\n")
-		if v.focusIndex == len(v.fields) {
+		if v.focusIndex == len(v.fields) && v.inputMode == components.InsertMode {
 			s.WriteString(styles.SelectedStyle.Render("▶ "))
+		} else if v.focusIndex == len(v.fields) {
+			s.WriteString(styles.ProcessingStyle.Render("● "))
 		} else {
 			s.WriteString("  ")
 		}
@@ -314,15 +379,26 @@ func (v *CreateRunView) View() string {
 		s.WriteString("\n")
 
 		s.WriteString("\nContext (optional):\n")
-		if v.focusIndex == len(v.fields)+1 {
+		if v.focusIndex == len(v.fields)+1 && v.inputMode == components.InsertMode {
 			s.WriteString(styles.SelectedStyle.Render("▶ "))
+		} else if v.focusIndex == len(v.fields)+1 {
+			s.WriteString(styles.ProcessingStyle.Render("● "))
 		} else {
 			s.WriteString("  ")
 		}
 		s.WriteString(v.contextArea.View())
 		s.WriteString("\n\n")
 
-		s.WriteString("Press Ctrl+F to load from file | Ctrl+S to submit\n")
+		// Show mode-specific instructions
+		if v.inputMode == components.InsertMode {
+			s.WriteString("INSERT MODE | ESC: normal mode | Tab: next field | Ctrl+S: submit\n")
+		} else {
+			if v.exitRequested {
+				s.WriteString("Press ESC again to exit | i/Enter: edit field | j/k: navigate\n")
+			} else {
+				s.WriteString("NORMAL MODE | ESC: exit | i/Enter: edit field | j/k: navigate\n")
+			}
+		}
 	}
 
 	if v.submitting {
@@ -344,9 +420,18 @@ func (v *CreateRunView) View() string {
 }
 
 func (v *CreateRunView) renderStatusBar() string {
-	return styles.StatusBarStyle.Width(v.width).Render(
-		"[Tab/Shift+Tab] navigate [Ctrl+S] submit [Ctrl+F] file [Esc] back [?] help",
-	)
+	var statusText string
+	if v.inputMode == components.InsertMode {
+		statusText = "[ESC] normal mode [Tab] next field [Ctrl+S] submit [Ctrl+F] file"
+	} else {
+		if v.exitRequested {
+			statusText = "[ESC] exit [i/Enter] edit field [j/k] navigate [Ctrl+S] submit"
+		} else {
+			statusText = "[ESC] exit [i/Enter] edit field [j/k] navigate [?] help"
+		}
+	}
+	
+	return styles.StatusBarStyle.Width(v.width).Render(statusText)
 }
 
 func (v *CreateRunView) submitRun() tea.Cmd {

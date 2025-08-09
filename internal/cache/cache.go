@@ -1,6 +1,8 @@
 package cache
 
 import (
+	"fmt"
+	"os"
 	"sync"
 	"time"
 
@@ -32,6 +34,14 @@ func GetCachedList() (runs []models.RunResponse, cached bool, cachedAt time.Time
 	globalCache.mu.RLock()
 	defer globalCache.mu.RUnlock()
 	
+	// Debug logging
+	debugInfo := fmt.Sprintf("DEBUG: GetCachedList called - cached=%v, runs=%d, details=%d, age=%.1fs\n", 
+		globalCache.cached, len(globalCache.runs), len(globalCache.details), time.Since(globalCache.cachedAt).Seconds())
+	if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+		f.WriteString(debugInfo)
+		f.Close()
+	}
+	
 	if globalCache.cached && time.Since(globalCache.cachedAt) < 30*time.Second {
 		// Return copies to avoid concurrent modification
 		runsCopy := make([]models.RunResponse, len(globalCache.runs))
@@ -44,7 +54,19 @@ func GetCachedList() (runs []models.RunResponse, cached bool, cachedAt time.Time
 			}
 		}
 		
+		debugInfo = fmt.Sprintf("DEBUG: GetCachedList returning cached data - runs=%d, details=%d\n", len(runsCopy), len(detailsCopy))
+		if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+			f.WriteString(debugInfo)
+			f.Close()
+		}
+		
 		return runsCopy, true, globalCache.cachedAt, detailsCopy, globalCache.selectedIndex
+	}
+	
+	debugInfo = fmt.Sprintf("DEBUG: GetCachedList returning empty data - cache expired or not set\n")
+	if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+		f.WriteString(debugInfo)
+		f.Close()
 	}
 	
 	return nil, false, time.Time{}, make(map[string]*models.RunResponse), 0
