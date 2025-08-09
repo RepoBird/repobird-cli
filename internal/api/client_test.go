@@ -238,7 +238,8 @@ func TestAPIError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for unauthorized request")
 	}
-	if err.Error() != "API error (status 401): Invalid API key" {
-		t.Errorf("unexpected error message: %v", err)
+	expectedMsg := "authentication failed: Invalid API key (http_401)"
+	if err.Error() != expectedMsg {
+		t.Errorf("unexpected error message: got %q, want %q", err.Error(), expectedMsg)
 	}
 }

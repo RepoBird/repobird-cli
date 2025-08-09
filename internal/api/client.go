@@ -15,6 +15,7 @@ import (
 	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/repobird/repobird-cli/internal/retry"
 	"github.com/repobird/repobird-cli/internal/utils"
+	"github.com/repobird/repobird-cli/pkg/version"
 )
 
 const (
@@ -66,6 +67,7 @@ func (c *Client) doRequest(method, path string, body interface{}) (*http.Respons
 	req.Header.Set("Authorization", "Bearer "+c.apiKey)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", fmt.Sprintf("repobird-cli/%s", version.GetVersion()))
 
 	if c.debug {
 		logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
@@ -181,6 +183,9 @@ func (c *Client) CreateRunAPI(request *models.APIRunRequest) (*models.RunRespons
 }
 
 func (c *Client) GetRun(id string) (*models.RunResponse, error) {
+	if id == "" {
+		return nil, fmt.Errorf("run ID cannot be empty")
+	}
 	resp, err := c.doRequest("GET", RunDetailsURL(id), nil)
 	if err != nil {
 		return nil, err
