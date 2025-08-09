@@ -357,32 +357,70 @@ func (v *RunDetailsView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (v *RunDetailsView) View() string {
-	var s strings.Builder
+	if v.height == 0 || v.width == 0 {
+		// Terminal dimensions not yet known
+		return ""
+	}
 
+	// Pre-allocate array for exactly terminal height lines
+	lines := make([]string, v.height)
+	lineIdx := 0
+
+	// Header
 	header := v.renderHeader()
-	s.WriteString(header)
-	s.WriteString("\n")
-	s.WriteString(strings.Repeat("─", v.width))
-	s.WriteString("\n")
+	lines[lineIdx] = header
+	lineIdx++
 
+	// Separator line
+	lines[lineIdx] = strings.Repeat("─", v.width)
+	lineIdx++
+
+	// Content area
 	if v.loading {
-		s.WriteString(v.spinner.View() + " Loading run details...\n")
+		lines[lineIdx] = v.spinner.View() + " Loading run details..."
+		lineIdx++
 	} else if v.error != nil {
-		s.WriteString(styles.ErrorStyle.Render("Error: "+v.error.Error()) + "\n")
+		lines[lineIdx] = styles.ErrorStyle.Render("Error: " + v.error.Error())
+		lineIdx++
 	} else {
-		s.WriteString(v.viewport.View())
-		s.WriteString("\n")
+		// Viewport content
+		viewportContent := v.viewport.View()
+		if viewportContent != "" {
+			// Split viewport content into lines
+			viewportLines := strings.Split(strings.TrimRight(viewportContent, "\n"), "\n")
+			for _, line := range viewportLines {
+				if lineIdx < v.height-1 { // Leave room for status bar
+					lines[lineIdx] = line
+					lineIdx++
+				}
+			}
+		}
 	}
 
-	statusBar := v.renderStatusBar()
-	s.WriteString(statusBar)
-
+	// Help content (if shown) - place just before status bar
 	if v.showHelp {
-		helpView := v.help.View(v.keys)
-		s.WriteString("\n" + helpView)
+		helpContent := v.help.View(v.keys)
+		if helpContent != "" {
+			helpLines := strings.Split(strings.TrimRight(helpContent, "\n"), "\n")
+			// Place help starting from height-1-len(helpLines)
+			helpStart := v.height - 1 - len(helpLines)
+			if helpStart < lineIdx {
+				helpStart = lineIdx
+			}
+			for i, line := range helpLines {
+				if helpStart+i < v.height-1 {
+					lines[helpStart+i] = line
+				}
+			}
+		}
 	}
 
-	return s.String()
+	// Status bar always goes in the last line
+	lines[v.height-1] = v.renderStatusBar()
+
+	// Join all lines with newlines
+	// This creates exactly height-1 newlines, which is correct
+	return strings.Join(lines, "\n")
 }
 
 func (v *RunDetailsView) renderHeader() string {
