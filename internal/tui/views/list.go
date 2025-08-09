@@ -109,6 +109,10 @@ func NewRunListViewWithCache(client *api.Client, runs []models.RunResponse, cach
 	// If we have cached data, update the table
 	if !shouldLoad && runs != nil && len(runs) > 0 {
 		v.updateTable()
+		// Restore cursor position
+		if selectedIndex >= 0 && selectedIndex < len(v.filteredRuns) {
+			v.table.SetSelectedIndex(selectedIndex)
+		}
 	}
 
 	return v
@@ -191,6 +195,9 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if idx := v.table.GetSelectedIndex(); idx >= 0 && idx < len(v.filteredRuns) {
 				run := v.filteredRuns[idx]
 				runID := run.GetIDString()
+				
+				// Save cursor position to cache before navigating
+				cache.SetSelectedIndex(idx)
 
 				// Debug logging for Enter key press
 				debugInfo := fmt.Sprintf("DEBUG: Enter pressed for run idx=%d, runID='%s', repo='%s'\n",
@@ -239,7 +246,7 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						f.Close()
 					}
 
-					return NewRunDetailsViewWithCache(v.client, cachedRun, v.runs, v.cached, v.cachedAt, v.detailsCache), nil
+					return NewRunDetailsView(v.client, cachedRun), nil
 				}
 
 				debugInfo = fmt.Sprintf("DEBUG: No cached data for runID='%s', loading fresh - NAVIGATING TO DETAILS VIEW\n", runID)
@@ -247,7 +254,7 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					f.WriteString(debugInfo)
 					f.Close()
 				}
-				return NewRunDetailsViewWithCache(v.client, run, v.runs, v.cached, v.cachedAt, v.detailsCache), nil
+				return NewRunDetailsView(v.client, run), nil
 			}
 		case key.Matches(msg, v.keys.New):
 			// DEBUG: Log cache info when creating new run view
@@ -298,11 +305,14 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Go forward/select (same as Enter)
 			if idx := v.table.GetSelectedIndex(); idx >= 0 && idx < len(v.filteredRuns) {
 				run := v.filteredRuns[idx]
+				
+				// Save cursor position to cache before navigating
+				cache.SetSelectedIndex(idx)
 
 				if detailed, ok := v.detailsCache[run.GetIDString()]; ok {
-					return NewRunDetailsViewWithCache(v.client, *detailed, v.runs, v.cached, v.cachedAt, v.detailsCache), nil
+					return NewRunDetailsView(v.client, *detailed), nil
 				}
-				return NewRunDetailsViewWithCache(v.client, run, v.runs, v.cached, v.cachedAt, v.detailsCache), nil
+				return NewRunDetailsView(v.client, run), nil
 			}
 			return v, tea.Batch(cmds...)
 		case "g":

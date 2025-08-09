@@ -48,7 +48,7 @@ type RunDetailsView struct {
 
 func NewRunDetailsView(client *api.Client, run models.RunResponse) *RunDetailsView {
 	// Get the current global cache
-	runs, cached, cachedAt, detailsCache := cache.GetCachedList()
+	runs, cached, cachedAt, detailsCache, _ := cache.GetCachedList()
 	return NewRunDetailsViewWithCache(client, run, runs, cached, cachedAt, detailsCache)
 }
 

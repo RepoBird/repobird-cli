@@ -154,6 +154,12 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return v, tea.Quit
 		case key.Matches(msg, v.keys.Back):
 			if !v.submitting {
+				// DEBUG: Log when returning from create view
+				debugInfo := "DEBUG: CreateView ESC pressed - returning to list view\n"
+				if f, err := os.OpenFile("/tmp/repobird_debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+					f.WriteString(debugInfo)
+					f.Close()
+				}
 				// Return a fresh list view that will automatically load from global cache
 				return NewRunListView(v.client), nil
 			}
