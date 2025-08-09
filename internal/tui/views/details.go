@@ -13,14 +13,14 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/repobird/repobird-cli/internal/api"
 	"github.com/repobird/repobird-cli/internal/models"
-	"github.com/repobird/repobird-cli/internal/tui"
+	"github.com/repobird/repobird-cli/internal/tui/components"
 	"github.com/repobird/repobird-cli/internal/tui/styles"
 )
 
 type RunDetailsView struct {
 	client      *api.Client
 	run         models.Run
-	keys        tui.KeyMap
+	keys        components.KeyMap
 	help        help.Model
 	viewport    viewport.Model
 	width       int
@@ -46,7 +46,7 @@ func NewRunDetailsView(client *api.Client, run models.Run) *RunDetailsView {
 	return &RunDetailsView{
 		client:   client,
 		run:      run,
-		keys:     tui.DefaultKeyMap,
+		keys:     components.DefaultKeyMap,
 		help:     help.New(),
 		viewport: vp,
 		spinner:  s,

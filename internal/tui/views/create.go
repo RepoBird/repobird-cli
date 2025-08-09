@@ -15,14 +15,14 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/repobird/repobird-cli/internal/api"
 	"github.com/repobird/repobird-cli/internal/models"
-	"github.com/repobird/repobird-cli/internal/tui"
+	"github.com/repobird/repobird-cli/internal/tui/components"
 	"github.com/repobird/repobird-cli/internal/tui/styles"
 	"github.com/repobird/repobird-cli/pkg/utils"
 )
 
 type CreateRunView struct {
 	client        *api.Client
-	keys          tui.KeyMap
+	keys          components.KeyMap
 	help          help.Model
 	width         int
 	height        int
@@ -87,7 +87,7 @@ func NewCreateRunView(client *api.Client) *CreateRunView {
 
 	return &CreateRunView{
 		client: client,
-		keys:   tui.DefaultKeyMap,
+		keys:   components.DefaultKeyMap,
 		help:   help.New(),
 		fields: []textinput.Model{
 			titleInput,

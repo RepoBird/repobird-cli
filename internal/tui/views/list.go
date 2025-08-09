@@ -12,16 +12,15 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/repobird/repobird-cli/internal/api"
 	"github.com/repobird/repobird-cli/internal/models"
-	"github.com/repobird/repobird-cli/internal/tui"
 	"github.com/repobird/repobird-cli/internal/tui/components"
 	"github.com/repobird/repobird-cli/internal/tui/styles"
 )
 
 type RunListView struct {
 	client       *api.Client
-	runs         []models.Run
+	runs         []models.RunResponse
 	table        *components.Table
-	keys         tui.KeyMap
+	keys         components.KeyMap
 	help         help.Model
 	width        int
 	height       int
@@ -33,7 +32,7 @@ type RunListView struct {
 	showHelp     bool
 	searchMode   bool
 	searchQuery  string
-	filteredRuns []models.Run
+	filteredRuns []models.RunResponse
 }
 
 func NewRunListView(client *api.Client) *RunListView {
@@ -52,7 +51,7 @@ func NewRunListView(client *api.Client) *RunListView {
 	return &RunListView{
 		client:  client,
 		table:   components.NewTable(columns),
-		keys:    tui.DefaultKeyMap,
+		keys:    components.DefaultKeyMap,
 		help:    help.New(),
 		spinner: s,
 		loading: true,
@@ -190,14 +189,14 @@ func (v *RunListView) filterRuns() {
 	if v.searchQuery == "" {
 		v.filteredRuns = v.runs
 	} else {
-		v.filteredRuns = []models.Run{}
+		v.filteredRuns = []models.RunResponse{}
 		query := strings.ToLower(v.searchQuery)
 		for _, run := range v.runs {
 			if strings.Contains(strings.ToLower(run.ID), query) ||
 				strings.Contains(strings.ToLower(run.Repository), query) ||
-				strings.Contains(strings.ToLower(run.Status), query) ||
-				strings.Contains(strings.ToLower(run.SourceBranch), query) ||
-				strings.Contains(strings.ToLower(run.TargetBranch), query) {
+				strings.Contains(strings.ToLower(string(run.Status)), query) ||
+				strings.Contains(strings.ToLower(run.Source), query) ||
+				strings.Contains(strings.ToLower(run.Target), query) {
 				v.filteredRuns = append(v.filteredRuns, run)
 			}
 		}
@@ -320,7 +319,7 @@ func formatTimeAgo(t time.Time) string {
 }
 
 type runsLoadedMsg struct {
-	runs []models.Run
+	runs []models.RunResponse
 	err  error
 }
 
