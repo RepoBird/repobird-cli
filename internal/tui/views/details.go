@@ -52,28 +52,51 @@ func NewRunDetailsViewWithCache(client *api.Client, run models.RunResponse, pare
 
 	vp := viewport.New(80, 20)
 
-	return &RunDetailsView{
+	// Check if we have preloaded data for this run
+	needsLoading := true
+	if parentDetailsCache != nil {
+		if cachedRun, exists := parentDetailsCache[run.GetIDString()]; exists && cachedRun != nil {
+			run = *cachedRun
+			needsLoading = false
+		}
+	}
+
+	v := &RunDetailsView{
 		client:             client,
 		run:                run,
 		keys:               components.DefaultKeyMap,
 		help:               help.New(),
 		viewport:           vp,
 		spinner:            s,
-		loading:            true,
+		loading:            needsLoading,
 		showLogs:           false,
 		parentRuns:         parentRuns,
 		parentCached:       parentCached,
 		parentCachedAt:     parentCachedAt,
 		parentDetailsCache: parentDetailsCache,
 	}
+
+	// Update content immediately if we have cached data
+	if !needsLoading {
+		v.updateContent()
+	}
+
+	return v
 }
 
 func (v *RunDetailsView) Init() tea.Cmd {
-	return tea.Batch(
-		v.loadRunDetails(),
-		v.spinner.Tick,
-		v.startPolling(),
-	)
+	var cmds []tea.Cmd
+	
+	// Only load details if not already loaded from cache
+	if v.loading {
+		cmds = append(cmds, v.loadRunDetails())
+		cmds = append(cmds, v.spinner.Tick)
+	}
+	
+	// Always start polling for active runs
+	cmds = append(cmds, v.startPolling())
+	
+	return tea.Batch(cmds...)
 }
 
 func (v *RunDetailsView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -98,7 +121,10 @@ func (v *RunDetailsView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, v.keys.Help):
 			v.showHelp = !v.showHelp
 		case key.Matches(msg, v.keys.Refresh):
+			v.loading = true
+			v.error = nil
 			cmds = append(cmds, v.loadRunDetails())
+			cmds = append(cmds, v.spinner.Tick)
 		case msg.String() == "l":
 			v.showLogs = !v.showLogs
 			v.updateContent()
@@ -271,17 +297,27 @@ func (v *RunDetailsView) updateStatusHistory(status string) {
 }
 
 func (v *RunDetailsView) loadRunDetails() tea.Cmd {
+	// Capture the current run ID to ensure it doesn't get lost
+	originalRunID := v.run.GetIDString()
+	originalRun := v.run
+	
 	return func() tea.Msg {
-		runID := v.run.GetIDString()
-		if runID == "" {
-			return runDetailsLoadedMsg{run: v.run, err: fmt.Errorf("invalid run ID")}
+		if originalRunID == "" {
+			return runDetailsLoadedMsg{run: originalRun, err: fmt.Errorf("invalid run ID")}
 		}
 		
-		runPtr, err := v.client.GetRun(runID)
+		runPtr, err := v.client.GetRun(originalRunID)
 		if err != nil {
-			return runDetailsLoadedMsg{run: v.run, err: err}
+			return runDetailsLoadedMsg{run: originalRun, err: err}
 		}
-		return runDetailsLoadedMsg{run: *runPtr, err: nil}
+		
+		// Ensure the returned run has the correct ID
+		updatedRun := *runPtr
+		if updatedRun.GetIDString() == "" && originalRun.ID != nil {
+			updatedRun.ID = originalRun.ID
+		}
+		
+		return runDetailsLoadedMsg{run: updatedRun, err: nil}
 	}
 }
 
