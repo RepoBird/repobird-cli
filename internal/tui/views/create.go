@@ -36,9 +36,18 @@ type CreateRunView struct {
 	showHelp      bool
 	useFileInput  bool
 	filePathInput textinput.Model
+	// Cache from parent list view
+	parentRuns         []models.RunResponse
+	parentCached       bool
+	parentCachedAt     time.Time
+	parentDetailsCache map[string]*models.RunResponse
 }
 
 func NewCreateRunView(client *api.Client) *CreateRunView {
+	return NewCreateRunViewWithCache(client, nil, false, time.Time{}, nil)
+}
+
+func NewCreateRunViewWithCache(client *api.Client, parentRuns []models.RunResponse, parentCached bool, parentCachedAt time.Time, parentDetailsCache map[string]*models.RunResponse) *CreateRunView {
 	titleInput := textinput.New()
 	titleInput.Placeholder = "Brief title for the run"
 	titleInput.Focus()
@@ -95,10 +104,14 @@ func NewCreateRunView(client *api.Client) *CreateRunView {
 			targetInput,
 			issueInput,
 		},
-		promptArea:    promptArea,
-		contextArea:   contextArea,
-		filePathInput: filePathInput,
-		focusIndex:    0,
+		promptArea:         promptArea,
+		contextArea:        contextArea,
+		filePathInput:      filePathInput,
+		focusIndex:         0,
+		parentRuns:         parentRuns,
+		parentCached:       parentCached,
+		parentCachedAt:     parentCachedAt,
+		parentDetailsCache: parentDetailsCache,
 	}
 }
 
@@ -134,7 +147,7 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return v, tea.Quit
 		case key.Matches(msg, v.keys.Back):
 			if !v.submitting {
-				return NewRunListView(v.client), nil
+				return NewRunListViewWithCache(v.client, v.parentRuns, v.parentCached, v.parentCachedAt, v.parentDetailsCache), nil
 			}
 		case key.Matches(msg, v.keys.Help):
 			v.showHelp = !v.showHelp
@@ -171,7 +184,7 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			v.success = true
 			v.createdRun = &msg.run
-			return NewRunDetailsView(v.client, msg.run), nil
+			return NewRunDetailsViewWithCache(v.client, msg.run, v.parentRuns, v.parentCached, v.parentCachedAt, v.parentDetailsCache), nil
 		}
 	}
 

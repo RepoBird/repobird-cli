@@ -233,7 +233,7 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return NewRunDetailsViewWithCache(v.client, run, v.runs, v.cached, v.cachedAt, v.detailsCache), nil
 			}
 		case key.Matches(msg, v.keys.New):
-			return NewCreateRunView(v.client), nil
+			return NewCreateRunViewWithCache(v.client, v.runs, v.cached, v.cachedAt, v.detailsCache), nil
 		case key.Matches(msg, v.keys.Up):
 			v.table.MoveUp()
 			// Prioritize preloading the newly selected run
