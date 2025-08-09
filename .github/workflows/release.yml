@@ -1,0 +1,277 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+
+jobs:
+  goreleaser:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3.4.0
+
+      - name: Install Syft
+        uses: anchore/sbom-action/download-syft@v0.15.9
+
+      - name: Generate completions and docs
+        run: |
+          make build
+          mkdir -p completions man docs/cli
+          ./scripts/generate-completions.sh
+          ./scripts/generate-docs.sh
+
+      - name: Import GPG key
+        id: import_gpg
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v5
+        with:
+          distribution: goreleaser
+          version: latest
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
+          # Package manager tokens
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+          SCOOP_GITHUB_TOKEN: ${{ secrets.SCOOP_GITHUB_TOKEN }}
+          CHOCOLATEY_API_KEY: ${{ secrets.CHOCOLATEY_API_KEY }}
+          AUR_KEY: ${{ secrets.AUR_KEY }}
+          # Container registry
+          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+
+  update-homebrew-core:
+    needs: goreleaser
+    runs-on: ubuntu-latest
+    if: "!contains(github.ref, '-')" # Only for stable releases
+    steps:
+      - name: Update Homebrew Core
+        uses: dawidd6/action-homebrew-bump-formula@v3
+        with:
+          token: ${{ secrets.HOMEBREW_GITHUB_TOKEN }}
+          formula: repobird
+          tag: ${{ github.ref_name }}
+          revision: ${{ github.sha }}
+
+  build-packages:
+    needs: goreleaser
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download release assets
+        uses: actions/download-artifact@v4
+        with:
+          path: ./dist
+
+      - name: Build DEB package
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential devscripts debhelper
+          
+          VERSION=${GITHUB_REF#refs/tags/v}
+          ARCH=${{ matrix.arch }}
+          
+          # Create package structure
+          mkdir -p debian-package/DEBIAN
+          mkdir -p debian-package/usr/bin
+          mkdir -p debian-package/usr/share/man/man1
+          mkdir -p debian-package/usr/share/bash-completion/completions
+          mkdir -p debian-package/usr/share/zsh/site-functions
+          mkdir -p debian-package/usr/share/fish/completions
+          
+          # Extract binary
+          tar -xzf dist/repobird_linux_${ARCH}.tar.gz -C debian-package/usr/bin/
+          
+          # Copy documentation and completions
+          cp man/repobird.1 debian-package/usr/share/man/man1/
+          cp completions/repobird.bash debian-package/usr/share/bash-completion/completions/repobird
+          cp completions/_repobird debian-package/usr/share/zsh/site-functions/
+          cp completions/repobird.fish debian-package/usr/share/fish/completions/
+          
+          # Create control file
+          cat > debian-package/DEBIAN/control << EOF
+          Package: repobird
+          Version: $VERSION
+          Section: utils
+          Priority: optional
+          Architecture: ${{ matrix.arch }}
+          Maintainer: RepoBird Team <team@repobird.ai>
+          Homepage: https://github.com/repobird/repobird-cli
+          Description: Fast CLI for RepoBird AI agent platform
+           RepoBird CLI enables users to submit AI-powered code
+           generation tasks and track their progress.
+          EOF
+          
+          # Build DEB package
+          dpkg-deb --build debian-package repobird_${VERSION}_${ARCH}.deb
+          
+      - name: Build RPM package
+        run: |
+          sudo apt-get install -y rpm
+          
+          VERSION=${GITHUB_REF#refs/tags/v}
+          ARCH=${{ matrix.arch }}
+          
+          # Create RPM build structure
+          mkdir -p rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+          
+          # Create spec file
+          cat > rpmbuild/SPECS/repobird.spec << EOF
+          Name:           repobird
+          Version:        $VERSION
+          Release:        1%{?dist}
+          Summary:        Fast CLI for RepoBird AI agent platform
+          License:        MIT
+          URL:            https://github.com/repobird/repobird-cli
+          BuildArch:      ${{ matrix.arch }}
+          
+          %description
+          RepoBird CLI enables users to submit AI-powered code generation tasks
+          and track their progress.
+          
+          %install
+          mkdir -p %{buildroot}%{_bindir}
+          mkdir -p %{buildroot}%{_mandir}/man1
+          mkdir -p %{buildroot}%{_datarootdir}/bash-completion/completions
+          mkdir -p %{buildroot}%{_datarootdir}/zsh/site-functions
+          mkdir -p %{buildroot}%{_datarootdir}/fish/completions
+          
+          cp %{_builddir}/../SOURCES/repobird %{buildroot}%{_bindir}/
+          cp %{_builddir}/../SOURCES/repobird.1 %{buildroot}%{_mandir}/man1/
+          cp %{_builddir}/../SOURCES/repobird.bash %{buildroot}%{_datarootdir}/bash-completion/completions/repobird
+          cp %{_builddir}/../SOURCES/_repobird %{buildroot}%{_datarootdir}/zsh/site-functions/
+          cp %{_builddir}/../SOURCES/repobird.fish %{buildroot}%{_datarootdir}/fish/completions/
+          
+          %files
+          %{_bindir}/repobird
+          %{_mandir}/man1/repobird.1*
+          %{_datarootdir}/bash-completion/completions/repobird
+          %{_datarootdir}/zsh/site-functions/_repobird
+          %{_datarootdir}/fish/completions/repobird.fish
+          EOF
+          
+          # Extract and copy files
+          tar -xzf dist/repobird_linux_${ARCH}.tar.gz
+          cp repobird rpmbuild/SOURCES/
+          cp man/repobird.1 rpmbuild/SOURCES/
+          cp completions/repobird.bash rpmbuild/SOURCES/
+          cp completions/_repobird rpmbuild/SOURCES/
+          cp completions/repobird.fish rpmbuild/SOURCES/
+          
+          # Build RPM
+          rpmbuild --define "_topdir $(pwd)/rpmbuild" -bb rpmbuild/SPECS/repobird.spec
+          
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-${{ matrix.arch }}
+          path: |
+            *.deb
+            rpmbuild/RPMS/*/*.rpm
+
+  deploy-packages:
+    needs: build-packages
+    runs-on: ubuntu-latest
+    if: github.repository == 'repobird/repobird-cli'
+    steps:
+      - name: Download all packages
+        uses: actions/download-artifact@v4
+        with:
+          path: ./packages
+
+      - name: Deploy to APT repository
+        env:
+          APT_REPO_HOST: ${{ secrets.APT_REPO_HOST }}
+          APT_REPO_USER: ${{ secrets.APT_REPO_USER }}
+          APT_REPO_KEY: ${{ secrets.APT_REPO_SSH_KEY }}
+        run: |
+          # Setup SSH key
+          mkdir -p ~/.ssh
+          echo "$APT_REPO_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H "$APT_REPO_HOST" >> ~/.ssh/known_hosts
+          
+          # Upload DEB packages
+          for deb_file in packages/packages-*/*.deb; do
+            if [ -f "$deb_file" ]; then
+              scp "$deb_file" "$APT_REPO_USER@$APT_REPO_HOST:/tmp/"
+              ssh "$APT_REPO_USER@$APT_REPO_HOST" "reprepro -b /var/www/apt includedeb stable /tmp/$(basename $deb_file)"
+            fi
+          done
+
+      - name: Deploy to YUM repository
+        env:
+          YUM_REPO_HOST: ${{ secrets.YUM_REPO_HOST }}
+          YUM_REPO_USER: ${{ secrets.YUM_REPO_USER }}
+          YUM_REPO_KEY: ${{ secrets.YUM_REPO_SSH_KEY }}
+        run: |
+          # Setup SSH key
+          mkdir -p ~/.ssh
+          echo "$YUM_REPO_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H "$YUM_REPO_HOST" >> ~/.ssh/known_hosts
+          
+          # Upload RPM packages
+          for rpm_file in packages/packages-*/rpmbuild/RPMS/*/*.rpm; do
+            if [ -f "$rpm_file" ]; then
+              scp "$rpm_file" "$YUM_REPO_USER@$YUM_REPO_HOST:/var/www/yum/"
+              ssh "$YUM_REPO_USER@$YUM_REPO_HOST" "createrepo /var/www/yum/"
+            fi
+          done
+
+  notify:
+    needs: [goreleaser, update-homebrew-core, deploy-packages]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Notify success
+        if: needs.goreleaser.result == 'success'
+        run: |
+          echo "🎉 Release ${{ github.ref_name }} published successfully!"
+          echo "📦 Packages available on:"
+          echo "  - GitHub Releases"
+          echo "  - Homebrew"
+          echo "  - Chocolatey"
+          echo "  - Scoop"
+          echo "  - Snap Store"
+          echo "  - AUR"
+          echo "  - APT Repository"
+          echo "  - YUM Repository"
+
+      - name: Notify failure
+        if: needs.goreleaser.result == 'failure'
+        run: |
+          echo "❌ Release ${{ github.ref_name }} failed!"
+          echo "Please check the logs and fix any issues."
+          exit 1

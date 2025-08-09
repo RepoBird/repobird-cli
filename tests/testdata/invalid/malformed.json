@@ -1,0 +1,6 @@
+{
+  "prompt": "This is malformed JSON",
+  "repository": "example/repo"
+  // missing comma and has trailing comma
+  "source": "main",
+}

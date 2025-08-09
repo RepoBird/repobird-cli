@@ -1,0 +1,10 @@
+{
+  "prompt": "Fix the authentication bug in the login flow",
+  "repository": "example/repo",
+  "source": "main",
+  "target": "fix/auth-bug",
+  "runType": "run",
+  "title": "Fix authentication bug",
+  "context": "Users are unable to login with valid credentials",
+  "files": ["src/auth.js", "src/login.js"]
+}

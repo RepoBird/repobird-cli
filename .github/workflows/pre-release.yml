@@ -1,0 +1,177 @@
+name: Pre-Release
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Run tests
+        run: make test
+
+      - name: Run linter
+        run: make lint
+
+      - name: Build for current platform
+        run: make build
+
+      - name: Generate completions and docs
+        run: |
+          mkdir -p completions man docs/cli
+          ./scripts/generate-completions.sh
+          ./scripts/generate-docs.sh
+
+      - name: Test GoReleaser config
+        uses: goreleaser/goreleaser-action@v5
+        with:
+          distribution: goreleaser
+          version: latest
+          args: check
+
+  test-cross-compile:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [linux, windows, darwin]
+        goarch: [amd64, arm64]
+        exclude:
+          - goos: windows
+            goarch: arm64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Build for ${{ matrix.goos }}/${{ matrix.goarch }}
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          CGO_ENABLED=0 go build -ldflags "-s -w" -o repobird-${{ matrix.goos }}-${{ matrix.goarch }} ./cmd/repobird
+
+  test-package-formats:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Install packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential devscripts debhelper rpm
+
+      - name: Test DEB package creation
+        run: |
+          make build
+          ./scripts/generate-completions.sh
+          ./scripts/generate-docs.sh
+          
+          # Create test DEB package structure
+          mkdir -p test-deb/DEBIAN
+          mkdir -p test-deb/usr/bin
+          
+          cp build/repobird test-deb/usr/bin/
+          
+          cat > test-deb/DEBIAN/control << EOF
+          Package: repobird
+          Version: 0.0.0-test
+          Section: utils
+          Priority: optional
+          Architecture: amd64
+          Maintainer: Test <test@example.com>
+          Description: Test package
+          EOF
+          
+          dpkg-deb --build test-deb test-repobird.deb
+          dpkg-deb --info test-repobird.deb
+
+      - name: Test RPM package creation
+        run: |
+          # Create test RPM spec
+          mkdir -p rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+          cp build/repobird rpmbuild/SOURCES/
+          
+          cat > rpmbuild/SPECS/test-repobird.spec << EOF
+          Name:           repobird
+          Version:        0.0.0
+          Release:        1%{?dist}
+          Summary:        Test package
+          License:        MIT
+          BuildArch:      x86_64
+          
+          %description
+          Test package
+          
+          %install
+          mkdir -p %{buildroot}%{_bindir}
+          cp %{_builddir}/../SOURCES/repobird %{buildroot}%{_bindir}/
+          
+          %files
+          %{_bindir}/repobird
+          EOF
+          
+          rpmbuild --define "_topdir $(pwd)/rpmbuild" -bb rpmbuild/SPECS/test-repobird.spec
+
+  test-installation-methods:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Test local installation
+        run: |
+          make build
+          make install
+          ~/.local/bin/repobird version
+          ~/.local/bin/rb version
+
+      - name: Test global installation (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo make install-global
+          repobird version
+          rb version
+          sudo make uninstall-global
+
+      - name: Test global installation (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          sudo make install-global
+          repobird version
+          rb version
+          sudo make uninstall-global

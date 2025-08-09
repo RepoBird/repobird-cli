@@ -38,6 +38,8 @@ type RunListView struct {
 	// Preloaded run details cache
 	detailsCache map[string]*models.RunResponse
 	preloading   map[string]bool
+	// User info for remaining runs counter
+	userInfo *models.UserInfo
 }
 
 func NewRunListView(client *api.Client) *RunListView {
@@ -104,7 +106,17 @@ func (v *RunListView) Init() tea.Cmd {
 		cmds = append(cmds, v.startPolling())
 	}
 
+	// Always load user info
+	cmds = append(cmds, v.loadUserInfo())
+
 	return tea.Batch(cmds...)
+}
+
+func (v *RunListView) loadUserInfo() tea.Cmd {
+	return func() tea.Msg {
+		userInfo, err := v.client.VerifyAuth()
+		return userInfoLoadedMsg{userInfo: userInfo, err: err}
+	}
 }
 
 func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -179,6 +191,42 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			v.table.GoToBottom()
 		}
 
+		// Additional vim keybindings
+		switch msg.String() {
+		case "j":
+			v.table.MoveDown()
+			cmds = append(cmds, v.preloadSelectedRun())
+		case "k":
+			v.table.MoveUp()
+			cmds = append(cmds, v.preloadSelectedRun())
+		case "h":
+			// Go back (same as ESC)
+			if v.searchMode {
+				v.searchMode = false
+				v.searchQuery = ""
+				v.filterRuns()
+			}
+		case "l":
+			// Go forward/select (same as Enter)
+			if idx := v.table.GetSelectedIndex(); idx >= 0 && idx < len(v.filteredRuns) {
+				run := v.filteredRuns[idx]
+				if detailed, ok := v.detailsCache[run.GetIDString()]; ok {
+					return NewRunDetailsViewWithCache(v.client, *detailed, v.runs, v.cached, v.cachedAt, v.detailsCache), nil
+				}
+				return NewRunDetailsViewWithCache(v.client, run, v.runs, v.cached, v.cachedAt, v.detailsCache), nil
+			}
+		case "g":
+			// Check for 'gg' combination - go to top
+			v.table.GoToTop()
+		case "G":
+			// Go to bottom
+			v.table.GoToBottom()
+		case "/":
+			// Start search
+			v.searchMode = true
+			v.searchQuery = ""
+		}
+
 	case runsLoadedMsg:
 		v.loading = false
 		v.runs = msg.runs
@@ -196,6 +244,11 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		v.preloading[msg.runID] = false
 		if msg.err == nil && msg.run != nil {
 			v.detailsCache[msg.runID] = msg.run
+		}
+
+	case userInfoLoadedMsg:
+		if msg.err == nil && msg.userInfo != nil {
+			v.userInfo = msg.userInfo
 		}
 
 	case pollTickMsg:
@@ -308,8 +361,18 @@ func (v *RunListView) renderStatusBar() string {
 	}
 
 	right := ""
+
+	// Add remaining runs counter if user info is available
+	if v.userInfo != nil {
+		tier := v.userInfo.Tier
+		if tier == "" {
+			tier = "free"
+		}
+		right = fmt.Sprintf("%s: %d/%d runs ", tier, v.userInfo.RemainingRuns, v.userInfo.TotalRuns)
+	}
+
 	if activeCount > 0 {
-		right = fmt.Sprintf("⟳ %d active ", activeCount)
+		right += fmt.Sprintf("⟳ %d active ", activeCount)
 	}
 
 	right += "[n]ew [r]efresh [/]search [?]help [q]uit "
@@ -404,10 +467,15 @@ type runsLoadedMsg struct {
 
 type pollTickMsg struct{}
 
-type runDetailsLoadedMsg struct {
+type runDetailsPreloadedMsg struct {
 	runID string
 	run   *models.RunResponse
 	err   error
+}
+
+type userInfoLoadedMsg struct {
+	userInfo *models.UserInfo
+	err      error
 }
 
 func (v *RunListView) preloadRunDetails() tea.Cmd {

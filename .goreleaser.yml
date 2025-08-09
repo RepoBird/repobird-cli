@@ -1,0 +1,233 @@
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+    - go mod download
+
+builds:
+  - env:
+      - CGO_ENABLED=0
+    main: ./cmd/repobird
+    binary: repobird
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+      - "386"
+    ignore:
+      - goos: darwin
+        goarch: "386"
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s -w
+      - -X github.com/repobird/repobird-cli/pkg/version.Version={{.Version}}
+      - -X github.com/repobird/repobird-cli/pkg/version.GitCommit={{.ShortCommit}}
+      - -X github.com/repobird/repobird-cli/pkg/version.BuildDate={{.Date}}
+
+archives:
+  - format: tar.gz
+    # Use zip for Windows archives
+    format_overrides:
+      - goos: windows
+        format: zip
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE*
+      - README*
+      - CHANGELOG*
+      - docs/*
+      - completions/*
+      - man/*
+
+checksum:
+  name_template: "checksums.txt"
+
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+
+release:
+  draft: false
+  prerelease: auto
+  name_template: "{{.ProjectName}} v{{.Version}}"
+  header: |
+    ## RepoBird CLI v{{.Version}}
+    
+    ### Installation
+    
+    #### Homebrew (macOS/Linux)
+    ```bash
+    brew install repobird/tap/repobird
+    ```
+    
+    #### Manual Installation
+    Download the appropriate binary for your platform from the assets below.
+    
+  footer: |
+    ## Checksums
+    
+    All binaries are checksummed for security. Verify downloads using:
+    ```bash
+    sha256sum -c checksums.txt
+    ```
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+
+# Package managers
+brews:
+  - name: repobird
+    repository:
+      owner: repobird
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    homepage: "https://github.com/repobird/repobird-cli"
+    description: "Fast CLI for RepoBird AI agent platform"
+    license: "MIT"
+    install: |
+      bin.install "repobird"
+      
+      # Install shell completions
+      bash_completion.install "completions/repobird.bash" => "repobird"
+      zsh_completion.install "completions/_repobird"
+      fish_completion.install "completions/repobird.fish"
+      
+      # Install man pages
+      man1.install "man/repobird.1"
+    test: |
+      system "#{bin}/repobird version"
+
+nfpms:
+  - file_name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Arch }}"
+    homepage: "https://github.com/repobird/repobird-cli"
+    description: "Fast CLI for RepoBird AI agent platform"
+    maintainer: "RepoBird Team <team@repobird.ai>"
+    license: "MIT"
+    vendor: "RepoBird"
+    section: "utils"
+    priority: "optional"
+    formats:
+      - deb
+      - rpm
+    contents:
+      - src: "completions/repobird.bash"
+        dst: "/usr/share/bash-completion/completions/repobird"
+      - src: "completions/_repobird"
+        dst: "/usr/share/zsh/site-functions/_repobird"
+      - src: "completions/repobird.fish"
+        dst: "/usr/share/fish/completions/repobird.fish"
+      - src: "man/repobird.1"
+        dst: "/usr/share/man/man1/repobird.1"
+      - src: "LICENSE"
+        dst: "/usr/share/doc/repobird/LICENSE"
+
+snapcrafts:
+  - name: repobird
+    summary: "Fast CLI for RepoBird AI agent platform"
+    description: |
+      RepoBird CLI enables users to submit AI-powered code generation tasks,
+      track their progress, and manage runs through a simple CLI interface.
+    grade: stable
+    confinement: strict
+    publish: true
+    license: MIT
+    base: core22
+    apps:
+      repobird:
+        command: repobird
+        plugs: ["home", "network", "removable-media"]
+
+scoop:
+  name: repobird
+  repository:
+    owner: repobird
+    name: scoop-bucket
+    token: "{{ .Env.SCOOP_GITHUB_TOKEN }}"
+  homepage: "https://github.com/repobird/repobird-cli"
+  description: "Fast CLI for RepoBird AI agent platform"
+  license: MIT
+
+chocolateys:
+  - name: repobird
+    title: RepoBird CLI
+    authors: RepoBird Team
+    project_url: "https://github.com/repobird/repobird-cli"
+    copyright: "2024 RepoBird Team"
+    license_url: "https://github.com/repobird/repobird-cli/blob/main/LICENSE"
+    require_license_acceptance: false
+    project_source_url: "https://github.com/repobird/repobird-cli"
+    docs_url: "https://github.com/repobird/repobird-cli/blob/main/README.md"
+    bug_tracker_url: "https://github.com/repobird/repobird-cli/issues"
+    tags: "cli ai code-generation"
+    summary: "Fast CLI for RepoBird AI agent platform"
+    description: |
+      RepoBird CLI enables users to submit AI-powered code generation tasks,
+      track their progress, and manage runs through a simple CLI interface.
+    release_notes: "https://github.com/repobird/repobird-cli/releases/tag/v{{ .Version }}"
+    api_key: "{{ .Env.CHOCOLATEY_API_KEY }}"
+    source_repo: "https://push.chocolatey.org/"
+    skip_publish: false
+
+aurs:
+  - name: repobird-bin
+    homepage: "https://github.com/repobird/repobird-cli"
+    description: "Fast CLI for RepoBird AI agent platform"
+    maintainers:
+      - "RepoBird Team <team@repobird.ai>"
+    license: MIT
+    private_key: "{{ .Env.AUR_KEY }}"
+    git_url: "ssh://aur@aur.archlinux.org/repobird-bin.git"
+    depends:
+      - glibc
+    package: |-
+      # bin
+      install -Dm755 "./repobird" "${pkgdir}/usr/bin/repobird"
+      
+      # license
+      install -Dm644 "./LICENSE" "${pkgdir}/usr/share/licenses/repobird/LICENSE"
+      
+      # completions
+      mkdir -p "${pkgdir}/usr/share/bash-completion/completions"
+      mkdir -p "${pkgdir}/usr/share/zsh/site-functions"
+      mkdir -p "${pkgdir}/usr/share/fish/completions"
+      install -Dm644 "./completions/repobird.bash" "${pkgdir}/usr/share/bash-completion/completions/repobird"
+      install -Dm644 "./completions/_repobird" "${pkgdir}/usr/share/zsh/site-functions/_repobird"
+      install -Dm644 "./completions/repobird.fish" "${pkgdir}/usr/share/fish/completions/repobird.fish"
+      
+      # man page
+      install -Dm644 "./man/repobird.1" "${pkgdir}/usr/share/man/man1/repobird.1"
+
+signs:
+  - artifacts: checksum
+    cmd: gpg
+    args:
+      - "--batch"
+      - "--local-user"
+      - "{{ .Env.GPG_FINGERPRINT }}"
+      - "--output"
+      - "${signature}"
+      - "--detach-sign"
+      - "${artifact}"
+
+docker_signs:
+  - cmd: cosign
+    artifacts: images
+    output: true
+    args:
+      - "sign"
+      - "${artifact}@${digest}"
+      - "--yes"
+
+sboms:
+  - artifacts: archive
+  - id: source
+    artifacts: source

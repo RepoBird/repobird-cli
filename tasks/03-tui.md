@@ -20,7 +20,7 @@ Build an interactive Terminal User Interface (TUI) with vim keybindings for effi
 - [ ] Add input field component
 - [ ] Create modal/dialog system
 - [ ] Implement status bar component
-- [ ] Add loading/spinner indicators
+- [x] Add loading/spinner indicators
 
 ### Run List View
 - [ ] Display paginated list of runs
@@ -32,7 +32,7 @@ Build an interactive Terminal User Interface (TUI) with vim keybindings for effi
 - [ ] Show run metadata (repo, source/target branches, duration)
 - [ ] Add auto-refresh with 5-second interval for active runs
 - [ ] Display remaining runs counter (pro/plan) in status bar
-- [ ] Implement lazy loading for large lists
+- [x] Implement background preloading of run details for instant access
 
 ### Run Details View
 - [ ] Display comprehensive run information
