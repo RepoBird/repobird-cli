@@ -717,12 +717,13 @@ func (d *DashboardView) renderTripleColumnLayout() string {
 		availableHeight = 5 // Minimum height
 	}
 
-	// Column widths - ensure we don't exceed terminal width
-	// Make columns smaller to ensure they fit
-	totalWidth := d.width - 4  // Leave margin for safety
+	// Column widths - calculate based on terminal width
+	// Account for spacing between columns and overall padding
+	// JoinHorizontal adds no spacing by default, so columns should use full width
+	totalWidth := d.width  // Use full terminal width
 	leftWidth := totalWidth / 3
 	centerWidth := totalWidth / 3
-	rightWidth := totalWidth / 3
+	rightWidth := totalWidth - leftWidth - centerWidth  // Ensure we use exact width
 	
 	// Ensure minimum widths
 	if leftWidth < 10 {
@@ -738,9 +739,9 @@ func (d *DashboardView) renderTripleColumnLayout() string {
 	debug.LogToFilef("Column widths: left=%d, center=%d, right=%d, total=%d\n", 
 		leftWidth, centerWidth, rightWidth, leftWidth+centerWidth+rightWidth)
 
-	// Make columns with rounded borders - ensure proper sizing
-	// Further reduce height to ensure bottom border is visible
-	columnHeight := availableHeight - 2
+	// Make columns with rounded borders - use full available height
+	// The Height() method in lipgloss includes borders in the total height
+	columnHeight := availableHeight
 	if columnHeight < 3 {
 		columnHeight = 3
 	}
@@ -763,28 +764,22 @@ func (d *DashboardView) renderTripleColumnLayout() string {
 		contentWidth1, contentWidth2, contentWidth3, contentHeight)
 	
 	// Create styles for columns
-	// Width() in lipgloss includes the border in the total width
+	// Width() and Height() in lipgloss include the border in the total dimensions
 	leftStyle := lipgloss.NewStyle().
 		Width(leftWidth).
 		Height(columnHeight).
-		MaxWidth(leftWidth).
-		MaxHeight(columnHeight).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("63"))
 
 	centerStyle := lipgloss.NewStyle().
 		Width(centerWidth).
 		Height(columnHeight).
-		MaxWidth(centerWidth).
-		MaxHeight(columnHeight).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("33"))
 
 	rightStyle := lipgloss.NewStyle().
 		Width(rightWidth).
 		Height(columnHeight).
-		MaxWidth(rightWidth).
-		MaxHeight(columnHeight).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("240"))
 
@@ -796,8 +791,7 @@ func (d *DashboardView) renderTripleColumnLayout() string {
 	debug.LogToFilef("Box widths: left=%d, center=%d, right=%d\n",
 		lipgloss.Width(leftBox), lipgloss.Width(centerBox), lipgloss.Width(rightBox))
 	
-	// Join columns without extra spacing
-	// Use PlaceHorizontal to ensure it fits within terminal width
+	// Join columns horizontally - they should already fit the width exactly
 	columns := lipgloss.JoinHorizontal(
 		lipgloss.Top,
 		leftBox,
@@ -808,10 +802,10 @@ func (d *DashboardView) renderTripleColumnLayout() string {
 	finalWidth := lipgloss.Width(columns)
 	debug.LogToFilef("Final columns width=%d (terminal width=%d)\n", finalWidth, d.width)
 	
-	// Force columns to fit within terminal width
+	// If columns still exceed terminal width (shouldn't happen with correct calculation)
+	// Use PlaceHorizontal to constrain them
 	if finalWidth > d.width {
 		debug.LogToFilef("WARNING: Columns width %d exceeds terminal width %d, constraining...\n", finalWidth, d.width)
-		// Use PlaceHorizontal to constrain to terminal width
 		columns = lipgloss.PlaceHorizontal(d.width, lipgloss.Left, columns)
 	}
 
@@ -819,23 +813,18 @@ func (d *DashboardView) renderTripleColumnLayout() string {
 	statusline := d.renderStatusLine("Miller Columns")
 	debug.LogToFilef("Statusline width: %d\n", lipgloss.Width(statusline))
 
-	// Calculate how much vertical space we have used
+	// The statusline should be placed at the bottom with proper spacing
+	// Place the columns and statusline in the available space
 	columnsHeight := lipgloss.Height(columns)
-	statusHeight := 1
-	totalUsed := columnsHeight + statusHeight
-	remainingHeight := d.height - 2 - totalUsed // -2 for title
+	debug.LogToFilef("Heights: columns=%d, availableHeight=%d\n", columnsHeight, availableHeight)
 	
-	debug.LogToFilef("Heights: columns=%d, status=%d, total=%d, remaining=%d\n",
-		columnsHeight, statusHeight, totalUsed, remainingHeight)
-	
-	// If we have remaining space, add it as padding
-	var finalLayout string
-	if remainingHeight > 0 {
-		padding := strings.Repeat("\n", remainingHeight)
-		finalLayout = lipgloss.JoinVertical(lipgloss.Left, columns, padding, statusline)
-	} else {
-		finalLayout = lipgloss.JoinVertical(lipgloss.Left, columns, statusline)
-	}
+	// Use PlaceVertical to position the statusline at the bottom
+	// The available height already accounts for title and statusline
+	finalLayout := lipgloss.JoinVertical(
+		lipgloss.Left,
+		columns,
+		statusline,
+	)
 	
 	debug.LogToFilef("Triple column layout dimensions: width=%d, height=%d\n",
 		lipgloss.Width(finalLayout), lipgloss.Height(finalLayout))
