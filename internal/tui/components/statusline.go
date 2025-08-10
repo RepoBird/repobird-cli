@@ -148,11 +148,8 @@ func truncateWithEllipsis(s string, maxWidth int) string {
 
 // DashboardStatusLine creates a status line for the dashboard
 func DashboardStatusLine(width int, layoutName string, dataFreshness string, shortHelp string) string {
-	// Keep left side concise
-	left := layoutName
-	if width > 80 {
-		left = fmt.Sprintf("Dashboard: %s", layoutName)
-	}
+	// Keep left side concise with bracket notation
+	left := fmt.Sprintf("[%s]", layoutName)
 
 	// Data freshness without brackets to save space
 	right := dataFreshness
@@ -161,7 +158,7 @@ func DashboardStatusLine(width int, layoutName string, dataFreshness string, sho
 	leftWidth := lipgloss.Width(left)
 	rightWidth := lipgloss.Width(right)
 	availableForHelp := width - leftWidth - rightWidth - 4 // 4 for padding/spacing
-	
+
 	// Dynamically adjust help text based on available space
 	if availableForHelp < lipgloss.Width(shortHelp) {
 		// Prioritize most important commands based on available space

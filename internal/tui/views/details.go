@@ -729,7 +729,8 @@ func (v *RunDetailsView) renderStatusBar() string {
 		options = copiedStyle.Render(v.copiedMessage) + " | " + options
 	}
 
-	return styles.StatusBarStyle.Width(v.width).Render(options)
+	// Use DashboardStatusLine for consistent formatting with [DETAILS] label
+	return components.DashboardStatusLine(v.width, "DETAILS", "", options)
 }
 
 func (v *RunDetailsView) updateContent() {

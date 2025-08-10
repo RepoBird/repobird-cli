@@ -2,6 +2,11 @@
 
 ## High Priority Tasks
 
+- Usage progress bar 0.00% always on status page.
+- It doesnt know free/pro tier usage limits lets hard code it and use that
+  (allow more than total allowed to exist because admin can credit extra runs.)
+- 
+
 ### 1. Add Global Configuration Support
 **Task File:** `tasks/add-global-configs.md`
 - [ ] Implement global config file support (~/.repobird/global.yaml)

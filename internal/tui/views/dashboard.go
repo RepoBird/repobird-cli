@@ -1091,7 +1091,7 @@ func (d *DashboardView) renderTripleColumnLayout() string {
 	}
 
 	// Create statusline
-	statusline := d.renderStatusLine("Miller Columns")
+	statusline := d.renderStatusLine("DASH")
 	debug.LogToFilef("Statusline width: %d\n", lipgloss.Width(statusline))
 
 	// The statusline should be placed at the bottom with proper spacing
@@ -1238,7 +1238,7 @@ func (d *DashboardView) renderAllRunsLayout() string {
 	runListContent := d.runListView.View()
 
 	// Create statusline
-	statusline := d.renderStatusLine("All Runs Timeline")
+	statusline := d.renderStatusLine("RUNS")
 
 	return lipgloss.JoinVertical(lipgloss.Left, runListContent, statusline)
 }
@@ -1249,7 +1249,7 @@ func (d *DashboardView) renderRepositoriesLayout() string {
 	content := d.renderRepositoriesTable()
 
 	// Create statusline
-	statusline := d.renderStatusLine("Repositories Overview")
+	statusline := d.renderStatusLine("REPOS")
 
 	return lipgloss.JoinVertical(lipgloss.Left, content, statusline)
 }
@@ -1716,8 +1716,8 @@ func (d *DashboardView) handleStatusInfoNavigation(msg tea.KeyMsg) (tea.Model, t
 			)
 		}
 		return d, nil
-	case "s", "q", "escape":
-		// Close the overlay with q, s, or ESC
+	case "s", "q", "b", "escape":
+		// Close the overlay with q, s, b, or ESC
 		d.showStatusInfo = false
 		return d, nil
 	case "Q":
@@ -1731,9 +1731,9 @@ func (d *DashboardView) handleStatusInfoNavigation(msg tea.KeyMsg) (tea.Model, t
 
 // renderStatusInfo renders the status/user info overlay
 func (d *DashboardView) renderStatusInfo() string {
-	// Calculate box dimensions - use most of the screen with some margin
+	// Calculate box dimensions - leave room for statusline at bottom
 	boxWidth := d.width - 4   // Leave 2 chars margin on each side
-	boxHeight := d.height - 2 // Leave 1 char margin top and bottom
+	boxHeight := d.height - 3 // Leave room for statusline at bottom
 
 	// Box style with rounded border
 	boxStyle := lipgloss.NewStyle().
@@ -1851,10 +1851,40 @@ func (d *DashboardView) renderStatusInfo() string {
 
 		// Show remaining runs with tier details if available
 		var runsRemaining string
+		var totalProRuns, totalPlanRuns int
+
+		// Hardcoded tier totals
+		switch strings.ToLower(d.userInfo.Tier) {
+		case "free", "":
+			totalProRuns = 3
+			totalPlanRuns = 5
+		case "pro":
+			totalProRuns = 30
+			totalPlanRuns = 35
+		default:
+			// For other tiers, use a reasonable default or what's provided
+			totalProRuns = 30
+			totalPlanRuns = 35
+		}
+
 		if d.userInfo.TierDetails != nil {
-			runsRemaining = fmt.Sprintf("%d Run / %d Plan",
+			// Handle cases where admin credits exceed defaults
+			actualProTotal := totalProRuns
+			actualPlanTotal := totalPlanRuns
+
+			// If remaining runs exceed the default total, admin has credited extra
+			if d.userInfo.TierDetails.RemainingProRuns > totalProRuns {
+				actualProTotal = d.userInfo.TierDetails.RemainingProRuns
+			}
+			if d.userInfo.TierDetails.RemainingPlanRuns > totalPlanRuns {
+				actualPlanTotal = d.userInfo.TierDetails.RemainingPlanRuns
+			}
+
+			runsRemaining = fmt.Sprintf("%d/%d Pro | %d/%d Plan",
 				d.userInfo.TierDetails.RemainingProRuns,
-				d.userInfo.TierDetails.RemainingPlanRuns)
+				actualProTotal,
+				d.userInfo.TierDetails.RemainingPlanRuns,
+				actualPlanTotal)
 		} else {
 			runsRemaining = fmt.Sprintf("%d / %d",
 				d.userInfo.RemainingRuns,
@@ -1863,7 +1893,65 @@ func (d *DashboardView) renderStatusInfo() string {
 		content = append(content, renderField("Runs Remaining:", runsRemaining, true))
 
 		// Show usage percentage with visual bar
-		if d.userInfo.TotalRuns > 0 {
+		if d.userInfo.TierDetails != nil {
+			// Calculate usage for Pro runs
+			proUsed := totalProRuns - d.userInfo.TierDetails.RemainingProRuns
+			// Handle admin credits that exceed defaults
+			if d.userInfo.TierDetails.RemainingProRuns > totalProRuns {
+				proUsed = 0 // No usage if credited beyond default
+			}
+			proPercentage := 0.0
+			if totalProRuns > 0 {
+				proPercentage = float64(proUsed) / float64(totalProRuns) * 100
+			}
+
+			// Calculate usage for Plan runs
+			planUsed := totalPlanRuns - d.userInfo.TierDetails.RemainingPlanRuns
+			// Handle admin credits that exceed defaults
+			if d.userInfo.TierDetails.RemainingPlanRuns > totalPlanRuns {
+				planUsed = 0 // No usage if credited beyond default
+			}
+			planPercentage := 0.0
+			if totalPlanRuns > 0 {
+				planPercentage = float64(planUsed) / float64(totalPlanRuns) * 100
+			}
+
+			// Create visual bars
+			barWidth := 10
+
+			// Pro bar
+			proFilledBars := int(proPercentage / 100 * float64(barWidth))
+			if proFilledBars < 0 {
+				proFilledBars = 0
+			}
+			if proFilledBars > barWidth {
+				proFilledBars = barWidth
+			}
+			proEmptyBars := barWidth - proFilledBars
+			if proEmptyBars < 0 {
+				proEmptyBars = 0
+			}
+			proBar := strings.Repeat("█", proFilledBars) + strings.Repeat("░", proEmptyBars)
+
+			// Plan bar
+			planFilledBars := int(planPercentage / 100 * float64(barWidth))
+			if planFilledBars < 0 {
+				planFilledBars = 0
+			}
+			if planFilledBars > barWidth {
+				planFilledBars = barWidth
+			}
+			planEmptyBars := barWidth - planFilledBars
+			if planEmptyBars < 0 {
+				planEmptyBars = 0
+			}
+			planBar := strings.Repeat("█", planFilledBars) + strings.Repeat("░", planEmptyBars)
+
+			usageValue := fmt.Sprintf("Pro: %s %.0f%% | Plan: %s %.0f%%",
+				proBar, proPercentage, planBar, planPercentage)
+			content = append(content, renderField("Usage:", usageValue, true))
+		} else if d.userInfo.TotalRuns > 0 {
+			// Fallback to legacy display if no tier details
 			usedRuns := d.userInfo.TotalRuns - d.userInfo.RemainingRuns
 			percentage := float64(usedRuns) / float64(d.userInfo.TotalRuns) * 100
 			barWidth := 20
@@ -1937,77 +2025,38 @@ func (d *DashboardView) renderStatusInfo() string {
 	mainContent := contentStyle.Render(strings.Join(content, "\n"))
 
 	// Calculate remaining height for spacing inside the box
-	innerHeight := boxHeight - 2                                               // Account for border
-	contentHeight := lipgloss.Height(title) + lipgloss.Height(mainContent) + 1 // +1 for statusline
+	innerHeight := boxHeight - 2                                           // Account for border
+	contentHeight := lipgloss.Height(title) + lipgloss.Height(mainContent) // No statusline inside now
 	remainingHeight := innerHeight - contentHeight
 	spacing := ""
 	if remainingHeight > 0 {
 		spacing = strings.Repeat("\n", remainingHeight)
 	}
 
-	// Create status line at bottom (inside the box)
-	var statusLine string
-
-	// Show copied message prominently if recent (same as dashboard)
-	if d.copiedMessage != "" && time.Since(d.copiedMessageTime) < 3*time.Second {
-		// Custom blinking: toggle visibility of the message
-		var copiedStyle lipgloss.Style
-		if time.Since(d.copiedMessageTime) < 2*time.Second {
-			if d.yankBlink {
-				// Bright and bold when visible
-				copiedStyle = lipgloss.NewStyle().
-					Foreground(lipgloss.Color("82")).
-					Background(lipgloss.Color("235")).
-					Bold(true).
-					Padding(0, 1)
-			} else {
-				// Dimmer when "off" for blinking effect
-				copiedStyle = lipgloss.NewStyle().
-					Foreground(lipgloss.Color("240")). // Dim gray
-					Background(lipgloss.Color("235")).
-					Padding(0, 1)
-			}
-		} else {
-			// After blinking period, show normally
-			copiedStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("82")).
-				Background(lipgloss.Color("235")).
-				Bold(true).
-				Padding(0, 1)
-		}
-
-		// Create a custom status line just for the clipboard message
-		statusStyle := lipgloss.NewStyle().
-			Width(boxWidth - 2).
-			Background(lipgloss.Color("235")).
-			Align(lipgloss.Center)
-
-		message := copiedStyle.Render(d.copiedMessage)
-		statusLine = statusStyle.Render(message)
-	} else {
-		// Normal status line
-		statusLineStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("240")).
-			Background(lipgloss.Color("235")).
-			Width(boxWidth - 2). // Account for border
-			Align(lipgloss.Center)
-
-		statusLine = statusLineStyle.Render("[j/k]navigate [y]copy [s/q/ESC]close [Q]uit")
-	}
-
-	// Join everything together inside the box
-	innerContent := lipgloss.JoinVertical(lipgloss.Left, title, mainContent, spacing, statusLine)
+	// Join everything together inside the box (without statusline)
+	innerContent := lipgloss.JoinVertical(lipgloss.Left, title, mainContent, spacing)
 
 	// Wrap in the box
 	boxedContent := boxStyle.Render(innerContent)
 
-	// Center the box on screen
-	finalStyle := lipgloss.NewStyle().
-		Width(d.width).
-		Height(d.height).
-		Align(lipgloss.Center, lipgloss.Center)
+	// Center the box on screen (leaving room for statusline)
+	centeredBox := lipgloss.Place(d.width, d.height-1, lipgloss.Center, lipgloss.Center, boxedContent)
 
-	return finalStyle.Render(boxedContent)
+	// Create the statusline using the dashboard statusline component
+	var statusLine string
+	shortHelp := "[j/k]navigate [y]copy [s/q/b/ESC]back [Q]uit"
+
+	// Show copied message prominently if recent
+	if d.copiedMessage != "" && time.Since(d.copiedMessageTime) < 3*time.Second {
+		// Use the renderStatusLine method which handles copied messages
+		statusLine = d.renderStatusLine("STATUS")
+	} else {
+		// Use components.DashboardStatusLine for consistent formatting
+		statusLine = components.DashboardStatusLine(d.width, "STATUS", "", shortHelp)
+	}
+
+	// Join the centered box and statusline
+	return lipgloss.JoinVertical(lipgloss.Left, centeredBox, statusLine)
 }
 
 // renderRepositoriesTable renders a table of repositories with real data

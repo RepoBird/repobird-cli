@@ -38,8 +38,8 @@ func TestCreateRunViewWithSelectedRepository(t *testing.T) {
 			view := NewCreateRunViewWithConfig(config)
 
 			// Check that the repository field is set correctly
-			if len(view.fields) >= 2 {
-				actualValue := view.fields[1].Value()
+			if len(view.fields) >= 1 {
+				actualValue := view.fields[0].Value()
 				if tt.selectedRepository != "" {
 					assert.Equal(t, tt.expectedValue, actualValue,
 						"Repository field should be set to the selected repository")

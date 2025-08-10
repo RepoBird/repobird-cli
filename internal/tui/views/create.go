@@ -19,7 +19,6 @@ import (
 	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/repobird/repobird-cli/internal/tui/components"
 	"github.com/repobird/repobird-cli/internal/tui/debug"
-	"github.com/repobird/repobird-cli/internal/tui/styles"
 	"github.com/repobird/repobird-cli/pkg/utils"
 )
 
@@ -45,6 +44,8 @@ type CreateRunView struct {
 	exitRequested bool
 	// Back button
 	backButtonFocused bool
+	// Submit button
+	submitButtonFocused bool
 	// Cache from parent list view
 	parentRuns         []models.RunResponse
 	parentCached       bool
@@ -373,6 +374,12 @@ func (v *CreateRunView) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			dashboard.width = v.width
 			dashboard.height = v.height
 			return dashboard, dashboard.Init()
+		} else if v.submitButtonFocused {
+			// Enter on submit button submits the run
+			if !v.submitting {
+				debug.LogToFile("DEBUG: Submit button pressed - submitting run\n")
+				return v, v.submitRun()
+			}
 		} else if v.focusIndex == 0 {
 			// Enter on run type field (index 0) toggles it
 			if v.runType == models.RunTypeRun {
@@ -571,6 +578,7 @@ func (v *CreateRunView) updateFields(msg tea.KeyMsg) []tea.Cmd {
 
 func (v *CreateRunView) nextField() {
 	v.backButtonFocused = false
+	v.submitButtonFocused = false
 	v.focusIndex++
 
 	// Calculate total fields: 1 (run type) + 1 (repo) + 1 (prompt) + 4 (other fields) + context (if shown)
@@ -579,8 +587,12 @@ func (v *CreateRunView) nextField() {
 		totalFields++ // +1 for context
 	}
 
-	if v.focusIndex >= totalFields {
-		// After last field, go to back button
+	if v.focusIndex == totalFields {
+		// After last field, go to submit button
+		v.submitButtonFocused = true
+	} else if v.focusIndex > totalFields {
+		// After submit button, go to back button
+		v.submitButtonFocused = false
 		v.backButtonFocused = true
 		v.focusIndex = 0
 	}
@@ -589,8 +601,17 @@ func (v *CreateRunView) nextField() {
 
 func (v *CreateRunView) prevField() {
 	if v.backButtonFocused {
-		// From back button, go to last field
+		// From back button, go to submit button
 		v.backButtonFocused = false
+		v.submitButtonFocused = true
+		totalFields := len(v.fields) + 2
+		if v.showContext {
+			totalFields++
+		}
+		v.focusIndex = totalFields
+	} else if v.submitButtonFocused {
+		// From submit button, go to last field
+		v.submitButtonFocused = false
 		if v.showContext {
 			v.focusIndex = len(v.fields) + 2 // context area (+2 for run type and prompt)
 		} else {
@@ -906,17 +927,17 @@ func (v *CreateRunView) renderCompactForm(width, height int) string {
 
 	labelStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("252")).
-		Width(15)
+		Width(20)
 
 	// Run type field (selectable, at index 0)
-	b.WriteString(labelStyle.Render("Run Type:"))
+	b.WriteString(labelStyle.Render("⚙️ Run Type:"))
 	if v.focusIndex == 0 {
 		b.WriteString(v.renderFieldIndicator())
 	} else {
 		b.WriteString("   ")
 	}
 
-	runTypeValue := "🚀 Run (execution)"
+	runTypeValue := "▶️ Run (execution)"
 	if v.runType == models.RunTypePlan {
 		runTypeValue = "📋 Plan (pro-plan)"
 	}
@@ -934,7 +955,7 @@ func (v *CreateRunView) renderCompactForm(width, height int) string {
 	b.WriteString("\n")
 
 	// Repository field (now at index 1)
-	b.WriteString(labelStyle.Render("Repository:"))
+	b.WriteString(labelStyle.Render("📁 Repository:"))
 	if v.focusIndex == 1 {
 		b.WriteString(v.renderFieldIndicator())
 	} else {
@@ -945,7 +966,7 @@ func (v *CreateRunView) renderCompactForm(width, height int) string {
 	b.WriteString("\n")
 
 	// Prompt area (now at index 2) - can be collapsed
-	b.WriteString(labelStyle.Render("Prompt:"))
+	b.WriteString(labelStyle.Render("✏️ Prompt:"))
 	if v.focusIndex == 2 {
 		b.WriteString(v.renderFieldIndicator())
 	} else {
@@ -982,10 +1003,10 @@ func (v *CreateRunView) renderCompactForm(width, height int) string {
 		label string
 		index int
 	}{
-		{"Source Branch:", 1},
-		{"Target Branch:", 2},
-		{"Title:", 3},
-		{"Issue:", 4},
+		{"🌿 Source (optional):", 1},
+		{"🎯 Target (optional):", 2},
+		{"📝 Title (optional):", 3},
+		{"🔢 Issue (optional):", 4},
 	}
 
 	for _, field := range fieldInfo {
@@ -1004,7 +1025,7 @@ func (v *CreateRunView) renderCompactForm(width, height int) string {
 	// Context area (optional, toggled with 'c')
 	if v.showContext {
 		b.WriteString("\n")
-		b.WriteString(labelStyle.Render("Context:"))
+		b.WriteString(labelStyle.Render("💭 Context (optional):"))
 		if v.focusIndex == len(v.fields)+2 {
 			b.WriteString(v.renderFieldIndicator())
 		} else {
@@ -1021,6 +1042,22 @@ func (v *CreateRunView) renderCompactForm(width, height int) string {
 			Render("[Press 'c' to show context]")
 		b.WriteString(contextHint)
 	}
+
+	// Submit button
+	b.WriteString("\n\n")
+	submitStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("33")).
+		Bold(true)
+
+	if v.submitButtonFocused {
+		if v.inputMode == components.NormalMode {
+			submitStyle = submitStyle.
+				Background(lipgloss.Color("236")).
+				Padding(0, 1)
+		}
+	}
+
+	b.WriteString(submitStyle.Render("🚀 Submit Run"))
 
 	// Back button at bottom
 	b.WriteString("\n\n")
@@ -1090,18 +1127,28 @@ func (v *CreateRunView) renderStatusBar() string {
 			statusText = "[Enter] exit insert [Tab] next [Ctrl+S] submit [Ctrl+X] clear"
 		}
 	} else {
-		if v.focusIndex == 0 {
-			// Run type field in normal mode
-			statusText = "[q]back [Enter] toggle type [j/k] navigate [c] context [Ctrl+S] submit [Q]uit"
-		} else if v.focusIndex == 1 {
-			// Repository field in normal mode
-			statusText = "[q]back [Enter] edit [f] fuzzy [j/k] navigate [c] context [Ctrl+S] submit [Q]uit"
+		if v.submitButtonFocused {
+			// Submit button in normal mode
+			statusText = "[q]back [Enter] 🚀 SUBMIT RUN [j/k] navigate [Q]uit"
+		} else if v.backButtonFocused {
+			// Back button in normal mode
+			statusText = "[Enter] back to dashboard [j/k] navigate [Q]uit"
 		} else {
-			statusText = "[q]back [Enter] edit [j/k] navigate [c] context [Ctrl+S] submit [?] help [Q]uit"
+			switch v.focusIndex {
+			case 0:
+				// Run type field in normal mode
+				statusText = "[q]back [Enter] toggle type [j/k] navigate [c] context [Ctrl+S] submit [Q]uit"
+			case 1:
+				// Repository field in normal mode
+				statusText = "[q]back [Enter] edit [f] fuzzy [j/k] navigate [c] context [Ctrl+S] submit [Q]uit"
+			default:
+				statusText = "[q]back [Enter] edit [j/k] navigate [c] context [Ctrl+S] submit [?] help [Q]uit"
+			}
 		}
 	}
 
-	return styles.StatusBarStyle.Width(v.width).Render(statusText)
+	// Use DashboardStatusLine for consistent formatting with [CREATE] label
+	return components.DashboardStatusLine(v.width, "CREATE", "", statusText)
 }
 
 // prepareTaskFromFile loads and parses task from a JSON file

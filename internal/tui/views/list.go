@@ -629,7 +629,8 @@ func (v *RunListView) updateTable() {
 }
 
 func (v *RunListView) renderStatusBar() string {
-	left := fmt.Sprintf(" %d runs | %s", len(v.filteredRuns), v.table.StatusLine())
+	// Build data info string
+	dataInfo := fmt.Sprintf("%d runs | %s", len(v.filteredRuns), v.table.StatusLine())
 
 	activeCount := 0
 	for _, run := range v.runs {
@@ -638,31 +639,24 @@ func (v *RunListView) renderStatusBar() string {
 		}
 	}
 
-	right := ""
-
 	// Add remaining runs counter if user info is available
 	if v.userInfo != nil {
 		tier := v.userInfo.Tier
 		if tier == "" {
 			tier = "free"
 		}
-		right = fmt.Sprintf("%s: %d/%d runs ", tier, v.userInfo.RemainingRuns, v.userInfo.TotalRuns)
+		dataInfo += fmt.Sprintf(" | %s: %d/%d runs", tier, v.userInfo.RemainingRuns, v.userInfo.TotalRuns)
 	}
 
 	if activeCount > 0 {
-		right += fmt.Sprintf("⟳ %d active ", activeCount)
+		dataInfo += fmt.Sprintf(" | ⟳ %d active", activeCount)
 	}
 
-	right += "[n]ew [r]efresh [/]search [?]help [q]back [Q]uit "
+	// Help text
+	helpText := "[n]ew [r]efresh [/]search [?]help [q]back [Q]uit"
 
-	padding := v.width - len(left) - len(right)
-	if padding < 0 {
-		padding = 0
-	}
-
-	return styles.StatusBarStyle.Width(v.width).Render(
-		left + strings.Repeat(" ", padding) + right,
-	)
+	// Use DashboardStatusLine for consistent formatting with [LIST] label
+	return components.DashboardStatusLine(v.width, "LIST", dataInfo, helpText)
 }
 
 func (v *RunListView) loadRuns() tea.Cmd {
