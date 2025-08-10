@@ -3,6 +3,7 @@ package views
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"runtime"
 	"strings"
@@ -16,6 +17,7 @@ import (
 	"github.com/repobird/repobird-cli/internal/cache"
 	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/repobird/repobird-cli/internal/tui/components"
+	"github.com/repobird/repobird-cli/internal/tui/debug"
 )
 
 // DashboardView is the main dashboard controller that manages different layout views
@@ -699,6 +701,9 @@ func (d *DashboardView) View() string {
 
 // renderTripleColumnLayout renders the Miller Columns layout with real data
 func (d *DashboardView) renderTripleColumnLayout() string {
+	// Debug logging
+	debug.LogToFilef("Dashboard Layout: width=%d, height=%d\n", d.width, d.height)
+	
 	// Calculate available height for columns
 	// We have d.height total, minus:
 	// - 2 for title
@@ -708,16 +713,21 @@ func (d *DashboardView) renderTripleColumnLayout() string {
 		availableHeight = 5 // Minimum height
 	}
 
-	// Column widths - full width, equally distributed
-	// Account for spacing between columns
-	totalWidth := d.width - 2 // Small margin for edges
+	// Column widths - ensure we don't exceed terminal width
+	// No margins needed - use full width
+	totalWidth := d.width
 	leftWidth := totalWidth / 3
 	centerWidth := totalWidth / 3
-	rightWidth := totalWidth - leftWidth - centerWidth
+	rightWidth := totalWidth - leftWidth - centerWidth - 2 // Account for any rounding
+	
+	debug.LogToFilef("Column widths: left=%d, center=%d, right=%d, total=%d\n", 
+		leftWidth, centerWidth, rightWidth, leftWidth+centerWidth+rightWidth)
 
 	// Make columns with rounded borders - ensure proper sizing
-	// Reduce height by 1 to ensure bottom border is visible
-	columnHeight := availableHeight - 1
+	// Don't reduce height too much
+	columnHeight := availableHeight
+	
+	debug.LogToFilef("Column height: available=%d, column=%d\n", availableHeight, columnHeight)
 
 	// Create column content with titles
 	// Account for borders (2 chars for left/right, 2 for top/bottom)
@@ -746,12 +756,15 @@ func (d *DashboardView) renderTripleColumnLayout() string {
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("240"))
 
+	// Join columns without extra spacing
 	columns := lipgloss.JoinHorizontal(
 		lipgloss.Top,
 		leftStyle.Render(leftContent),
 		centerStyle.Render(centerContent),
 		rightStyle.Render(rightContent),
 	)
+	
+	debug.LogToFilef("Columns rendered, width=%d\n", lipgloss.Width(columns))
 
 	// Create statusline
 	statusline := d.renderStatusLine("Miller Columns")
@@ -803,18 +816,34 @@ func (d *DashboardView) updateDetailLines() {
 // copyToClipboard copies the given text to clipboard
 func (d *DashboardView) copyToClipboard(text string) tea.Cmd {
 	return func() tea.Msg {
-		// Try to copy to clipboard using pbcopy on macOS, xclip on Linux
 		var cmd *exec.Cmd
+		
 		if runtime.GOOS == "darwin" {
 			cmd = exec.Command("pbcopy")
 		} else if runtime.GOOS == "linux" {
-			cmd = exec.Command("xclip", "-selection", "clipboard")
+			// Check if we're on Wayland or X11
+			if os.Getenv("WAYLAND_DISPLAY") != "" {
+				// Wayland - use wl-copy
+				cmd = exec.Command("wl-copy")
+			} else if os.Getenv("DISPLAY") != "" {
+				// X11 - use xclip
+				cmd = exec.Command("xclip", "-selection", "clipboard")
+			} else {
+				// Try xclip as fallback
+				cmd = exec.Command("xclip", "-selection", "clipboard")
+			}
 		} else {
 			return nil // Unsupported OS
 		}
 		
-		cmd.Stdin = strings.NewReader(text)
-		_ = cmd.Run()
+		if cmd != nil {
+			cmd.Stdin = strings.NewReader(text)
+			err := cmd.Run()
+			if err != nil {
+				// Log error but don't crash
+				fmt.Fprintf(os.Stderr, "Failed to copy to clipboard: %v\n", err)
+			}
+		}
 		return nil
 	}
 }
