@@ -27,14 +27,14 @@ type DashboardView struct {
 	help   help.Model
 
 	// Dashboard state
-	currentLayout     models.LayoutType
-	showHelp          bool
-	selectedRepo      *models.Repository
-	selectedRepoIdx   int
-	selectedRunIdx    int
-	focusedColumn     int // 0: repositories, 1: runs, 2: details
-	selectedDetailLine int // Selected line in details column
-	detailLines       []string // Lines in details column for selection
+	currentLayout      models.LayoutType
+	showHelp           bool
+	selectedRepo       *models.Repository
+	selectedRepoIdx    int
+	selectedRunIdx     int
+	focusedColumn      int      // 0: repositories, 1: runs, 2: details
+	selectedDetailLine int      // Selected line in details column
+	detailLines        []string // Lines in details column for selection
 
 	// Layout views (simplified for now)
 	runListView *RunListView
@@ -698,7 +698,7 @@ func (d *DashboardView) View() string {
 	}
 
 	finalView := lipgloss.JoinVertical(lipgloss.Left, title, content)
-	debug.LogToFilef("Final view dimensions: width=%d, height=%d\n", 
+	debug.LogToFilef("Final view dimensions: width=%d, height=%d\n",
 		lipgloss.Width(finalView), lipgloss.Height(finalView))
 	return finalView
 }
@@ -707,7 +707,7 @@ func (d *DashboardView) View() string {
 func (d *DashboardView) renderTripleColumnLayout() string {
 	// Debug logging
 	debug.LogToFilef("Dashboard Layout: width=%d, height=%d\n", d.width, d.height)
-	
+
 	// Calculate available height for columns
 	// We have d.height total, minus:
 	// - 2 for title (1 line + spacing)
@@ -720,11 +720,11 @@ func (d *DashboardView) renderTripleColumnLayout() string {
 	// Column widths - calculate based on terminal width
 	// Each box renders 2 pixels wider than its set width, so subtract 6 total (2 per column)
 	// to ensure they fit within terminal width
-	totalWidth := d.width - 6  // Subtract 6 to account for the 2-pixel expansion per box
+	totalWidth := d.width - 6 // Subtract 6 to account for the 2-pixel expansion per box
 	leftWidth := totalWidth / 3
 	centerWidth := totalWidth / 3
-	rightWidth := totalWidth - leftWidth - centerWidth  // Use remaining width
-	
+	rightWidth := totalWidth - leftWidth - centerWidth // Use remaining width
+
 	// Ensure minimum widths
 	if leftWidth < 10 {
 		leftWidth = 10
@@ -735,8 +735,8 @@ func (d *DashboardView) renderTripleColumnLayout() string {
 	if rightWidth < 10 {
 		rightWidth = 10
 	}
-	
-	debug.LogToFilef("Column widths: left=%d, center=%d, right=%d, total=%d\n", 
+
+	debug.LogToFilef("Column widths: left=%d, center=%d, right=%d, total=%d\n",
 		leftWidth, centerWidth, rightWidth, leftWidth+centerWidth+rightWidth)
 
 	// Make columns with rounded borders - use full available height
@@ -745,7 +745,7 @@ func (d *DashboardView) renderTripleColumnLayout() string {
 	if columnHeight < 3 {
 		columnHeight = 3
 	}
-	
+
 	debug.LogToFilef("Column height: available=%d, column=%d\n", availableHeight, columnHeight)
 
 	// Create column content with titles
@@ -755,14 +755,14 @@ func (d *DashboardView) renderTripleColumnLayout() string {
 	contentWidth2 := centerWidth - 2
 	contentWidth3 := rightWidth - 2
 	contentHeight := columnHeight - 2
-	
+
 	leftContent := d.renderRepositoriesColumn(contentWidth1, contentHeight)
 	centerContent := d.renderRunsColumn(contentWidth2, contentHeight)
 	rightContent := d.renderDetailsColumn(contentWidth3, contentHeight)
-	
-	debug.LogToFilef("Content dimensions: w1=%d, w2=%d, w3=%d, h=%d\n", 
+
+	debug.LogToFilef("Content dimensions: w1=%d, w2=%d, w3=%d, h=%d\n",
 		contentWidth1, contentWidth2, contentWidth3, contentHeight)
-	
+
 	// Create styles for columns
 	// Width() and Height() in lipgloss include the border in the total dimensions
 	leftStyle := lipgloss.NewStyle().
@@ -787,10 +787,10 @@ func (d *DashboardView) renderTripleColumnLayout() string {
 	leftBox := leftStyle.Render(leftContent)
 	centerBox := centerStyle.Render(centerContent)
 	rightBox := rightStyle.Render(rightContent)
-	
+
 	debug.LogToFilef("Box widths: left=%d, center=%d, right=%d\n",
 		lipgloss.Width(leftBox), lipgloss.Width(centerBox), lipgloss.Width(rightBox))
-	
+
 	// Join columns horizontally - they should already fit the width exactly
 	columns := lipgloss.JoinHorizontal(
 		lipgloss.Top,
@@ -798,10 +798,10 @@ func (d *DashboardView) renderTripleColumnLayout() string {
 		centerBox,
 		rightBox,
 	)
-	
+
 	finalWidth := lipgloss.Width(columns)
 	debug.LogToFilef("Final columns width=%d (terminal width=%d)\n", finalWidth, d.width)
-	
+
 	// If columns still exceed terminal width (shouldn't happen with correct calculation)
 	// Use PlaceHorizontal to constrain them
 	if finalWidth > d.width {
@@ -817,7 +817,7 @@ func (d *DashboardView) renderTripleColumnLayout() string {
 	// Place the columns and statusline in the available space
 	columnsHeight := lipgloss.Height(columns)
 	debug.LogToFilef("Heights: columns=%d, availableHeight=%d\n", columnsHeight, availableHeight)
-	
+
 	// Use PlaceVertical to position the statusline at the bottom
 	// The available height already accounts for title and statusline
 	finalLayout := lipgloss.JoinVertical(
@@ -825,7 +825,7 @@ func (d *DashboardView) renderTripleColumnLayout() string {
 		columns,
 		statusline,
 	)
-	
+
 	debug.LogToFilef("Triple column layout dimensions: width=%d, height=%d\n",
 		lipgloss.Width(finalLayout), lipgloss.Height(finalLayout))
 	return finalLayout
@@ -835,11 +835,11 @@ func (d *DashboardView) renderTripleColumnLayout() string {
 func (d *DashboardView) updateDetailLines() {
 	d.detailLines = []string{}
 	d.selectedDetailLine = 0
-	
+
 	if d.selectedRunData == nil {
 		return
 	}
-	
+
 	run := d.selectedRunData
 	d.detailLines = []string{
 		fmt.Sprintf("ID: %s", run.GetIDString()),
@@ -876,10 +876,11 @@ func (d *DashboardView) updateDetailLines() {
 func (d *DashboardView) copyToClipboard(text string) tea.Cmd {
 	return func() tea.Msg {
 		var cmd *exec.Cmd
-		
-		if runtime.GOOS == "darwin" {
+
+		switch runtime.GOOS {
+		case "darwin":
 			cmd = exec.Command("pbcopy")
-		} else if runtime.GOOS == "linux" {
+		case "linux":
 			// Check if we're on Wayland or X11
 			if os.Getenv("WAYLAND_DISPLAY") != "" {
 				// Wayland - use wl-copy
@@ -891,10 +892,10 @@ func (d *DashboardView) copyToClipboard(text string) tea.Cmd {
 				// Try xclip as fallback
 				cmd = exec.Command("xclip", "-selection", "clipboard")
 			}
-		} else {
+		default:
 			return nil // Unsupported OS
 		}
-		
+
 		if cmd != nil {
 			cmd.Stdin = strings.NewReader(text)
 			err := cmd.Run()
@@ -939,7 +940,7 @@ func (d *DashboardView) renderRepositoriesColumn(width, height int) string {
 		BorderStyle(lipgloss.NormalBorder()).
 		BorderBottom(true).
 		BorderForeground(lipgloss.Color("63"))
-	
+
 	if d.focusedColumn == 0 {
 		titleStyle = titleStyle.Foreground(lipgloss.Color("63"))
 	} else {
@@ -985,7 +986,7 @@ func (d *DashboardView) renderRepositoriesColumn(width, height int) string {
 	// Calculate content height (subtract title height)
 	contentHeight := height - 2
 	content := strings.Join(items, "\n")
-	
+
 	// Pad content to fill height
 	contentStyle := lipgloss.NewStyle().
 		Width(width).
@@ -1005,7 +1006,7 @@ func (d *DashboardView) renderRunsColumn(width, height int) string {
 		BorderStyle(lipgloss.NormalBorder()).
 		BorderBottom(true).
 		BorderForeground(lipgloss.Color("33"))
-	
+
 	if d.focusedColumn == 1 {
 		titleStyle = titleStyle.Foreground(lipgloss.Color("33"))
 	} else {
@@ -1023,7 +1024,7 @@ func (d *DashboardView) renderRunsColumn(width, height int) string {
 			if displayTitle == "" {
 				displayTitle = "Untitled Run"
 			}
-			
+
 			// Truncate based on available width
 			maxTitleLen := width - 5 // Account for icon and padding
 			if len(displayTitle) > maxTitleLen {
@@ -1060,7 +1061,7 @@ func (d *DashboardView) renderRunsColumn(width, height int) string {
 	// Calculate content height (subtract title height)
 	contentHeight := height - 2
 	content := strings.Join(items, "\n")
-	
+
 	// Pad content to fill height
 	contentStyle := lipgloss.NewStyle().
 		Width(width).
@@ -1080,7 +1081,7 @@ func (d *DashboardView) renderDetailsColumn(width, height int) string {
 		BorderStyle(lipgloss.NormalBorder()).
 		BorderBottom(true).
 		BorderForeground(lipgloss.Color("240"))
-	
+
 	if d.focusedColumn == 2 {
 		titleStyle = titleStyle.Foreground(lipgloss.Color("63"))
 	} else {
@@ -1097,7 +1098,7 @@ func (d *DashboardView) renderDetailsColumn(width, height int) string {
 			if d.focusedColumn == 2 && i == d.selectedDetailLine {
 				// Highlight selected line
 				line = lipgloss.NewStyle().
-					Width(width-2).
+					Width(width - 2).
 					Background(lipgloss.Color("63")).
 					Foreground(lipgloss.Color("255")).
 					Render(line)
@@ -1109,7 +1110,7 @@ func (d *DashboardView) renderDetailsColumn(width, height int) string {
 	// Calculate content height (subtract title height)
 	contentHeight := height - 2
 	content := strings.Join(displayLines, "\n")
-	
+
 	// Pad content to fill height
 	contentStyle := lipgloss.NewStyle().
 		Width(width).

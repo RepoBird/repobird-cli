@@ -198,6 +198,24 @@ The triple-column layout follows Ranger's Miller Columns pattern:
 - **Real-time Updates**: Live status updates for running tasks
 - **Pagination**: Handle large lists efficiently
 
+## Current Implementation Status
+
+### Completed Features
+- **Triple-Column Layout**: Fully implemented with Miller Columns navigation pattern
+- **Repository List**: Shows repositories with run counts and last activity
+- **Run List**: Displays runs for selected repository with status indicators
+- **Run Details**: Shows detailed information about selected run
+- **Keyboard Navigation**: h/j/k/l vim-style navigation between and within columns
+- **Visual Indicators**: Color-coded status icons and borders
+- **Column Width Management**: Automatic width calculation with proper border rendering
+- **Statusline**: Shows current layout mode and navigation hints
+- **Real-time Updates**: Live status updates for running tasks
+
+### Known Issues (Fixed)
+- ✅ Column width calculation now properly accounts for border rendering
+- ✅ Column heights now render fully without bottom border cutoff
+- ✅ Third column no longer gets cut off on the right side
+
 ## Implementation Architecture
 
 ### Bubble Tea Models

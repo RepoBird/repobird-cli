@@ -70,14 +70,14 @@ func (s *StatusLine) Render() string {
 	leftContent := s.leftContent
 	rightContent := s.rightContent
 	helpContent := s.helpContent
-	
+
 	if lipgloss.Width(leftContent) > maxPartWidth {
 		leftContent = truncateWithEllipsis(leftContent, maxPartWidth)
 	}
 	if lipgloss.Width(rightContent) > maxPartWidth {
 		rightContent = truncateWithEllipsis(rightContent, maxPartWidth)
 	}
-	
+
 	leftLen := lipgloss.Width(leftContent)
 	rightLen := lipgloss.Width(rightContent)
 
@@ -105,9 +105,9 @@ func (s *StatusLine) Render() string {
 			if padding < 0 {
 				padding = 0
 			}
-			statusContent = fmt.Sprintf("%s%s%s", 
-				leftContent, 
-				strings.Repeat(" ", padding), 
+			statusContent = fmt.Sprintf("%s%s%s",
+				leftContent,
+				strings.Repeat(" ", padding),
 				rightContent)
 		}
 	} else {
@@ -116,9 +116,9 @@ func (s *StatusLine) Render() string {
 		if padding < 0 {
 			padding = 0
 		}
-		statusContent = fmt.Sprintf("%s%s%s", 
-			leftContent, 
-			strings.Repeat(" ", padding), 
+		statusContent = fmt.Sprintf("%s%s%s",
+			leftContent,
+			strings.Repeat(" ", padding),
 			rightContent)
 	}
 
@@ -153,15 +153,15 @@ func DashboardStatusLine(width int, layoutName string, dataFreshness string, sho
 	if width > 80 {
 		left = fmt.Sprintf("Dashboard: %s", layoutName)
 	}
-	
+
 	// Data freshness without brackets to save space
 	right := dataFreshness
-	
+
 	// Truncate help if needed
 	if width < 100 && len(shortHelp) > 40 {
 		shortHelp = "n:new y:copy ?:help q:quit"
 	}
-	
+
 	statusLine := NewStatusLine().
 		SetWidth(width).
 		SetLeft(left).
