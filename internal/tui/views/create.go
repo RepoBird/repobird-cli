@@ -49,6 +49,11 @@ type CreateRunView struct {
 	submitButtonFocused bool
 	// Error handling
 	errorButtonFocused bool
+	errorRowFocused    bool // For selecting the error message row
+	// State preservation when returning from error
+	prevFocusIndex          int
+	prevBackButtonFocused   bool
+	prevSubmitButtonFocused bool
 	// Cache from parent list view
 	parentRuns         []models.RunResponse
 	parentCached       bool
@@ -455,6 +460,7 @@ func (v *CreateRunView) handleRunCreated(msg runCreatedMsg) (tea.Model, tea.Cmd)
 	v.submitting = false
 	if msg.err != nil {
 		v.error = msg.err
+		v.initErrorFocus()
 		return v, nil
 	}
 
@@ -462,6 +468,7 @@ func (v *CreateRunView) handleRunCreated(msg runCreatedMsg) (tea.Model, tea.Cmd)
 	runID := msg.run.GetIDString()
 	if runID == "" {
 		v.error = fmt.Errorf("run created but received invalid ID from server")
+		v.initErrorFocus()
 		debug.LogToFile("DEBUG: Run created successfully but runID is empty, not navigating to details\n")
 		return v, nil
 	}
@@ -481,6 +488,7 @@ func (v *CreateRunView) handleRepositorySelected(msg repositorySelectedMsg) (tea
 	if msg.err != nil {
 		debug.LogToFilef("DEBUG: Repository selection error: %v\n", msg.err)
 		v.error = msg.err
+		v.initErrorFocus()
 		return v, nil
 	}
 
@@ -503,18 +511,34 @@ func (v *CreateRunView) handleErrorMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Capital Q to force quit from anywhere
 		return v, tea.Quit
 	case "y":
-		// Copy error message to clipboard
-		if v.error != nil {
+		// Copy error message to clipboard only if error row is selected
+		if v.error != nil && v.errorRowFocused {
 			return v, v.copyToClipboard(v.error.Error())
 		}
+	case "j", "down":
+		// Navigate down from error row to back button
+		if v.errorRowFocused {
+			v.errorRowFocused = false
+			v.errorButtonFocused = true
+		}
+	case "k", "up":
+		// Navigate up from back button to error row
+		if v.errorButtonFocused {
+			v.errorButtonFocused = false
+			v.errorRowFocused = true
+		}
 	case "enter":
-		// Enter on error goes back to form (clear error)
-		v.error = nil
-		v.errorButtonFocused = false
-		// Set focus to back button by default after error
-		v.backButtonFocused = true
-		v.focusIndex = 0
-		return v, nil
+		if v.errorButtonFocused {
+			// Enter on back button goes back to form (clear error)
+			v.error = nil
+			v.restorePreviousFocus()
+			return v, nil
+		} else if v.errorRowFocused {
+			// Enter on error row also goes back to form
+			v.error = nil
+			v.restorePreviousFocus()
+			return v, nil
+		}
 	case "escape", "q", "b":
 		// ESC, q, b - go back to dashboard
 		v.saveFormData()
@@ -526,7 +550,7 @@ func (v *CreateRunView) handleErrorMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "r":
 		// 'r' to retry (clear error and go back to form)
 		v.error = nil
-		v.errorButtonFocused = false
+		v.restorePreviousFocus()
 		return v, nil
 	}
 	return v, nil
@@ -1143,18 +1167,42 @@ func (v *CreateRunView) renderErrorLayout(availableHeight int) string {
 	b.WriteString(errorHeaderStyle.Render("❌ Error"))
 	b.WriteString("\n\n")
 
-	// Error message
-	errorMsgStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("252"))
-	b.WriteString(errorMsgStyle.Render(v.error.Error()))
+	// Error message row (selectable)
+	errorRowStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("252")).
+		Width(panelWidth - 6) // Account for padding and potential selection indicator
+
+	if v.errorRowFocused {
+		// Show selection indicator and highlight when focused
+		b.WriteString(lipgloss.NewStyle().
+			Foreground(lipgloss.Color("33")).
+			Render(" ● "))
+		errorRowStyle = errorRowStyle.
+			Background(lipgloss.Color("236"))
+	} else {
+		b.WriteString("   ")
+	}
+
+	b.WriteString(errorRowStyle.Render(v.error.Error()))
 	b.WriteString("\n\n")
 
-	// Back button (focused by default in error mode)
+	// Back button
 	backStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("63")).
-		Bold(true).
-		Background(lipgloss.Color("236")).
-		Padding(0, 1)
+		Foreground(lipgloss.Color("63"))
+
+	if v.errorButtonFocused {
+		// Show selection indicator and highlight when focused
+		b.WriteString(lipgloss.NewStyle().
+			Foreground(lipgloss.Color("33")).
+			Render(" ● "))
+		backStyle = backStyle.
+			Bold(true).
+			Background(lipgloss.Color("236")).
+			Padding(0, 1)
+	} else {
+		b.WriteString("   ")
+		backStyle = backStyle.Foreground(lipgloss.Color("240"))
+	}
 
 	b.WriteString(backStyle.Render("← Back to Form"))
 	b.WriteString("\n\n")
@@ -1163,7 +1211,17 @@ func (v *CreateRunView) renderErrorLayout(availableHeight int) string {
 	helpStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("240")).
 		Italic(true)
-	b.WriteString(helpStyle.Render("Press [Enter] to go back, [y] to copy error, [q] to dashboard, [r] to retry"))
+
+	var helpText string
+	if v.errorRowFocused {
+		helpText = "[j/k] navigate [Enter] back to form [y] copy error [q] dashboard [r] retry"
+	} else if v.errorButtonFocused {
+		helpText = "[j/k] navigate [Enter] back to form [q] dashboard [r] retry"
+	} else {
+		helpText = "[j/k] navigate [Enter] back to form [y] copy error [q] dashboard [r] retry"
+	}
+
+	b.WriteString(helpStyle.Render(helpText))
 
 	// Style for the panel
 	panelStyle := lipgloss.NewStyle().
@@ -1174,6 +1232,27 @@ func (v *CreateRunView) renderErrorLayout(availableHeight int) string {
 		Padding(1)
 
 	return panelStyle.Render(b.String())
+}
+
+// initErrorFocus sets the default focus when entering error mode
+func (v *CreateRunView) initErrorFocus() {
+	// Save current focus state before entering error mode
+	v.prevFocusIndex = v.focusIndex
+	v.prevBackButtonFocused = v.backButtonFocused
+	v.prevSubmitButtonFocused = v.submitButtonFocused
+
+	// Default to focusing the error row first
+	v.errorRowFocused = true
+	v.errorButtonFocused = false
+}
+
+// restorePreviousFocus restores the focus state from before the error
+func (v *CreateRunView) restorePreviousFocus() {
+	v.focusIndex = v.prevFocusIndex
+	v.backButtonFocused = v.prevBackButtonFocused
+	v.submitButtonFocused = v.prevSubmitButtonFocused
+	v.errorRowFocused = false
+	v.errorButtonFocused = false
 }
 
 // copyToClipboard copies text to clipboard and shows feedback
@@ -1230,7 +1309,13 @@ func (v *CreateRunView) renderStatusBar() string {
 
 	// Handle error mode status
 	if v.error != nil && !v.submitting {
-		statusText = "[Enter] back to form [y] copy error [q] dashboard [r] retry [Q]uit"
+		if v.errorRowFocused {
+			statusText = "[Enter] back to form [j/k] navigate [y] copy error [q] dashboard [r] retry [Q]uit"
+		} else if v.errorButtonFocused {
+			statusText = "[Enter] back to form [j/k] navigate [q] dashboard [r] retry [Q]uit"
+		} else {
+			statusText = "[Enter] back to form [j/k] navigate [y] copy error [q] dashboard [r] retry [Q]uit"
+		}
 		return components.DashboardStatusLine(v.width, "ERROR", "", statusText)
 	}
 
