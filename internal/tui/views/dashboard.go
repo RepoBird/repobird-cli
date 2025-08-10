@@ -3,9 +3,6 @@ package views
 import (
 	"context"
 	"fmt"
-	"os"
-	"os/exec"
-	"runtime"
 	"strings"
 	"time"
 
@@ -19,6 +16,7 @@ import (
 	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/repobird/repobird-cli/internal/tui/components"
 	"github.com/repobird/repobird-cli/internal/tui/debug"
+	"github.com/repobird/repobird-cli/internal/utils"
 )
 
 // DashboardView is the main dashboard controller that manages different layout views
@@ -71,6 +69,11 @@ type DashboardView struct {
 
 	// Loading spinner
 	spinner spinner.Model
+
+	// Clipboard feedback
+	copiedMessage     string
+	copiedMessageTime time.Time
+	yankBlink         bool // Toggle for blinking effect
 }
 
 type dashboardDataLoadedMsg struct {
@@ -120,6 +123,13 @@ func NewDashboardView(client *api.Client) *DashboardView {
 
 // Init implements the tea.Model interface
 func (d *DashboardView) Init() tea.Cmd {
+	// Initialize clipboard (will detect CGO availability)
+	err := utils.InitClipboard()
+	if err != nil {
+		// Log error but don't fail - clipboard may not be available in some environments
+		debug.LogToFilef("DEBUG: Failed to initialize clipboard: %v\n", err)
+	}
+
 	return tea.Batch(
 		d.loadDashboardData(),
 		d.loadUserInfo(),
@@ -505,6 +515,14 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
+	case yankBlinkMsg:
+		// Toggle blink state for animation effect
+		d.yankBlink = !d.yankBlink
+		// Continue blinking for the first second
+		if time.Since(d.copiedMessageTime) < 1*time.Second {
+			cmds = append(cmds, d.startYankBlinkAnimation())
+		}
+
 	case components.FZFSelectedMsg:
 		// Handle FZF selection result
 		if !msg.Result.Canceled {
@@ -715,22 +733,38 @@ func (d *DashboardView) handleMillerColumnsNavigation(msg tea.KeyMsg) tea.Cmd {
 
 	case msg.Type == tea.KeyRunes && string(msg.Runes) == "y":
 		// Copy current row/line in any column
+		var textToCopy string
+		var copiedItem string
+
 		switch d.focusedColumn {
 		case 0: // Repository column
 			if d.selectedRepoIdx < len(d.repositories) {
 				repo := d.repositories[d.selectedRepoIdx]
-				return d.copyToClipboard(repo.Name)
+				textToCopy = repo.Name
+				copiedItem = "repository"
 			}
 		case 1: // Runs column
 			if d.selectedRunIdx < len(d.filteredRuns) {
 				run := d.filteredRuns[d.selectedRunIdx]
-				text := fmt.Sprintf("%s - %s", run.GetIDString(), run.Title)
-				return d.copyToClipboard(text)
+				textToCopy = fmt.Sprintf("%s - %s", run.GetIDString(), run.Title)
+				copiedItem = "run"
 			}
 		case 2: // Details column
 			if d.selectedDetailLine < len(d.detailLines) {
-				return d.copyToClipboard(d.detailLines[d.selectedDetailLine])
+				textToCopy = d.detailLines[d.selectedDetailLine]
+				copiedItem = "detail"
 			}
+		}
+
+		if textToCopy != "" {
+			if err := d.copyToClipboard(textToCopy); err == nil {
+				d.copiedMessage = fmt.Sprintf("📋 Copied %s", copiedItem)
+			} else {
+				d.copiedMessage = "✗ Failed to copy"
+			}
+			d.copiedMessageTime = time.Now()
+			d.yankBlink = true
+			return d.startYankBlinkAnimation()
 		}
 
 	case key.Matches(msg, d.keys.Right) || (msg.Type == tea.KeyRunes && string(msg.Runes) == "l"):
@@ -998,6 +1032,16 @@ func (d *DashboardView) updateDetailLines() {
 		fmt.Sprintf("Repository: %s", run.GetRepositoryName()),
 	}
 
+	// Show run type - normalize API values to display values
+	if run.RunType != "" {
+		displayType := "Run"
+		runTypeLower := strings.ToLower(run.RunType)
+		if strings.Contains(runTypeLower, "plan") {
+			displayType = "Plan"
+		}
+		d.detailLines = append(d.detailLines, fmt.Sprintf("Type: %s", displayType))
+	}
+
 	if run.Source != "" && run.Target != "" {
 		d.detailLines = append(d.detailLines, fmt.Sprintf("Branch: %s → %s", run.Source, run.Target))
 	}
@@ -1016,6 +1060,14 @@ func (d *DashboardView) updateDetailLines() {
 		d.detailLines = append(d.detailLines, wrapped...)
 	}
 
+	// Show plan for plan-type runs that are completed
+	if strings.Contains(strings.ToLower(run.RunType), "plan") && run.Status == models.StatusDone && run.Plan != "" {
+		d.detailLines = append(d.detailLines, "", "Plan:")
+		// Wrap plan text
+		wrapped := d.wrapText(run.Plan, 50)
+		d.detailLines = append(d.detailLines, wrapped...)
+	}
+
 	if run.Error != "" {
 		d.detailLines = append(d.detailLines, "", "Error:")
 		wrapped := d.wrapText(run.Error, 50)
@@ -1024,38 +1076,15 @@ func (d *DashboardView) updateDetailLines() {
 }
 
 // copyToClipboard copies the given text to clipboard
-func (d *DashboardView) copyToClipboard(text string) tea.Cmd {
+func (d *DashboardView) copyToClipboard(text string) error {
+	return utils.WriteToClipboard(text)
+}
+
+// startYankBlinkAnimation starts the blinking animation for clipboard feedback
+func (d *DashboardView) startYankBlinkAnimation() tea.Cmd {
 	return func() tea.Msg {
-		var cmd *exec.Cmd
-
-		switch runtime.GOOS {
-		case "darwin":
-			cmd = exec.Command("pbcopy")
-		case "linux":
-			// Check if we're on Wayland or X11
-			if os.Getenv("WAYLAND_DISPLAY") != "" {
-				// Wayland - use wl-copy
-				cmd = exec.Command("wl-copy")
-			} else if os.Getenv("DISPLAY") != "" {
-				// X11 - use xclip
-				cmd = exec.Command("xclip", "-selection", "clipboard")
-			} else {
-				// Try xclip as fallback
-				cmd = exec.Command("xclip", "-selection", "clipboard")
-			}
-		default:
-			return nil // Unsupported OS
-		}
-
-		if cmd != nil {
-			cmd.Stdin = strings.NewReader(text)
-			err := cmd.Run()
-			if err != nil {
-				// Log error but don't crash
-				fmt.Fprintf(os.Stderr, "Failed to copy to clipboard: %v\n", err)
-			}
-		}
-		return nil
+		time.Sleep(100 * time.Millisecond)
+		return yankBlinkMsg{}
 	}
 }
 
@@ -1617,6 +1646,20 @@ func (d *DashboardView) renderStatusLine(layoutName string) string {
 	shortHelp := "n:new f:fuzzy y:copy ?:help r:refresh q:quit"
 	if d.showHelp {
 		shortHelp = "n:new f:fuzzy y:copy j/k:↑↓ h/l:←→ Enter:→ BS:← ?:help q:quit"
+	}
+
+	// Show copied message if recent with blinking effect
+	if d.copiedMessage != "" && time.Since(d.copiedMessageTime) < 3*time.Second {
+		copiedStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("82")).
+			Bold(true)
+
+		// Apply blinking effect for the first second
+		if time.Since(d.copiedMessageTime) < 1*time.Second && d.yankBlink {
+			copiedStyle = copiedStyle.Blink(true)
+		}
+
+		shortHelp = copiedStyle.Render(d.copiedMessage) + " | " + shortHelp
 	}
 
 	return components.DashboardStatusLine(d.width, layoutName, dataInfo, shortHelp)

@@ -37,3 +37,7 @@ man/
 
 # Go linting config (environment-specific)
 .golangci.yml
+
+# Ignore repobird binary in any folder
+**/repobird
+repobird

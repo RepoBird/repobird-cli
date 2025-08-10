@@ -17,7 +17,7 @@ import (
 	"github.com/repobird/repobird-cli/internal/tui/components"
 	"github.com/repobird/repobird-cli/internal/tui/debug"
 	"github.com/repobird/repobird-cli/internal/tui/styles"
-	"golang.design/x/clipboard"
+	"github.com/repobird/repobird-cli/internal/utils"
 )
 
 type RunDetailsView struct {
@@ -37,6 +37,7 @@ type RunDetailsView struct {
 	showLogs      bool
 	logs          string
 	statusHistory []string
+	pollingStatus bool // Track if currently fetching status
 	// Cache from parent list view
 	parentRuns         []models.RunResponse
 	parentCached       bool
@@ -48,6 +49,7 @@ type RunDetailsView struct {
 	// Clipboard feedback
 	copiedMessage     string
 	copiedMessageTime time.Time
+	yankBlink         bool // Toggle for blinking effect
 	// Store full content for clipboard operations
 	fullContent string
 }
@@ -112,7 +114,7 @@ func NewRunDetailsViewWithConfig(config RunDetailsViewConfig) *RunDetailsView {
 
 	// Initialize status history with current status if we have cached data
 	if !needsLoading {
-		v.updateStatusHistory(string(run.Status))
+		v.updateStatusHistory(string(run.Status), false)
 		v.updateContent()
 	}
 
@@ -165,8 +167,8 @@ func NewRunDetailsViewWithCache(
 }
 
 func (v *RunDetailsView) Init() tea.Cmd {
-	// Initialize clipboard
-	err := clipboard.Init()
+	// Initialize clipboard (will detect CGO availability)
+	err := utils.InitClipboard()
 	if err != nil {
 		// Log error but don't fail - clipboard may not be available in some environments
 		debug.LogToFilef("DEBUG: Failed to initialize clipboard: %v\n", err)
@@ -192,7 +194,7 @@ func (v *RunDetailsView) Init() tea.Cmd {
 
 				v.run = *cachedRun
 				v.loading = false
-				v.updateStatusHistory(string(cachedRun.Status))
+				v.updateStatusHistory(string(cachedRun.Status), false)
 				v.updateContent()
 			} else {
 				v.cacheRetryCount++
@@ -287,21 +289,23 @@ func (v *RunDetailsView) handleClipboardOperations(key string) tea.Cmd {
 	case "y":
 		// Copy current line to clipboard
 		if err := v.copyCurrentLine(); err == nil {
-			v.copiedMessage = "✓ Copied current line"
+			v.copiedMessage = "📋 Copied current line"
 		} else {
 			v.copiedMessage = "✗ Failed to copy"
 		}
 		v.copiedMessageTime = time.Now()
-		return nil
+		v.yankBlink = true
+		return v.startYankBlinkAnimation()
 	case "Y":
 		// Copy all content to clipboard
 		if err := v.copyAllContent(); err == nil {
-			v.copiedMessage = "✓ Copied all content"
+			v.copiedMessage = "📋 Copied all content"
 		} else {
 			v.copiedMessage = "✗ Failed to copy"
 		}
 		v.copiedMessageTime = time.Now()
-		return nil
+		v.yankBlink = true
+		return v.startYankBlinkAnimation()
 	}
 	return nil
 }
@@ -327,10 +331,11 @@ func (v *RunDetailsView) handleViewportNavigation(msg tea.KeyMsg) {
 // handleRunDetailsLoaded handles the runDetailsLoadedMsg message
 func (v *RunDetailsView) handleRunDetailsLoaded(msg runDetailsLoadedMsg) {
 	v.loading = false
+	v.pollingStatus = false // Clear polling status
 	v.run = msg.run
 	v.error = msg.err
 	if msg.err == nil {
-		v.updateStatusHistory(string(msg.run.Status))
+		v.updateStatusHistory(string(msg.run.Status), false)
 	}
 	v.updateContent()
 
@@ -342,7 +347,13 @@ func (v *RunDetailsView) handleRunDetailsLoaded(msg runDetailsLoadedMsg) {
 func (v *RunDetailsView) handlePolling(msg pollTickMsg) []tea.Cmd {
 	var cmds []tea.Cmd
 	if models.IsActiveStatus(string(v.run.Status)) {
+		// Mark that we're fetching status
+		v.pollingStatus = true
+		v.updateStatusHistory("Fetching status...", true)
+		v.updateContent()
 		cmds = append(cmds, v.loadRunDetails())
+		// Keep the polling going
+		cmds = append(cmds, v.startPolling())
 	} else {
 		v.stopPolling()
 	}
@@ -365,8 +376,16 @@ func (v *RunDetailsView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case pollTickMsg:
 		cmds = append(cmds, v.handlePolling(msg)...)
 
+	case yankBlinkMsg:
+		// Toggle blink state for animation effect
+		v.yankBlink = !v.yankBlink
+		// Continue blinking for the first second
+		if time.Since(v.copiedMessageTime) < 1*time.Second {
+			cmds = append(cmds, v.startYankBlinkAnimation())
+		}
+
 	case spinner.TickMsg:
-		if v.loading {
+		if v.loading || v.pollingStatus {
 			var cmd tea.Cmd
 			v.spinner, cmd = v.spinner.Update(msg)
 			cmds = append(cmds, cmd)
@@ -492,8 +511,15 @@ func (v *RunDetailsView) renderHeader() string {
 	header := styles.TitleStyle.MaxWidth(v.width).Render(title)
 
 	if models.IsActiveStatus(string(v.run.Status)) {
-		pollingIndicator := styles.ProcessingStyle.Render(" [Polling ⟳]")
-		header += pollingIndicator
+		if v.pollingStatus {
+			// Show active polling indicator
+			pollingIndicator := styles.ProcessingStyle.Render(" [Fetching... " + v.spinner.View() + "]")
+			header += pollingIndicator
+		} else {
+			// Show passive polling indicator
+			pollingIndicator := styles.ProcessingStyle.Render(" [Monitoring ⟳]")
+			header += pollingIndicator
+		}
 	}
 
 	rightAlign := lipgloss.NewStyle().Align(lipgloss.Right).Width(v.width - lipgloss.Width(header))
@@ -509,9 +535,18 @@ func (v *RunDetailsView) renderStatusBar() string {
 		options = "[b]ack [l]details [y]copy line [Y]copy all [r]efresh [?]help [q]uit"
 	}
 
-	// Show copied message if recent
-	if v.copiedMessage != "" && time.Since(v.copiedMessageTime) < 2*time.Second {
-		options = v.copiedMessage + " | " + options
+	// Show copied message if recent with blinking effect
+	if v.copiedMessage != "" && time.Since(v.copiedMessageTime) < 3*time.Second {
+		copiedStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("82")).
+			Bold(true)
+
+		// Apply blinking effect for the first second
+		if time.Since(v.copiedMessageTime) < 1*time.Second && v.yankBlink {
+			copiedStyle = copiedStyle.Blink(true)
+		}
+
+		options = copiedStyle.Render(v.copiedMessage) + " | " + options
 	}
 
 	return styles.StatusBarStyle.Width(v.width).Render(options)
@@ -538,6 +573,9 @@ func (v *RunDetailsView) updateContent() {
 		if v.run.Target != "" && v.run.Target != v.run.Source {
 			content.WriteString(fmt.Sprintf("Target Branch: %s\n", v.run.Target))
 		}
+		if v.run.RunType != "" {
+			content.WriteString(fmt.Sprintf("Run Type: %s\n", v.run.RunType))
+		}
 		content.WriteString(fmt.Sprintf("Created: %s\n", v.run.CreatedAt.Format(time.RFC3339)))
 
 		if v.run.UpdatedAt.After(v.run.CreatedAt) && (v.run.Status == models.StatusDone || v.run.Status == models.StatusFailed) {
@@ -549,6 +587,17 @@ func (v *RunDetailsView) updateContent() {
 		// Display status history in reverse order (most recent first)
 		for i := len(v.statusHistory) - 1; i >= 0; i-- {
 			content.WriteString(v.statusHistory[i] + "\n")
+		}
+
+		if v.run.Prompt != "" {
+			content.WriteString("\n═══ Prompt ═══\n")
+			content.WriteString(v.run.Prompt + "\n")
+		}
+
+		// Show plan for plan-type runs that are completed (includes "plan", "pro-plan", etc.)
+		if strings.Contains(strings.ToLower(v.run.RunType), "plan") && v.run.Status == models.StatusDone && v.run.Plan != "" {
+			content.WriteString("\n═══ Plan ═══\n")
+			content.WriteString(v.run.Plan + "\n")
 		}
 
 		if v.run.Context != "" {
@@ -567,12 +616,33 @@ func (v *RunDetailsView) updateContent() {
 	v.viewport.SetContent(v.fullContent)
 }
 
-func (v *RunDetailsView) updateStatusHistory(status string) {
-	if len(v.statusHistory) == 0 || v.statusHistory[len(v.statusHistory)-1] != status {
-		timestamp := time.Now().Format("15:04:05")
+func (v *RunDetailsView) updateStatusHistory(status string, isPolling bool) {
+	timestamp := time.Now().Format("15:04:05")
+	var entry string
+
+	if isPolling {
+		// Show polling indicator
+		entry = fmt.Sprintf("[%s] 🔄 %s", timestamp, status)
+	} else {
+		// Regular status update - only add if different from last non-polling status
+		if len(v.statusHistory) > 0 {
+			// Find last non-polling status
+			for i := len(v.statusHistory) - 1; i >= 0; i-- {
+				if !strings.Contains(v.statusHistory[i], "🔄") && strings.Contains(v.statusHistory[i], status) {
+					// Same status as before, don't add duplicate
+					return
+				}
+			}
+		}
 		statusIcon := styles.GetStatusIcon(status)
-		entry := fmt.Sprintf("[%s] %s %s", timestamp, statusIcon, status)
-		v.statusHistory = append(v.statusHistory, entry)
+		entry = fmt.Sprintf("[%s] %s %s", timestamp, statusIcon, status)
+	}
+
+	v.statusHistory = append(v.statusHistory, entry)
+
+	// Keep history size reasonable
+	if len(v.statusHistory) > 50 {
+		v.statusHistory = v.statusHistory[len(v.statusHistory)-50:]
 	}
 }
 
@@ -620,7 +690,7 @@ func (v *RunDetailsView) startPolling() tea.Cmd {
 		return nil
 	}
 
-	v.pollTicker = time.NewTicker(5 * time.Second)
+	v.pollTicker = time.NewTicker(10 * time.Second) // Poll every 10 seconds
 	v.pollStop = make(chan bool)
 
 	return func() tea.Msg {
@@ -663,6 +733,8 @@ type runDetailsLoadedMsg struct {
 	err error
 }
 
+type yankBlinkMsg struct{}
+
 // copyCurrentLine copies the current visible line to clipboard
 func (v *RunDetailsView) copyCurrentLine() error {
 	// Get the current line based on viewport position
@@ -672,10 +744,7 @@ func (v *RunDetailsView) copyCurrentLine() error {
 		// Get first visible line (could be partial due to scrolling)
 		currentLine := visibleLines[0]
 		if currentLine != "" {
-			// Write returns a channel that signals when done
-			done := clipboard.Write(clipboard.FmtText, []byte(currentLine))
-			<-done // Wait for completion
-			return nil
+			return utils.WriteToClipboard(currentLine)
 		}
 	}
 
@@ -687,8 +756,13 @@ func (v *RunDetailsView) copyAllContent() error {
 	if v.fullContent == "" {
 		return fmt.Errorf("no content to copy")
 	}
-	// Write returns a channel that signals when done
-	done := clipboard.Write(clipboard.FmtText, []byte(v.fullContent))
-	<-done // Wait for completion
-	return nil
+	return utils.WriteToClipboard(v.fullContent)
+}
+
+// startYankBlinkAnimation starts the blinking animation for clipboard feedback
+func (v *RunDetailsView) startYankBlinkAnimation() tea.Cmd {
+	return func() tea.Msg {
+		time.Sleep(100 * time.Millisecond)
+		return yankBlinkMsg{}
+	}
 }

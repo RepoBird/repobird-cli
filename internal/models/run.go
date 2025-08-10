@@ -80,6 +80,7 @@ type RunResponse struct {
 	Error          string    `json:"error,omitempty"`
 	PrURL          *string   `json:"prUrl,omitempty"`
 	RunType        string    `json:"runType,omitempty"`
+	Plan           string    `json:"plan,omitempty"`
 }
 
 // GetIDString returns the ID as a string

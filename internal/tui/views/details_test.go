@@ -127,7 +127,7 @@ func TestRunDetailsView_LoadingStateHandling(t *testing.T) {
 	view.loading = false
 	view.run = updatedRun
 	view.error = nil
-	view.updateStatusHistory(string(updatedRun.Status))
+	view.updateStatusHistory(string(updatedRun.Status), false)
 	view.updateContent()
 
 	// Should no longer be loading

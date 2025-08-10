@@ -57,11 +57,17 @@ deps:
 	$(GOMOD) download
 	$(GOMOD) verify
 
-## build: Build the binary for current platform
+## build: Build the binary for current platform (without CGO for portability)
 build:
 	@mkdir -p $(BUILD_DIR)
 	CGO_ENABLED=0 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) $(MAIN_PATH)
 	@echo "Build complete: $(BUILD_DIR)/$(BINARY_NAME)"
+
+## build-cgo: Build the binary with CGO enabled (better clipboard support)
+build-cgo:
+	@mkdir -p $(BUILD_DIR)
+	CGO_ENABLED=1 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) $(MAIN_PATH)
+	@echo "Build complete with CGO: $(BUILD_DIR)/$(BINARY_NAME)"
 
 ## build-all: Build binaries for all platforms
 build-all:
@@ -78,8 +84,12 @@ build-all:
 run:
 	$(GOCMD) run $(LDFLAGS) $(MAIN_PATH)
 
-## tui: Build and run the TUI interface
+## tui: Build and run the TUI interface (portable build)
 tui: build
+	./$(BUILD_DIR)/$(BINARY_NAME) tui
+
+## tui-cgo: Build and run the TUI interface with CGO (better clipboard support)
+tui-cgo: build-cgo
 	./$(BUILD_DIR)/$(BINARY_NAME) tui
 
 ## status: Build and run status command
