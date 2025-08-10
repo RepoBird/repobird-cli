@@ -718,12 +718,12 @@ func (d *DashboardView) renderTripleColumnLayout() string {
 	}
 
 	// Column widths - calculate based on terminal width
-	// Account for spacing between columns and overall padding
-	// JoinHorizontal adds no spacing by default, so columns should use full width
-	totalWidth := d.width  // Use full terminal width
-	leftWidth := totalWidth / 3
-	centerWidth := totalWidth / 3
-	rightWidth := totalWidth - leftWidth - centerWidth  // Ensure we use exact width
+	// We need to ensure columns fit exactly within terminal width
+	// Divide width evenly among three columns
+	totalWidth := d.width
+	leftWidth := (totalWidth - 2) / 3  // Subtract 2 for safety margin
+	centerWidth := (totalWidth - 2) / 3
+	rightWidth := totalWidth - 2 - leftWidth - centerWidth  // Use remaining width
 	
 	// Ensure minimum widths
 	if leftWidth < 10 {
