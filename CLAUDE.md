@@ -46,7 +46,10 @@ Comprehensive documentation is available in the `docs/` directory:
 - **Go 1.20+** - Primary language
 - **Cobra** - CLI framework
 - **Viper** - Configuration management
+- **Bubble Tea** - Terminal UI framework
+- **Lipgloss** - Terminal styling
 - **Standard library HTTP client** - API communication
+- **Fuzzy** - Fuzzy string matching for search
 
 ## Development Guidelines
 
@@ -72,6 +75,43 @@ Comprehensive documentation is available in the `docs/` directory:
 - Always create PRs for review
 - Squash commits when merging
 - Keep main branch stable and deployable
+
+## Terminal UI (TUI) Implementation
+
+### FZF Integration
+The TUI includes built-in fuzzy search functionality:
+
+#### Dashboard View (`internal/tui/views/dashboard.go`)
+- Press `f` on any column to activate FZF mode
+- Shows dropdown overlay at cursor position
+- Filters repositories, runs, or details based on input
+- Enter selects and moves to next column
+- ESC cancels FZF mode
+
+#### Create Run View (`internal/tui/views/create.go`)
+- `Ctrl+F` in insert mode activates FZF for repository field
+- `f` in normal mode (after ESC) activates FZF for repository field
+- Shows repository history and current git repo
+- Smart icon indicators (📁 current, 🔄 history, ✏️ edited)
+
+#### FZF Component (`internal/tui/components/fzf_selector.go`)
+- Reusable fuzzy search component
+- Compact dropdown style with rounded borders
+- Real-time filtering using sahilm/fuzzy library
+- Keyboard navigation (arrows, Ctrl+j/k)
+- Scroll indicators for long lists
+
+### Key Bindings
+- `f` - Activate FZF mode (dashboard)
+- `Ctrl+F` - Activate FZF mode (create view, insert mode)
+- `↑↓` or `j/k` - Navigate items
+- `Enter` - Select item
+- `ESC` - Cancel FZF mode
+- `Tab` - Next field/column
+- `n` - New run
+- `s` - Status info
+- `r` - Refresh
+- `q` - Quit
 
 ## Common Commands
 
@@ -170,6 +210,10 @@ repobird version
 - Go 1.20 or higher
 - Git (for repository detection)
 - Internet connection for API calls
+- github.com/charmbracelet/bubbletea (TUI framework)
+- github.com/charmbracelet/lipgloss (styling)
+- github.com/sahilm/fuzzy (fuzzy matching)
+- github.com/ktr0731/go-fuzzyfinder (repository selector fallback)
 
 ## Known Issues & Limitations
 - Maximum timeout for runs is 45 minutes

@@ -50,6 +50,10 @@ type GlobalCache struct {
 
 	// In-memory repository history for testing
 	repoHistory []string
+
+	// User info cache
+	userInfo     *models.UserInfo
+	userInfoTime time.Time
 }
 
 var globalCache *GlobalCache
@@ -265,10 +269,26 @@ func ClearCache() {
 
 // InitializeCacheForUser reinitializes the cache for a specific user
 func InitializeCacheForUser(userID *int) {
-	// Clear current cache first
+	// Clear current cache first (but preserve user info if same user)
+	var savedUserInfo *models.UserInfo
+	var savedUserInfoTime time.Time
+	if globalCache != nil && globalCache.userInfo != nil && userID != nil && globalCache.userInfo.ID == *userID {
+		// Save user info if it's for the same user
+		savedUserInfo = globalCache.userInfo
+		savedUserInfoTime = globalCache.userInfoTime
+	}
+
 	ClearCache()
 	// Initialize with user-specific cache
 	initializeCacheForUser(userID)
+
+	// Restore user info if same user
+	if savedUserInfo != nil {
+		globalCache.mu.Lock()
+		globalCache.userInfo = savedUserInfo
+		globalCache.userInfoTime = savedUserInfoTime
+		globalCache.mu.Unlock()
+	}
 }
 
 // ClearActiveCache clears only the temporary cache (keeps terminal runs)
@@ -360,4 +380,25 @@ func GetMostRecentRepository() (string, error) {
 		return "", err
 	}
 	return repos[0], nil
+}
+
+// GetCachedUserInfo returns cached user info if available and not expired
+func GetCachedUserInfo() *models.UserInfo {
+	globalCache.mu.RLock()
+	defer globalCache.mu.RUnlock()
+
+	// Cache user info for 5 minutes
+	if globalCache.userInfo != nil && time.Since(globalCache.userInfoTime) < 5*time.Minute {
+		return globalCache.userInfo
+	}
+	return nil
+}
+
+// SetCachedUserInfo stores user info in cache
+func SetCachedUserInfo(userInfo *models.UserInfo) {
+	globalCache.mu.Lock()
+	defer globalCache.mu.Unlock()
+
+	globalCache.userInfo = userInfo
+	globalCache.userInfoTime = time.Now()
 }

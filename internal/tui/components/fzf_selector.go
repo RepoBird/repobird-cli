@@ -273,4 +273,3 @@ func (f *FZFMode) GetSelected() (string, bool) {
 	}
 	return "", false
 }
-

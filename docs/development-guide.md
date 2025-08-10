@@ -218,6 +218,75 @@ func (v *NewView) View() string {
 }
 ```
 
+### 5. Adding TUI Components
+
+#### FZF Selector Component
+
+The FZF selector provides fuzzy search functionality:
+
+```go
+// internal/tui/components/fzf_selector.go
+import "github.com/sahilm/fuzzy"
+
+// Create FZF mode
+fzf := components.NewFZFMode(items, width, height)
+fzf.Activate()
+
+// Handle in Update method
+if fzf.IsActive() {
+    newFzf, cmd := fzf.Update(msg)
+    // Handle FZFSelectedMsg
+}
+
+// Render dropdown
+fzfView := fzf.View()
+```
+
+#### Repository Selector
+
+Provides repository selection with history:
+
+```go
+// internal/tui/components/repository_selector.go
+selector := components.NewRepositorySelector()
+repo, err := selector.SelectRepository()
+```
+
+#### Integrating FZF in Views
+
+1. Add FZF state to view struct:
+```go
+type MyView struct {
+    fzfMode   *components.FZFMode
+    fzfActive bool
+}
+```
+
+2. Handle activation:
+```go
+case "f": // Activate FZF
+    items := getItems()
+    v.fzfMode = components.NewFZFMode(items, width, height)
+    v.fzfMode.Activate()
+```
+
+3. Handle selection:
+```go
+case components.FZFSelectedMsg:
+    if !msg.Result.Canceled {
+        // Process selection
+        selected := msg.Result.Selected
+    }
+    v.fzfMode = nil
+```
+
+4. Render with overlay:
+```go
+if v.fzfMode != nil && v.fzfMode.IsActive() {
+    return v.renderWithFZFOverlay(baseView)
+}
+```
+
 ## Code Style Guidelines
 
 ### Go Conventions
@@ -582,6 +651,55 @@ go test -timeout 30s ./...
 
 # Skip integration tests
 go test -short ./...
+```
+
+## Dependencies Management
+
+### Core Dependencies
+
+```go
+// Terminal UI
+github.com/charmbracelet/bubbletea  // TUI framework
+github.com/charmbracelet/lipgloss   // Styling
+github.com/charmbracelet/bubbles    // UI components
+
+// Fuzzy Search
+github.com/sahilm/fuzzy              // Fuzzy string matching
+github.com/ktr0731/go-fuzzyfinder   // Interactive fuzzy finder
+
+// CLI Framework
+github.com/spf13/cobra               // Command-line interface
+github.com/spf13/viper               // Configuration
+
+// Utilities
+github.com/briandowns/spinner       // Progress indicators
+github.com/fatih/color              // Terminal colors
+```
+
+### Adding Dependencies
+
+```bash
+# Add new dependency
+go get github.com/package/name
+
+# Update go.mod and go.sum
+go mod tidy
+
+# Verify
+go mod verify
+```
+
+### Updating Dependencies
+
+```bash
+# Update all dependencies
+go get -u ./...
+
+# Update specific dependency
+go get -u github.com/package/name
+
+# Clean up
+go mod tidy
 ```
 
 ## IDE Setup

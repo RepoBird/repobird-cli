@@ -129,11 +129,14 @@ func (r *RunResponse) UnmarshalJSON(data []byte) error {
 }
 
 type UserInfo struct {
-	ID            int    `json:"id,omitempty"`
-	Email         string `json:"email"`
-	RemainingRuns int    `json:"remainingRuns"`
-	TotalRuns     int    `json:"totalRuns"`
-	Tier          string `json:"tier"`
+	ID             int    `json:"id,omitempty"`
+	Email          string `json:"email"`
+	Name           string `json:"name,omitempty"`
+	GithubUsername string `json:"githubUsername,omitempty"`
+	RemainingRuns  int    `json:"remainingRuns"`
+	TotalRuns      int    `json:"totalRuns"`
+	Tier           string `json:"tier"`
+	TierDetails    *Tier  `json:"tierDetails,omitempty"`
 }
 
 type ListRunsResponse struct {

@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
+
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textarea"
@@ -66,6 +68,7 @@ type CreateRunViewConfig struct {
 	ParentCached       bool
 	ParentCachedAt     time.Time
 	ParentDetailsCache map[string]*models.RunResponse
+	SelectedRepository string // Pre-selected repository from dashboard
 }
 
 // NewCreateRunViewWithConfig creates a new CreateRunView with the given configuration
@@ -84,7 +87,16 @@ func NewCreateRunViewWithConfig(config CreateRunViewConfig) *CreateRunView {
 	v.repoSelector = components.NewRepositorySelector()
 	v.initializeInputFields()
 	v.loadFormData()
-	v.autofillRepository()
+	
+	// If a repository was selected in the dashboard, use it
+	if config.SelectedRepository != "" {
+		if len(v.fields) >= 2 {
+			v.fields[1].SetValue(config.SelectedRepository)
+		}
+	} else {
+		v.autofillRepository()
+	}
+	
 	return v
 }
 
@@ -606,122 +618,89 @@ func (v *CreateRunView) clearCurrentField() {
 }
 
 func (v *CreateRunView) View() string {
-	var s strings.Builder
-
-	title := styles.TitleStyle.Render("Create New Run")
-	s.WriteString(title)
-	s.WriteString("\n\n")
-
-	if v.error != nil {
-		s.WriteString(styles.ErrorStyle.Render("Error: " + v.error.Error()))
-		s.WriteString("\n\n")
+	if v.width <= 0 || v.height <= 0 {
+		return "Initializing..."
 	}
 
-	if v.useFileInput {
-		s.WriteString("═══ Load from File ═══\n\n")
-		s.WriteString("File Path: ")
-		s.WriteString(v.filePathInput.View())
-		s.WriteString("\n\n")
-		s.WriteString("Press Ctrl+F to switch to manual input\n")
-		s.WriteString("Press Ctrl+S to submit\n")
+	// Consistent title style with dashboard
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("63")).
+		PaddingLeft(1)
+
+	title := titleStyle.Render("Repobird.ai CLI - Create New Run")
+
+	// Calculate available height for content
+	// Title (1) + spacing (1) + statusbar (1) = 3
+	availableHeight := v.height - 3
+	if availableHeight < 10 {
+		availableHeight = 10
+	}
+
+	var content string
+
+	if v.error != nil && !v.submitting {
+		errorContent := fmt.Sprintf("Error: %s\n\nPress 'ESC' to go back, 'r' to retry", v.error.Error())
+		errorStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("196")).
+			Width(v.width).
+			Align(lipgloss.Center).
+			MarginTop((availableHeight - 4) / 2)
+		content = errorStyle.Render(errorContent)
+	} else if v.submitting {
+		loadingContent := "⟳ Creating run...\n\nPlease wait..."
+		loadingStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("33")).
+			Bold(true).
+			Width(v.width).
+			Align(lipgloss.Center).
+			MarginTop((availableHeight - 2) / 2)
+		content = loadingStyle.Render(loadingContent)
+	} else if v.useFileInput {
+		// File input mode - centered box
+		fileContent := v.renderFileInputMode()
+		boxWidth := 60
+		boxHeight := 10
+
+		fileBoxStyle := lipgloss.NewStyle().
+			Width(boxWidth).
+			Height(boxHeight).
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("63")).
+			Padding(1, 2)
+
+		fileBox := fileBoxStyle.Render(fileContent)
+
+		// Center the box
+		content = lipgloss.Place(
+			v.width,
+			availableHeight,
+			lipgloss.Center,
+			lipgloss.Center,
+			fileBox,
+		)
 	} else {
-		s.WriteString("═══ Run Configuration ═══\n\n")
-
-		fieldLabels := []string{
-			"Title:      ",
-			"Repository: ",
-			"Source:     ",
-			"Target:     ",
-			"Issue:      ",
-		}
-
-		for i, label := range fieldLabels {
-			s.WriteString(label)
-			if i == v.focusIndex && v.inputMode == components.InsertMode {
-				s.WriteString(styles.SelectedStyle.Render("▶ "))
-			} else if i == v.focusIndex {
-				s.WriteString(styles.ProcessingStyle.Render("● "))
-			} else {
-				s.WriteString("  ")
-			}
-			s.WriteString(v.fields[i].View())
-			s.WriteString("\n")
-		}
-
-		s.WriteString("\nPrompt:\n")
-		if v.focusIndex == len(v.fields) && v.inputMode == components.InsertMode {
-			s.WriteString(styles.SelectedStyle.Render("▶ "))
-		} else if v.focusIndex == len(v.fields) {
-			s.WriteString(styles.ProcessingStyle.Render("● "))
-		} else {
-			s.WriteString("  ")
-		}
-		s.WriteString(v.promptArea.View())
-		s.WriteString("\n")
-
-		s.WriteString("\nContext (optional):\n")
-		if v.focusIndex == len(v.fields)+1 && v.inputMode == components.InsertMode {
-			s.WriteString(styles.SelectedStyle.Render("▶ "))
-		} else if v.focusIndex == len(v.fields)+1 {
-			s.WriteString(styles.ProcessingStyle.Render("● "))
-		} else {
-			s.WriteString("  ")
-		}
-		s.WriteString(v.contextArea.View())
-		s.WriteString("\n\n")
-
-		// Back button
-		if v.backButtonFocused {
-			if v.inputMode == components.InsertMode {
-				s.WriteString(styles.SelectedStyle.Render("← [Back to Runs]"))
-			} else {
-				s.WriteString(styles.ProcessingStyle.Render("← [Back to Runs]"))
-			}
-		} else {
-			s.WriteString("← [Back to Runs]")
-		}
-		s.WriteString("\n\n")
-
-		// Show mode-specific instructions
-		if v.inputMode == components.InsertMode {
-			s.WriteString("INSERT MODE | ESC: normal mode | Tab: next field | Ctrl+S: submit\n")
-		} else {
-			if v.exitRequested {
-				s.WriteString("Press ESC again to exit | Enter: select | j/k: navigate | Ctrl+S: submit\n")
-			} else {
-				s.WriteString("NORMAL MODE | ESC: exit | Enter: select | j/k: navigate | Ctrl+S: submit\n")
-			}
-		}
+		// Form input mode - two-column layout
+		content = v.renderFormLayout(availableHeight)
 	}
 
-	if v.submitting {
-		s.WriteString("\n")
-		s.WriteString(styles.ProcessingStyle.Render("⟳ Creating run..."))
-		s.WriteString("\n")
-	}
-
-	// Show error at bottom if present (make it more prominent)
-	if v.error != nil {
-		s.WriteString("\n")
-		s.WriteString(styles.ErrorStyle.Render("❌ " + v.error.Error()))
-		s.WriteString("\n")
-	}
-
+	// Create status bar
 	statusBar := v.renderStatusBar()
-	s.WriteString("\n")
-	s.WriteString(statusBar)
 
-	if v.showHelp {
-		helpView := v.help.View(v.keys)
-		s.WriteString("\n" + helpView)
-	}
+	// Join all components
+	finalView := lipgloss.JoinVertical(
+		lipgloss.Left,
+		title,
+		content,
+		statusBar,
+	)
 
 	// If FZF mode is active, overlay the dropdown
 	if v.fzfMode != nil && v.fzfMode.IsActive() {
-		return v.renderWithFZFOverlay(s.String())
+		return v.renderWithFZFOverlay(finalView)
 	}
 
-	return s.String()
+	return finalView
 }
 
 // renderWithFZFOverlay renders the view with FZF dropdown overlay
@@ -774,6 +753,217 @@ func (v *CreateRunView) renderWithFZFOverlay(baseView string) string {
 	}
 
 	return strings.Join(result, "\n")
+}
+
+// renderFormLayout renders the form in a two-column layout similar to dashboard
+func (v *CreateRunView) renderFormLayout(availableHeight int) string {
+	// Calculate column widths (60/40 split)
+	leftWidth := int(float64(v.width) * 0.55)
+	rightWidth := v.width - leftWidth - 1 // -1 for spacing
+
+	if leftWidth < 40 {
+		leftWidth = 40
+	}
+	if rightWidth < 30 {
+		rightWidth = 30
+	}
+
+	// Create form fields content
+	fieldsContent := v.renderFormFields(leftWidth-4, availableHeight-4)
+
+	// Create prompt/context content
+	promptContent := v.renderPromptFields(rightWidth-4, availableHeight-4)
+
+	// Style for columns
+	leftStyle := lipgloss.NewStyle().
+		Width(leftWidth).
+		Height(availableHeight).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("63")).
+		Padding(1)
+
+	rightStyle := lipgloss.NewStyle().
+		Width(rightWidth).
+		Height(availableHeight).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("33")).
+		Padding(1)
+
+	// Render columns
+	leftBox := leftStyle.Render(fieldsContent)
+	rightBox := rightStyle.Render(promptContent)
+
+	// Join columns horizontally
+	return lipgloss.JoinHorizontal(
+		lipgloss.Top,
+		leftBox,
+		" ",
+		rightBox,
+	)
+}
+
+// renderFormFields renders the left column with form fields
+func (v *CreateRunView) renderFormFields(width, height int) string {
+	var b strings.Builder
+
+	// Column title
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("63")).
+		Width(width).
+		PaddingBottom(1).
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderBottom(true).
+		BorderForeground(lipgloss.Color("63"))
+
+	b.WriteString(titleStyle.Render("Configuration"))
+	b.WriteString("\n\n")
+
+	// Field labels and inputs
+	fieldLabels := []string{
+		"Title",
+		"Repository",
+		"Source Branch",
+		"Target Branch",
+		"Issue (optional)",
+	}
+
+	for i, label := range fieldLabels {
+		// Label style
+		labelStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("252")).
+			Width(15)
+
+		b.WriteString(labelStyle.Render(label + ":"))
+
+		// Field indicator
+		if i == v.focusIndex {
+			if v.inputMode == components.InsertMode {
+				b.WriteString(lipgloss.NewStyle().
+					Foreground(lipgloss.Color("63")).
+					Bold(true).
+					Render(" ▶ "))
+			} else {
+				b.WriteString(lipgloss.NewStyle().
+					Foreground(lipgloss.Color("33")).
+					Render(" ● "))
+			}
+		} else {
+			b.WriteString("   ")
+		}
+
+		b.WriteString(v.fields[i].View())
+		b.WriteString("\n")
+
+		if i < len(fieldLabels)-1 {
+			b.WriteString("\n")
+		}
+	}
+
+	// Back button at bottom
+	if height > 15 {
+		b.WriteString("\n\n")
+		backStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("240"))
+
+		if v.backButtonFocused {
+			if v.inputMode == components.InsertMode {
+				backStyle = backStyle.
+					Background(lipgloss.Color("63")).
+					Foreground(lipgloss.Color("255"))
+			} else {
+				backStyle = backStyle.
+					Foreground(lipgloss.Color("63")).
+					Bold(true)
+			}
+		}
+
+		b.WriteString(backStyle.Render("← Back to Dashboard"))
+	}
+
+	return b.String()
+}
+
+// renderPromptFields renders the right column with prompt and context
+func (v *CreateRunView) renderPromptFields(width, height int) string {
+	var b strings.Builder
+
+	// Column title
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("33")).
+		Width(width).
+		PaddingBottom(1).
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderBottom(true).
+		BorderForeground(lipgloss.Color("33"))
+
+	b.WriteString(titleStyle.Render("Task Details"))
+	b.WriteString("\n\n")
+
+	// Prompt label
+	labelStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("252")).
+		Bold(true)
+
+	b.WriteString(labelStyle.Render("Prompt:"))
+	if v.focusIndex == len(v.fields) {
+		if v.inputMode == components.InsertMode {
+			b.WriteString(lipgloss.NewStyle().
+				Foreground(lipgloss.Color("63")).
+				Bold(true).
+				Render(" ▶"))
+		} else {
+			b.WriteString(lipgloss.NewStyle().
+				Foreground(lipgloss.Color("33")).
+				Render(" ●"))
+		}
+	}
+	b.WriteString("\n")
+	b.WriteString(v.promptArea.View())
+	b.WriteString("\n\n")
+
+	// Context label
+	b.WriteString(labelStyle.Render("Context (optional):"))
+	if v.focusIndex == len(v.fields)+1 {
+		if v.inputMode == components.InsertMode {
+			b.WriteString(lipgloss.NewStyle().
+				Foreground(lipgloss.Color("63")).
+				Bold(true).
+				Render(" ▶"))
+		} else {
+			b.WriteString(lipgloss.NewStyle().
+				Foreground(lipgloss.Color("33")).
+				Render(" ●"))
+		}
+	}
+	b.WriteString("\n")
+	b.WriteString(v.contextArea.View())
+
+	return b.String()
+}
+
+// renderFileInputMode renders the file input interface
+func (v *CreateRunView) renderFileInputMode() string {
+	var b strings.Builder
+
+	b.WriteString(lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("63")).
+		Render("Load Task from File"))
+	b.WriteString("\n\n")
+
+	b.WriteString("File Path:\n")
+	b.WriteString(v.filePathInput.View())
+	b.WriteString("\n\n")
+
+	helpStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("240")).
+		Italic(true)
+
+	b.WriteString(helpStyle.Render("Ctrl+F: Manual input | Ctrl+S: Submit | ESC: Cancel"))
+
+	return b.String()
 }
 
 func (v *CreateRunView) renderStatusBar() string {

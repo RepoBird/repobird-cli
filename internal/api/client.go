@@ -284,8 +284,22 @@ func (c *Client) VerifyAuth() (*models.UserInfo, error) {
 		return nil, err
 	}
 
+	// Try to decode as AuthVerifyResponse first (new API format)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	// First try the new nested structure
+	var authResponse models.AuthVerifyResponse
+	if err := json.Unmarshal(body, &authResponse); err == nil && authResponse.Data.User.Email != "" {
+		// Successfully parsed as new format
+		return authResponse.ToUserInfo(), nil
+	}
+
+	// Fall back to legacy flat structure
 	var userInfo models.UserInfo
-	if err := json.NewDecoder(resp.Body).Decode(&userInfo); err != nil {
+	if err := json.Unmarshal(body, &userInfo); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
@@ -385,8 +399,22 @@ func (c *Client) GetUserInfoWithContext(ctx context.Context) (*models.UserInfo, 
 		return nil, err
 	}
 
+	// Try to decode as AuthVerifyResponse first (new API format)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	// First try the new nested structure
+	var authResponse models.AuthVerifyResponse
+	if err := json.Unmarshal(body, &authResponse); err == nil && authResponse.Data.User.Email != "" {
+		// Successfully parsed as new format
+		return authResponse.ToUserInfo(), nil
+	}
+
+	// Fall back to legacy flat structure
 	var userInfo models.UserInfo
-	if err := json.NewDecoder(resp.Body).Decode(&userInfo); err != nil {
+	if err := json.Unmarshal(body, &userInfo); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 

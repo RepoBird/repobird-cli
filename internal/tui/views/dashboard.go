@@ -62,6 +62,7 @@ type DashboardView struct {
 
 	// User info
 	userInfo *models.UserInfo
+	userID   *int // User ID for cache isolation
 
 	// FZF mode for each column
 	fzfMode   *components.FZFMode
@@ -119,7 +120,20 @@ func (d *DashboardView) Init() tea.Cmd {
 // loadUserInfo loads user information from the API
 func (d *DashboardView) loadUserInfo() tea.Cmd {
 	return func() tea.Msg {
+		// First check if we have cached user info
+		if cachedInfo := cache.GetCachedUserInfo(); cachedInfo != nil {
+			return dashboardUserInfoLoadedMsg{
+				userInfo: cachedInfo,
+				error:    nil,
+			}
+		}
+
+		// Fetch from API if not cached
 		userInfo, err := d.client.GetUserInfo()
+		if err == nil && userInfo != nil {
+			// Cache the user info
+			cache.SetCachedUserInfo(userInfo)
+		}
 		return dashboardUserInfoLoadedMsg{
 			userInfo: userInfo,
 			error:    err,
@@ -462,8 +476,15 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case dashboardUserInfoLoadedMsg:
-		if msg.error == nil {
+		if msg.error == nil && msg.userInfo != nil {
 			d.userInfo = msg.userInfo
+			// Store user ID and reinitialize caches if needed
+			if d.userID == nil || (d.userID != nil && *d.userID != msg.userInfo.ID) {
+				d.userID = &msg.userInfo.ID
+				// Reinitialize caches with user-specific paths
+				cache.InitializeCacheForUser(d.userID)
+				cache.InitializeDashboardForUser(d.userID)
+			}
 		}
 
 	case components.FZFSelectedMsg:
@@ -519,8 +540,17 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return d, tea.Batch(cmds...)
 		case msg.Type == tea.KeyRunes && string(msg.Runes) == "n":
-			// Navigate to create new run view
-			createView := NewCreateRunViewWithCache(d.client, nil, false, time.Time{}, nil)
+			// Navigate to create new run view with selected repository
+			config := CreateRunViewConfig{
+				Client: d.client,
+			}
+			
+			// Pass the selected repository if one is selected
+			if d.selectedRepo != nil {
+				config.SelectedRepository = d.selectedRepo.Name
+			}
+			
+			createView := NewCreateRunViewWithConfig(config)
 			createView.width = d.width
 			createView.height = d.height
 			return createView, nil
@@ -1263,16 +1293,52 @@ func (d *DashboardView) renderStatusInfo() string {
 	// User Info Section
 	if d.userInfo != nil {
 		content = append(content, sectionStyle.Render("User Information"))
-		content = append(content, fmt.Sprintf("%s%s",
-			labelStyle.Render("Email:"),
-			valueStyle.Render(d.userInfo.Email)))
+
+		// Show name if available
+		if d.userInfo.Name != "" {
+			content = append(content, fmt.Sprintf("%s%s",
+				labelStyle.Render("Name:"),
+				valueStyle.Render(d.userInfo.Name)))
+		}
+
+		// Show email
+		if d.userInfo.Email != "" {
+			content = append(content, fmt.Sprintf("%s%s",
+				labelStyle.Render("Email:"),
+				valueStyle.Render(d.userInfo.Email)))
+		}
+
+		// Show GitHub username if available
+		if d.userInfo.GithubUsername != "" {
+			content = append(content, fmt.Sprintf("%s%s",
+				labelStyle.Render("GitHub:"),
+				valueStyle.Render(d.userInfo.GithubUsername)))
+		}
+
+		// Show tier with better formatting
+		tierDisplay := d.userInfo.Tier
+		if tierDisplay == "" {
+			tierDisplay = "Free"
+		} else {
+			// Capitalize first letter
+			tierDisplay = strings.ToUpper(tierDisplay[:1]) + tierDisplay[1:]
+		}
 		content = append(content, fmt.Sprintf("%s%s",
 			labelStyle.Render("Account Tier:"),
-			valueStyle.Render(d.userInfo.Tier)))
-		content = append(content, fmt.Sprintf("%s%d / %d",
-			labelStyle.Render("Runs Remaining:"),
-			d.userInfo.RemainingRuns,
-			d.userInfo.TotalRuns))
+			valueStyle.Render(tierDisplay)))
+
+		// Show remaining runs with tier details if available
+		if d.userInfo.TierDetails != nil {
+			content = append(content, fmt.Sprintf("%s%d Run / %d Plan",
+				labelStyle.Render("Runs Remaining:"),
+				d.userInfo.TierDetails.RemainingProRuns,
+				d.userInfo.TierDetails.RemainingPlanRuns))
+		} else {
+			content = append(content, fmt.Sprintf("%s%d / %d",
+				labelStyle.Render("Runs Remaining:"),
+				d.userInfo.RemainingRuns,
+				d.userInfo.TotalRuns))
+		}
 
 		// Show usage percentage with visual bar
 		if d.userInfo.TotalRuns > 0 {

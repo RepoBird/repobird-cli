@@ -30,13 +30,12 @@ components:
       properties:
         error:
           type: string
-          description: Error code
+          description: Error code or message
         message:
           type: string
-          description: Human-readable error message
+          description: Human-readable error message (optional)
       required:
         - error
-        - message
 
     User:
       type: object
@@ -103,10 +102,6 @@ components:
         updatedAt:
           type: string
           format: date-time
-        completedAt:
-          type: string
-          format: date-time
-          nullable: true
 
     Repository:
       type: object
@@ -128,6 +123,12 @@ components:
         githubInstallationId:
           type: integer
           nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
 
     CreateRunRequest:
       type: object
@@ -184,7 +185,21 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Authentication failed"
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "User not found"
 
   /api/v1/user:
     get:
@@ -206,7 +221,21 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Authentication failed"
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "User not found"
 
   /api/v1/user/usage:
     get:
@@ -236,7 +265,21 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Authentication failed"
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "User not found"
 
   /api/v1/runs:
     post:
@@ -308,6 +351,8 @@ paths:
           name: status
           schema:
             type: string
+          description: Status filtering (not yet implemented)
+          deprecated: true
         - in: query
           name: sortBy
           schema:
