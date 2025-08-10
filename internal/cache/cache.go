@@ -60,7 +60,12 @@ func init() {
 }
 
 func initializeCache() {
-	pc, err := NewPersistentCache()
+	initializeCacheForUser(nil)
+}
+
+// initializeCacheForUser initializes cache for a specific user
+func initializeCacheForUser(userID *int) {
+	pc, err := NewPersistentCacheForUser(userID)
 	if err != nil {
 		// Fall back to memory-only cache if persistent cache fails
 		pc = nil
@@ -256,6 +261,14 @@ func ClearCache() {
 	globalCache.terminalDetails = make(map[string]*models.RunResponse)
 	globalCache.selectedIndex = 0
 	globalCache.formData = nil
+}
+
+// InitializeCacheForUser reinitializes the cache for a specific user
+func InitializeCacheForUser(userID *int) {
+	// Clear current cache first
+	ClearCache()
+	// Initialize with user-specific cache
+	initializeCacheForUser(userID)
 }
 
 // ClearActiveCache clears only the temporary cache (keeps terminal runs)

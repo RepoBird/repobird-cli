@@ -79,7 +79,7 @@ Contains business logic and domain models, isolated from external concerns.
 - **Business Rules**: Validation and state transitions
 
 ### 5. Cache System (`/internal/cache/`)
-Multi-level caching for performance and offline support.
+Multi-level caching for performance and offline support with user isolation.
 
 ```
 Memory Cache (30s TTL)
@@ -88,6 +88,31 @@ Persistent Cache (Terminal runs never expire)
     ↓
 Global Cache (Cross-view state)
 ```
+
+**User-Based Cache Separation:**
+The cache system now supports user-specific storage to prevent data mixing when multiple users share the same machine:
+
+```
+~/.cache/repobird/
+├── users/
+│   ├── user-123/
+│   │   ├── runs/
+│   │   │   ├── run-456.json
+│   │   │   └── ...
+│   │   └── repository_history.json
+│   └── user-789/
+│       ├── runs/
+│       └── repository_history.json
+└── shared/ (fallback for unknown users)
+    ├── runs/
+    └── repository_history.json
+```
+
+**User Service (`/internal/services/user_service.go`):**
+- Manages current authenticated user context
+- Automatically initializes user-specific cache on authentication
+- Provides user ID extraction from API responses
+- Handles cache switching when users login/logout
 
 ### 6. Configuration Management (`/internal/config/`)
 Secure, flexible configuration with multiple storage backends.

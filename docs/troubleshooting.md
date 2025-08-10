@@ -211,7 +211,7 @@ repobird cache clear
 
 2. Delete cache directory:
 ```bash
-rm -rf ~/.repobird/cache
+rm -rf ~/.cache/repobird
 ```
 
 3. Disable cache temporarily:
@@ -222,6 +222,50 @@ repobird status --no-cache
 4. Disable cache permanently:
 ```bash
 repobird config set cache.enabled false
+```
+
+#### User-Specific Cache Issues
+**Symptoms:**
+- Seeing another user's run data
+- Cache not being saved for current user
+- Mixed data from different users
+
+**New Cache Structure:**
+RepoBird CLI now uses user-specific cache directories to prevent data mixing:
+```
+~/.cache/repobird/
+├── users/
+│   ├── user-123/  # User ID-based directories
+│   │   ├── runs/
+│   │   └── repository_history.json
+│   └── user-456/
+└── shared/        # Fallback for unknown users
+    ├── runs/
+    └── repository_history.json
+```
+
+**Solutions:**
+1. Ensure you're authenticated:
+```bash
+repobird auth verify
+```
+
+2. Clear user-specific cache:
+```bash
+# Clear only your cache
+rm -rf ~/.cache/repobird/users/user-YOUR_ID
+```
+
+3. Reset to shared cache:
+```bash
+# If user ID detection fails, manually clear shared cache
+rm -rf ~/.cache/repobird/shared
+```
+
+4. Check cache location:
+```bash
+# Debug which cache directory is being used
+REPOBIRD_DEBUG=true repobird status 2>&1 | grep cache
 ```
 
 ### TUI Issues

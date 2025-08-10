@@ -175,7 +175,7 @@ func TestListRuns(t *testing.T) {
 	defer server.Close()
 
 	client := NewClient("test-key", server.URL, false)
-	runs, err := client.ListRuns(10, 0)
+	runs, err := client.ListRunsLegacy(10, 0)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

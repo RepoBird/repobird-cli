@@ -15,6 +15,12 @@ const (
 
 	// EndpointAuthVerify is the endpoint for verifying authentication
 	EndpointAuthVerify = "/api/v1/auth/verify"
+
+	// EndpointRepositories is the endpoint for listing repositories
+	EndpointRepositories = "/api/v1/repositories"
+
+	// EndpointUser is the endpoint for getting user information
+	EndpointUser = "/api/v1/user"
 )
 
 // RunDetailsURL builds the URL for getting a specific run by ID

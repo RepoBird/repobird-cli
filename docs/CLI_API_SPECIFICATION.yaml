@@ -1,0 +1,567 @@
+openapi: 3.0.0
+info:
+  title: RepoBird CLI API
+  version: 1.0.0
+  description: API endpoints for RepoBird CLI integration
+  contact:
+    name: RepoBird Support
+    email: support@repobird.ai
+    url: https://repobird.ai
+
+servers:
+  - url: https://api.repobird.ai
+    description: Production API
+  - url: http://localhost:3000
+    description: Development server
+
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: API key authentication
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error code
+        message:
+          type: string
+          description: Human-readable error message
+      required:
+        - error
+        - message
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        name:
+          type: string
+        githubUsername:
+          type: string
+        tier:
+          $ref: '#/components/schemas/Tier'
+
+    Tier:
+      type: object
+      properties:
+        name:
+          type: string
+          enum: [free, pro, enterprise]
+        remainingProRuns:
+          type: integer
+        remainingPlanRuns:
+          type: integer
+        lastPeriodResetDate:
+          type: string
+          format: date-time
+
+    Run:
+      type: object
+      properties:
+        id:
+          type: integer
+        repoId:
+          type: integer
+        repositoryName:
+          type: string
+          nullable: true
+          description: Repository name in owner/repo format
+        repositoryFullName:
+          type: string
+          nullable: true
+          description: Full repository name
+        status:
+          type: string
+          enum: [QUEUED, INITIALIZING, PROCESSING, DONE, FAILED]
+        runType:
+          type: string
+          enum: [pro, pro-plan]
+        title:
+          type: string
+        description:
+          type: string
+        prUrl:
+          type: string
+          nullable: true
+        commandLogUrl:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    Repository:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        repoName:
+          type: string
+        repoOwner:
+          type: string
+        repoUrl:
+          type: string
+        defaultBranch:
+          type: string
+        isEnabled:
+          type: boolean
+        githubInstallationId:
+          type: integer
+          nullable: true
+
+    CreateRunRequest:
+      type: object
+      properties:
+        repoId:
+          type: integer
+          description: Repository ID (either repoId or repositoryName required)
+        repositoryName:
+          type: string
+          description: Repository name (owner/repo or just repo)
+        runType:
+          type: string
+          enum: [run, plan]
+          default: run
+          description: Type of run (run for execution, plan for planning)
+        prompt:
+          type: string
+          description: The task description or prompt
+        title:
+          type: string
+          description: Optional title for the run
+        sourceBranch:
+          type: string
+          description: Source branch (defaults to repo default)
+        targetBranch:
+          type: string
+          description: Target branch (defaults to repo default)
+      required:
+        - prompt
+
+paths:
+  /api/v1/auth/verify:
+    get:
+      summary: Verify API key
+      tags:
+        - Authentication
+      responses:
+        '200':
+          description: API key is valid
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        $ref: '#/components/schemas/User'
+                      tier:
+                        $ref: '#/components/schemas/Tier'
+        '401':
+          description: Invalid API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/user:
+    get:
+      summary: Get current user info
+      tags:
+        - User
+      responses:
+        '200':
+          description: User information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/User'
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/user/usage:
+    get:
+      summary: Get usage statistics
+      tags:
+        - User
+      responses:
+        '200':
+          description: Usage information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      remainingProRuns:
+                        type: integer
+                      remainingPlanRuns:
+                        type: integer
+                      lastPeriodResetDate:
+                        type: string
+                        format: date-time
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/runs:
+    post:
+      summary: Create new run
+      tags:
+        - Runs
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRunRequest'
+      responses:
+        '200':
+          description: Run created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      status:
+                        type: string
+                      message:
+                        type: string
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden (no runs remaining or repo disabled)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Repository not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    get:
+      summary: List user's runs
+      tags:
+        - Runs
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+        - in: query
+          name: repoId
+          schema:
+            type: integer
+        - in: query
+          name: status
+          schema:
+            type: string
+        - in: query
+          name: sortBy
+          schema:
+            type: string
+            default: createdAt
+        - in: query
+          name: sortOrder
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+      responses:
+        '200':
+          description: List of runs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Run'
+                  metadata:
+                    type: object
+                    properties:
+                      currentPage:
+                        type: integer
+                      total:
+                        type: integer
+                      totalPages:
+                        type: integer
+
+  /api/v1/runs/{id}:
+    get:
+      summary: Get run details
+      tags:
+        - Runs
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Run details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Run'
+        '404':
+          description: Run not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: Cancel run
+      tags:
+        - Runs
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Run cancelled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+        '400':
+          description: Cannot cancel run in current status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Run not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/runs/{id}/logs:
+    get:
+      summary: Get run logs
+      tags:
+        - Runs
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Run logs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      commandLogUrl:
+                        type: string
+                        nullable: true
+                      logs:
+                        type: string
+
+  /api/v1/runs/{id}/diff:
+    get:
+      summary: Get changes diff
+      tags:
+        - Runs
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Changes diff
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      diff:
+                        type: string
+                        nullable: true
+
+  /api/v1/repositories:
+    get:
+      summary: List user's repositories
+      tags:
+        - Repositories
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: List of repositories
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Repository'
+                  metadata:
+                    type: object
+                    properties:
+                      currentPage:
+                        type: integer
+                      total:
+                        type: integer
+                      totalPages:
+                        type: integer
+
+  /api/v1/repositories/search:
+    get:
+      summary: Search repositories by name
+      tags:
+        - Repositories
+      parameters:
+        - in: query
+          name: q
+          required: true
+          schema:
+            type: string
+          description: Search query
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Repository'
+        '400':
+          description: Search query required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/v1/repositories/{id}:
+    get:
+      summary: Get repository details
+      tags:
+        - Repositories
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Repository details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Repository'
+        '404':
+          description: Repository not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+tags:
+  - name: Authentication
+    description: API key verification
+  - name: User
+    description: User information and usage
+  - name: Runs
+    description: Run management
+  - name: Repositories
+    description: Repository management

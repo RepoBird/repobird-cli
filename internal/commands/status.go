@@ -13,6 +13,7 @@ import (
 	"github.com/repobird/repobird-cli/internal/api"
 	"github.com/repobird/repobird-cli/internal/errors"
 	"github.com/repobird/repobird-cli/internal/models"
+	"github.com/repobird/repobird-cli/internal/services"
 	"github.com/repobird/repobird-cli/internal/utils"
 )
 
@@ -79,10 +80,12 @@ func listRuns(client *api.Client) error {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: Could not fetch user info: %s\n", errors.FormatUserError(err))
 	} else {
+		// Set the current user for cache initialization
+		services.SetCurrentUser(userInfo)
 		fmt.Printf("Remaining runs: %d/%d (%s tier)\n\n", userInfo.RemainingRuns, userInfo.TotalRuns, userInfo.Tier)
 	}
 
-	runs, err := client.ListRuns(statusLimit, 0)
+	runs, err := client.ListRunsLegacy(statusLimit, 0)
 	if err != nil {
 		return fmt.Errorf("failed to list runs: %s", errors.FormatUserError(err))
 	}

@@ -17,8 +17,8 @@ func NewApp(client *api.Client) *App {
 }
 
 func (a *App) Run() error {
-	listView := views.NewRunListView(a.client)
-	p := tea.NewProgram(listView, tea.WithAltScreen(), tea.WithMouseCellMotion())
+	dashboardView := views.NewDashboardView(a.client)
+	p := tea.NewProgram(dashboardView, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	_, err := p.Run()
 	return err
 }

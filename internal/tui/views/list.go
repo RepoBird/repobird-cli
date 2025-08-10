@@ -13,6 +13,7 @@ import (
 	"github.com/repobird/repobird-cli/internal/api"
 	"github.com/repobird/repobird-cli/internal/cache"
 	"github.com/repobird/repobird-cli/internal/models"
+	"github.com/repobird/repobird-cli/internal/services"
 	"github.com/repobird/repobird-cli/internal/tui/components"
 	"github.com/repobird/repobird-cli/internal/tui/debug"
 	"github.com/repobird/repobird-cli/internal/tui/styles"
@@ -193,6 +194,10 @@ func (v *RunListView) Init() tea.Cmd {
 func (v *RunListView) loadUserInfo() tea.Cmd {
 	return func() tea.Msg {
 		userInfo, err := v.client.VerifyAuth()
+		if err == nil && userInfo != nil {
+			// Set the current user for cache initialization
+			services.SetCurrentUser(userInfo)
+		}
 		return userInfoLoadedMsg{userInfo: userInfo, err: err}
 	}
 }
@@ -656,7 +661,7 @@ func (v *RunListView) renderStatusBar() string {
 
 func (v *RunListView) loadRuns() tea.Cmd {
 	return func() tea.Msg {
-		runPtrs, err := v.client.ListRuns(100, 0)
+		runPtrs, err := v.client.ListRunsLegacy(100, 0)
 		if err != nil {
 			return runsLoadedMsg{runs: nil, err: err}
 		}

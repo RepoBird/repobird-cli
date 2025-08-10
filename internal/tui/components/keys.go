@@ -28,6 +28,11 @@ type KeyMap struct {
 	VisualMode  key.Binding
 	Tab         key.Binding
 	ShiftTab    key.Binding
+	// Dashboard layout keys
+	LayoutSwitch  key.Binding
+	LayoutTriple  key.Binding
+	LayoutAllRuns key.Binding
+	LayoutRepos   key.Binding
 }
 
 var DefaultKeyMap = KeyMap{
@@ -119,6 +124,23 @@ var DefaultKeyMap = KeyMap{
 		key.WithKeys("shift+tab"),
 		key.WithHelp("shift+tab", "previous field"),
 	),
+	// Dashboard layout keys
+	LayoutSwitch: key.NewBinding(
+		key.WithKeys("shift+l"),
+		key.WithHelp("shift+l", "switch layout"),
+	),
+	LayoutTriple: key.NewBinding(
+		key.WithKeys("ctrl+1"),
+		key.WithHelp("ctrl+1", "triple column"),
+	),
+	LayoutAllRuns: key.NewBinding(
+		key.WithKeys("ctrl+2"),
+		key.WithHelp("ctrl+2", "all runs"),
+	),
+	LayoutRepos: key.NewBinding(
+		key.WithKeys("ctrl+3"),
+		key.WithHelp("ctrl+3", "repositories"),
+	),
 }
 
 func (k KeyMap) ShortHelp() []key.Binding {
@@ -131,6 +153,7 @@ func (k KeyMap) FullHelp() [][]key.Binding {
 		{k.PageUp, k.PageDown, k.Home, k.End},
 		{k.Enter, k.Back, k.Refresh, k.New},
 		{k.Delete, k.Search, k.CommandMode, k.Help},
+		{k.LayoutSwitch, k.LayoutTriple, k.LayoutAllRuns, k.LayoutRepos},
 		{k.Quit},
 	}
 }

@@ -74,7 +74,7 @@ func TestAPIClient_Integration(t *testing.T) {
 		runs := []*models.RunResponse{&expectedRun}
 		mockServer.SetRunsListResponse([]models.RunResponse{expectedRun})
 
-		resp, err := client.ListRuns(10, 0)
+		resp, err := client.ListRunsLegacy(10, 0)
 		require.NoError(t, err)
 		require.Len(t, resp, 1)
 

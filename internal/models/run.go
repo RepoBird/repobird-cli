@@ -120,6 +120,7 @@ func (r *RunResponse) UnmarshalJSON(data []byte) error {
 }
 
 type UserInfo struct {
+	ID            int    `json:"id,omitempty"`
 	Email         string `json:"email"`
 	RemainingRuns int    `json:"remainingRuns"`
 	TotalRuns     int    `json:"totalRuns"`

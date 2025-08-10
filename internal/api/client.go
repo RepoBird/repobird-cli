@@ -226,7 +226,7 @@ func (c *Client) GetRun(id string) (*models.RunResponse, error) {
 	return &runResp, nil
 }
 
-func (c *Client) ListRuns(limit, offset int) ([]*models.RunResponse, error) {
+func (c *Client) ListRunsLegacy(limit, offset int) ([]*models.RunResponse, error) {
 	path := RunsListURL(limit, offset)
 	resp, err := c.doRequest("GET", path, nil)
 	if err != nil {
@@ -272,6 +272,102 @@ func (c *Client) VerifyAuth() (*models.UserInfo, error) {
 	resp, err := c.doRequest("GET", EndpointAuthVerify, nil)
 	if err != nil {
 		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if err := ValidateResponseOK(resp); err != nil {
+		return nil, err
+	}
+
+	var userInfo models.UserInfo
+	if err := json.NewDecoder(resp.Body).Decode(&userInfo); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &userInfo, nil
+}
+
+// ListRuns with context and page-based pagination (for dashboard compatibility)
+func (c *Client) ListRuns(ctx context.Context, page, limit int) (*models.ListRunsResponse, error) {
+	// Convert page to offset for existing endpoint
+	offset := (page - 1) * limit
+	if offset < 0 {
+		offset = 0
+	}
+
+	path := RunsListURL(limit, offset)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+path, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", fmt.Sprintf("repobird-cli/%s", version.GetVersion()))
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, &errors.NetworkError{
+			Err:       err,
+			Operation: fmt.Sprintf("GET %s", path),
+			URL:       c.baseURL + path,
+		}
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if err := ValidateResponseOK(resp); err != nil {
+		return nil, err
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	// Try to decode as ListRunsResponse first (wrapped response)
+	var listResp models.ListRunsResponse
+	if err := json.Unmarshal(body, &listResp); err == nil {
+		return &listResp, nil
+	}
+
+	// Fall back to direct array decoding for backward compatibility
+	var runs []*models.RunResponse
+	if err := json.Unmarshal(body, &runs); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	// Wrap in ListRunsResponse
+	return &models.ListRunsResponse{
+		Data: runs,
+		Metadata: &models.PaginationMetadata{
+			CurrentPage: page,
+			Total:       len(runs),
+			TotalPages:  1, // We don't have this info from the simple response
+		},
+	}, nil
+}
+
+// GetUserInfo gets user information (alias for VerifyAuth for dashboard compatibility)
+func (c *Client) GetUserInfo(ctx context.Context) (*models.UserInfo, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+EndpointAuthVerify, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", fmt.Sprintf("repobird-cli/%s", version.GetVersion()))
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, &errors.NetworkError{
+			Err:       err,
+			Operation: "GET " + EndpointAuthVerify,
+			URL:       c.baseURL + EndpointAuthVerify,
+		}
 	}
 	defer func() { _ = resp.Body.Close() }()
 
@@ -374,4 +470,24 @@ func (c *Client) GetRunWithRetry(ctx context.Context, id string) (*models.RunRes
 	}
 
 	return &runResp, nil
+}
+
+// ListRepositories retrieves a list of repositories for the authenticated user
+func (c *Client) ListRepositories(ctx context.Context) ([]models.APIRepository, error) {
+	resp, err := c.doRequestWithRetry(ctx, "GET", EndpointRepositories, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if err := ValidateResponseOK(resp); err != nil {
+		return nil, err
+	}
+
+	var repoListResp models.RepositoryListResponse
+	if err := json.NewDecoder(resp.Body).Decode(&repoListResp); err != nil {
+		return nil, fmt.Errorf("failed to decode repositories response: %w", err)
+	}
+
+	return repoListResp.Data, nil
 }

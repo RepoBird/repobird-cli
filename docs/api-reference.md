@@ -5,9 +5,8 @@
 ### Base Configuration
 ```go
 const (
-    BaseURL        = "https://api.repobird.ai"
-    DefaultTimeout = 45 * time.Minute
-    MaxRetries     = 5
+    BaseURL        = "https://api.repobird.ai/v1"
+    DefaultTimeout = 30 * time.Second
     UserAgent      = "repobird-cli/{version}"
 )
 ```
@@ -142,10 +141,40 @@ Lists all runs for the authenticated user.
 func (c *Client) ListRuns(ctx context.Context, opts ListOptions) (*RunList, error)
 ```
 
-### 4. Cancel Run
+### 4. Get Run Logs
+Streams logs for a specific run in real-time.
+
+**Endpoint:** `GET /api/v1/runs/{id}/logs`
+
+**Path Parameters:**
+- `id` (string): The run ID
+
+**Query Parameters:**
+- `follow` (bool): Whether to stream logs in real-time (default: false)
+- `tail` (int): Number of recent log lines to return (default: all)
+
+**Response:**
+```
+Content-Type: text/plain
+Content-Type: text/event-stream (for streaming)
+
+2024-01-01T10:00:00Z [INFO] Starting code analysis...
+2024-01-01T10:00:01Z [INFO] Processing file: src/main.go
+2024-01-01T10:00:02Z [INFO] Generating changes...
+```
+
+**Go Implementation:**
+```go
+func (c *Client) GetRunLogs(ctx context.Context, id string, follow bool) (io.ReadCloser, error)
+```
+
+### 5. Cancel Run
 Cancels an active run.
 
-**Endpoint:** `POST /api/v1/runs/{id}/cancel`
+**Endpoint:** `DELETE /api/v1/runs/{id}`
+
+**Path Parameters:**
+- `id` (string): The run ID
 
 **Response:**
 ```json
@@ -161,31 +190,84 @@ Cancels an active run.
 func (c *Client) CancelRun(ctx context.Context, id string) error
 ```
 
-### 5. Verify Authentication
-Verifies API key and retrieves account information.
+### 6. Get User Information
+Retrieves authenticated user information and account details.
 
-**Endpoint:** `GET /api/v1/auth/verify`
+**Endpoint:** `GET /api/v1/user`
 
 **Response:**
 ```json
 {
-  "valid": true,
-  "user": {
-    "id": "string",
-    "email": "user@example.com",
-    "name": "string",
-    "quota": {
-      "used": 10,
-      "limit": 100,
-      "period": "month"
-    }
+  "id": 12345,
+  "username": "string",
+  "email": "user@example.com",
+  "name": "string",
+  "avatar": "https://example.com/avatar.jpg",
+  "plan": "pro",
+  "quota": {
+    "used": 10,
+    "limit": 100,
+    "period": "month",
+    "resetAt": "2024-02-01T00:00:00Z"
+  },
+  "preferences": {
+    "defaultRunType": "run",
+    "emailNotifications": true
   }
 }
 ```
 
 **Go Implementation:**
 ```go
-func (c *Client) VerifyAuth(ctx context.Context) (*AuthInfo, error)
+func (c *Client) GetUserInfo(ctx context.Context) (*UserInfo, error)
+```
+
+### 7. List Repositories
+Lists repositories available to the authenticated user.
+
+**Endpoint:** `GET /api/v1/repositories`
+
+**Query Parameters:**
+- `page` (int): Page number (default: 1)
+- `limit` (int): Items per page (default: 20, max: 100)
+- `search` (string): Search repositories by name
+- `sort` (string): Sort field (name, updatedAt, createdAt)
+- `order` (string): Sort order (asc, desc)
+
+**Response:**
+```json
+{
+  "repositories": [
+    {
+      "id": 123456,
+      "name": "org/repo",
+      "fullName": "organization/repository",
+      "description": "Repository description",
+      "private": false,
+      "language": "Go",
+      "starCount": 42,
+      "forkCount": 12,
+      "updatedAt": "2024-01-01T00:00:00Z",
+      "createdAt": "2024-01-01T00:00:00Z",
+      "permissions": {
+        "admin": false,
+        "push": true,
+        "pull": true
+      }
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 50,
+    "totalPages": 3
+  }
+}
+```
+
+**Go Implementation:**
+```go
+func (c *Client) ListRepositories(ctx context.Context, opts ListOptions) (*RepositoryList, error)
 ```
 
 ## Error Responses
@@ -226,13 +308,17 @@ REPOBIRD_DEBUG=true                      # Enable debug logging
 
 ### Programmatic Configuration
 ```go
-client := api.NewClient(api.Config{
+// Simple client initialization
+client := api.NewClient("your_api_key")
+
+// Or with custom configuration
+client := &api.Client{
+    BaseURL:    "https://api.repobird.ai/v1",
     APIKey:     "your_api_key",
-    BaseURL:    "https://api.repobird.ai",
-    Timeout:    45 * time.Minute,
-    MaxRetries: 5,
-    Debug:      false,
-})
+    HTTPClient: &http.Client{
+        Timeout: 30 * time.Second,
+    },
+}
 ```
 
 ## Retry Logic
@@ -334,6 +420,40 @@ ws://api.repobird.ai/v1/ws?token=<API_KEY>
 }
 ```
 
+## API Integration
+
+### Authentication Flow
+
+```go
+// API client initialization
+type Client struct {
+    baseURL    string
+    apiKey     string
+    httpClient *http.Client
+}
+
+func NewClient(apiKey string) *Client {
+    return &Client{
+        baseURL:    "https://api.repobird.ai/v1",
+        apiKey:     apiKey,
+        httpClient: &http.Client{
+            Timeout: 30 * time.Second,
+        },
+    }
+}
+
+// Request with authentication
+func (c *Client) doRequest(method, path string, body interface{}) (*http.Response, error) {
+    req, err := http.NewRequest(method, c.baseURL+path, body)
+    if err != nil {
+        return nil, err
+    }
+    req.Header.Set("Authorization", "Bearer "+c.apiKey)
+    req.Header.Set("Content-Type", "application/json")
+    return c.httpClient.Do(req)
+}
+```
+
 ## SDK Usage Examples
 
 ### Basic Run Creation
@@ -342,13 +462,12 @@ package main
 
 import (
     "context"
-    "github.com/repobird/cli/internal/api"
+    "fmt"
+    "github.com/repobird/repobird-cli/internal/api"
 )
 
 func main() {
-    client := api.NewClient(api.Config{
-        APIKey: "your_api_key",
-    })
+    client := api.NewClient("your_api_key")
     
     run, err := client.CreateRun(context.Background(), &api.RunRequest{
         Prompt:     "Fix the authentication bug",

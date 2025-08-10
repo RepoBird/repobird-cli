@@ -14,6 +14,7 @@ import (
 	"github.com/repobird/repobird-cli/internal/api"
 	"github.com/repobird/repobird-cli/internal/config"
 	"github.com/repobird/repobird-cli/internal/models"
+	"github.com/repobird/repobird-cli/internal/services"
 )
 
 var authCmd = &cobra.Command{
@@ -63,6 +64,9 @@ or in an encrypted file as a fallback.`,
 		if err != nil {
 			return fmt.Errorf("invalid API key: %w", err)
 		}
+
+		// Set the current user for cache initialization
+		services.SetCurrentUser(userInfo)
 
 		// Save the API key securely
 		secureConfig, err := config.LoadSecureConfig()
@@ -127,6 +131,9 @@ var logoutCmd = &cobra.Command{
 			return fmt.Errorf("failed to remove API key: %w", err)
 		}
 
+		// Clear the current user cache
+		services.ClearCurrentUser()
+
 		fmt.Println("✓ API key removed from secure storage")
 		return nil
 	},
@@ -153,6 +160,9 @@ var verifyCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("API key verification failed: %w", err)
 		}
+
+		// Set the current user for cache initialization
+		services.SetCurrentUser(userInfo)
 
 		fmt.Println("✓ API key is valid")
 		fmt.Printf("  Email: %s\n", userInfo.Email)
@@ -222,6 +232,8 @@ var infoCmd = &cobra.Command{
 			fmt.Println()
 			client := api.NewClient(secureConfig.APIKey, secureConfig.APIURL, secureConfig.Debug)
 			if userInfo, err := client.VerifyAuth(); err == nil {
+				// Set the current user for cache initialization
+				services.SetCurrentUser(userInfo)
 				fmt.Println("Account Information:")
 				fmt.Printf("  Email: %s\n", userInfo.Email)
 				fmt.Printf("  Tier: %s\n", userInfo.Tier)
@@ -265,6 +277,9 @@ func getCachedUserInfo(apiKey, apiEndpoint string, debug bool) (*models.UserInfo
 	if err != nil {
 		return nil, err
 	}
+
+	// Set the current user for cache initialization
+	services.SetCurrentUser(userInfo)
 
 	// Update cache
 	userInfoCache = &cachedUserInfo{

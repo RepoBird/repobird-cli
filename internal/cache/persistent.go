@@ -15,6 +15,7 @@ import (
 type PersistentCache struct {
 	mu       sync.RWMutex
 	cacheDir string
+	userID   *int // Optional user ID for user-specific caching
 }
 
 // RepositoryHistory tracks repositories used in runs
@@ -41,25 +42,43 @@ const (
 
 // NewPersistentCache creates a new persistent cache instance
 func NewPersistentCache() (*PersistentCache, error) {
-	dir, err := getCacheDir()
+	return NewPersistentCacheForUser(nil)
+}
+
+// NewPersistentCacheForUser creates a new persistent cache instance for a specific user
+func NewPersistentCacheForUser(userID *int) (*PersistentCache, error) {
+	dir, err := getCacheDirForUser(userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get cache directory: %w", err)
 	}
 
 	return &PersistentCache{
 		cacheDir: dir,
+		userID:   userID,
 	}, nil
 }
 
-// getCacheDir returns the appropriate cache directory for the platform
+// getCacheDir returns the appropriate cache directory for the platform (backward compatibility)
 func getCacheDir() (string, error) {
+	return getCacheDirForUser(nil)
+}
+
+// getCacheDirForUser returns the appropriate cache directory for a specific user
+func getCacheDirForUser(userID *int) (string, error) {
 	// Use os.UserCacheDir for cross-platform compatibility
 	baseDir, err := os.UserCacheDir()
 	if err != nil {
 		return "", err
 	}
 
-	cacheDir := filepath.Join(baseDir, appName, "runs")
+	var cacheDir string
+	if userID != nil {
+		// User-specific cache directory
+		cacheDir = filepath.Join(baseDir, appName, "users", fmt.Sprintf("user-%d", *userID), "runs")
+	} else {
+		// Fallback to shared cache directory for backward compatibility
+		cacheDir = filepath.Join(baseDir, appName, "shared", "runs")
+	}
 
 	// Create directory if it doesn't exist
 	if err := os.MkdirAll(cacheDir, 0755); err != nil {
@@ -270,7 +289,9 @@ func readJSON(filePath string, dst interface{}) error {
 
 // getRepositoryHistoryPath returns the path to repository history file
 func (pc *PersistentCache) getRepositoryHistoryPath() string {
-	return filepath.Join(pc.cacheDir, repoHistoryFile)
+	// Repository history is stored in the parent directory of runs
+	parentDir := filepath.Dir(pc.cacheDir)
+	return filepath.Join(parentDir, repoHistoryFile)
 }
 
 // AddRepository adds a repository to the history, moving it to front if already exists

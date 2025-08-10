@@ -373,7 +373,7 @@ func TestClient_ListRuns_Pagination(t *testing.T) {
 			defer server.Close()
 
 			client := NewClient("test-key", server.URL, false)
-			runs, err := client.ListRuns(tt.limit, tt.offset)
+			runs, err := client.ListRunsLegacy(tt.limit, tt.offset)
 
 			if tt.expectErr {
 				assert.Error(t, err)
