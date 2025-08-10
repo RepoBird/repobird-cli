@@ -1166,19 +1166,31 @@ func (d *DashboardView) renderDetailsColumn(width, height int) string {
 
 // renderStatusInfo renders the status/user info overlay
 func (d *DashboardView) renderStatusInfo() string {
-	// Title bar
+	// Calculate box dimensions - use most of the screen with some margin
+	boxWidth := d.width - 4  // Leave 2 chars margin on each side
+	boxHeight := d.height - 2 // Leave 1 char margin top and bottom
+	
+	// Box style with rounded border
+	boxStyle := lipgloss.NewStyle().
+		Width(boxWidth).
+		Height(boxHeight).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("63"))
+	
+	// Title bar (inside the box)
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("255")).
 		Background(lipgloss.Color("63")).
-		Width(d.width).
+		Width(boxWidth-2). // Account for border
+		Align(lipgloss.Center).
 		Padding(0, 1)
 	
 	title := titleStyle.Render("System Status & User Information")
 	
 	// Content styles
 	contentStyle := lipgloss.NewStyle().
-		Width(d.width).
+		Width(boxWidth-2). // Account for border
 		Padding(1, 2)
 	
 	sectionStyle := lipgloss.NewStyle().
@@ -1292,25 +1304,37 @@ func (d *DashboardView) renderStatusInfo() string {
 	// Build the main content
 	mainContent := contentStyle.Render(strings.Join(content, "\n"))
 	
-	// Calculate remaining height for spacing
+	// Calculate remaining height for spacing inside the box
+	innerHeight := boxHeight - 2 // Account for border
 	contentHeight := lipgloss.Height(title) + lipgloss.Height(mainContent) + 1 // +1 for statusline
-	remainingHeight := d.height - contentHeight
+	remainingHeight := innerHeight - contentHeight
 	spacing := ""
 	if remainingHeight > 0 {
 		spacing = strings.Repeat("\n", remainingHeight)
 	}
 	
-	// Create status line at bottom
+	// Create status line at bottom (inside the box)
 	statusLineStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("240")).
 		Background(lipgloss.Color("235")).
-		Width(d.width).
+		Width(boxWidth-2). // Account for border
 		Align(lipgloss.Center)
 	
 	statusLine := statusLineStyle.Render("Press 's' or ESC to close")
 	
-	// Join everything together
-	return lipgloss.JoinVertical(lipgloss.Left, title, mainContent, spacing, statusLine)
+	// Join everything together inside the box
+	innerContent := lipgloss.JoinVertical(lipgloss.Left, title, mainContent, spacing, statusLine)
+	
+	// Wrap in the box
+	boxedContent := boxStyle.Render(innerContent)
+	
+	// Center the box on screen
+	finalStyle := lipgloss.NewStyle().
+		Width(d.width).
+		Height(d.height).
+		Align(lipgloss.Center, lipgloss.Center)
+	
+	return finalStyle.Render(boxedContent)
 }
 
 // renderRepositoriesTable renders a table of repositories with real data
