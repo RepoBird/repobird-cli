@@ -651,6 +651,7 @@ func (d *DashboardView) View() string {
 		PaddingLeft(1)
 
 	title := titleStyle.Render("Repobird.ai CLI")
+	debug.LogToFilef("Title width: %d\n", lipgloss.Width(title))
 
 	if d.error != nil {
 		content = fmt.Sprintf("Error loading dashboard data: %s\n\nPress 'r' to retry, 'q' to quit", d.error.Error())
@@ -696,7 +697,10 @@ func (d *DashboardView) View() string {
 		content = d.renderTripleColumnLayout()
 	}
 
-	return lipgloss.JoinVertical(lipgloss.Left, title, content)
+	finalView := lipgloss.JoinVertical(lipgloss.Left, title, content)
+	debug.LogToFilef("Final view dimensions: width=%d, height=%d\n", 
+		lipgloss.Width(finalView), lipgloss.Height(finalView))
+	return finalView
 }
 
 // renderTripleColumnLayout renders the Miller Columns layout with real data
@@ -706,38 +710,64 @@ func (d *DashboardView) renderTripleColumnLayout() string {
 	
 	// Calculate available height for columns
 	// We have d.height total, minus:
-	// - 2 for title
-	// - 1 for statusline  
+	// - 2 for title (1 line + spacing)
+	// - 1 for statusline
 	availableHeight := d.height - 3
 	if availableHeight < 5 {
 		availableHeight = 5 // Minimum height
 	}
 
 	// Column widths - ensure we don't exceed terminal width
-	// No margins needed - use full width
-	totalWidth := d.width
+	// Make columns smaller to ensure they fit
+	totalWidth := d.width - 4  // Leave margin for safety
 	leftWidth := totalWidth / 3
 	centerWidth := totalWidth / 3
-	rightWidth := totalWidth - leftWidth - centerWidth - 2 // Account for any rounding
+	rightWidth := totalWidth / 3
+	
+	// Ensure minimum widths
+	if leftWidth < 10 {
+		leftWidth = 10
+	}
+	if centerWidth < 10 {
+		centerWidth = 10
+	}
+	if rightWidth < 10 {
+		rightWidth = 10
+	}
 	
 	debug.LogToFilef("Column widths: left=%d, center=%d, right=%d, total=%d\n", 
 		leftWidth, centerWidth, rightWidth, leftWidth+centerWidth+rightWidth)
 
 	// Make columns with rounded borders - ensure proper sizing
-	// Don't reduce height too much
-	columnHeight := availableHeight
+	// Further reduce height to ensure bottom border is visible
+	columnHeight := availableHeight - 2
+	if columnHeight < 3 {
+		columnHeight = 3
+	}
 	
 	debug.LogToFilef("Column height: available=%d, column=%d\n", availableHeight, columnHeight)
 
 	// Create column content with titles
 	// Account for borders (2 chars for left/right, 2 for top/bottom)
-	leftContent := d.renderRepositoriesColumn(leftWidth - 2, columnHeight - 2)
-	centerContent := d.renderRunsColumn(centerWidth - 2, columnHeight - 2)
-	rightContent := d.renderDetailsColumn(rightWidth - 2, columnHeight - 2)
+	// Content width should be column width minus borders
+	contentWidth1 := leftWidth - 2
+	contentWidth2 := centerWidth - 2
+	contentWidth3 := rightWidth - 2
+	contentHeight := columnHeight - 2
 	
+	leftContent := d.renderRepositoriesColumn(contentWidth1, contentHeight)
+	centerContent := d.renderRunsColumn(contentWidth2, contentHeight)
+	rightContent := d.renderDetailsColumn(contentWidth3, contentHeight)
+	
+	debug.LogToFilef("Content dimensions: w1=%d, w2=%d, w3=%d, h=%d\n", 
+		contentWidth1, contentWidth2, contentWidth3, contentHeight)
+	
+	// Create styles for columns
+	// Width() in lipgloss includes the border in the total width
 	leftStyle := lipgloss.NewStyle().
 		Width(leftWidth).
 		Height(columnHeight).
+		MaxWidth(leftWidth).
 		MaxHeight(columnHeight).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("63"))
@@ -745,6 +775,7 @@ func (d *DashboardView) renderTripleColumnLayout() string {
 	centerStyle := lipgloss.NewStyle().
 		Width(centerWidth).
 		Height(columnHeight).
+		MaxWidth(centerWidth).
 		MaxHeight(columnHeight).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("33"))
@@ -752,24 +783,46 @@ func (d *DashboardView) renderTripleColumnLayout() string {
 	rightStyle := lipgloss.NewStyle().
 		Width(rightWidth).
 		Height(columnHeight).
+		MaxWidth(rightWidth).
 		MaxHeight(columnHeight).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("240"))
 
+	// Render each column
+	leftBox := leftStyle.Render(leftContent)
+	centerBox := centerStyle.Render(centerContent)
+	rightBox := rightStyle.Render(rightContent)
+	
+	debug.LogToFilef("Box widths: left=%d, center=%d, right=%d\n",
+		lipgloss.Width(leftBox), lipgloss.Width(centerBox), lipgloss.Width(rightBox))
+	
 	// Join columns without extra spacing
+	// Use PlaceHorizontal to ensure it fits within terminal width
 	columns := lipgloss.JoinHorizontal(
 		lipgloss.Top,
-		leftStyle.Render(leftContent),
-		centerStyle.Render(centerContent),
-		rightStyle.Render(rightContent),
+		leftBox,
+		centerBox,
+		rightBox,
 	)
 	
-	debug.LogToFilef("Columns rendered, width=%d\n", lipgloss.Width(columns))
+	finalWidth := lipgloss.Width(columns)
+	debug.LogToFilef("Final columns width=%d (terminal width=%d)\n", finalWidth, d.width)
+	
+	// Force columns to fit within terminal width
+	if finalWidth > d.width {
+		debug.LogToFilef("WARNING: Columns width %d exceeds terminal width %d, constraining...\n", finalWidth, d.width)
+		// Use PlaceHorizontal to constrain to terminal width
+		columns = lipgloss.PlaceHorizontal(d.width, lipgloss.Left, columns)
+	}
 
 	// Create statusline
 	statusline := d.renderStatusLine("Miller Columns")
+	debug.LogToFilef("Statusline width: %d\n", lipgloss.Width(statusline))
 
-	return lipgloss.JoinVertical(lipgloss.Left, columns, statusline)
+	finalLayout := lipgloss.JoinVertical(lipgloss.Left, columns, statusline)
+	debug.LogToFilef("Triple column layout dimensions: width=%d, height=%d\n",
+		lipgloss.Width(finalLayout), lipgloss.Height(finalLayout))
+	return finalLayout
 }
 
 // updateDetailLines updates the detail lines for the selected run
