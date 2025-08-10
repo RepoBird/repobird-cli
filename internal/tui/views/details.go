@@ -608,6 +608,41 @@ func (v *RunDetailsView) View() string {
 		}
 	}
 
+	// Add notification above status bar if there's a message
+	notificationIdx := len(lines) - 1
+	if v.copiedMessage != "" && time.Since(v.copiedMessageTime) < 3*time.Second {
+		// Show notification on the second-to-last line
+		if len(lines) > 1 {
+			notificationIdx = len(lines) - 2
+			var notificationStyle lipgloss.Style
+			if time.Since(v.copiedMessageTime) < 2*time.Second {
+				if v.yankBlink {
+					// Bright and bold when visible
+					notificationStyle = lipgloss.NewStyle().
+						Foreground(lipgloss.Color("82")).
+						Background(lipgloss.Color("235")).
+						Bold(true).
+						Width(v.width)
+				} else {
+					// Dimmer when "off" for blinking effect
+					notificationStyle = lipgloss.NewStyle().
+						Foreground(lipgloss.Color("240")).
+						Background(lipgloss.Color("235")).
+						Width(v.width)
+				}
+			} else {
+				// After blinking period, show normally
+				notificationStyle = lipgloss.NewStyle().
+					Foreground(lipgloss.Color("82")).
+					Background(lipgloss.Color("235")).
+					Bold(true).
+					Width(v.width)
+			}
+
+			lines[notificationIdx] = notificationStyle.Render(" " + v.copiedMessage)
+		}
+	}
+
 	// Status bar always goes in the last line
 	if len(lines) > 0 {
 		lines[len(lines)-1] = v.renderStatusBar()
@@ -752,29 +787,7 @@ func (v *RunDetailsView) renderStatusBar() string {
 		}
 	}
 
-	// Show copied message if recent with custom blinking effect
-	if v.copiedMessage != "" && time.Since(v.copiedMessageTime) < 3*time.Second {
-		var copiedStyle lipgloss.Style
-		if time.Since(v.copiedMessageTime) < 2*time.Second {
-			if v.yankBlink {
-				// Bright and bold when visible
-				copiedStyle = lipgloss.NewStyle().
-					Foreground(lipgloss.Color("82")).
-					Bold(true)
-			} else {
-				// Dimmer when "off" for blinking effect
-				copiedStyle = lipgloss.NewStyle().
-					Foreground(lipgloss.Color("240")) // Dim gray
-			}
-		} else {
-			// After blinking period, show normally
-			copiedStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("82")).
-				Bold(true)
-		}
-
-		options = copiedStyle.Render(v.copiedMessage) + " | " + options
-	}
+	// Notifications are now shown above the status bar, not in it
 
 	// Use DashboardStatusLine for consistent formatting with [DETAILS] label
 	return components.DashboardStatusLine(v.width, "DETAILS", "", options)

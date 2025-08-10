@@ -2,7 +2,6 @@ package utils
 
 import (
 	"net/url"
-	"os"
 	"os/exec"
 	"regexp"
 	"runtime"
@@ -59,7 +58,28 @@ func OpenURL(urlStr string) error {
 		return nil
 	}
 
-	return browser.OpenURL(cleanURL)
+	return openURLSilent(cleanURL)
+}
+
+// openURLSilent opens a URL while suppressing stderr to prevent GTK theme warnings
+func openURLSilent(url string) error {
+	var cmd *exec.Cmd
+
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = exec.Command("open", url)
+	case "windows":
+		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
+	default: // linux, freebsd, openbsd, netbsd, etc.
+		cmd = exec.Command("xdg-open", url)
+	}
+
+	// Suppress stderr to prevent GTK theme warnings from cluttering the terminal
+	cmd.Stderr = nil
+	// Also suppress stdout to keep it clean
+	cmd.Stdout = nil
+
+	return cmd.Run()
 }
 
 // ContainsURL checks if a field label typically contains URLs

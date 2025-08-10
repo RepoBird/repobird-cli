@@ -1136,13 +1136,20 @@ func (d *DashboardView) renderTripleColumnLayout() string {
 	columnsHeight := lipgloss.Height(columns)
 	debug.LogToFilef("Heights: columns=%d, availableHeight=%d\n", columnsHeight, availableHeight)
 
+	// Add notification line if there's a message to show
+	var parts []string
+	parts = append(parts, columns)
+
+	// Add notification above status line if there's a message
+	if notificationLine := d.renderNotificationLine(); notificationLine != "" {
+		parts = append(parts, notificationLine)
+	}
+
+	parts = append(parts, statusline)
+
 	// Use PlaceVertical to position the statusline at the bottom
 	// The available height already accounts for title and statusline
-	finalLayout := lipgloss.JoinVertical(
-		lipgloss.Left,
-		columns,
-		statusline,
-	)
+	finalLayout := lipgloss.JoinVertical(lipgloss.Left, parts...)
 
 	debug.LogToFilef("Triple column layout dimensions: width=%d, height=%d\n",
 		lipgloss.Width(finalLayout), lipgloss.Height(finalLayout))
@@ -1287,7 +1294,15 @@ func (d *DashboardView) renderAllRunsLayout() string {
 	// Create statusline
 	statusline := d.renderStatusLine("RUNS")
 
-	return lipgloss.JoinVertical(lipgloss.Left, runListContent, statusline)
+	// Add notification above status line if there's a message
+	var parts []string
+	parts = append(parts, runListContent)
+	if notificationLine := d.renderNotificationLine(); notificationLine != "" {
+		parts = append(parts, notificationLine)
+	}
+	parts = append(parts, statusline)
+
+	return lipgloss.JoinVertical(lipgloss.Left, parts...)
 }
 
 // renderRepositoriesLayout renders the repositories-only layout
@@ -1298,7 +1313,15 @@ func (d *DashboardView) renderRepositoriesLayout() string {
 	// Create statusline
 	statusline := d.renderStatusLine("REPOS")
 
-	return lipgloss.JoinVertical(lipgloss.Left, content, statusline)
+	// Add notification above status line if there's a message
+	var parts []string
+	parts = append(parts, content)
+	if notificationLine := d.renderNotificationLine(); notificationLine != "" {
+		parts = append(parts, notificationLine)
+	}
+	parts = append(parts, statusline)
+
+	return lipgloss.JoinVertical(lipgloss.Left, parts...)
 }
 
 // renderRepositoriesColumn renders the left column with real repositories
@@ -2252,6 +2275,40 @@ func (d *DashboardView) wrapTextWithLimit(text string, width int, maxLines int) 
 	return result
 }
 
+// renderNotificationLine renders a notification line if there's a message to show
+func (d *DashboardView) renderNotificationLine() string {
+	if d.copiedMessage == "" || time.Since(d.copiedMessageTime) >= 3*time.Second {
+		return ""
+	}
+
+	var notificationStyle lipgloss.Style
+	if time.Since(d.copiedMessageTime) < 2*time.Second {
+		if d.yankBlink {
+			// Bright and bold when visible
+			notificationStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("82")).
+				Background(lipgloss.Color("235")).
+				Bold(true).
+				Width(d.width)
+		} else {
+			// Dimmer when "off" for blinking effect
+			notificationStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("240")).
+				Background(lipgloss.Color("235")).
+				Width(d.width)
+		}
+	} else {
+		// After blinking period, show normally
+		notificationStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("82")).
+			Background(lipgloss.Color("235")).
+			Bold(true).
+			Width(d.width)
+	}
+
+	return notificationStyle.Render(" " + d.copiedMessage)
+}
+
 // hasCurrentSelectionURL checks if the current selection contains a URL
 func (d *DashboardView) hasCurrentSelectionURL() bool {
 	switch d.focusedColumn {
@@ -2273,49 +2330,7 @@ func (d *DashboardView) hasCurrentSelectionURL() bool {
 
 // renderStatusLine renders the universal status line
 func (d *DashboardView) renderStatusLine(layoutName string) string {
-	// Show copied message prominently if recent
-	if d.copiedMessage != "" && time.Since(d.copiedMessageTime) < 3*time.Second {
-		// Custom blinking: toggle visibility of the message
-		var copiedStyle lipgloss.Style
-		if time.Since(d.copiedMessageTime) < 2*time.Second {
-			if d.yankBlink {
-				// Bright and bold when visible
-				copiedStyle = lipgloss.NewStyle().
-					Foreground(lipgloss.Color("82")).
-					Background(lipgloss.Color("235")).
-					Bold(true).
-					Padding(0, 1)
-			} else {
-				// Dimmer when "off" for blinking effect
-				copiedStyle = lipgloss.NewStyle().
-					Foreground(lipgloss.Color("240")). // Dim gray
-					Background(lipgloss.Color("235")).
-					Padding(0, 1)
-			}
-		} else {
-			// After blinking period, show normally
-			copiedStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("82")).
-				Background(lipgloss.Color("235")).
-				Bold(true).
-				Padding(0, 1)
-		}
-
-		// Create a custom status line just for the clipboard message
-		statusStyle := lipgloss.NewStyle().
-			Width(d.width).
-			Background(lipgloss.Color("235"))
-
-		message := copiedStyle.Render(d.copiedMessage)
-		padding := d.width - lipgloss.Width(message)
-		if padding > 0 {
-			message = message + strings.Repeat(" ", padding)
-		}
-
-		return statusStyle.Render(message)
-	}
-
-	// Normal status line when no clipboard message
+	// Always show normal status line now - notifications are shown above
 	// Data freshness indicator - keep it very short
 	dataInfo := ""
 	if d.loading && len(d.repositories) > 0 {

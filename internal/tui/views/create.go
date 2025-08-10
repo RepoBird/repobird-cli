@@ -694,6 +694,15 @@ func (v *CreateRunView) updateFields(msg tea.KeyMsg) []tea.Cmd {
 }
 
 func (v *CreateRunView) nextField() {
+	// Handle cycling from back button to first field (run type)
+	if v.backButtonFocused {
+		v.backButtonFocused = false
+		v.submitButtonFocused = false
+		v.focusIndex = 0 // Go to run type field
+		v.updateFocus()
+		return
+	}
+
 	v.backButtonFocused = false
 	v.submitButtonFocused = false
 	v.focusIndex++
@@ -1043,7 +1052,7 @@ func (v *CreateRunView) renderCompactForm(width, height int) string {
 
 	// Run type field (selectable, at index 0)
 	b.WriteString(labelStyle.Render("⚙️ Run Type:"))
-	if v.focusIndex == 0 {
+	if v.focusIndex == 0 && !v.backButtonFocused && !v.submitButtonFocused {
 		b.WriteString(v.renderFieldIndicator())
 	} else {
 		b.WriteString("   ")
@@ -1057,9 +1066,9 @@ func (v *CreateRunView) renderCompactForm(width, height int) string {
 	// Style the run type value based on focus
 	runTypeStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("33")).
-		Bold(v.focusIndex == 0)
+		Bold(v.focusIndex == 0 && !v.backButtonFocused && !v.submitButtonFocused)
 
-	if v.focusIndex == 0 && v.inputMode == components.NormalMode {
+	if v.focusIndex == 0 && !v.backButtonFocused && !v.submitButtonFocused && v.inputMode == components.NormalMode {
 		runTypeStyle = runTypeStyle.Background(lipgloss.Color("236"))
 	}
 
