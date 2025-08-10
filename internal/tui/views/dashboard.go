@@ -718,12 +718,12 @@ func (d *DashboardView) renderTripleColumnLayout() string {
 	}
 
 	// Column widths - calculate based on terminal width
-	// We need to ensure columns fit exactly within terminal width
-	// Divide width evenly among three columns
-	totalWidth := d.width
-	leftWidth := (totalWidth - 2) / 3  // Subtract 2 for safety margin
-	centerWidth := (totalWidth - 2) / 3
-	rightWidth := totalWidth - 2 - leftWidth - centerWidth  // Use remaining width
+	// Each box renders 2 pixels wider than its set width, so subtract 6 total (2 per column)
+	// to ensure they fit within terminal width
+	totalWidth := d.width - 6  // Subtract 6 to account for the 2-pixel expansion per box
+	leftWidth := totalWidth / 3
+	centerWidth := totalWidth / 3
+	rightWidth := totalWidth - leftWidth - centerWidth  // Use remaining width
 	
 	// Ensure minimum widths
 	if leftWidth < 10 {
