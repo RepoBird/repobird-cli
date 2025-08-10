@@ -1166,52 +1166,45 @@ func (d *DashboardView) renderDetailsColumn(width, height int) string {
 
 // renderStatusInfo renders the status/user info overlay
 func (d *DashboardView) renderStatusInfo() string {
-	// Create a box for the status info
-	boxWidth := 60
-	if boxWidth > d.width-10 {
-		boxWidth = d.width - 10
-	}
-	
-	boxStyle := lipgloss.NewStyle().
-		Width(boxWidth).
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("63")).
-		Padding(1, 2)
-	
+	// Title bar
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("63")).
-		Width(boxWidth-4).
-		Align(lipgloss.Center).
-		MarginBottom(1)
+		Foreground(lipgloss.Color("255")).
+		Background(lipgloss.Color("63")).
+		Width(d.width).
+		Padding(0, 1)
+	
+	title := titleStyle.Render("System Status & User Information")
+	
+	// Content styles
+	contentStyle := lipgloss.NewStyle().
+		Width(d.width).
+		Padding(1, 2)
 	
 	sectionStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("240")).
-		MarginBottom(1)
+		Bold(true).
+		Foreground(lipgloss.Color("63")).
+		MarginTop(1)
 	
 	labelStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("33")).
-		Width(20)
+		Foreground(lipgloss.Color("240")).
+		Width(25)
 	
 	valueStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("255"))
 	
 	var content []string
 	
-	// Title
-	content = append(content, titleStyle.Render("System Status & User Info"))
-	content = append(content, "")
-	
 	// User Info Section
 	if d.userInfo != nil {
-		content = append(content, sectionStyle.Render("═══ User Information ═══"))
-		content = append(content, fmt.Sprintf("%s %s", 
+		content = append(content, sectionStyle.Render("User Information"))
+		content = append(content, fmt.Sprintf("%s%s", 
 			labelStyle.Render("Email:"), 
 			valueStyle.Render(d.userInfo.Email)))
-		content = append(content, fmt.Sprintf("%s %s", 
+		content = append(content, fmt.Sprintf("%s%s", 
 			labelStyle.Render("Account Tier:"), 
 			valueStyle.Render(d.userInfo.Tier)))
-		content = append(content, fmt.Sprintf("%s %d / %d", 
+		content = append(content, fmt.Sprintf("%s%d / %d", 
 			labelStyle.Render("Runs Remaining:"), 
 			d.userInfo.RemainingRuns, 
 			d.userInfo.TotalRuns))
@@ -1234,29 +1227,27 @@ func (d *DashboardView) renderStatusInfo() string {
 			}
 			bar := strings.Repeat("█", filledBars) + strings.Repeat("░", emptyBars)
 			
-			content = append(content, fmt.Sprintf("%s %s %.1f%%", 
+			content = append(content, fmt.Sprintf("%s%s %.1f%%", 
 				labelStyle.Render("Usage:"), 
 				bar, 
 				percentage))
 		} else {
 			// Handle unlimited or zero total runs
-			content = append(content, fmt.Sprintf("%s %s", 
+			content = append(content, fmt.Sprintf("%s%s", 
 				labelStyle.Render("Usage:"), 
 				valueStyle.Render("Unlimited")))
 		}
 	} else {
-		content = append(content, sectionStyle.Render("═══ User Information ═══"))
+		content = append(content, sectionStyle.Render("User Information"))
 		content = append(content, "Loading user info...")
 	}
 	
-	content = append(content, "")
-	
 	// System Stats Section
-	content = append(content, sectionStyle.Render("═══ Dashboard Statistics ═══"))
-	content = append(content, fmt.Sprintf("%s %d", 
+	content = append(content, sectionStyle.Render("Dashboard Statistics"))
+	content = append(content, fmt.Sprintf("%s%d", 
 		labelStyle.Render("Repositories:"), 
 		len(d.repositories)))
-	content = append(content, fmt.Sprintf("%s %d", 
+	content = append(content, fmt.Sprintf("%s%d", 
 		labelStyle.Render("Total Runs:"), 
 		len(d.allRuns)))
 	
@@ -1273,7 +1264,7 @@ func (d *DashboardView) renderStatusInfo() string {
 		}
 	}
 	
-	content = append(content, fmt.Sprintf("%s 🔄 %d  ✅ %d  ❌ %d", 
+	content = append(content, fmt.Sprintf("%s🔄 %d  ✅ %d  ❌ %d", 
 		labelStyle.Render("Run Status:"),
 		running, completed, failed))
 	
@@ -1284,26 +1275,42 @@ func (d *DashboardView) renderStatusInfo() string {
 		if timeSince.Minutes() > 1 {
 			refreshText = fmt.Sprintf("%.1f minutes ago", timeSince.Minutes())
 		}
-		content = append(content, fmt.Sprintf("%s %s", 
+		content = append(content, fmt.Sprintf("%s%s", 
 			labelStyle.Render("Last Refresh:"), 
 			valueStyle.Render(refreshText)))
 	}
 	
-	content = append(content, "")
-	
 	// Connection Info Section
-	content = append(content, sectionStyle.Render("═══ Connection Info ═══"))
-	content = append(content, fmt.Sprintf("%s %s", 
+	content = append(content, sectionStyle.Render("Connection Info"))
+	content = append(content, fmt.Sprintf("%s%s", 
 		labelStyle.Render("API Endpoint:"), 
 		valueStyle.Render(d.client.GetAPIEndpoint())))
-	content = append(content, fmt.Sprintf("%s %s", 
+	content = append(content, fmt.Sprintf("%s%s", 
 		labelStyle.Render("Status:"), 
 		valueStyle.Render("Connected ✅")))
 	
-	content = append(content, "")
-	content = append(content, sectionStyle.Render("Press 's' or ESC to close"))
+	// Build the main content
+	mainContent := contentStyle.Render(strings.Join(content, "\n"))
 	
-	return boxStyle.Render(strings.Join(content, "\n"))
+	// Calculate remaining height for spacing
+	contentHeight := lipgloss.Height(title) + lipgloss.Height(mainContent) + 1 // +1 for statusline
+	remainingHeight := d.height - contentHeight
+	spacing := ""
+	if remainingHeight > 0 {
+		spacing = strings.Repeat("\n", remainingHeight)
+	}
+	
+	// Create status line at bottom
+	statusLineStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("240")).
+		Background(lipgloss.Color("235")).
+		Width(d.width).
+		Align(lipgloss.Center)
+	
+	statusLine := statusLineStyle.Render("Press 's' or ESC to close")
+	
+	// Join everything together
+	return lipgloss.JoinVertical(lipgloss.Left, title, mainContent, spacing, statusLine)
 }
 
 // renderRepositoriesTable renders a table of repositories with real data
