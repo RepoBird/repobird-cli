@@ -49,6 +49,11 @@ func NewClient(apiKey, baseURL string, debug bool) *Client {
 	}
 }
 
+// GetAPIEndpoint returns the API endpoint URL
+func (c *Client) GetAPIEndpoint() string {
+	return c.baseURL
+}
+
 func (c *Client) doRequest(method, path string, body interface{}) (*http.Response, error) {
 	var bodyReader io.Reader
 	if body != nil {
@@ -349,8 +354,13 @@ func (c *Client) ListRuns(ctx context.Context, page, limit int) (*models.ListRun
 	}, nil
 }
 
-// GetUserInfo gets user information (alias for VerifyAuth for dashboard compatibility)
-func (c *Client) GetUserInfo(ctx context.Context) (*models.UserInfo, error) {
+// GetUserInfo gets user information (without context for backward compatibility)
+func (c *Client) GetUserInfo() (*models.UserInfo, error) {
+	return c.GetUserInfoWithContext(context.Background())
+}
+
+// GetUserInfoWithContext gets user information with context
+func (c *Client) GetUserInfoWithContext(ctx context.Context) (*models.UserInfo, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+EndpointAuthVerify, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)

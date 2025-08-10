@@ -29,6 +29,7 @@ type DashboardView struct {
 	// Dashboard state
 	currentLayout      models.LayoutType
 	showHelp           bool
+	showStatusInfo     bool      // Show status/user info overlay
 	selectedRepo       *models.Repository
 	selectedRepoIdx    int
 	selectedRunIdx     int
@@ -58,6 +59,9 @@ type DashboardView struct {
 	// Cache management
 	lastDataRefresh time.Time
 	refreshInterval time.Duration
+	
+	// User info
+	userInfo *models.UserInfo
 }
 
 type dashboardDataLoadedMsg struct {
@@ -69,6 +73,11 @@ type dashboardDataLoadedMsg struct {
 type dashboardRepositorySelectedMsg struct {
 	repository *models.Repository
 	runs       []*models.RunResponse
+}
+
+type dashboardUserInfoLoadedMsg struct {
+	userInfo *models.UserInfo
+	error    error
 }
 
 // NewDashboardView creates a new dashboard view
@@ -97,8 +106,20 @@ func NewDashboardView(client *api.Client) *DashboardView {
 func (d *DashboardView) Init() tea.Cmd {
 	return tea.Batch(
 		d.loadDashboardData(),
+		d.loadUserInfo(),
 		d.runListView.Init(),
 	)
+}
+
+// loadUserInfo loads user information from the API
+func (d *DashboardView) loadUserInfo() tea.Cmd {
+	return func() tea.Msg {
+		userInfo, err := d.client.GetUserInfo()
+		return dashboardUserInfoLoadedMsg{
+			userInfo: userInfo,
+			error:    err,
+		}
+	}
 }
 
 // loadDashboardData loads data from cache or API
@@ -434,10 +455,27 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			d.selectedRunIdx = 0
 			d.updateDetailLines()
 		}
+		
+	case dashboardUserInfoLoadedMsg:
+		if msg.error == nil {
+			d.userInfo = msg.userInfo
+		}
 
 	case tea.KeyMsg:
 		// Handle dashboard-specific keys first
 		switch {
+		case msg.Type == tea.KeyEsc && d.showStatusInfo:
+			// Close status info overlay with ESC
+			d.showStatusInfo = false
+			return d, nil
+		case msg.Type == tea.KeyRunes && string(msg.Runes) == "s":
+			// Toggle status info view
+			d.showStatusInfo = !d.showStatusInfo
+			// Refresh user info when showing
+			if d.showStatusInfo {
+				cmds = append(cmds, d.loadUserInfo())
+			}
+			return d, tea.Batch(cmds...)
 		case msg.Type == tea.KeyRunes && string(msg.Runes) == "n":
 			// Navigate to create new run view
 			createView := NewCreateRunViewWithCache(d.client, nil, false, time.Time{}, nil)
@@ -698,6 +736,12 @@ func (d *DashboardView) View() string {
 	}
 
 	finalView := lipgloss.JoinVertical(lipgloss.Left, title, content)
+	
+	// Overlay status info if requested
+	if d.showStatusInfo {
+		return d.renderStatusInfo()
+	}
+	
 	debug.LogToFilef("Final view dimensions: width=%d, height=%d\n",
 		lipgloss.Width(finalView), lipgloss.Height(finalView))
 	return finalView
@@ -1118,6 +1162,148 @@ func (d *DashboardView) renderDetailsColumn(width, height int) string {
 		Padding(0, 1)
 
 	return lipgloss.JoinVertical(lipgloss.Left, title, contentStyle.Render(content))
+}
+
+// renderStatusInfo renders the status/user info overlay
+func (d *DashboardView) renderStatusInfo() string {
+	// Create a box for the status info
+	boxWidth := 60
+	if boxWidth > d.width-10 {
+		boxWidth = d.width - 10
+	}
+	
+	boxStyle := lipgloss.NewStyle().
+		Width(boxWidth).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("63")).
+		Padding(1, 2)
+	
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("63")).
+		Width(boxWidth-4).
+		Align(lipgloss.Center).
+		MarginBottom(1)
+	
+	sectionStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("240")).
+		MarginBottom(1)
+	
+	labelStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("33")).
+		Width(20)
+	
+	valueStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("255"))
+	
+	var content []string
+	
+	// Title
+	content = append(content, titleStyle.Render("System Status & User Info"))
+	content = append(content, "")
+	
+	// User Info Section
+	if d.userInfo != nil {
+		content = append(content, sectionStyle.Render("═══ User Information ═══"))
+		content = append(content, fmt.Sprintf("%s %s", 
+			labelStyle.Render("Email:"), 
+			valueStyle.Render(d.userInfo.Email)))
+		content = append(content, fmt.Sprintf("%s %s", 
+			labelStyle.Render("Account Tier:"), 
+			valueStyle.Render(d.userInfo.Tier)))
+		content = append(content, fmt.Sprintf("%s %d / %d", 
+			labelStyle.Render("Runs Remaining:"), 
+			d.userInfo.RemainingRuns, 
+			d.userInfo.TotalRuns))
+		
+		// Show usage percentage with visual bar
+		if d.userInfo.TotalRuns > 0 {
+			usedRuns := d.userInfo.TotalRuns - d.userInfo.RemainingRuns
+			percentage := float64(usedRuns) / float64(d.userInfo.TotalRuns) * 100
+			barWidth := 20
+			filledBars := int(percentage / 100 * float64(barWidth))
+			if filledBars < 0 {
+				filledBars = 0
+			}
+			if filledBars > barWidth {
+				filledBars = barWidth
+			}
+			emptyBars := barWidth - filledBars
+			if emptyBars < 0 {
+				emptyBars = 0
+			}
+			bar := strings.Repeat("█", filledBars) + strings.Repeat("░", emptyBars)
+			
+			content = append(content, fmt.Sprintf("%s %s %.1f%%", 
+				labelStyle.Render("Usage:"), 
+				bar, 
+				percentage))
+		} else {
+			// Handle unlimited or zero total runs
+			content = append(content, fmt.Sprintf("%s %s", 
+				labelStyle.Render("Usage:"), 
+				valueStyle.Render("Unlimited")))
+		}
+	} else {
+		content = append(content, sectionStyle.Render("═══ User Information ═══"))
+		content = append(content, "Loading user info...")
+	}
+	
+	content = append(content, "")
+	
+	// System Stats Section
+	content = append(content, sectionStyle.Render("═══ Dashboard Statistics ═══"))
+	content = append(content, fmt.Sprintf("%s %d", 
+		labelStyle.Render("Repositories:"), 
+		len(d.repositories)))
+	content = append(content, fmt.Sprintf("%s %d", 
+		labelStyle.Render("Total Runs:"), 
+		len(d.allRuns)))
+	
+	// Count run statuses
+	var running, completed, failed int
+	for _, run := range d.allRuns {
+		switch run.Status {
+		case "running", "pending":
+			running++
+		case "completed", "success":
+			completed++
+		case "failed", "error":
+			failed++
+		}
+	}
+	
+	content = append(content, fmt.Sprintf("%s 🔄 %d  ✅ %d  ❌ %d", 
+		labelStyle.Render("Run Status:"),
+		running, completed, failed))
+	
+	// Last refresh time
+	if !d.lastDataRefresh.IsZero() {
+		timeSince := time.Since(d.lastDataRefresh)
+		refreshText := fmt.Sprintf("%d seconds ago", int(timeSince.Seconds()))
+		if timeSince.Minutes() > 1 {
+			refreshText = fmt.Sprintf("%.1f minutes ago", timeSince.Minutes())
+		}
+		content = append(content, fmt.Sprintf("%s %s", 
+			labelStyle.Render("Last Refresh:"), 
+			valueStyle.Render(refreshText)))
+	}
+	
+	content = append(content, "")
+	
+	// Connection Info Section
+	content = append(content, sectionStyle.Render("═══ Connection Info ═══"))
+	content = append(content, fmt.Sprintf("%s %s", 
+		labelStyle.Render("API Endpoint:"), 
+		valueStyle.Render(d.client.GetAPIEndpoint())))
+	content = append(content, fmt.Sprintf("%s %s", 
+		labelStyle.Render("Status:"), 
+		valueStyle.Render("Connected ✅")))
+	
+	content = append(content, "")
+	content = append(content, sectionStyle.Render("Press 's' or ESC to close"))
+	
+	return boxStyle.Render(strings.Join(content, "\n"))
 }
 
 // renderRepositoriesTable renders a table of repositories with real data
