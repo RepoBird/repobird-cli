@@ -74,6 +74,9 @@ type DashboardView struct {
 	copiedMessage     string
 	copiedMessageTime time.Time
 	yankBlink         bool // Toggle for blinking effect
+
+	// Store original untruncated detail lines for copying
+	detailLinesOriginal []string
 }
 
 type dashboardDataLoadedMsg struct {
@@ -523,6 +526,11 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, d.startYankBlinkAnimation())
 		}
 
+	case clearStatusMsg:
+		// Clear the clipboard message after timeout
+		d.copiedMessage = ""
+		d.yankBlink = false
+
 	case components.FZFSelectedMsg:
 		// Handle FZF selection result
 		if !msg.Result.Canceled {
@@ -800,37 +808,45 @@ func (d *DashboardView) handleMillerColumnsNavigation(msg tea.KeyMsg) tea.Cmd {
 	case msg.Type == tea.KeyRunes && string(msg.Runes) == "y":
 		// Copy current row/line in any column
 		var textToCopy string
-		var copiedItem string
 
 		switch d.focusedColumn {
 		case 0: // Repository column
 			if d.selectedRepoIdx < len(d.repositories) {
 				repo := d.repositories[d.selectedRepoIdx]
 				textToCopy = repo.Name
-				copiedItem = "repository"
 			}
 		case 1: // Runs column
 			if d.selectedRunIdx < len(d.filteredRuns) {
 				run := d.filteredRuns[d.selectedRunIdx]
 				textToCopy = fmt.Sprintf("%s - %s", run.GetIDString(), run.Title)
-				copiedItem = "run"
 			}
 		case 2: // Details column
-			if d.selectedDetailLine < len(d.detailLines) {
-				textToCopy = d.detailLines[d.selectedDetailLine]
-				copiedItem = "detail"
+			if d.selectedDetailLine < len(d.detailLinesOriginal) {
+				// Use original untruncated text for copying
+				textToCopy = d.detailLinesOriginal[d.selectedDetailLine]
 			}
 		}
 
 		if textToCopy != "" {
 			if err := d.copyToClipboard(textToCopy); err == nil {
-				d.copiedMessage = fmt.Sprintf("📋 Copied %s", copiedItem)
+				// Show what's actually on the clipboard, truncated for display if needed
+				// Use the actual text that was copied (textToCopy), not a truncated version
+				displayText := textToCopy
+				maxLen := 30
+				if len(displayText) > maxLen {
+					displayText = displayText[:maxLen-3] + "..."
+				}
+				d.copiedMessage = fmt.Sprintf("📋 Copied \"%s\"", displayText)
 			} else {
 				d.copiedMessage = "✗ Failed to copy"
 			}
 			d.copiedMessageTime = time.Now()
 			d.yankBlink = true
-			return d.startYankBlinkAnimation()
+			// Start blink animation and clear timer
+			return tea.Batch(
+				d.startYankBlinkAnimation(),
+				d.startClearStatusTimer(),
+			)
 		}
 
 	case key.Matches(msg, d.keys.Right) || (msg.Type == tea.KeyRunes && string(msg.Runes) == "l"):
@@ -1092,6 +1108,7 @@ func (d *DashboardView) renderTripleColumnLayout() string {
 // updateDetailLines updates the detail lines for the selected run
 func (d *DashboardView) updateDetailLines() {
 	d.detailLines = []string{}
+	d.detailLinesOriginal = []string{}
 	d.selectedDetailLine = 0
 
 	if d.selectedRunData == nil {
@@ -1117,12 +1134,16 @@ func (d *DashboardView) updateDetailLines() {
 		return text
 	}
 
-	// Add single-line fields (truncated if needed)
-	d.detailLines = []string{
-		truncateLine(fmt.Sprintf("ID: %s", run.GetIDString())),
-		truncateLine(fmt.Sprintf("Status: %s", run.Status)),
-		truncateLine(fmt.Sprintf("Repository: %s", run.GetRepositoryName())),
+	// Helper to add both truncated and original lines
+	addLine := func(text string) {
+		d.detailLines = append(d.detailLines, truncateLine(text))
+		d.detailLinesOriginal = append(d.detailLinesOriginal, text)
 	}
+
+	// Add single-line fields (truncated for display, original for copying)
+	addLine(fmt.Sprintf("ID: %s", run.GetIDString()))
+	addLine(fmt.Sprintf("Status: %s", run.Status))
+	addLine(fmt.Sprintf("Repository: %s", run.GetRepositoryName()))
 
 	// Show run type - normalize API values to display values
 	if run.RunType != "" {
@@ -1131,47 +1152,53 @@ func (d *DashboardView) updateDetailLines() {
 		if strings.Contains(runTypeLower, "plan") {
 			displayType = "Plan"
 		}
-		d.detailLines = append(d.detailLines, truncateLine(fmt.Sprintf("Type: %s", displayType)))
+		addLine(fmt.Sprintf("Type: %s", displayType))
 	}
 
 	if run.Source != "" && run.Target != "" {
-		d.detailLines = append(d.detailLines, truncateLine(fmt.Sprintf("Branch: %s → %s", run.Source, run.Target)))
+		addLine(fmt.Sprintf("Branch: %s → %s", run.Source, run.Target))
 	}
 
-	d.detailLines = append(d.detailLines, truncateLine(fmt.Sprintf("Created: %s", run.CreatedAt.Format("Jan 2 15:04"))))
-	d.detailLines = append(d.detailLines, truncateLine(fmt.Sprintf("Updated: %s", run.UpdatedAt.Format("Jan 2 15:04"))))
+	addLine(fmt.Sprintf("Created: %s", run.CreatedAt.Format("Jan 2 15:04")))
+	addLine(fmt.Sprintf("Updated: %s", run.UpdatedAt.Format("Jan 2 15:04")))
 
 	// Title - single line truncated
 	if run.Title != "" {
-		d.detailLines = append(d.detailLines, "", "Title:")
-		d.detailLines = append(d.detailLines, truncateLine(run.Title))
+		addLine("")
+		addLine("Title:")
+		addLine(run.Title)
 	}
 
 	// Prompt - single line truncated
 	if run.Prompt != "" {
-		d.detailLines = append(d.detailLines, "", "Prompt:")
-		d.detailLines = append(d.detailLines, truncateLine(run.Prompt))
+		addLine("")
+		addLine("Prompt:")
+		addLine(run.Prompt)
 	}
 
 	// Error - single line truncated
 	if run.Error != "" {
-		d.detailLines = append(d.detailLines, "", "Error:")
-		d.detailLines = append(d.detailLines, truncateLine(run.Error))
+		addLine("")
+		addLine("Error:")
+		addLine(run.Error)
 	}
 
 	// Plan field - special handling (can be multi-line if space available)
 	// This should be last so it can use remaining space
 	if strings.Contains(strings.ToLower(run.RunType), "plan") && run.Status == models.StatusDone && run.Plan != "" {
-		d.detailLines = append(d.detailLines, "", "Plan:")
+		addLine("")
+		addLine("Plan:")
 		// For now, just show first line with ellipsis if there's more
 		// The renderDetailsColumn will handle proper multi-line display
 		lines := strings.Split(run.Plan, "\n")
 		if len(lines) > 0 {
+			// Store full plan in original, but truncate for display
+			d.detailLinesOriginal[len(d.detailLinesOriginal)-1] = run.Plan // Replace last "Plan:" with full plan
 			firstLine := truncateLine(lines[0])
 			if len(lines) > 1 {
 				firstLine = firstLine + " (...)"
 			}
-			d.detailLines = append(d.detailLines, firstLine)
+			d.detailLines[len(d.detailLines)-1] = firstLine // Update display version
 		}
 	}
 }
@@ -1186,6 +1213,14 @@ func (d *DashboardView) startYankBlinkAnimation() tea.Cmd {
 	return func() tea.Msg {
 		time.Sleep(100 * time.Millisecond)
 		return yankBlinkMsg{}
+	}
+}
+
+// startClearStatusTimer starts a timer to clear the status message
+func (d *DashboardView) startClearStatusTimer() tea.Cmd {
+	return func() tea.Msg {
+		time.Sleep(3 * time.Second)
+		return clearStatusMsg{}
 	}
 }
 
@@ -1243,11 +1278,15 @@ func (d *DashboardView) renderRepositoriesColumn(width, height int) string {
 		// Highlight selected repository
 		if i == d.selectedRepoIdx {
 			if d.focusedColumn == 0 {
-				item = lipgloss.NewStyle().
+				style := lipgloss.NewStyle().
 					Width(width).
 					Background(lipgloss.Color("63")).
-					Foreground(lipgloss.Color("255")).
-					Render(item)
+					Foreground(lipgloss.Color("255"))
+				// Apply blinking if copying and within first second
+				if d.yankBlink && d.copiedMessage != "" && time.Since(d.copiedMessageTime) < 1*time.Second {
+					style = style.Blink(true)
+				}
+				item = style.Render(item)
 			} else {
 				item = lipgloss.NewStyle().
 					Width(width).
@@ -1317,11 +1356,15 @@ func (d *DashboardView) renderRunsColumn(width, height int) string {
 			// Highlight selected run
 			if i == d.selectedRunIdx {
 				if d.focusedColumn == 1 {
-					item = lipgloss.NewStyle().
+					style := lipgloss.NewStyle().
 						Width(width).
 						Background(lipgloss.Color("33")).
-						Foreground(lipgloss.Color("255")).
-						Render(item)
+						Foreground(lipgloss.Color("255"))
+					// Apply blinking if copying and within first second
+					if d.yankBlink && d.copiedMessage != "" && time.Since(d.copiedMessageTime) < 1*time.Second {
+						style = style.Blink(true)
+					}
+					item = style.Render(item)
 				} else {
 					item = lipgloss.NewStyle().
 						Width(width).
@@ -1390,12 +1433,16 @@ func (d *DashboardView) renderDetailsColumn(width, height int) string {
 
 			if d.focusedColumn == 2 && i == d.selectedDetailLine {
 				// Highlight selected line
-				styledLine = lipgloss.NewStyle().
+				style := lipgloss.NewStyle().
 					MaxWidth(contentWidth).
 					Inline(true).
 					Background(lipgloss.Color("63")).
-					Foreground(lipgloss.Color("255")).
-					Render(line)
+					Foreground(lipgloss.Color("255"))
+				// Apply blinking if copying and within first second
+				if d.yankBlink && d.copiedMessage != "" && time.Since(d.copiedMessageTime) < 1*time.Second {
+					style = style.Blink(true)
+				}
+				styledLine = style.Render(line)
 			}
 			displayLines = append(displayLines, styledLine)
 		}

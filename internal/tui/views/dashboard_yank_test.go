@@ -38,7 +38,8 @@ func TestDashboardViewYankFeedback(t *testing.T) {
 
 	// Check that it contains the expected content
 	// Note: In CI/test environments, clipboard may fail, so we accept both success and failure messages
-	expectedSuccessMsg := "📋 Copied repository"
+	// The success message should now show the actual text that was copied
+	expectedSuccessMsg := "📋 Copied \"test-repo-1\""
 	expectedFailMsg := "✗ Failed to copy"
 	if view.copiedMessage != expectedSuccessMsg && view.copiedMessage != expectedFailMsg {
 		t.Errorf("Expected copiedMessage to be '%s' or '%s', got '%s'", expectedSuccessMsg, expectedFailMsg, view.copiedMessage)
@@ -103,7 +104,8 @@ func TestDashboardViewYankInRunsColumn(t *testing.T) {
 
 	// Check that clipboard message was set
 	// Note: In CI/test environments, clipboard may fail, so we accept both success and failure messages
-	expectedSuccessMsg := "📋 Copied run"
+	// The success message should show the actual text (truncated if needed)
+	expectedSuccessMsg := "📋 Copied \"run-123 - Test Run\""
 	expectedFailMsg := "✗ Failed to copy"
 	if view.copiedMessage != expectedSuccessMsg && view.copiedMessage != expectedFailMsg {
 		t.Errorf("Expected copiedMessage to be '%s' or '%s', got '%s'", expectedSuccessMsg, expectedFailMsg, view.copiedMessage)
@@ -122,8 +124,13 @@ func TestDashboardViewYankInDetailsColumn(t *testing.T) {
 	view.height = 30
 	view.focusedColumn = 2 // Focus on details column
 
-	// Add test detail lines
+	// Add test detail lines (both display and original versions)
 	view.detailLines = []string{
+		"Detail line 1",
+		"Detail line 2",
+		"Detail line 3",
+	}
+	view.detailLinesOriginal = []string{
 		"Detail line 1",
 		"Detail line 2",
 		"Detail line 3",
@@ -141,7 +148,8 @@ func TestDashboardViewYankInDetailsColumn(t *testing.T) {
 
 	// Check that clipboard message was set
 	// Note: In CI/test environments, clipboard may fail, so we accept both success and failure messages
-	expectedSuccessMsg := "📋 Copied detail"
+	// The success message should show the actual text
+	expectedSuccessMsg := "📋 Copied \"Detail line 2\""
 	expectedFailMsg := "✗ Failed to copy"
 	if view.copiedMessage != expectedSuccessMsg && view.copiedMessage != expectedFailMsg {
 		t.Errorf("Expected copiedMessage to be '%s' or '%s', got '%s'", expectedSuccessMsg, expectedFailMsg, view.copiedMessage)
@@ -184,5 +192,30 @@ func TestDashboardViewBlinkAnimation(t *testing.T) {
 	// Check that yankBlink toggled back
 	if !view.yankBlink {
 		t.Error("Expected yankBlink to toggle back to true")
+	}
+}
+
+func TestDashboardViewClearStatus(t *testing.T) {
+	// Create a new dashboard view
+	view := NewDashboardView(nil) // Pass nil client for testing
+	view.width = 100
+	view.height = 30
+
+	// Set clipboard message
+	view.copiedMessage = "📋 Copied \"test\""
+	view.copiedMessageTime = time.Now()
+	view.yankBlink = true
+
+	// Simulate clearStatusMsg
+	_, _ = view.Update(clearStatusMsg{})
+
+	// Check that message was cleared
+	if view.copiedMessage != "" {
+		t.Errorf("Expected copiedMessage to be cleared, got '%s'", view.copiedMessage)
+	}
+
+	// Check that yankBlink was reset
+	if view.yankBlink {
+		t.Error("Expected yankBlink to be false after clearing")
 	}
 }

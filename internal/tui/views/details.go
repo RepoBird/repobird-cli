@@ -52,6 +52,13 @@ type RunDetailsView struct {
 	yankBlink         bool // Toggle for blinking effect
 	// Store full content for clipboard operations
 	fullContent string
+	// Row navigation
+	selectedRow    int      // Currently selected row/field
+	fieldLines     []string // Lines that can be selected (field values)
+	fieldValues    []string // Actual field values for copying
+	fieldIndices   []int    // Line indices of selectable fields in the viewport
+	fieldRanges    [][2]int // Start and end line indices for each field (for multi-line fields)
+	navigationMode bool     // Whether we're in navigation mode
 }
 
 func NewRunDetailsView(client *api.Client, run models.RunResponse) *RunDetailsView {
@@ -117,6 +124,9 @@ func NewRunDetailsViewWithConfig(config RunDetailsViewConfig) *RunDetailsView {
 		v.updateStatusHistory(string(run.Status), false)
 		v.updateContent()
 	}
+
+	// Start in navigation mode
+	v.navigationMode = true
 
 	return v
 }
@@ -271,27 +281,126 @@ func (v *RunDetailsView) handleKeyInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		v.showLogs = !v.showLogs
 		v.updateContent()
 	default:
-		// Handle clipboard operations
-		if cmd := v.handleClipboardOperations(msg.String()); cmd != nil {
-			cmds = append(cmds, cmd)
+		// Handle navigation in navigation mode
+		if v.navigationMode {
+			if cmd := v.handleRowNavigation(msg); cmd != nil {
+				cmds = append(cmds, cmd)
+			} else if cmd := v.handleClipboardOperations(msg.String()); cmd != nil {
+				cmds = append(cmds, cmd)
+			} else {
+				// Handle viewport navigation as fallback
+				v.handleViewportNavigation(msg)
+			}
 		} else {
-			// Handle viewport navigation
-			v.handleViewportNavigation(msg)
+			// Handle clipboard operations
+			if cmd := v.handleClipboardOperations(msg.String()); cmd != nil {
+				cmds = append(cmds, cmd)
+			} else {
+				// Handle viewport navigation
+				v.handleViewportNavigation(msg)
+			}
 		}
 	}
 
 	return v, tea.Batch(cmds...)
 }
 
+// handleRowNavigation handles navigation between selectable rows/fields
+func (v *RunDetailsView) handleRowNavigation(msg tea.KeyMsg) tea.Cmd {
+	switch msg.String() {
+	case "j", "down":
+		if v.selectedRow < len(v.fieldValues)-1 {
+			v.selectedRow++
+			// Scroll viewport if needed to show selected field
+			v.scrollToSelectedField()
+		}
+	case "k", "up":
+		if v.selectedRow > 0 {
+			v.selectedRow--
+			// Scroll viewport if needed to show selected field
+			v.scrollToSelectedField()
+		}
+	case "g":
+		// Go to first field
+		v.selectedRow = 0
+		v.scrollToSelectedField()
+	case "G":
+		// Go to last field
+		if len(v.fieldValues) > 0 {
+			v.selectedRow = len(v.fieldValues) - 1
+			v.scrollToSelectedField()
+		}
+	}
+	return nil
+}
+
+// scrollToSelectedField ensures the selected field is visible in the viewport
+func (v *RunDetailsView) scrollToSelectedField() {
+	if v.selectedRow >= 0 && v.selectedRow < len(v.fieldRanges) {
+		// Get the range of the selected field
+		fieldRange := v.fieldRanges[v.selectedRow]
+		startLine := fieldRange[0]
+		endLine := fieldRange[1]
+
+		viewportTop := v.viewport.YOffset
+		viewportBottom := viewportTop + v.viewport.Height - 1
+
+		// If the entire field is above the viewport, scroll to show the start
+		if endLine < viewportTop {
+			v.viewport.SetYOffset(startLine)
+		} else if startLine > viewportBottom {
+			// If the entire field is below the viewport, scroll to show as much as possible
+			// Try to show the whole field if it fits
+			fieldHeight := endLine - startLine + 1
+			if fieldHeight <= v.viewport.Height {
+				// Field fits in viewport, position it at the top
+				v.viewport.SetYOffset(startLine)
+			} else {
+				// Field is larger than viewport, show the beginning
+				v.viewport.SetYOffset(startLine)
+			}
+		}
+		// If part of the field is visible, don't scroll
+	}
+}
+
 // handleClipboardOperations handles clipboard-related key presses
 func (v *RunDetailsView) handleClipboardOperations(key string) tea.Cmd {
 	switch key {
 	case "y":
-		// Copy current line to clipboard
-		if err := v.copyCurrentLine(); err == nil {
-			v.copiedMessage = "📋 Copied current line"
+		// Copy selected field value to clipboard
+		var textToCopy string
+		if v.navigationMode && v.selectedRow >= 0 && v.selectedRow < len(v.fieldValues) {
+			textToCopy = v.fieldValues[v.selectedRow]
+			if err := utils.WriteToClipboard(textToCopy); err == nil {
+				// Show what's actually copied, truncated for display
+				displayText := textToCopy
+				maxLen := 30
+				if len(displayText) > maxLen {
+					displayText = displayText[:maxLen-3] + "..."
+				}
+				v.copiedMessage = fmt.Sprintf("📋 Copied \"%s\"", displayText)
+			} else {
+				v.copiedMessage = "✗ Failed to copy"
+			}
 		} else {
-			v.copiedMessage = "✗ Failed to copy"
+			// Copy current line to clipboard (old behavior)
+			currentLine := v.getCurrentLine()
+			if currentLine != "" {
+				if err := utils.WriteToClipboard(currentLine); err == nil {
+					// Show what's actually copied, truncated for display
+					displayText := currentLine
+					maxLen := 30
+					if len(displayText) > maxLen {
+						displayText = displayText[:maxLen-3] + "..."
+					}
+					v.copiedMessage = fmt.Sprintf("📋 Copied \"%s\"", displayText)
+				} else {
+					v.copiedMessage = "✗ Failed to copy"
+				}
+			} else {
+				v.copiedMessage = "✗ No line to copy"
+			}
 		}
 		v.copiedMessageTime = time.Now()
 		v.yankBlink = true
@@ -443,16 +552,12 @@ func (v *RunDetailsView) View() string {
 			lineIdx++
 		}
 	} else {
-		// Viewport content
-		viewportContent := v.viewport.View()
-		if viewportContent != "" {
-			// Split viewport content into lines
-			viewportLines := strings.Split(strings.TrimRight(viewportContent, "\n"), "\n")
-			for _, line := range viewportLines {
-				if lineIdx < len(lines)-1 { // Leave room for status bar
-					lines[lineIdx] = line
-					lineIdx++
-				}
+		// Render content with visible cursor selection
+		contentLines := v.renderContentWithCursor()
+		for _, line := range contentLines {
+			if lineIdx < len(lines)-1 { // Leave room for status bar
+				lines[lineIdx] = line
+				lineIdx++
 			}
 		}
 	}
@@ -484,6 +589,63 @@ func (v *RunDetailsView) View() string {
 	// Join all lines with newlines
 	// This creates exactly height-1 newlines, which is correct
 	return strings.Join(lines, "\n")
+}
+
+// renderContentWithCursor renders the content with a visible row selector
+func (v *RunDetailsView) renderContentWithCursor() []string {
+	if v.showLogs {
+		// For logs view, just return the viewport content as-is
+		return strings.Split(v.viewport.View(), "\n")
+	}
+
+	// Get all content lines
+	allLines := strings.Split(v.fullContent, "\n")
+	if len(allLines) == 0 {
+		return []string{}
+	}
+
+	// Calculate viewport bounds
+	viewportHeight := v.viewport.Height
+	if viewportHeight <= 0 {
+		viewportHeight = v.height - 6 // Fallback calculation
+	}
+
+	// Get the current viewport offset
+	viewportOffset := v.viewport.YOffset
+
+	// Determine which lines are visible
+	visibleLines := []string{}
+	for i := viewportOffset; i < len(allLines) && i < viewportOffset+viewportHeight; i++ {
+		line := allLines[i]
+
+		// Check if this line should be highlighted
+		shouldHighlight := false
+		if v.navigationMode && v.selectedRow >= 0 && v.selectedRow < len(v.fieldRanges) {
+			fieldRange := v.fieldRanges[v.selectedRow]
+			if i >= fieldRange[0] && i <= fieldRange[1] {
+				shouldHighlight = true
+			}
+		}
+
+		if shouldHighlight {
+			// Apply highlight style
+			highlightStyle := lipgloss.NewStyle().
+				Background(lipgloss.Color("63")).
+				Foreground(lipgloss.Color("255")).
+				Width(v.width)
+
+			// Apply blinking if copying
+			if v.yankBlink && v.copiedMessage != "" && time.Since(v.copiedMessageTime) < 1*time.Second {
+				highlightStyle = highlightStyle.Blink(true)
+			}
+
+			visibleLines = append(visibleLines, highlightStyle.Render(line))
+		} else {
+			visibleLines = append(visibleLines, line)
+		}
+	}
+
+	return visibleLines
 }
 
 func (v *RunDetailsView) renderHeader() string {
@@ -529,10 +691,10 @@ func (v *RunDetailsView) renderHeader() string {
 }
 
 func (v *RunDetailsView) renderStatusBar() string {
-	options := "[b]ack [l]ogs [y]copy line [Y]copy all [r]efresh [?]help [q]uit"
+	options := "[b]ack [l]ogs [j/k]navigate [y]copy field [Y]copy all [r]efresh [?]help [q]uit"
 
 	if v.showLogs {
-		options = "[b]ack [l]details [y]copy line [Y]copy all [r]efresh [?]help [q]uit"
+		options = "[b]ack [l]details [j/k]navigate [y]copy field [Y]copy all [r]efresh [?]help [q]uit"
 	}
 
 	// Show copied message if recent with blinking effect
@@ -554,6 +716,12 @@ func (v *RunDetailsView) renderStatusBar() string {
 
 func (v *RunDetailsView) updateContent() {
 	var content strings.Builder
+	var lines []string
+	v.fieldLines = []string{}
+	v.fieldValues = []string{}
+	v.fieldIndices = []int{}
+	v.fieldRanges = [][2]int{}
+	lineCount := 0
 
 	if v.showLogs {
 		content.WriteString("═══ Logs ═══\n\n")
@@ -563,57 +731,152 @@ func (v *RunDetailsView) updateContent() {
 			content.WriteString("No logs available yet...\n")
 		}
 	} else {
+		// Helper to add a single-line field and track its position
+		addField := func(label, value string) {
+			if value != "" {
+				line := fmt.Sprintf("%s: %s", label, value)
+				content.WriteString(line + "\n")
+				lines = append(lines, line)
+				v.fieldLines = append(v.fieldLines, line)
+				v.fieldValues = append(v.fieldValues, value)
+				v.fieldIndices = append(v.fieldIndices, lineCount)
+				v.fieldRanges = append(v.fieldRanges, [2]int{lineCount, lineCount})
+				lineCount++
+			}
+		}
+
+		addSeparator := func(text string) {
+			content.WriteString(text + "\n")
+			lines = append(lines, text)
+			lineCount++
+		}
+
 		// Display title only if it exists
 		if v.run.Title != "" {
-			content.WriteString(fmt.Sprintf("Title: %s\n", v.run.Title))
+			addField("Title", v.run.Title)
 		}
-		content.WriteString(fmt.Sprintf("Run ID: %s\n", v.run.GetIDString()))
-		content.WriteString(fmt.Sprintf("Repository: %s\n", v.run.Repository))
-		content.WriteString(fmt.Sprintf("Source Branch: %s\n", v.run.Source))
+		addField("Run ID", v.run.GetIDString())
+		addField("Repository", v.run.Repository)
+		addField("Source Branch", v.run.Source)
 		if v.run.Target != "" && v.run.Target != v.run.Source {
-			content.WriteString(fmt.Sprintf("Target Branch: %s\n", v.run.Target))
+			addField("Target Branch", v.run.Target)
 		}
 		if v.run.RunType != "" {
-			content.WriteString(fmt.Sprintf("Run Type: %s\n", v.run.RunType))
+			addField("Run Type", v.run.RunType)
 		}
-		content.WriteString(fmt.Sprintf("Created: %s\n", v.run.CreatedAt.Format(time.RFC3339)))
+		addField("Created", v.run.CreatedAt.Format(time.RFC3339))
 
 		if v.run.UpdatedAt.After(v.run.CreatedAt) && (v.run.Status == models.StatusDone || v.run.Status == models.StatusFailed) {
 			duration := v.run.UpdatedAt.Sub(v.run.CreatedAt)
-			content.WriteString(fmt.Sprintf("Duration: %s\n", formatDuration(duration)))
+			addField("Duration", formatDuration(duration))
 		}
 
-		content.WriteString("\n═══ Status History ═══\n")
+		addSeparator("\n═══ Status History ═══")
 		// Display status history in reverse order (most recent first)
 		for i := len(v.statusHistory) - 1; i >= 0; i-- {
 			content.WriteString(v.statusHistory[i] + "\n")
+			lines = append(lines, v.statusHistory[i])
+			lineCount++
+		}
+
+		// Helper to add multi-line field and track its range
+		addMultilineField := func(label, value string) {
+			if value != "" {
+				v.fieldLines = append(v.fieldLines, label)
+				v.fieldValues = append(v.fieldValues, value)
+				v.fieldIndices = append(v.fieldIndices, lineCount)
+
+				startLine := lineCount
+				fieldLines := strings.Split(value, "\n")
+				for _, fieldLine := range fieldLines {
+					content.WriteString(fieldLine + "\n")
+					lines = append(lines, fieldLine)
+					lineCount++
+				}
+				endLine := lineCount - 1
+				v.fieldRanges = append(v.fieldRanges, [2]int{startLine, endLine})
+			}
 		}
 
 		if v.run.Prompt != "" {
-			content.WriteString("\n═══ Prompt ═══\n")
-			content.WriteString(v.run.Prompt + "\n")
+			addSeparator("\n═══ Prompt ═══")
+			addMultilineField("Prompt", v.run.Prompt)
 		}
 
 		// Show plan for plan-type runs that are completed (includes "plan", "pro-plan", etc.)
 		if strings.Contains(strings.ToLower(v.run.RunType), "plan") && v.run.Status == models.StatusDone && v.run.Plan != "" {
-			content.WriteString("\n═══ Plan ═══\n")
-			content.WriteString(v.run.Plan + "\n")
+			addSeparator("\n═══ Plan ═══")
+			addMultilineField("Plan", v.run.Plan)
 		}
 
 		if v.run.Context != "" {
-			content.WriteString("\n═══ Context ═══\n")
-			content.WriteString(v.run.Context + "\n")
+			addSeparator("\n═══ Context ═══")
+			addMultilineField("Context", v.run.Context)
 		}
 
 		if v.run.Error != "" {
-			content.WriteString("\n═══ Error ═══\n")
-			content.WriteString(styles.ErrorStyle.Render(v.run.Error) + "\n")
+			addSeparator("\n═══ Error ═══")
+			// Special handling for error to apply styling
+			v.fieldLines = append(v.fieldLines, "Error")
+			v.fieldValues = append(v.fieldValues, v.run.Error)
+			v.fieldIndices = append(v.fieldIndices, lineCount)
+
+			startLine := lineCount
+			errorLines := strings.Split(v.run.Error, "\n")
+			for _, errorLine := range errorLines {
+				styledLine := styles.ErrorStyle.Render(errorLine)
+				content.WriteString(styledLine + "\n")
+				lines = append(lines, errorLine)
+				lineCount++
+			}
+			endLine := lineCount - 1
+			v.fieldRanges = append(v.fieldRanges, [2]int{startLine, endLine})
 		}
 	}
 
 	// Store the full content for clipboard operations
 	v.fullContent = content.String()
+
+	// Set the content in the viewport (without highlighting, as we'll do that in rendering)
 	v.viewport.SetContent(v.fullContent)
+
+	// Ensure selected row is within bounds
+	if v.selectedRow >= len(v.fieldValues) && len(v.fieldValues) > 0 {
+		v.selectedRow = len(v.fieldValues) - 1
+	} else if v.selectedRow < 0 && len(v.fieldValues) > 0 {
+		v.selectedRow = 0
+	}
+}
+
+// createHighlightedContent creates content with the selected field highlighted
+func (v *RunDetailsView) createHighlightedContent(lines []string) string {
+	if v.selectedRow < 0 || v.selectedRow >= len(v.fieldRanges) {
+		return v.fullContent
+	}
+
+	// Get the range of lines for the selected field
+	fieldRange := v.fieldRanges[v.selectedRow]
+	startLine := fieldRange[0]
+	endLine := fieldRange[1]
+
+	var result strings.Builder
+	highlightStyle := lipgloss.NewStyle().
+		Background(lipgloss.Color("238")).
+		Foreground(lipgloss.Color("15"))
+
+	for i, line := range lines {
+		if i >= startLine && i <= endLine {
+			// Highlight all lines in the field range
+			result.WriteString(highlightStyle.Render(line))
+		} else {
+			result.WriteString(line)
+		}
+		if i < len(lines)-1 {
+			result.WriteString("\n")
+		}
+	}
+
+	return result.String()
 }
 
 func (v *RunDetailsView) updateStatusHistory(status string, isPolling bool) {
@@ -734,6 +997,22 @@ type runDetailsLoadedMsg struct {
 }
 
 type yankBlinkMsg struct{}
+type clearStatusMsg struct{}
+
+// getCurrentLine gets the current visible line
+func (v *RunDetailsView) getCurrentLine() string {
+	// Get the current line based on viewport position
+	// The viewport tracks the top visible line
+	visibleLines := strings.Split(v.viewport.View(), "\n")
+	if len(visibleLines) > 0 {
+		// Get first visible line (could be partial due to scrolling)
+		currentLine := visibleLines[0]
+		if currentLine != "" {
+			return currentLine
+		}
+	}
+	return ""
+}
 
 // copyCurrentLine copies the current visible line to clipboard
 func (v *RunDetailsView) copyCurrentLine() error {
