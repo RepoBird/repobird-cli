@@ -513,19 +513,9 @@ func (d *DashboardView) View() string {
 
 	var content string
 
-	// Always show title first
-	titleStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("63")).
-		Width(d.width).
-		Align(lipgloss.Center).
-		MarginBottom(1)
-
-	title := titleStyle.Render("RepoBird Dashboard")
-
 	if d.error != nil {
 		content = fmt.Sprintf("Error loading dashboard data: %s\n\nPress 'r' to retry, 'q' to quit", d.error.Error())
-		return lipgloss.JoinVertical(lipgloss.Left, title, content)
+		return content
 	}
 
 	// Show cached content while loading new data
@@ -541,19 +531,7 @@ func (d *DashboardView) View() string {
 		default:
 			content = d.renderTripleColumnLayout()
 		}
-
-		// Add loading indicator in bottom left
-		loadingStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("226")).
-			Italic(true)
-		loadingIndicator := loadingStyle.Render("⟳ Refreshing data...")
-
-		// Overlay loading indicator
-		lines := strings.Split(content, "\n")
-		if len(lines) > 2 {
-			lines[len(lines)-2] = loadingIndicator
-		}
-		return lipgloss.JoinVertical(lipgloss.Left, title, strings.Join(lines, "\n"))
+		return content
 	}
 
 	if d.loading || d.initializing {
@@ -562,9 +540,9 @@ func (d *DashboardView) View() string {
 			Foreground(lipgloss.Color("240")).
 			Width(d.width).
 			Align(lipgloss.Center).
-			MarginTop(5)
+			MarginTop(d.height / 2)
 		content = loadingStyle.Render(content)
-		return lipgloss.JoinVertical(lipgloss.Left, title, content)
+		return content
 	}
 
 	// Render based on current layout
@@ -579,39 +557,39 @@ func (d *DashboardView) View() string {
 		content = d.renderTripleColumnLayout()
 	}
 
-	return lipgloss.JoinVertical(lipgloss.Left, title, content)
+	return content
 }
 
 // renderTripleColumnLayout renders the Miller Columns layout with real data
 func (d *DashboardView) renderTripleColumnLayout() string {
-	// Calculate available height (minus title, header, footer)
-	availableHeight := d.height - 6 // Account for title, layout info, and footer
+	// Calculate available height (minus statusline only)
+	availableHeight := d.height - 1 // Account for statusline at bottom
 
 	// Create three columns
 	leftColumn := d.renderRepositoriesColumn()
 	centerColumn := d.renderRunsColumn()
 	rightColumn := d.renderDetailsColumn()
 
-	// Column widths (30%, 35%, 35%)
-	leftWidth := int(float64(d.width) * 0.30)
-	centerWidth := int(float64(d.width) * 0.35)
-	rightWidth := d.width - leftWidth - centerWidth - 4 // Account for borders and spacing
+	// Column widths - full width, equally distributed
+	leftWidth := d.width / 3
+	centerWidth := d.width / 3
+	rightWidth := d.width - leftWidth - centerWidth
 
 	// Make columns full height with rounded borders
 	leftStyle := lipgloss.NewStyle().
-		Width(leftWidth).
+		Width(leftWidth - 1).
 		Height(availableHeight).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("63"))
 
 	centerStyle := lipgloss.NewStyle().
-		Width(centerWidth).
+		Width(centerWidth - 1).
 		Height(availableHeight).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("33"))
 
 	rightStyle := lipgloss.NewStyle().
-		Width(rightWidth).
+		Width(rightWidth - 1).
 		Height(availableHeight).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("240"))
@@ -619,41 +597,36 @@ func (d *DashboardView) renderTripleColumnLayout() string {
 	columns := lipgloss.JoinHorizontal(
 		lipgloss.Top,
 		leftStyle.Render(leftColumn),
-		" ",
 		centerStyle.Render(centerColumn),
-		" ",
 		rightStyle.Render(rightColumn),
 	)
 
-	// Layout info and footer
-	layoutInfo := d.renderLayoutInfo("Miller Columns")
-	footer := d.renderFooter()
+	// Create statusline
+	statusline := d.renderStatusLine("Miller Columns")
 
-	return lipgloss.JoinVertical(lipgloss.Left, layoutInfo, columns, footer)
+	return lipgloss.JoinVertical(lipgloss.Left, columns, statusline)
 }
 
 // renderAllRunsLayout renders the timeline layout
 func (d *DashboardView) renderAllRunsLayout() string {
-	header := d.renderHeader("All Runs Timeline")
-
 	// Use the existing run list view
 	runListContent := d.runListView.View()
 
-	footer := d.renderFooter()
+	// Create statusline
+	statusline := d.renderStatusLine("All Runs Timeline")
 
-	return lipgloss.JoinVertical(lipgloss.Left, header, "", runListContent, "", footer)
+	return lipgloss.JoinVertical(lipgloss.Left, runListContent, statusline)
 }
 
 // renderRepositoriesLayout renders the repositories-only layout
 func (d *DashboardView) renderRepositoriesLayout() string {
-	header := d.renderHeader("Repositories Overview")
-
 	// Render repositories table
 	content := d.renderRepositoriesTable()
 
-	footer := d.renderFooter()
+	// Create statusline
+	statusline := d.renderStatusLine("Repositories Overview")
 
-	return lipgloss.JoinVertical(lipgloss.Left, header, "", content, "", footer)
+	return lipgloss.JoinVertical(lipgloss.Left, content, statusline)
 }
 
 // renderLayoutInfo renders the layout information bar
@@ -965,4 +938,27 @@ func (d *DashboardView) wrapText(text string, width int) []string {
 	}
 
 	return lines
+}
+
+// renderStatusLine renders the universal status line
+func (d *DashboardView) renderStatusLine(layoutName string) string {
+	// Data freshness indicator
+	dataInfo := "fresh"
+	if !d.lastDataRefresh.IsZero() {
+		elapsed := time.Since(d.lastDataRefresh)
+		if elapsed >= time.Minute {
+			dataInfo = fmt.Sprintf("%dm ago", int(elapsed.Minutes()))
+		}
+	}
+	if d.loading && len(d.repositories) > 0 {
+		dataInfo = "⟳ refreshing..."
+	}
+
+	// Short help based on whether help is shown
+	shortHelp := "? help | Shift+L layout | r refresh | q quit"
+	if d.showHelp {
+		shortHelp = "j/k up/down | h/l left/right | Shift+L layout | r refresh | ? help | q quit"
+	}
+
+	return components.DashboardStatusLine(d.width, layoutName, dataInfo, shortHelp)
 }
