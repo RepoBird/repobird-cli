@@ -50,6 +50,9 @@ type CreateRunView struct {
 	parentDetailsCache map[string]*models.RunResponse
 	// Repository selector
 	repoSelector *components.RepositorySelector
+	// FZF mode for repository selection
+	fzfMode   *components.FZFMode
+	fzfActive bool
 }
 
 func NewCreateRunView(client *api.Client) *CreateRunView {
@@ -270,12 +273,19 @@ func (v *CreateRunView) handleInsertMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// In insert mode, handle text input and field navigation
 	switch {
 	case msg.String() == "ctrl+f":
-		v.useFileInput = !v.useFileInput
-		if v.useFileInput {
-			v.filePathInput.Focus()
+		// Activate FZF mode for repository field if focused on it
+		if !v.useFileInput && v.focusIndex == 1 && !v.fzfActive {
+			v.activateFZFMode()
+			return v, nil
 		} else {
-			v.fields[0].Focus()
-			v.focusIndex = 0
+			// Original file input toggle behavior
+			v.useFileInput = !v.useFileInput
+			if v.useFileInput {
+				v.filePathInput.Focus()
+			} else {
+				v.fields[0].Focus()
+				v.focusIndex = 0
+			}
 		}
 	case msg.String() == "ctrl+r":
 		// Trigger repository selector when repository field is focused
@@ -355,6 +365,12 @@ func (v *CreateRunView) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		v.clearAllFields()
 	case msg.String() == "ctrl+x":
 		v.clearCurrentField()
+	case msg.String() == "f":
+		// In normal mode, 'f' activates FZF for repository field
+		if v.focusIndex == 1 && !v.fzfActive {
+			v.activateFZFMode()
+			return v, nil
+		}
 	default:
 		// Block vim navigation keys from doing anything else
 	}
@@ -424,6 +440,13 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		v.handleWindowSizeMsg(msg)
 
 	case tea.KeyMsg:
+		// If FZF mode is active, handle input there first
+		if v.fzfMode != nil && v.fzfMode.IsActive() {
+			newFzf, cmd := v.fzfMode.Update(msg)
+			v.fzfMode = newFzf
+			return v, cmd
+		}
+
 		switch v.inputMode {
 		case components.InsertMode:
 			return v.handleInsertMode(msg)
@@ -436,6 +459,25 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case repositorySelectedMsg:
 		return v.handleRepositorySelected(msg)
+
+	case components.FZFSelectedMsg:
+		// Handle FZF selection result
+		if !msg.Result.Canceled && v.focusIndex == 1 {
+			// Update repository field with selected value
+			if msg.Result.Selected != "" {
+				// Extract just the repository name (remove any icons)
+				repoName := msg.Result.Selected
+				if idx := strings.Index(repoName, " "); idx > 0 {
+					repoName = repoName[idx+1:] // Skip icon
+				}
+				v.fields[1].SetValue(repoName)
+				v.repoSelector.AddManualRepository(repoName)
+			}
+		}
+		// Deactivate FZF mode
+		v.fzfActive = false
+		v.fzfMode = nil
+		return v, nil
 	}
 
 	return v, tea.Batch(cmds...)
@@ -674,21 +716,81 @@ func (v *CreateRunView) View() string {
 		s.WriteString("\n" + helpView)
 	}
 
+	// If FZF mode is active, overlay the dropdown
+	if v.fzfMode != nil && v.fzfMode.IsActive() {
+		return v.renderWithFZFOverlay(s.String())
+	}
+
 	return s.String()
+}
+
+// renderWithFZFOverlay renders the view with FZF dropdown overlay
+func (v *CreateRunView) renderWithFZFOverlay(baseView string) string {
+	if v.fzfMode == nil || !v.fzfMode.IsActive() {
+		return baseView
+	}
+
+	// Split base view into lines
+	baseLines := strings.Split(baseView, "\n")
+
+	// Calculate position for FZF dropdown (repository field is 2nd field)
+	// Title + spacing + first field = about 5 lines
+	// Repository field is around line 6
+	yOffset := 6
+	xOffset := 14 // After "Repository: " label
+
+	// Create FZF dropdown view
+	fzfView := v.fzfMode.View()
+	fzfLines := strings.Split(fzfView, "\n")
+
+	// Create a new view with the FZF dropdown overlaid
+	result := make([]string, max(len(baseLines), yOffset+len(fzfLines)))
+	copy(result, baseLines)
+
+	// Ensure we have enough lines
+	for i := len(baseLines); i < len(result); i++ {
+		result[i] = ""
+	}
+
+	// Insert FZF dropdown at the calculated position
+	for i, fzfLine := range fzfLines {
+		lineIdx := yOffset + i
+		if lineIdx >= 0 && lineIdx < len(result) {
+			// Create the overlay line
+			if xOffset < len(result[lineIdx]) {
+				// Preserve part of the base line before the dropdown
+				basePart := ""
+				if xOffset > 0 {
+					basePart = result[lineIdx][:min(xOffset, len(result[lineIdx]))]
+				}
+				// Add the FZF line
+				result[lineIdx] = basePart + fzfLine
+			} else {
+				// Line is shorter than offset, pad and add FZF
+				padding := strings.Repeat(" ", max(0, xOffset-len(result[lineIdx])))
+				result[lineIdx] = result[lineIdx] + padding + fzfLine
+			}
+		}
+	}
+
+	return strings.Join(result, "\n")
 }
 
 func (v *CreateRunView) renderStatusBar() string {
 	var statusText string
 	if v.inputMode == components.InsertMode {
 		if !v.useFileInput && v.focusIndex == 1 {
-			// When repository field is focused, show Ctrl+R option
-			statusText = "[ESC] normal mode [Tab] next [Ctrl+R] select repo [Ctrl+S] submit [Ctrl+X] clear field [Ctrl+L] clear all"
+			// When repository field is focused, show FZF options
+			statusText = "[ESC] normal [Tab] next [Ctrl+F] fuzzy search [Ctrl+R] browse repos [Ctrl+S] submit"
 		} else {
 			statusText = "[ESC] normal mode [Tab] next [Ctrl+S] submit [Ctrl+X] clear field [Ctrl+L] clear all"
 		}
 	} else {
 		if v.exitRequested {
-			statusText = "[ESC] exit [Enter] select [j/k] navigate [Ctrl+S] submit [Ctrl+X] clear field [Ctrl+L] clear all"
+			statusText = "[ESC] exit [Enter] select [j/k] navigate [Ctrl+S] submit [Ctrl+X] clear field"
+		} else if v.focusIndex == 1 {
+			// Repository field in normal mode
+			statusText = "[ESC] exit [Enter] edit [f] fuzzy search [j/k] navigate [Ctrl+S] submit [?] help"
 		} else {
 			statusText = "[ESC] exit [Enter] select [j/k] navigate [Ctrl+S] submit [Ctrl+X] clear field [?] help"
 		}
@@ -880,4 +982,60 @@ type runCreatedMsg struct {
 type repositorySelectedMsg struct {
 	repository string
 	err        error
+}
+
+// activateFZFMode activates FZF mode for repository selection
+func (v *CreateRunView) activateFZFMode() {
+	// Build list of repositories
+	var items []string
+
+	// Add current git repository if available
+	if gitRepo, _, err := utils.GetGitInfo(); err == nil && gitRepo != "" {
+		items = append(items, fmt.Sprintf("📁 %s", gitRepo))
+	}
+
+	// Add repositories from history
+	if history, err := cache.GetRepositoryHistory(); err == nil {
+		for _, repoName := range history {
+			if repoName != "" {
+				// Skip if already added (git repo)
+				skip := false
+				for _, item := range items {
+					if strings.Contains(item, repoName) {
+						skip = true
+						break
+					}
+				}
+				if !skip {
+					items = append(items, fmt.Sprintf("🔄 %s", repoName))
+				}
+			}
+		}
+	}
+
+	// Add current value if not empty and not in list
+	currentValue := v.fields[1].Value()
+	if currentValue != "" {
+		skip := false
+		for _, item := range items {
+			if strings.Contains(item, currentValue) {
+				skip = true
+				break
+			}
+		}
+		if !skip {
+			items = append([]string{fmt.Sprintf("✏️ %s", currentValue)}, items...)
+		}
+	}
+
+	// Add example if no items
+	if len(items) == 0 {
+		items = []string{"📝 owner/repo"}
+	}
+
+	// Create FZF mode
+	fieldWidth := 50 // Default width for repository field
+	v.fzfMode = components.NewFZFMode(items, fieldWidth, 10)
+	v.fzfMode.Activate()
+	v.fzfActive = true
 }
