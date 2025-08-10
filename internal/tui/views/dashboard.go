@@ -3,6 +3,8 @@ package views
 import (
 	"context"
 	"fmt"
+	"os/exec"
+	"runtime"
 	"strings"
 	"time"
 
@@ -23,12 +25,14 @@ type DashboardView struct {
 	help   help.Model
 
 	// Dashboard state
-	currentLayout   models.LayoutType
-	showHelp        bool
-	selectedRepo    *models.Repository
-	selectedRepoIdx int
-	selectedRunIdx  int
-	focusedColumn   int // 0: repositories, 1: runs, 2: details
+	currentLayout     models.LayoutType
+	showHelp          bool
+	selectedRepo      *models.Repository
+	selectedRepoIdx   int
+	selectedRunIdx    int
+	focusedColumn     int // 0: repositories, 1: runs, 2: details
+	selectedDetailLine int // Selected line in details column
+	detailLines       []string // Lines in details column for selection
 
 	// Layout views (simplified for now)
 	runListView *RunListView
@@ -44,6 +48,7 @@ type DashboardView struct {
 
 	// Real data
 	repositories    []models.Repository
+	apiRepositories map[int]models.APIRepository // Map repo ID to API repository
 	allRuns         []*models.RunResponse
 	filteredRuns    []*models.RunResponse
 	selectedRunData *models.RunResponse
@@ -74,7 +79,11 @@ func NewDashboardView(client *api.Client) *DashboardView {
 		loading:         true,
 		initializing:    true,
 		refreshInterval: 30 * time.Second,
+		apiRepositories: make(map[int]models.APIRepository),
 	}
+
+	// Initialize cache system
+	_ = cache.InitializeDashboardCache()
 
 	// Initialize with existing list view
 	dashboard.runListView = NewRunListView(client)
@@ -93,30 +102,36 @@ func (d *DashboardView) Init() tea.Cmd {
 // loadDashboardData loads data from cache or API
 func (d *DashboardView) loadDashboardData() tea.Cmd {
 	return func() tea.Msg {
-		// Try to get cached repository overview first
-		repositories, cached, err := cache.GetRepositoryOverview()
-		if err == nil && cached && len(repositories) > 0 {
-			// We have cached repo data, now get run data
-			allRuns := make([]*models.RunResponse, 0)
-			cachedRepoData, err := cache.GetAllCachedRepositoryData()
-			if err == nil {
-				for _, repoRuns := range cachedRepoData {
-					allRuns = append(allRuns, repoRuns...)
-				}
+		// First try to load from run cache which should always have data
+		runs, cached, _, _, _ := cache.GetCachedList()
+		if cached && len(runs) > 0 {
+			// Convert to pointer slice
+			allRuns := make([]*models.RunResponse, len(runs))
+			for i, run := range runs {
+				allRuns[i] = &run
 			}
 
-			if len(allRuns) > 0 {
-				return dashboardDataLoadedMsg{
-					repositories: repositories,
-					allRuns:      allRuns,
-					error:        nil,
-				}
+			// Try to get cached repository overview
+			repositories, repoCached, _ := cache.GetRepositoryOverview()
+			if !repoCached || len(repositories) == 0 {
+				// Build repositories from runs if not cached
+				repositories = cache.BuildRepositoryOverviewFromRuns(allRuns)
+				_ = cache.SetRepositoryOverview(repositories)
+			}
+
+			return dashboardDataLoadedMsg{
+				repositories: repositories,
+				allRuns:      allRuns,
+				error:        nil,
 			}
 		}
 
-		// No cache or cache is empty, fetch from API
+		// No cache, fetch from API
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
+
+		// Store API repositories for ID mapping
+		d.apiRepositories = make(map[int]models.APIRepository)
 
 		// First, try to get repositories from API
 		apiRepositories, err := d.client.ListRepositories(ctx)
@@ -125,20 +140,25 @@ func (d *DashboardView) loadDashboardData() tea.Cmd {
 			return d.loadFromRunsOnly()
 		}
 
+		// Store API repositories by ID for quick lookup
+		for _, apiRepo := range apiRepositories {
+			d.apiRepositories[apiRepo.ID] = apiRepo
+		}
+
 		// Convert API repositories to dashboard models
-		repositories = make([]models.Repository, len(apiRepositories))
-		for i, apiRepo := range apiRepositories {
+		repositories := make([]models.Repository, 0, len(apiRepositories))
+		for _, apiRepo := range apiRepositories {
 			// Construct full repository name
 			repoName := apiRepo.Name
 			if repoName == "" {
 				repoName = fmt.Sprintf("%s/%s", apiRepo.RepoOwner, apiRepo.RepoName)
 			}
 
-			repositories[i] = models.Repository{
+			repositories = append(repositories, models.Repository{
 				Name:        repoName,
 				Description: "",                // API doesn't provide description
 				RunCounts:   models.RunStats{}, // Will be populated below
-			}
+			})
 		}
 
 		// Get runs to populate repository statistics
@@ -267,21 +287,44 @@ func (d *DashboardView) loadFromRunsOnly() tea.Msg {
 
 // updateRepositoryStats updates repository statistics from runs
 func (d *DashboardView) updateRepositoryStats(repositories []models.Repository, allRuns []*models.RunResponse) []models.Repository {
-	// Create a map for quick lookup
+	// Create maps for quick lookup
 	repoMap := make(map[string]*models.Repository)
+	repoIDMap := make(map[int]*models.Repository) // Map by repo ID
+
 	for i := range repositories {
 		repoMap[repositories[i].Name] = &repositories[i]
+
+		// Also map by ID if we have API repositories
+		if d.apiRepositories != nil {
+			for id, apiRepo := range d.apiRepositories {
+				apiRepoName := apiRepo.Name
+				if apiRepoName == "" {
+					apiRepoName = fmt.Sprintf("%s/%s", apiRepo.RepoOwner, apiRepo.RepoName)
+				}
+				if apiRepoName == repositories[i].Name {
+					repoIDMap[id] = &repositories[i]
+					break
+				}
+			}
+		}
 	}
 
 	// Update statistics from runs
 	for _, run := range allRuns {
+		var repo *models.Repository
+
+		// First try to match by repository name
 		repoName := run.GetRepositoryName()
-		if repoName == "" {
-			continue
+		if repoName != "" {
+			repo = repoMap[repoName]
 		}
 
-		repo, exists := repoMap[repoName]
-		if !exists {
+		// If not found and we have a repo ID, try to match by ID
+		if repo == nil && run.RepoID > 0 {
+			repo = repoIDMap[run.RepoID]
+		}
+
+		if repo == nil {
 			continue
 		}
 
@@ -312,24 +355,34 @@ func (d *DashboardView) selectRepository(repo *models.Repository) tea.Cmd {
 	}
 
 	return func() tea.Msg {
-		// Try cache first
-		runs, _, cached, err := cache.GetRepositoryData(repo.Name)
-		if err == nil && cached && len(runs) > 0 {
-			return dashboardRepositorySelectedMsg{
-				repository: repo,
-				runs:       runs,
+		// Filter runs for this repository
+		var filteredRuns []*models.RunResponse
+
+		// First try to match by repository name
+		for _, run := range d.allRuns {
+			runRepoName := run.GetRepositoryName()
+			if runRepoName == repo.Name {
+				filteredRuns = append(filteredRuns, run)
+				continue
+			}
+
+			// Also try to match by repo ID if we have API repositories
+			if run.RepoID > 0 && d.apiRepositories != nil {
+				if apiRepo, exists := d.apiRepositories[run.RepoID]; exists {
+					apiRepoName := apiRepo.Name
+					if apiRepoName == "" {
+						apiRepoName = fmt.Sprintf("%s/%s", apiRepo.RepoOwner, apiRepo.RepoName)
+					}
+					if apiRepoName == repo.Name {
+						filteredRuns = append(filteredRuns, run)
+					}
+				}
 			}
 		}
 
-		// Filter from all runs
-		runs = cache.FilterRunsByRepository(d.allRuns, repo.Name)
-
-		// Cache the filtered data
-		_ = cache.SetRepositoryData(repo.Name, runs, make(map[string]*models.RunResponse))
-
 		return dashboardRepositorySelectedMsg{
 			repository: repo,
-			runs:       runs,
+			runs:       filteredRuns,
 		}
 	}
 }
@@ -377,11 +430,18 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if len(d.filteredRuns) > 0 {
 			d.selectedRunData = d.filteredRuns[0]
 			d.selectedRunIdx = 0
+			d.updateDetailLines()
 		}
 
 	case tea.KeyMsg:
 		// Handle dashboard-specific keys first
 		switch {
+		case msg.Type == tea.KeyRunes && string(msg.Runes) == "n":
+			// Navigate to create new run view
+			createView := NewCreateRunViewWithCache(d.client, nil, false, time.Time{}, nil)
+			createView.width = d.width
+			createView.height = d.height
+			return createView, nil
 		case key.Matches(msg, d.keys.LayoutSwitch):
 			d.cycleLayout()
 			return d, nil
@@ -450,7 +510,12 @@ func (d *DashboardView) handleMillerColumnsNavigation(msg tea.KeyMsg) tea.Cmd {
 				d.selectedRunIdx--
 				if len(d.filteredRuns) > d.selectedRunIdx {
 					d.selectedRunData = d.filteredRuns[d.selectedRunIdx]
+					d.updateDetailLines()
 				}
+			}
+		case 2: // Details column
+			if d.selectedDetailLine > 0 {
+				d.selectedDetailLine--
 			}
 		}
 
@@ -467,8 +532,42 @@ func (d *DashboardView) handleMillerColumnsNavigation(msg tea.KeyMsg) tea.Cmd {
 				d.selectedRunIdx++
 				if len(d.filteredRuns) > d.selectedRunIdx {
 					d.selectedRunData = d.filteredRuns[d.selectedRunIdx]
+					d.updateDetailLines()
 				}
 			}
+		case 2: // Details column
+			if d.selectedDetailLine < len(d.detailLines)-1 {
+				d.selectedDetailLine++
+			}
+		}
+
+	case key.Matches(msg, d.keys.Enter):
+		// Enter moves focus right and selects first item
+		if d.focusedColumn < 2 {
+			d.focusedColumn++
+			if d.focusedColumn == 1 && len(d.filteredRuns) > 0 {
+				// Moving to runs column, select first run if none selected
+				if d.selectedRunData == nil && len(d.filteredRuns) > 0 {
+					d.selectedRunIdx = 0
+					d.selectedRunData = d.filteredRuns[0]
+					d.updateDetailLines()
+				}
+			} else if d.focusedColumn == 2 {
+				// Moving to details column, select first line
+				d.selectedDetailLine = 0
+			}
+		}
+
+	case msg.Type == tea.KeyBackspace:
+		// Backspace moves focus left
+		if d.focusedColumn > 0 {
+			d.focusedColumn--
+		}
+
+	case msg.Type == tea.KeyRunes && string(msg.Runes) == "y" && d.focusedColumn == 2:
+		// Copy selected line to clipboard
+		if d.selectedDetailLine < len(d.detailLines) {
+			return d.copyToClipboard(d.detailLines[d.selectedDetailLine])
 		}
 
 	case key.Matches(msg, d.keys.Right) || (msg.Type == tea.KeyRunes && string(msg.Runes) == "l"):
@@ -479,6 +578,9 @@ func (d *DashboardView) handleMillerColumnsNavigation(msg tea.KeyMsg) tea.Cmd {
 			if d.focusedColumn == 1 && len(d.filteredRuns) > 0 && d.selectedRunData == nil {
 				d.selectedRunIdx = 0
 				d.selectedRunData = d.filteredRuns[0]
+				d.updateDetailLines()
+			} else if d.focusedColumn == 2 {
+				d.selectedDetailLine = 0
 			}
 		}
 
@@ -513,9 +615,18 @@ func (d *DashboardView) View() string {
 
 	var content string
 
+	// Always show title
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("63")).
+		Width(d.width).
+		Align(lipgloss.Center)
+
+	title := titleStyle.Render("Repobird.ai CLI")
+
 	if d.error != nil {
 		content = fmt.Sprintf("Error loading dashboard data: %s\n\nPress 'r' to retry, 'q' to quit", d.error.Error())
-		return content
+		return lipgloss.JoinVertical(lipgloss.Left, title, content)
 	}
 
 	// Show cached content while loading new data
@@ -531,7 +642,7 @@ func (d *DashboardView) View() string {
 		default:
 			content = d.renderTripleColumnLayout()
 		}
-		return content
+		return lipgloss.JoinVertical(lipgloss.Left, title, content)
 	}
 
 	if d.loading || d.initializing {
@@ -540,9 +651,9 @@ func (d *DashboardView) View() string {
 			Foreground(lipgloss.Color("240")).
 			Width(d.width).
 			Align(lipgloss.Center).
-			MarginTop(d.height / 2)
+			MarginTop((d.height - 2) / 2)
 		content = loadingStyle.Render(content)
-		return content
+		return lipgloss.JoinVertical(lipgloss.Left, title, content)
 	}
 
 	// Render based on current layout
@@ -557,23 +668,23 @@ func (d *DashboardView) View() string {
 		content = d.renderTripleColumnLayout()
 	}
 
-	return content
+	return lipgloss.JoinVertical(lipgloss.Left, title, content)
 }
 
 // renderTripleColumnLayout renders the Miller Columns layout with real data
 func (d *DashboardView) renderTripleColumnLayout() string {
-	// Calculate available height (minus statusline only)
-	availableHeight := d.height - 1 // Account for statusline at bottom
-
-	// Create three columns
-	leftColumn := d.renderRepositoriesColumn()
-	centerColumn := d.renderRunsColumn()
-	rightColumn := d.renderDetailsColumn()
+	// Calculate available height (minus title and statusline)
+	availableHeight := d.height - 2 // Account for title and statusline
 
 	// Column widths - full width, equally distributed
 	leftWidth := d.width / 3
 	centerWidth := d.width / 3
 	rightWidth := d.width - leftWidth - centerWidth
+
+	// Create column content with titles
+	leftContent := d.renderRepositoriesColumn(leftWidth - 2, availableHeight - 2)
+	centerContent := d.renderRunsColumn(centerWidth - 2, availableHeight - 2)
+	rightContent := d.renderDetailsColumn(rightWidth - 2, availableHeight - 2)
 
 	// Make columns full height with rounded borders
 	leftStyle := lipgloss.NewStyle().
@@ -596,15 +707,75 @@ func (d *DashboardView) renderTripleColumnLayout() string {
 
 	columns := lipgloss.JoinHorizontal(
 		lipgloss.Top,
-		leftStyle.Render(leftColumn),
-		centerStyle.Render(centerColumn),
-		rightStyle.Render(rightColumn),
+		leftStyle.Render(leftContent),
+		centerStyle.Render(centerContent),
+		rightStyle.Render(rightContent),
 	)
 
 	// Create statusline
 	statusline := d.renderStatusLine("Miller Columns")
 
 	return lipgloss.JoinVertical(lipgloss.Left, columns, statusline)
+}
+
+// updateDetailLines updates the detail lines for the selected run
+func (d *DashboardView) updateDetailLines() {
+	d.detailLines = []string{}
+	d.selectedDetailLine = 0
+	
+	if d.selectedRunData == nil {
+		return
+	}
+	
+	run := d.selectedRunData
+	d.detailLines = []string{
+		fmt.Sprintf("ID: %s", run.GetIDString()),
+		fmt.Sprintf("Status: %s", run.Status),
+		fmt.Sprintf("Repository: %s", run.GetRepositoryName()),
+	}
+
+	if run.Source != "" && run.Target != "" {
+		d.detailLines = append(d.detailLines, fmt.Sprintf("Branch: %s → %s", run.Source, run.Target))
+	}
+
+	d.detailLines = append(d.detailLines, fmt.Sprintf("Created: %s", run.CreatedAt.Format("Jan 2 15:04")))
+	d.detailLines = append(d.detailLines, fmt.Sprintf("Updated: %s", run.UpdatedAt.Format("Jan 2 15:04")))
+
+	if run.Title != "" {
+		d.detailLines = append(d.detailLines, "", "Title:", run.Title)
+	}
+
+	if run.Prompt != "" {
+		d.detailLines = append(d.detailLines, "", "Prompt:")
+		// Wrap prompt text - use a reasonable width
+		wrapped := d.wrapText(run.Prompt, 50)
+		d.detailLines = append(d.detailLines, wrapped...)
+	}
+
+	if run.Error != "" {
+		d.detailLines = append(d.detailLines, "", "Error:")
+		wrapped := d.wrapText(run.Error, 50)
+		d.detailLines = append(d.detailLines, wrapped...)
+	}
+}
+
+// copyToClipboard copies the given text to clipboard
+func (d *DashboardView) copyToClipboard(text string) tea.Cmd {
+	return func() tea.Msg {
+		// Try to copy to clipboard using pbcopy on macOS, xclip on Linux
+		var cmd *exec.Cmd
+		if runtime.GOOS == "darwin" {
+			cmd = exec.Command("pbcopy")
+		} else if runtime.GOOS == "linux" {
+			cmd = exec.Command("xclip", "-selection", "clipboard")
+		} else {
+			return nil // Unsupported OS
+		}
+		
+		cmd.Stdin = strings.NewReader(text)
+		_ = cmd.Run()
+		return nil
+	}
 }
 
 // renderAllRunsLayout renders the timeline layout
@@ -629,97 +800,49 @@ func (d *DashboardView) renderRepositoriesLayout() string {
 	return lipgloss.JoinVertical(lipgloss.Left, content, statusline)
 }
 
-// renderLayoutInfo renders the layout information bar
-func (d *DashboardView) renderLayoutInfo(layoutName string) string {
-	layoutStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("33")).
-		Width(d.width).
-		Align(lipgloss.Center)
-
-	// Show data freshness
-	dataInfo := ""
-	if !d.lastDataRefresh.IsZero() {
-		elapsed := time.Since(d.lastDataRefresh)
-		if elapsed < time.Minute {
-			dataInfo = " (data: fresh)"
-		} else {
-			dataInfo = fmt.Sprintf(" (data: %dm ago)", int(elapsed.Minutes()))
-		}
-	}
-
-	return layoutStyle.Render(fmt.Sprintf("Layout: %s%s", layoutName, dataInfo))
-}
-
-// renderHeader renders the dashboard header
-func (d *DashboardView) renderHeader(layoutName string) string {
+// renderRepositoriesColumn renders the left column with real repositories
+func (d *DashboardView) renderRepositoriesColumn(width, height int) string {
+	// Create title with underline
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("63")).
-		Width(d.width).
-		Align(lipgloss.Center)
-
-	layoutStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("33")).
-		Width(d.width).
-		Align(lipgloss.Center)
-
-	title := titleStyle.Render("RepoBird Dashboard")
-
-	// Show data freshness
-	dataInfo := ""
-	if !d.lastDataRefresh.IsZero() {
-		elapsed := time.Since(d.lastDataRefresh)
-		if elapsed < time.Minute {
-			dataInfo = " (data: fresh)"
-		} else {
-			dataInfo = fmt.Sprintf(" (data: %dm ago)", int(elapsed.Minutes()))
-		}
-	}
-
-	layout := layoutStyle.Render(fmt.Sprintf("Layout: %s%s", layoutName, dataInfo))
-
-	return lipgloss.JoinVertical(lipgloss.Left, title, layout)
-}
-
-// renderFooter renders the dashboard footer with help
-func (d *DashboardView) renderFooter() string {
-	helpStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("240")).
-		Width(d.width).
-		Align(lipgloss.Center)
-
-	if d.showHelp {
-		help := []string{
-			"Navigation:",
-			"  Shift+L: Switch Layout  |  Ctrl+1: Miller Columns  |  Ctrl+2: All Runs  |  Ctrl+3: Repositories",
-			"  j/k: Move Up/Down  |  h/l: Move Left/Right  |  r: Refresh  |  ?: Toggle Help  |  q: Quit",
-		}
-		return helpStyle.Render(strings.Join(help, "\n"))
-	}
-
-	shortHelp := "? help  |  Shift+L switch  |  r refresh  |  q quit"
-	return helpStyle.Render(shortHelp)
-}
-
-// renderRepositoriesColumn renders the left column with real repositories
-func (d *DashboardView) renderRepositoriesColumn() string {
-	titleStyle := lipgloss.NewStyle().Bold(true)
+		Width(width).
+		Padding(0, 1).
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderBottom(true).
+		BorderForeground(lipgloss.Color("63"))
+	
 	if d.focusedColumn == 0 {
 		titleStyle = titleStyle.Foreground(lipgloss.Color("63"))
+	} else {
+		titleStyle = titleStyle.Foreground(lipgloss.Color("240"))
 	}
 	title := titleStyle.Render("Repositories")
 
+	// Build items list
 	var items []string
 	for i, repo := range d.repositories {
 		statusIcon := d.getRepositoryStatusIcon(&repo)
 		item := fmt.Sprintf("%s %s", statusIcon, repo.Name)
 
+		// Truncate if too long
+		if len(item) > width-2 {
+			item = item[:width-5] + "..."
+		}
+
 		// Highlight selected repository
 		if i == d.selectedRepoIdx {
 			if d.focusedColumn == 0 {
-				item = lipgloss.NewStyle().Background(lipgloss.Color("63")).Foreground(lipgloss.Color("255")).Render(item)
+				item = lipgloss.NewStyle().
+					Width(width).
+					Background(lipgloss.Color("63")).
+					Foreground(lipgloss.Color("255")).
+					Render(item)
 			} else {
-				item = lipgloss.NewStyle().Background(lipgloss.Color("240")).Foreground(lipgloss.Color("255")).Render(item)
+				item = lipgloss.NewStyle().
+					Width(width).
+					Background(lipgloss.Color("240")).
+					Foreground(lipgloss.Color("255")).
+					Render(item)
 			}
 		}
 
@@ -730,96 +853,141 @@ func (d *DashboardView) renderRepositoriesColumn() string {
 		items = []string{"No repositories"}
 	}
 
+	// Calculate content height (subtract title height)
+	contentHeight := height - 2
 	content := strings.Join(items, "\n")
-	return lipgloss.JoinVertical(lipgloss.Left, title, "", content)
+	
+	// Pad content to fill height
+	contentStyle := lipgloss.NewStyle().
+		Width(width).
+		Height(contentHeight).
+		Padding(0, 1)
+
+	return lipgloss.JoinVertical(lipgloss.Left, title, contentStyle.Render(content))
 }
 
 // renderRunsColumn renders the center column with runs for selected repository
-func (d *DashboardView) renderRunsColumn() string {
-	titleStyle := lipgloss.NewStyle().Bold(true)
+func (d *DashboardView) renderRunsColumn(width, height int) string {
+	// Create title with underline
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Width(width).
+		Padding(0, 1).
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderBottom(true).
+		BorderForeground(lipgloss.Color("33"))
+	
 	if d.focusedColumn == 1 {
 		titleStyle = titleStyle.Foreground(lipgloss.Color("33"))
+	} else {
+		titleStyle = titleStyle.Foreground(lipgloss.Color("240"))
 	}
 	title := titleStyle.Render("Runs")
 
-	if d.selectedRepo == nil {
-		return lipgloss.JoinVertical(lipgloss.Left, title, "", "Select a repository")
-	}
-
 	var items []string
-	for i, run := range d.filteredRuns {
-		statusIcon := d.getRunStatusIcon(run.Status)
-		displayTitle := run.Title
-		if displayTitle == "" {
-			displayTitle = "Untitled Run"
-		}
-		if len(displayTitle) > 30 {
-			displayTitle = displayTitle[:27] + "..."
-		}
-
-		item := fmt.Sprintf("%s %s", statusIcon, displayTitle)
-
-		// Highlight selected run
-		if i == d.selectedRunIdx {
-			if d.focusedColumn == 1 {
-				item = lipgloss.NewStyle().Background(lipgloss.Color("33")).Foreground(lipgloss.Color("255")).Render(item)
-			} else {
-				item = lipgloss.NewStyle().Background(lipgloss.Color("240")).Foreground(lipgloss.Color("255")).Render(item)
+	if d.selectedRepo == nil {
+		items = []string{"Select a repository"}
+	} else {
+		for i, run := range d.filteredRuns {
+			statusIcon := d.getRunStatusIcon(run.Status)
+			displayTitle := run.Title
+			if displayTitle == "" {
+				displayTitle = "Untitled Run"
 			}
+			
+			// Truncate based on available width
+			maxTitleLen := width - 5 // Account for icon and padding
+			if len(displayTitle) > maxTitleLen {
+				displayTitle = displayTitle[:maxTitleLen-3] + "..."
+			}
+
+			item := fmt.Sprintf("%s %s", statusIcon, displayTitle)
+
+			// Highlight selected run
+			if i == d.selectedRunIdx {
+				if d.focusedColumn == 1 {
+					item = lipgloss.NewStyle().
+						Width(width).
+						Background(lipgloss.Color("33")).
+						Foreground(lipgloss.Color("255")).
+						Render(item)
+				} else {
+					item = lipgloss.NewStyle().
+						Width(width).
+						Background(lipgloss.Color("240")).
+						Foreground(lipgloss.Color("255")).
+						Render(item)
+				}
+			}
+
+			items = append(items, item)
 		}
 
-		items = append(items, item)
+		if len(items) == 0 {
+			items = []string{fmt.Sprintf("No runs for %s", d.selectedRepo.Name)}
+		}
 	}
 
-	if len(items) == 0 {
-		items = []string{fmt.Sprintf("No runs for %s", d.selectedRepo.Name)}
-	}
-
+	// Calculate content height (subtract title height)
+	contentHeight := height - 2
 	content := strings.Join(items, "\n")
-	return lipgloss.JoinVertical(lipgloss.Left, title, "", content)
+	
+	// Pad content to fill height
+	contentStyle := lipgloss.NewStyle().
+		Width(width).
+		Height(contentHeight).
+		Padding(0, 1)
+
+	return lipgloss.JoinVertical(lipgloss.Left, title, contentStyle.Render(content))
 }
 
 // renderDetailsColumn renders the right column with run details
-func (d *DashboardView) renderDetailsColumn() string {
-	title := lipgloss.NewStyle().Bold(true).Render("Run Details")
+func (d *DashboardView) renderDetailsColumn(width, height int) string {
+	// Create title with underline
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Width(width).
+		Padding(0, 1).
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderBottom(true).
+		BorderForeground(lipgloss.Color("240"))
+	
+	if d.focusedColumn == 2 {
+		titleStyle = titleStyle.Foreground(lipgloss.Color("63"))
+	} else {
+		titleStyle = titleStyle.Foreground(lipgloss.Color("240"))
+	}
+	title := titleStyle.Render("Run Details")
 
+	var displayLines []string
 	if d.selectedRunData == nil {
-		return lipgloss.JoinVertical(lipgloss.Left, title, "", "Select a run")
+		displayLines = []string{"Select a run"}
+	} else {
+		// Build lines with selection highlighting
+		for i, line := range d.detailLines {
+			if d.focusedColumn == 2 && i == d.selectedDetailLine {
+				// Highlight selected line
+				line = lipgloss.NewStyle().
+					Width(width-2).
+					Background(lipgloss.Color("63")).
+					Foreground(lipgloss.Color("255")).
+					Render(line)
+			}
+			displayLines = append(displayLines, line)
+		}
 	}
 
-	run := d.selectedRunData
-	details := []string{
-		fmt.Sprintf("ID: %s", run.GetIDString()),
-		fmt.Sprintf("Status: %s", run.Status),
-		fmt.Sprintf("Repository: %s", run.Repository),
-	}
+	// Calculate content height (subtract title height)
+	contentHeight := height - 2
+	content := strings.Join(displayLines, "\n")
+	
+	// Pad content to fill height
+	contentStyle := lipgloss.NewStyle().
+		Width(width).
+		Height(contentHeight).
+		Padding(0, 1)
 
-	if run.Source != "" && run.Target != "" {
-		details = append(details, fmt.Sprintf("Branch: %s → %s", run.Source, run.Target))
-	}
-
-	details = append(details, fmt.Sprintf("Created: %s", run.CreatedAt.Format("Jan 2 15:04")))
-	details = append(details, fmt.Sprintf("Updated: %s", run.UpdatedAt.Format("Jan 2 15:04")))
-
-	if run.Title != "" {
-		details = append(details, "", "Title:", run.Title)
-	}
-
-	if run.Prompt != "" {
-		details = append(details, "", "Prompt:")
-		// Wrap prompt text
-		wrapped := d.wrapText(run.Prompt, 30)
-		details = append(details, wrapped...)
-	}
-
-	if run.Error != "" {
-		details = append(details, "", "Error:")
-		wrapped := d.wrapText(run.Error, 30)
-		details = append(details, wrapped...)
-	}
-
-	content := strings.Join(details, "\n")
-	return lipgloss.JoinVertical(lipgloss.Left, title, "", content)
+	return lipgloss.JoinVertical(lipgloss.Left, title, contentStyle.Render(content))
 }
 
 // renderRepositoriesTable renders a table of repositories with real data
@@ -955,9 +1123,9 @@ func (d *DashboardView) renderStatusLine(layoutName string) string {
 	}
 
 	// Short help based on whether help is shown
-	shortHelp := "? help | Shift+L layout | r refresh | q quit"
+	shortHelp := "n new | ? help | Shift+L layout | r refresh | q quit"
 	if d.showHelp {
-		shortHelp = "j/k up/down | h/l left/right | Shift+L layout | r refresh | ? help | q quit"
+		shortHelp = "n new run | j/k up/down | h/l left/right | Shift+L layout | r refresh | ? help | q quit"
 	}
 
 	return components.DashboardStatusLine(d.width, layoutName, dataInfo, shortHelp)

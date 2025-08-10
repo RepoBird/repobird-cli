@@ -16,7 +16,6 @@ import (
 type DashboardCache struct {
 	mu          sync.RWMutex
 	cacheDir    string
-	repoCache   *RepositoryCache
 	maxAge      time.Duration
 	initialized bool
 	userID      *int // Optional user ID for user-specific caching
@@ -198,12 +197,18 @@ func SetRepositoryData(repoName string, runs []*models.RunResponse, details map[
 // BuildRepositoryOverviewFromRuns builds repository overview from run data
 func BuildRepositoryOverviewFromRuns(runs []*models.RunResponse) []models.Repository {
 	repoMap := make(map[string]*models.Repository)
+	repoIDNameMap := make(map[int]string) // Track repo ID to name mapping
 
-	// Extract unique repository names and create repository objects
+	// First pass: extract unique repository names and create repository objects
 	for _, run := range runs {
 		repoName := run.GetRepositoryName()
 		if repoName == "" {
 			continue
+		}
+
+		// Track the repo ID to name mapping if we have both
+		if run.RepoID > 0 {
+			repoIDNameMap[run.RepoID] = repoName
 		}
 
 		repo, exists := repoMap[repoName]
@@ -214,6 +219,26 @@ func BuildRepositoryOverviewFromRuns(runs []*models.RunResponse) []models.Reposi
 				LastActivity: run.UpdatedAt,
 			}
 			repoMap[repoName] = repo
+		}
+	}
+
+	// Second pass: update statistics, including runs that only have repo ID
+	for _, run := range runs {
+		var repo *models.Repository
+
+		// Try to find repo by name first
+		repoName := run.GetRepositoryName()
+		if repoName != "" {
+			repo = repoMap[repoName]
+		} else if run.RepoID > 0 {
+			// Try to find by repo ID mapping
+			if mappedName, exists := repoIDNameMap[run.RepoID]; exists {
+				repo = repoMap[mappedName]
+			}
+		}
+
+		if repo == nil {
+			continue
 		}
 
 		// Update last activity if this run is more recent
@@ -245,12 +270,34 @@ func BuildRepositoryOverviewFromRuns(runs []*models.RunResponse) []models.Reposi
 // FilterRunsByRepository filters runs for a specific repository
 func FilterRunsByRepository(runs []*models.RunResponse, repoName string) []*models.RunResponse {
 	var filtered []*models.RunResponse
+	repoIDSet := make(map[int]bool)
+
+	// First pass: collect all runs that match by name and build ID set
 	for _, run := range runs {
 		runRepoName := run.GetRepositoryName()
 		if runRepoName == repoName {
 			filtered = append(filtered, run)
+			// If this run has a repo ID, track it
+			if run.RepoID > 0 {
+				repoIDSet[run.RepoID] = true
+			}
 		}
 	}
+
+	// Second pass: also include runs that match by repo ID
+	if len(repoIDSet) > 0 {
+		for _, run := range runs {
+			// Skip if already included
+			if run.GetRepositoryName() == repoName {
+				continue
+			}
+			// Include if repo ID matches
+			if run.RepoID > 0 && repoIDSet[run.RepoID] {
+				filtered = append(filtered, run)
+			}
+		}
+	}
+
 	return filtered
 }
 
@@ -381,9 +428,4 @@ func getDashboardCacheDirForUser(userID *int) (string, error) {
 	}
 
 	return cacheDir, nil
-}
-
-// getCacheDirPath returns the cache directory path (backward compatibility)
-func getCacheDirPath() (string, error) {
-	return getDashboardCacheDirForUser(nil)
 }

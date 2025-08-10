@@ -65,49 +65,70 @@ func (s *StatusLine) Render() string {
 		return ""
 	}
 
-	// Calculate available space
-	leftLen := lipgloss.Width(s.leftContent)
-	rightLen := lipgloss.Width(s.rightContent)
-	helpLen := lipgloss.Width(s.helpContent)
+	// Truncate individual parts if they're too long
+	maxPartWidth := s.width / 3
+	leftContent := s.leftContent
+	rightContent := s.rightContent
+	helpContent := s.helpContent
 	
+	if lipgloss.Width(leftContent) > maxPartWidth {
+		leftContent = truncateWithEllipsis(leftContent, maxPartWidth)
+	}
+	if lipgloss.Width(rightContent) > maxPartWidth {
+		rightContent = truncateWithEllipsis(rightContent, maxPartWidth)
+	}
+	
+	leftLen := lipgloss.Width(leftContent)
+	rightLen := lipgloss.Width(rightContent)
+
 	// Create the main status line
 	var statusContent string
-	
-	if s.helpContent != "" {
-		// If we have help content, show it in the middle with dimmed style
+
+	if helpContent != "" {
+		// Calculate available space for help
 		availableForHelp := s.width - leftLen - rightLen - 4 // Account for padding
-		if availableForHelp > helpLen {
-			// We have enough space for everything
-			middlePadding := strings.Repeat(" ", availableForHelp - helpLen)
-			statusContent = fmt.Sprintf("%s  %s%s  %s", 
-				s.leftContent, 
-				s.helpStyle.Render(s.helpContent),
+		if availableForHelp > 10 {
+			// Truncate help to fit
+			if lipgloss.Width(helpContent) > availableForHelp {
+				helpContent = truncateWithEllipsis(helpContent, availableForHelp)
+			}
+			helpLen := lipgloss.Width(helpContent)
+			middlePadding := strings.Repeat(" ", availableForHelp-helpLen)
+			statusContent = fmt.Sprintf("%s  %s%s  %s",
+				leftContent,
+				s.helpStyle.Render(helpContent),
 				middlePadding,
-				s.rightContent)
-		} else if availableForHelp > 10 {
-			// Truncate help content if needed
-			truncatedHelp := truncateWithEllipsis(s.helpContent, availableForHelp)
-			statusContent = fmt.Sprintf("%s  %s  %s", 
-				s.leftContent, 
-				s.helpStyle.Render(truncatedHelp),
-				s.rightContent)
+				rightContent)
 		} else {
 			// Not enough space for help, just show left and right
-			padding := strings.Repeat(" ", s.width - leftLen - rightLen)
-			statusContent = fmt.Sprintf("%s%s%s", s.leftContent, padding, s.rightContent)
+			padding := s.width - leftLen - rightLen
+			if padding < 0 {
+				padding = 0
+			}
+			statusContent = fmt.Sprintf("%s%s%s", 
+				leftContent, 
+				strings.Repeat(" ", padding), 
+				rightContent)
 		}
 	} else {
 		// No help content, just left and right
-		padding := strings.Repeat(" ", s.width - leftLen - rightLen)
-		statusContent = fmt.Sprintf("%s%s%s", s.leftContent, padding, s.rightContent)
+		padding := s.width - leftLen - rightLen
+		if padding < 0 {
+			padding = 0
+		}
+		statusContent = fmt.Sprintf("%s%s%s", 
+			leftContent, 
+			strings.Repeat(" ", padding), 
+			rightContent)
 	}
 
-	// Ensure the content fits the width
+	// Final safety check - ensure it fits exactly
 	if lipgloss.Width(statusContent) > s.width {
 		statusContent = truncateWithEllipsis(statusContent, s.width)
 	}
 
-	return s.style.Width(s.width).Render(statusContent)
+	// Use MaxWidth to ensure no wrapping
+	return s.style.Width(s.width).MaxWidth(s.width).Render(statusContent)
 }
 
 // truncateWithEllipsis truncates a string to fit within maxWidth with ellipsis
@@ -128,7 +149,7 @@ func DashboardStatusLine(width int, layoutName string, dataFreshness string, sho
 		SetLeft(fmt.Sprintf("Dashboard: %s", layoutName)).
 		SetRight(dataFreshness).
 		SetHelp(shortHelp)
-	
+
 	return statusLine.Render()
 }
 
@@ -138,12 +159,12 @@ func RunListStatusLine(width int, totalRuns int, filterStatus string, shortHelp 
 	if filterStatus != "" {
 		left = fmt.Sprintf("Runs: %d total (%s)", totalRuns, filterStatus)
 	}
-	
+
 	statusLine := NewStatusLine().
 		SetWidth(width).
 		SetLeft(left).
 		SetHelp(shortHelp)
-	
+
 	return statusLine.Render()
 }
 
@@ -153,7 +174,7 @@ func CreateRunStatusLine(width int, step string, shortHelp string) string {
 		SetWidth(width).
 		SetLeft(fmt.Sprintf("Create Run: %s", step)).
 		SetHelp(shortHelp)
-	
+
 	return statusLine.Render()
 }
 
@@ -164,6 +185,6 @@ func DetailsStatusLine(width int, runID string, status string, shortHelp string)
 		SetLeft(fmt.Sprintf("Run Details: %s", runID)).
 		SetRight(status).
 		SetHelp(shortHelp)
-	
+
 	return statusLine.Render()
 }

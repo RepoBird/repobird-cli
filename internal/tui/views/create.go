@@ -315,11 +315,12 @@ func (v *CreateRunView) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			// Second ESC - actually exit
 			if !v.submitting {
 				v.saveFormData()
-				debug.LogToFile("DEBUG: CreateView double ESC - returning to list view\n")
-				// Return to list view with cached data and current dimensions
-				return NewRunListViewWithCacheAndDimensions(
-					v.client, v.parentRuns, v.parentCached, v.parentCachedAt,
-					v.parentDetailsCache, -1, v.width, v.height), nil
+				debug.LogToFile("DEBUG: CreateView double ESC - returning to dashboard\n")
+				// Return to dashboard view
+				dashboard := NewDashboardView(v.client)
+				dashboard.width = v.width
+				dashboard.height = v.height
+				return dashboard, dashboard.Init()
 			}
 		} else {
 			// First ESC in normal mode - prepare to exit
@@ -330,11 +331,12 @@ func (v *CreateRunView) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case msg.String() == "i" || msg.String() == "enter":
 		if v.backButtonFocused {
 			v.saveFormData()
-			debug.LogToFile("DEBUG: Back button pressed - returning to list view\n")
-			// Return to list view with cached data and current dimensions
-			return NewRunListViewWithCacheAndDimensions(
-				v.client, v.parentRuns, v.parentCached, v.parentCachedAt,
-				v.parentDetailsCache, -1, v.width, v.height), nil
+			debug.LogToFile("DEBUG: Back button pressed - returning to dashboard\n")
+			// Return to dashboard view
+			dashboard := NewDashboardView(v.client)
+			dashboard.width = v.width
+			dashboard.height = v.height
+			return dashboard, dashboard.Init()
 		} else {
 			v.inputMode = components.InsertMode
 			v.exitRequested = false
