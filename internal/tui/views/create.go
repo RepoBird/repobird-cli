@@ -691,10 +691,12 @@ func (v *CreateRunView) View() string {
 	title := titleStyle.Render("Repobird.ai CLI - Create New Run")
 
 	// Calculate available height for content
-	// Title (1) + statusbar (1) = 2
-	availableHeight := v.height - 2
-	if availableHeight < 10 {
-		availableHeight = 10
+	// We have v.height total, minus:
+	// - 2 for title (1 line + spacing) 
+	// - 1 for statusbar
+	availableHeight := v.height - 3
+	if availableHeight < 5 {
+		availableHeight = 5
 	}
 
 	var content string
@@ -747,7 +749,7 @@ func (v *CreateRunView) View() string {
 	// Create status bar
 	statusBar := v.renderStatusBar()
 
-	// Join all components
+	// Join all components with status bar
 	finalView := lipgloss.JoinVertical(
 		lipgloss.Left,
 		title,
@@ -816,19 +818,38 @@ func (v *CreateRunView) renderWithFZFOverlay(baseView string) string {
 
 // renderSinglePanelLayout renders the form in a single panel with compact fields
 func (v *CreateRunView) renderSinglePanelLayout(availableHeight int) string {
-	// Use full width with padding
-	contentWidth := v.width - 4
-	if contentWidth < 60 {
-		contentWidth = 60
+	// Account for borders (2 chars for top/bottom) in the content dimensions
+	// Width calculation: terminal width minus some padding for cleaner look
+	panelWidth := v.width - 2
+	if panelWidth < 60 {
+		panelWidth = 60
+	}
+	
+	// Height should fill available space
+	panelHeight := availableHeight
+	if panelHeight < 3 {
+		panelHeight = 3
+	}
+	
+	// Content dimensions (accounting for border and padding)
+	// Border takes 2 from width and height, padding takes another 2 from each
+	contentWidth := panelWidth - 4
+	contentHeight := panelHeight - 4
+	
+	if contentWidth < 40 {
+		contentWidth = 40
+	}
+	if contentHeight < 1 {
+		contentHeight = 1
 	}
 
 	// Create the single panel content
-	panelContent := v.renderCompactForm(contentWidth, availableHeight-2)
+	panelContent := v.renderCompactForm(contentWidth, contentHeight)
 
-	// Style for single panel - similar to status view
+	// Style for single panel - Width and Height include the border
 	panelStyle := lipgloss.NewStyle().
-		Width(v.width).
-		Height(availableHeight).
+		Width(panelWidth).
+		Height(panelHeight).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("63")).
 		Padding(1)
