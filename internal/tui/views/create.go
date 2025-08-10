@@ -19,7 +19,8 @@ import (
 	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/repobird/repobird-cli/internal/tui/components"
 	"github.com/repobird/repobird-cli/internal/tui/debug"
-	"github.com/repobird/repobird-cli/pkg/utils"
+	"github.com/repobird/repobird-cli/internal/utils"
+	pkgutils "github.com/repobird/repobird-cli/pkg/utils"
 )
 
 type CreateRunView struct {
@@ -46,6 +47,8 @@ type CreateRunView struct {
 	backButtonFocused bool
 	// Submit button
 	submitButtonFocused bool
+	// Error handling
+	errorButtonFocused bool
 	// Cache from parent list view
 	parentRuns         []models.RunResponse
 	parentCached       bool
@@ -227,7 +230,7 @@ func NewCreateRunViewWithCache(
 }
 
 func autoDetectGit(repoInput, sourceInput textinput.Model) {
-	if repo, branch, err := utils.GetGitInfo(); err == nil {
+	if repo, branch, err := pkgutils.GetGitInfo(); err == nil {
 		if repo != "" {
 			repoInput.SetValue(repo)
 		}
@@ -343,6 +346,11 @@ func (v *CreateRunView) handleInsertMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // handleNormalMode handles keyboard input in normal mode
 func (v *CreateRunView) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Handle error state first
+	if v.error != nil && !v.submitting {
+		return v.handleErrorMode(msg)
+	}
+
 	switch {
 	case msg.String() == "Q":
 		// Capital Q to force quit from anywhere
@@ -485,6 +493,42 @@ func (v *CreateRunView) handleRepositorySelected(msg repositorySelectedMsg) (tea
 		v.repoSelector.AddManualRepository(msg.repository)
 	}
 
+	return v, nil
+}
+
+// handleErrorMode handles keyboard input when there's an error
+func (v *CreateRunView) handleErrorMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "Q":
+		// Capital Q to force quit from anywhere
+		return v, tea.Quit
+	case "y":
+		// Copy error message to clipboard
+		if v.error != nil {
+			return v, v.copyToClipboard(v.error.Error())
+		}
+	case "enter":
+		// Enter on error goes back to form (clear error)
+		v.error = nil
+		v.errorButtonFocused = false
+		// Set focus to back button by default after error
+		v.backButtonFocused = true
+		v.focusIndex = 0
+		return v, nil
+	case "escape", "q", "b":
+		// ESC, q, b - go back to dashboard
+		v.saveFormData()
+		debug.LogToFile("DEBUG: CreateView error mode - returning to dashboard\n")
+		dashboard := NewDashboardView(v.client)
+		dashboard.width = v.width
+		dashboard.height = v.height
+		return dashboard, dashboard.Init()
+	case "r":
+		// 'r' to retry (clear error and go back to form)
+		v.error = nil
+		v.errorButtonFocused = false
+		return v, nil
+	}
 	return v, nil
 }
 
@@ -766,13 +810,8 @@ func (v *CreateRunView) View() string {
 	var content string
 
 	if v.error != nil && !v.submitting {
-		errorContent := fmt.Sprintf("Error: %s\n\nPress 'ESC' to go back, 'r' to retry", v.error.Error())
-		errorStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("196")).
-			Width(v.width).
-			Align(lipgloss.Center).
-			MarginTop((availableHeight - 4) / 2)
-		content = errorStyle.Render(errorContent)
+		// Error mode - render error in bordered box similar to form
+		content = v.renderErrorLayout(availableHeight)
 	} else if v.submitting {
 		loadingContent := "⟳ Creating run...\n\nPlease wait..."
 		loadingStyle := lipgloss.NewStyle().
@@ -1081,6 +1120,75 @@ func (v *CreateRunView) renderCompactForm(width, height int) string {
 	return b.String()
 }
 
+// renderErrorLayout renders the error message in a bordered box
+func (v *CreateRunView) renderErrorLayout(availableHeight int) string {
+	// Calculate box dimensions similar to form layout
+	panelWidth := v.width - 2
+	if panelWidth < 60 {
+		panelWidth = 60
+	}
+
+	panelHeight := availableHeight
+	if panelHeight < 8 {
+		panelHeight = 8
+	}
+
+	// Error content
+	var b strings.Builder
+
+	// Error header
+	errorHeaderStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("196")).
+		Bold(true)
+	b.WriteString(errorHeaderStyle.Render("❌ Error"))
+	b.WriteString("\n\n")
+
+	// Error message
+	errorMsgStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("252"))
+	b.WriteString(errorMsgStyle.Render(v.error.Error()))
+	b.WriteString("\n\n")
+
+	// Back button (focused by default in error mode)
+	backStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("63")).
+		Bold(true).
+		Background(lipgloss.Color("236")).
+		Padding(0, 1)
+
+	b.WriteString(backStyle.Render("← Back to Form"))
+	b.WriteString("\n\n")
+
+	// Help text
+	helpStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("240")).
+		Italic(true)
+	b.WriteString(helpStyle.Render("Press [Enter] to go back, [y] to copy error, [q] to dashboard, [r] to retry"))
+
+	// Style for the panel
+	panelStyle := lipgloss.NewStyle().
+		Width(panelWidth).
+		Height(panelHeight).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("196")).
+		Padding(1)
+
+	return panelStyle.Render(b.String())
+}
+
+// copyToClipboard copies text to clipboard and shows feedback
+func (v *CreateRunView) copyToClipboard(text string) tea.Cmd {
+	return func() tea.Msg {
+		if err := utils.WriteToClipboard(text); err != nil {
+			debug.LogToFilef("DEBUG: Failed to copy to clipboard: %v\n", err)
+			// You could return an error message to display to user
+			return nil
+		}
+		debug.LogToFilef("DEBUG: Successfully copied to clipboard: %s\n", text)
+		return nil
+	}
+}
+
 // renderFieldIndicator renders the field focus indicator
 func (v *CreateRunView) renderFieldIndicator() string {
 	if v.inputMode == components.InsertMode {
@@ -1119,6 +1227,13 @@ func (v *CreateRunView) renderFileInputMode() string {
 
 func (v *CreateRunView) renderStatusBar() string {
 	var statusText string
+
+	// Handle error mode status
+	if v.error != nil && !v.submitting {
+		statusText = "[Enter] back to form [y] copy error [q] dashboard [r] retry [Q]uit"
+		return components.DashboardStatusLine(v.width, "ERROR", "", statusText)
+	}
+
 	if v.inputMode == components.InsertMode {
 		if !v.useFileInput && v.focusIndex == 1 {
 			// When repository field is focused, show FZF options
@@ -1211,13 +1326,13 @@ func (v *CreateRunView) validateTask(task *models.RunRequest) error {
 func (v *CreateRunView) autoDetectGitInfo(task *models.RunRequest) {
 	if task.Repository == "" {
 		debug.LogToFile("DEBUG: Repository field empty, trying git auto-detect\n")
-		if repo, _, err := utils.GetGitInfo(); err == nil {
+		if repo, _, err := pkgutils.GetGitInfo(); err == nil {
 			task.Repository = repo
 		}
 	}
 
 	if task.Source == "" {
-		if _, branch, err := utils.GetGitInfo(); err == nil {
+		if _, branch, err := pkgutils.GetGitInfo(); err == nil {
 			task.Source = branch
 		}
 		if task.Source == "" {
@@ -1342,7 +1457,7 @@ func (v *CreateRunView) activateFZFMode() {
 	var items []string
 
 	// Add current git repository if available
-	if gitRepo, _, err := utils.GetGitInfo(); err == nil && gitRepo != "" {
+	if gitRepo, _, err := pkgutils.GetGitInfo(); err == nil && gitRepo != "" {
 		items = append(items, fmt.Sprintf("📁 %s", gitRepo))
 	}
 
