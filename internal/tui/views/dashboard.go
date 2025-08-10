@@ -564,10 +564,24 @@ func (d *DashboardView) handleMillerColumnsNavigation(msg tea.KeyMsg) tea.Cmd {
 			d.focusedColumn--
 		}
 
-	case msg.Type == tea.KeyRunes && string(msg.Runes) == "y" && d.focusedColumn == 2:
-		// Copy selected line to clipboard
-		if d.selectedDetailLine < len(d.detailLines) {
-			return d.copyToClipboard(d.detailLines[d.selectedDetailLine])
+	case msg.Type == tea.KeyRunes && string(msg.Runes) == "y":
+		// Copy current row/line in any column
+		switch d.focusedColumn {
+		case 0: // Repository column
+			if d.selectedRepoIdx < len(d.repositories) {
+				repo := d.repositories[d.selectedRepoIdx]
+				return d.copyToClipboard(repo.Name)
+			}
+		case 1: // Runs column
+			if d.selectedRunIdx < len(d.filteredRuns) {
+				run := d.filteredRuns[d.selectedRunIdx]
+				text := fmt.Sprintf("%s - %s", run.GetIDString(), run.Title)
+				return d.copyToClipboard(text)
+			}
+		case 2: // Details column
+			if d.selectedDetailLine < len(d.detailLines) {
+				return d.copyToClipboard(d.detailLines[d.selectedDetailLine])
+			}
 		}
 
 	case key.Matches(msg, d.keys.Right) || (msg.Type == tea.KeyRunes && string(msg.Runes) == "l"):
@@ -673,8 +687,10 @@ func (d *DashboardView) View() string {
 
 // renderTripleColumnLayout renders the Miller Columns layout with real data
 func (d *DashboardView) renderTripleColumnLayout() string {
-	// Calculate available height (minus title and statusline)
-	availableHeight := d.height - 2 // Account for title and statusline
+	// Calculate available height for columns
+	// We receive (d.height - 1) from View() after title
+	// We need to reserve 1 line for statusline
+	availableHeight := d.height - 3 // Account for title (1) and statusline (1)
 
 	// Column widths - full width, equally distributed
 	leftWidth := d.width / 3
@@ -1110,22 +1126,23 @@ func (d *DashboardView) wrapText(text string, width int) []string {
 
 // renderStatusLine renders the universal status line
 func (d *DashboardView) renderStatusLine(layoutName string) string {
-	// Data freshness indicator
-	dataInfo := "fresh"
-	if !d.lastDataRefresh.IsZero() {
+	// Data freshness indicator - keep it short
+	dataInfo := ""
+	if d.loading && len(d.repositories) > 0 {
+		dataInfo = "⟳"
+	} else if !d.lastDataRefresh.IsZero() {
 		elapsed := time.Since(d.lastDataRefresh)
-		if elapsed >= time.Minute {
-			dataInfo = fmt.Sprintf("%dm ago", int(elapsed.Minutes()))
+		if elapsed < time.Minute {
+			dataInfo = "✓"
+		} else {
+			dataInfo = fmt.Sprintf("%dm", int(elapsed.Minutes()))
 		}
 	}
-	if d.loading && len(d.repositories) > 0 {
-		dataInfo = "⟳ refreshing..."
-	}
 
-	// Short help based on whether help is shown
-	shortHelp := "n new | ? help | Shift+L layout | r refresh | q quit"
+	// Shorter help text to fit on one line
+	shortHelp := "n new | y copy | ? help | r refresh | q quit"
 	if d.showHelp {
-		shortHelp = "n new run | j/k up/down | h/l left/right | Shift+L layout | r refresh | ? help | q quit"
+		shortHelp = "n new | y copy | j/k ↑↓ | h/l ←→ | Enter → | Backspace ← | ? help | q quit"
 	}
 
 	return components.DashboardStatusLine(d.width, layoutName, dataInfo, shortHelp)
