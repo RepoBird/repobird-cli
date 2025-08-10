@@ -31,11 +31,11 @@ type RepositoryCache struct {
 
 // RepoDataCache contains detailed data for a specific repository
 type RepoDataCache struct {
-	Repository   string                     `json:"repository"`
-	Runs         []*models.RunResponse      `json:"runs"`
-	RunDetails   map[string]*models.RunResponse `json:"run_details"`
-	CachedAt     time.Time                  `json:"cached_at"`
-	TTL          time.Duration              `json:"ttl"`
+	Repository string                         `json:"repository"`
+	Runs       []*models.RunResponse          `json:"runs"`
+	RunDetails map[string]*models.RunResponse `json:"run_details"`
+	CachedAt   time.Time                      `json:"cached_at"`
+	TTL        time.Duration                  `json:"ttl"`
 }
 
 var dashboardCache *DashboardCache
@@ -81,7 +81,7 @@ func GetRepositoryOverview() ([]models.Repository, bool, error) {
 	defer dashboardCache.mu.RUnlock()
 
 	repoFile := filepath.Join(dashboardCache.cacheDir, "repos.json")
-	
+
 	// Check if file exists
 	if _, err := os.Stat(repoFile); os.IsNotExist(err) {
 		return nil, false, nil
@@ -142,7 +142,7 @@ func GetRepositoryData(repoName string) ([]*models.RunResponse, map[string]*mode
 	// Sanitize repo name for filename
 	safeRepoName := sanitizeFilename(repoName)
 	repoFile := filepath.Join(dashboardCache.cacheDir, fmt.Sprintf("repo_%s.json", safeRepoName))
-	
+
 	// Check if file exists
 	if _, err := os.Stat(repoFile); os.IsNotExist(err) {
 		return nil, nil, false, nil
@@ -198,28 +198,29 @@ func SetRepositoryData(repoName string, runs []*models.RunResponse, details map[
 // BuildRepositoryOverviewFromRuns builds repository overview from run data
 func BuildRepositoryOverviewFromRuns(runs []*models.RunResponse) []models.Repository {
 	repoMap := make(map[string]*models.Repository)
-	
+
 	// Extract unique repository names and create repository objects
 	for _, run := range runs {
-		if run.Repository == "" {
+		repoName := run.GetRepositoryName()
+		if repoName == "" {
 			continue
 		}
-		
-		repo, exists := repoMap[run.Repository]
+
+		repo, exists := repoMap[repoName]
 		if !exists {
 			repo = &models.Repository{
-				Name:         run.Repository,
+				Name:         repoName,
 				RunCounts:    models.RunStats{},
 				LastActivity: run.UpdatedAt,
 			}
-			repoMap[run.Repository] = repo
+			repoMap[repoName] = repo
 		}
-		
+
 		// Update last activity if this run is more recent
 		if run.UpdatedAt.After(repo.LastActivity) {
 			repo.LastActivity = run.UpdatedAt
 		}
-		
+
 		// Update run counts
 		repo.RunCounts.Total++
 		switch run.Status {
@@ -231,13 +232,13 @@ func BuildRepositoryOverviewFromRuns(runs []*models.RunResponse) []models.Reposi
 			repo.RunCounts.Failed++
 		}
 	}
-	
+
 	// Convert map to slice
 	repositories := make([]models.Repository, 0, len(repoMap))
 	for _, repo := range repoMap {
 		repositories = append(repositories, *repo)
 	}
-	
+
 	return repositories
 }
 
@@ -245,7 +246,8 @@ func BuildRepositoryOverviewFromRuns(runs []*models.RunResponse) []models.Reposi
 func FilterRunsByRepository(runs []*models.RunResponse, repoName string) []*models.RunResponse {
 	var filtered []*models.RunResponse
 	for _, run := range runs {
-		if run.Repository == repoName {
+		runRepoName := run.GetRepositoryName()
+		if runRepoName == repoName {
 			filtered = append(filtered, run)
 		}
 	}
@@ -262,7 +264,7 @@ func GetAllCachedRepositoryData() (map[string][]*models.RunResponse, error) {
 	defer dashboardCache.mu.RUnlock()
 
 	result := make(map[string][]*models.RunResponse)
-	
+
 	// Read all repo_*.json files
 	files, err := filepath.Glob(filepath.Join(dashboardCache.cacheDir, "repo_*.json"))
 	if err != nil {
@@ -300,11 +302,11 @@ func InvalidateRepositoryCache(repoName string) error {
 
 	safeRepoName := sanitizeFilename(repoName)
 	repoFile := filepath.Join(dashboardCache.cacheDir, fmt.Sprintf("repo_%s.json", safeRepoName))
-	
+
 	if _, err := os.Stat(repoFile); err == nil {
 		return os.Remove(repoFile)
 	}
-	
+
 	return nil // File doesn't exist, nothing to do
 }
 
@@ -329,7 +331,7 @@ func InitializeDashboardForUser(userID *int) error {
 		dashboardCache.mu.Unlock()
 	}
 	dashboardCache = nil
-	
+
 	// Initialize with user-specific cache
 	return InitializeDashboardCacheForUser(userID)
 }
@@ -339,25 +341,25 @@ func sanitizeFilename(name string) string {
 	// Replace common problematic characters
 	safe := name
 	safe = filepath.Base(safe) // Remove any path components
-	
+
 	// Replace slashes and other problematic characters
 	replacements := map[string]string{
-		"/": "_",
+		"/":  "_",
 		"\\": "_",
-		":": "_",
-		"*": "_",
-		"?": "_",
+		":":  "_",
+		"*":  "_",
+		"?":  "_",
 		"\"": "_",
-		"<": "_",
-		">": "_",
-		"|": "_",
-		" ": "_",
+		"<":  "_",
+		">":  "_",
+		"|":  "_",
+		" ":  "_",
 	}
-	
+
 	for old, new := range replacements {
 		safe = strings.ReplaceAll(safe, old, new)
 	}
-	
+
 	return safe
 }
 

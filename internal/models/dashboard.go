@@ -70,7 +70,7 @@ type APIRepository struct {
 
 // RepositoryListResponse represents the API response for repository list
 type RepositoryListResponse struct {
-	Data []APIRepository `json:"data"`
+	Data     []APIRepository `json:"data"`
 	Metadata struct {
 		CurrentPage int `json:"currentPage"`
 		Total       int `json:"total"`

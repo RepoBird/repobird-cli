@@ -63,21 +63,22 @@ func (r *RunRequest) ToAPIRequest() *APIRunRequest {
 }
 
 type RunResponse struct {
-	ID          string    `json:"id"` // Now stored as string internally
-	Status      RunStatus `json:"status"`
-	Repository  string    `json:"repository"`
-	RepoID      int       `json:"repoId,omitempty"`
-	Source      string    `json:"source"`
-	Target      string    `json:"target"`
-	CreatedAt   time.Time `json:"createdAt"`
-	UpdatedAt   time.Time `json:"updatedAt"`
-	Prompt      string    `json:"prompt"`
-	Title       string    `json:"title,omitempty"`
-	Description string    `json:"description,omitempty"`
-	Context     string    `json:"context,omitempty"`
-	Error       string    `json:"error,omitempty"`
-	PrURL       *string   `json:"prUrl,omitempty"`
-	RunType     string    `json:"runType,omitempty"`
+	ID             string    `json:"id"` // Now stored as string internally
+	Status         RunStatus `json:"status"`
+	Repository     string    `json:"repository,omitempty"`     // Legacy field
+	RepositoryName string    `json:"repositoryName,omitempty"` // New API field
+	RepoID         int       `json:"repoId,omitempty"`
+	Source         string    `json:"source"`
+	Target         string    `json:"target"`
+	CreatedAt      time.Time `json:"createdAt"`
+	UpdatedAt      time.Time `json:"updatedAt"`
+	Prompt         string    `json:"prompt"`
+	Title          string    `json:"title,omitempty"`
+	Description    string    `json:"description,omitempty"`
+	Context        string    `json:"context,omitempty"`
+	Error          string    `json:"error,omitempty"`
+	PrURL          *string   `json:"prUrl,omitempty"`
+	RunType        string    `json:"runType,omitempty"`
 }
 
 // GetIDString returns the ID as a string
@@ -86,6 +87,14 @@ func (r *RunResponse) GetIDString() string {
 		return ""
 	}
 	return r.ID
+}
+
+// GetRepositoryName returns the repository name from either field
+func (r *RunResponse) GetRepositoryName() string {
+	if r.RepositoryName != "" {
+		return r.RepositoryName
+	}
+	return r.Repository
 }
 
 // UnmarshalJSON custom unmarshaler to handle ID field that can be string or number
