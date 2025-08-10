@@ -18,7 +18,7 @@ func NewHeader(title string) *Header {
 		style: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("63")).
-			Align(lipgloss.Center),
+			PaddingLeft(1),
 	}
 }
 

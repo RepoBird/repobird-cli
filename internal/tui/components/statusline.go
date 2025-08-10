@@ -127,8 +127,12 @@ func (s *StatusLine) Render() string {
 		statusContent = truncateWithEllipsis(statusContent, s.width)
 	}
 
-	// Use MaxWidth to ensure no wrapping
-	return s.style.Width(s.width).MaxWidth(s.width).Render(statusContent)
+	// Use MaxWidth and MaxHeight to ensure no wrapping
+	return s.style.
+		Width(s.width).
+		MaxWidth(s.width).
+		MaxHeight(1).
+		Render(statusContent)
 }
 
 // truncateWithEllipsis truncates a string to fit within maxWidth with ellipsis
@@ -145,12 +149,17 @@ func truncateWithEllipsis(s string, maxWidth int) string {
 // DashboardStatusLine creates a status line for the dashboard
 func DashboardStatusLine(width int, layoutName string, dataFreshness string, shortHelp string) string {
 	// Keep left side concise
-	left := fmt.Sprintf("Dashboard: %s", layoutName)
+	left := layoutName
+	if width > 80 {
+		left = fmt.Sprintf("Dashboard: %s", layoutName)
+	}
 	
-	// Only show data freshness if it's not empty
-	right := ""
-	if dataFreshness != "" {
-		right = fmt.Sprintf("[%s]", dataFreshness)
+	// Data freshness without brackets to save space
+	right := dataFreshness
+	
+	// Truncate help if needed
+	if width < 100 && len(shortHelp) > 40 {
+		shortHelp = "n:new y:copy ?:help q:quit"
 	}
 	
 	statusLine := NewStatusLine().

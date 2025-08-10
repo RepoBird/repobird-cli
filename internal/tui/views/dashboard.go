@@ -541,6 +541,19 @@ func (d *DashboardView) handleMillerColumnsNavigation(msg tea.KeyMsg) tea.Cmd {
 			}
 		}
 
+	case key.Matches(msg, d.keys.Tab):
+		// Tab cycles through columns
+		d.focusedColumn = (d.focusedColumn + 1) % 3
+		if d.focusedColumn == 1 && len(d.filteredRuns) > 0 && d.selectedRunData == nil {
+			// Moving to runs column, select first run if none selected
+			d.selectedRunIdx = 0
+			d.selectedRunData = d.filteredRuns[0]
+			d.updateDetailLines()
+		} else if d.focusedColumn == 2 {
+			// Moving to details column, select first line
+			d.selectedDetailLine = 0
+		}
+
 	case key.Matches(msg, d.keys.Enter):
 		// Enter moves focus right and selects first item
 		if d.focusedColumn < 2 {
@@ -629,12 +642,11 @@ func (d *DashboardView) View() string {
 
 	var content string
 
-	// Always show title
+	// Always show title - left aligned
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("63")).
-		Width(d.width).
-		Align(lipgloss.Center)
+		PaddingLeft(1)
 
 	title := titleStyle.Render("Repobird.ai CLI")
 
@@ -688,36 +700,49 @@ func (d *DashboardView) View() string {
 // renderTripleColumnLayout renders the Miller Columns layout with real data
 func (d *DashboardView) renderTripleColumnLayout() string {
 	// Calculate available height for columns
-	// We receive (d.height - 1) from View() after title
-	// We need to reserve 1 line for statusline
-	availableHeight := d.height - 3 // Account for title (1) and statusline (1)
+	// We have d.height total, minus:
+	// - 2 for title
+	// - 1 for statusline  
+	availableHeight := d.height - 3
+	if availableHeight < 5 {
+		availableHeight = 5 // Minimum height
+	}
 
 	// Column widths - full width, equally distributed
-	leftWidth := d.width / 3
-	centerWidth := d.width / 3
-	rightWidth := d.width - leftWidth - centerWidth
+	// Account for spacing between columns
+	totalWidth := d.width - 2 // Small margin for edges
+	leftWidth := totalWidth / 3
+	centerWidth := totalWidth / 3
+	rightWidth := totalWidth - leftWidth - centerWidth
+
+	// Make columns with rounded borders - ensure proper sizing
+	// Reduce height by 1 to ensure bottom border is visible
+	columnHeight := availableHeight - 1
 
 	// Create column content with titles
-	leftContent := d.renderRepositoriesColumn(leftWidth - 2, availableHeight - 2)
-	centerContent := d.renderRunsColumn(centerWidth - 2, availableHeight - 2)
-	rightContent := d.renderDetailsColumn(rightWidth - 2, availableHeight - 2)
-
-	// Make columns full height with rounded borders
+	// Account for borders (2 chars for left/right, 2 for top/bottom)
+	leftContent := d.renderRepositoriesColumn(leftWidth - 2, columnHeight - 2)
+	centerContent := d.renderRunsColumn(centerWidth - 2, columnHeight - 2)
+	rightContent := d.renderDetailsColumn(rightWidth - 2, columnHeight - 2)
+	
 	leftStyle := lipgloss.NewStyle().
-		Width(leftWidth - 1).
-		Height(availableHeight).
+		Width(leftWidth).
+		Height(columnHeight).
+		MaxHeight(columnHeight).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("63"))
 
 	centerStyle := lipgloss.NewStyle().
-		Width(centerWidth - 1).
-		Height(availableHeight).
+		Width(centerWidth).
+		Height(columnHeight).
+		MaxHeight(columnHeight).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("33"))
 
 	rightStyle := lipgloss.NewStyle().
-		Width(rightWidth - 1).
-		Height(availableHeight).
+		Width(rightWidth).
+		Height(columnHeight).
+		MaxHeight(columnHeight).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("240"))
 
@@ -1126,23 +1151,23 @@ func (d *DashboardView) wrapText(text string, width int) []string {
 
 // renderStatusLine renders the universal status line
 func (d *DashboardView) renderStatusLine(layoutName string) string {
-	// Data freshness indicator - keep it short
+	// Data freshness indicator - keep it very short
 	dataInfo := ""
 	if d.loading && len(d.repositories) > 0 {
-		dataInfo = "⟳"
+		dataInfo = "loading"
 	} else if !d.lastDataRefresh.IsZero() {
 		elapsed := time.Since(d.lastDataRefresh)
 		if elapsed < time.Minute {
-			dataInfo = "✓"
+			dataInfo = "fresh"
 		} else {
-			dataInfo = fmt.Sprintf("%dm", int(elapsed.Minutes()))
+			dataInfo = fmt.Sprintf("%dm ago", int(elapsed.Minutes()))
 		}
 	}
 
-	// Shorter help text to fit on one line
-	shortHelp := "n new | y copy | ? help | r refresh | q quit"
+	// Compact help text
+	shortHelp := "n:new y:copy ?:help r:refresh q:quit"
 	if d.showHelp {
-		shortHelp = "n new | y copy | j/k ↑↓ | h/l ←→ | Enter → | Backspace ← | ? help | q quit"
+		shortHelp = "n:new y:copy j/k:↑↓ h/l:←→ Enter:→ BS:← ?:help q:quit"
 	}
 
 	return components.DashboardStatusLine(d.width, layoutName, dataInfo, shortHelp)
