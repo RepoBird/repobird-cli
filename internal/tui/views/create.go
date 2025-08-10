@@ -54,6 +54,10 @@ type CreateRunView struct {
 	prevFocusIndex          int
 	prevBackButtonFocused   bool
 	prevSubmitButtonFocused bool
+	// Clipboard feedback
+	copiedMessage     string
+	copiedMessageTime time.Time
+	yankBlink         bool
 	// Cache from parent list view
 	parentRuns         []models.RunResponse
 	parentCached       bool
@@ -602,6 +606,40 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		v.fzfActive = false
 		v.fzfMode = nil
 		return v, nil
+
+	case yankBlinkMsg:
+		// Single blink: toggle off after being on
+		if v.yankBlink {
+			v.yankBlink = false // Turn off after being on - completes the single blink
+		}
+		return v, nil
+
+	case clearStatusMsg:
+		// Clear the clipboard message after timeout
+		v.copiedMessage = ""
+		v.yankBlink = false
+		return v, nil
+
+	case clipboardResultMsg:
+		// Handle clipboard result
+		if msg.success {
+			// Show what's actually on the clipboard, truncated for display if needed
+			displayText := msg.text
+			maxLen := 30
+			if len(displayText) > maxLen {
+				displayText = displayText[:maxLen-3] + "..."
+			}
+			v.copiedMessage = fmt.Sprintf("📋 Copied \"%s\"", displayText)
+		} else {
+			v.copiedMessage = "✗ Failed to copy"
+		}
+		v.copiedMessageTime = time.Now()
+		v.yankBlink = true
+		// Start blink animation and clear timer
+		return v, tea.Batch(
+			v.startYankBlinkAnimation(),
+			v.startClearStatusTimer(),
+		)
 	}
 
 	return v, tea.Batch(cmds...)
@@ -1177,8 +1215,23 @@ func (v *CreateRunView) renderErrorLayout(availableHeight int) string {
 		b.WriteString(lipgloss.NewStyle().
 			Foreground(lipgloss.Color("33")).
 			Render(" ● "))
-		errorRowStyle = errorRowStyle.
-			Background(lipgloss.Color("236"))
+
+		// Add blinking effect if recently copied
+		if v.copiedMessage != "" && time.Since(v.copiedMessageTime) < 2*time.Second {
+			if v.yankBlink {
+				// Bright green flash
+				errorRowStyle = errorRowStyle.
+					Background(lipgloss.Color("82")).
+					Foreground(lipgloss.Color("0"))
+			} else {
+				// Normal focused style
+				errorRowStyle = errorRowStyle.
+					Background(lipgloss.Color("236"))
+			}
+		} else {
+			errorRowStyle = errorRowStyle.
+				Background(lipgloss.Color("236"))
+		}
 	} else {
 		b.WriteString("   ")
 	}
@@ -1260,11 +1313,10 @@ func (v *CreateRunView) copyToClipboard(text string) tea.Cmd {
 	return func() tea.Msg {
 		if err := utils.WriteToClipboard(text); err != nil {
 			debug.LogToFilef("DEBUG: Failed to copy to clipboard: %v\n", err)
-			// You could return an error message to display to user
-			return nil
+			return clipboardResultMsg{success: false, text: text}
 		}
 		debug.LogToFilef("DEBUG: Successfully copied to clipboard: %s\n", text)
-		return nil
+		return clipboardResultMsg{success: true, text: text}
 	}
 }
 
@@ -1309,6 +1361,11 @@ func (v *CreateRunView) renderStatusBar() string {
 
 	// Handle error mode status
 	if v.error != nil && !v.submitting {
+		// Check if we should show clipboard message
+		if v.copiedMessage != "" && time.Since(v.copiedMessageTime) < 3*time.Second {
+			return v.renderClipboardStatusLine()
+		}
+
 		if v.errorRowFocused {
 			statusText = "[Enter] back to form [j/k] navigate [y] copy error [q] dashboard [r] retry [Q]uit"
 		} else if v.errorButtonFocused {
@@ -1349,6 +1406,46 @@ func (v *CreateRunView) renderStatusBar() string {
 
 	// Use DashboardStatusLine for consistent formatting with [CREATE] label
 	return components.DashboardStatusLine(v.width, "CREATE", "", statusText)
+}
+
+// renderClipboardStatusLine renders the status line with clipboard message
+func (v *CreateRunView) renderClipboardStatusLine() string {
+	// Custom blinking: toggle visibility of the message
+	var copiedStyle lipgloss.Style
+	if time.Since(v.copiedMessageTime) < 2*time.Second {
+		if v.yankBlink {
+			// Bright and bold when visible
+			copiedStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("82")).
+				Background(lipgloss.Color("235")).
+				Bold(true).
+				Padding(0, 1)
+		} else {
+			// Dimmer when "off" for blinking effect
+			copiedStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("240")). // Dim gray
+				Background(lipgloss.Color("235")).
+				Padding(0, 1)
+		}
+	} else {
+		// After blinking period, show normally
+		copiedStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("82")).
+			Background(lipgloss.Color("235")).
+			Bold(true).
+			Padding(0, 1)
+	}
+
+	// Create a custom status line just for the clipboard message
+	statusStyle := lipgloss.NewStyle().
+		Width(v.width).
+		Background(lipgloss.Color("235"))
+	message := copiedStyle.Render(v.copiedMessage)
+	padding := v.width - lipgloss.Width(message)
+	if padding > 0 {
+		message = message + strings.Repeat(" ", padding)
+	}
+	return statusStyle.Render(message)
 }
 
 // prepareTaskFromFile loads and parses task from a JSON file
@@ -1534,6 +1631,28 @@ type runCreatedMsg struct {
 type repositorySelectedMsg struct {
 	repository string
 	err        error
+}
+
+type clipboardResultMsg struct {
+	success bool
+	text    string
+}
+
+// startYankBlinkAnimation starts the blink animation for clipboard feedback
+func (v *CreateRunView) startYankBlinkAnimation() tea.Cmd {
+	return func() tea.Msg {
+		// Single blink duration - quick flash (100ms)
+		time.Sleep(100 * time.Millisecond)
+		return yankBlinkMsg{}
+	}
+}
+
+// startClearStatusTimer starts the timer to clear clipboard status
+func (v *CreateRunView) startClearStatusTimer() tea.Cmd {
+	return func() tea.Msg {
+		time.Sleep(3 * time.Second)
+		return clearStatusMsg{}
+	}
 }
 
 // activateFZFMode activates FZF mode for repository selection
