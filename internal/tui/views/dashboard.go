@@ -1854,15 +1854,18 @@ func (d *DashboardView) renderStatusInfo() string {
 		var totalProRuns, totalPlanRuns int
 
 		// Hardcoded tier totals
-		switch strings.ToLower(d.userInfo.Tier) {
-		case "free", "":
+		// Check if tier contains "free" or "Free" (handles "Free Plan v1", etc.)
+		tierLower := strings.ToLower(d.userInfo.Tier)
+		if strings.Contains(tierLower, "free") || tierLower == "" {
+			// Free tier
 			totalProRuns = 3
 			totalPlanRuns = 5
-		case "pro":
+		} else if strings.Contains(tierLower, "pro") {
+			// Pro tier
 			totalProRuns = 30
 			totalPlanRuns = 35
-		default:
-			// For other tiers, use a reasonable default or what's provided
+		} else {
+			// Default to pro tier totals for unknown tiers
 			totalProRuns = 30
 			totalPlanRuns = 35
 		}

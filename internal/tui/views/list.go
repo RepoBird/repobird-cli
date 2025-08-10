@@ -649,15 +649,19 @@ func (v *RunListView) renderStatusBar() string {
 		// Show tier-specific runs with hardcoded totals
 		if v.userInfo.TierDetails != nil {
 			// Hardcoded tier totals
+			// Check if tier contains "free" or "Free" (handles "Free Plan v1", etc.)
 			var totalProRuns, totalPlanRuns int
-			switch strings.ToLower(tier) {
-			case "free":
+			tierLower := strings.ToLower(tier)
+			if strings.Contains(tierLower, "free") {
+				// Free tier
 				totalProRuns = 3
 				totalPlanRuns = 5
-			case "pro":
+			} else if strings.Contains(tierLower, "pro") {
+				// Pro tier
 				totalProRuns = 30
 				totalPlanRuns = 35
-			default:
+			} else {
+				// Default to pro tier totals for unknown tiers
 				totalProRuns = 30
 				totalPlanRuns = 35
 			}
