@@ -77,6 +77,11 @@ type DashboardView struct {
 
 	// Store original untruncated detail lines for copying
 	detailLinesOriginal []string
+
+	// Status info overlay navigation
+	statusInfoSelectedRow int      // Currently selected row in status info
+	statusInfoFields      []string // Field values that can be copied
+	statusInfoFieldLines  []int    // Line numbers for each field
 }
 
 type dashboardDataLoadedMsg struct {
@@ -519,12 +524,11 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case yankBlinkMsg:
-		// Toggle blink state for animation effect
-		d.yankBlink = !d.yankBlink
-		// Continue blinking for the first second
-		if time.Since(d.copiedMessageTime) < 1*time.Second {
-			cmds = append(cmds, d.startYankBlinkAnimation())
+		// Single blink: toggle off after being on
+		if d.yankBlink {
+			d.yankBlink = false // Turn off after being on - completes the single blink
 		}
+		// No more blinking after the single on-off cycle
 
 	case clearStatusMsg:
 		// Clear the clipboard message after timeout
@@ -575,14 +579,17 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Close status info overlay with ESC
 			d.showStatusInfo = false
 			return d, nil
-		case msg.Type == tea.KeyRunes && string(msg.Runes) == "s":
+		case msg.Type == tea.KeyRunes && string(msg.Runes) == "s" && !d.showStatusInfo:
 			// Toggle status info view
-			d.showStatusInfo = !d.showStatusInfo
+			d.showStatusInfo = true
+			// Initialize status info navigation
+			d.initializeStatusInfoFields()
 			// Refresh user info when showing
-			if d.showStatusInfo {
-				cmds = append(cmds, d.loadUserInfo())
-			}
+			cmds = append(cmds, d.loadUserInfo())
 			return d, tea.Batch(cmds...)
+		case d.showStatusInfo:
+			// Handle navigation in status info overlay
+			return d.handleStatusInfoNavigation(msg)
 		case msg.Type == tea.KeyRunes && string(msg.Runes) == "n":
 			// Navigate to create new run view with selected repository
 			config := CreateRunViewConfig{
@@ -1208,9 +1215,10 @@ func (d *DashboardView) copyToClipboard(text string) error {
 	return utils.WriteToClipboard(text)
 }
 
-// startYankBlinkAnimation starts the blinking animation for clipboard feedback
+// startYankBlinkAnimation starts the single blink animation for clipboard feedback
 func (d *DashboardView) startYankBlinkAnimation() tea.Cmd {
 	return func() tea.Msg {
+		// Single blink duration - quick flash (100ms)
 		time.Sleep(100 * time.Millisecond)
 		return yankBlinkMsg{}
 	}
@@ -1278,15 +1286,23 @@ func (d *DashboardView) renderRepositoriesColumn(width, height int) string {
 		// Highlight selected repository
 		if i == d.selectedRepoIdx {
 			if d.focusedColumn == 0 {
-				style := lipgloss.NewStyle().
-					Width(width).
-					Background(lipgloss.Color("63")).
-					Foreground(lipgloss.Color("255"))
-				// Apply blinking if copying and within first second
-				if d.yankBlink && d.copiedMessage != "" && time.Since(d.copiedMessageTime) < 1*time.Second {
-					style = style.Blink(true)
+				// Single blink: bright green briefly when yankBlink is true
+				if d.yankBlink && d.copiedMessage != "" {
+					// Bright green flash
+					item = lipgloss.NewStyle().
+						Width(width).
+						Background(lipgloss.Color("82")). // Bright green
+						Foreground(lipgloss.Color("0")).  // Black text
+						Bold(true).
+						Render(item)
+				} else {
+					// Normal focused highlight
+					item = lipgloss.NewStyle().
+						Width(width).
+						Background(lipgloss.Color("63")).
+						Foreground(lipgloss.Color("255")).
+						Render(item)
 				}
-				item = style.Render(item)
 			} else {
 				item = lipgloss.NewStyle().
 					Width(width).
@@ -1356,15 +1372,32 @@ func (d *DashboardView) renderRunsColumn(width, height int) string {
 			// Highlight selected run
 			if i == d.selectedRunIdx {
 				if d.focusedColumn == 1 {
-					style := lipgloss.NewStyle().
-						Width(width).
-						Background(lipgloss.Color("33")).
-						Foreground(lipgloss.Color("255"))
-					// Apply blinking if copying and within first second
-					if d.yankBlink && d.copiedMessage != "" && time.Since(d.copiedMessageTime) < 1*time.Second {
-						style = style.Blink(true)
+					// Custom blinking: toggle between bright and normal colors
+					if d.copiedMessage != "" && time.Since(d.copiedMessageTime) < 2*time.Second {
+						if d.yankBlink {
+							// Bright green when visible
+							item = lipgloss.NewStyle().
+								Width(width).
+								Background(lipgloss.Color("82")). // Bright green
+								Foreground(lipgloss.Color("0")).  // Black text
+								Bold(true).
+								Render(item)
+						} else {
+							// Normal highlight when "off"
+							item = lipgloss.NewStyle().
+								Width(width).
+								Background(lipgloss.Color("33")).
+								Foreground(lipgloss.Color("255")).
+								Render(item)
+						}
+					} else {
+						// Normal focused highlight (no blinking)
+						item = lipgloss.NewStyle().
+							Width(width).
+							Background(lipgloss.Color("33")).
+							Foreground(lipgloss.Color("255")).
+							Render(item)
 					}
-					item = style.Render(item)
 				} else {
 					item = lipgloss.NewStyle().
 						Width(width).
@@ -1432,17 +1465,35 @@ func (d *DashboardView) renderDetailsColumn(width, height int) string {
 				Render(line)
 
 			if d.focusedColumn == 2 && i == d.selectedDetailLine {
-				// Highlight selected line
-				style := lipgloss.NewStyle().
-					MaxWidth(contentWidth).
-					Inline(true).
-					Background(lipgloss.Color("63")).
-					Foreground(lipgloss.Color("255"))
-				// Apply blinking if copying and within first second
-				if d.yankBlink && d.copiedMessage != "" && time.Since(d.copiedMessageTime) < 1*time.Second {
-					style = style.Blink(true)
+				// Custom blinking: toggle between bright and normal colors
+				if d.copiedMessage != "" && time.Since(d.copiedMessageTime) < 2*time.Second {
+					if d.yankBlink {
+						// Bright green when visible
+						styledLine = lipgloss.NewStyle().
+							MaxWidth(contentWidth).
+							Inline(true).
+							Background(lipgloss.Color("82")). // Bright green
+							Foreground(lipgloss.Color("0")).  // Black text
+							Bold(true).
+							Render(line)
+					} else {
+						// Normal highlight when "off"
+						styledLine = lipgloss.NewStyle().
+							MaxWidth(contentWidth).
+							Inline(true).
+							Background(lipgloss.Color("63")).
+							Foreground(lipgloss.Color("255")).
+							Render(line)
+					}
+				} else {
+					// Normal focused highlight (no blinking)
+					styledLine = lipgloss.NewStyle().
+						MaxWidth(contentWidth).
+						Inline(true).
+						Background(lipgloss.Color("63")).
+						Foreground(lipgloss.Color("255")).
+						Render(line)
 				}
-				styledLine = style.Render(line)
 			}
 			displayLines = append(displayLines, styledLine)
 		}
@@ -1496,6 +1547,188 @@ func (d *DashboardView) renderDetailsColumn(width, height int) string {
 	return lipgloss.JoinVertical(lipgloss.Left, title, contentStyle.Render(content))
 }
 
+// initializeStatusInfoFields initializes the selectable fields for the status info overlay
+func (d *DashboardView) initializeStatusInfoFields() {
+	d.statusInfoFields = []string{}
+	d.statusInfoFieldLines = []int{}
+	d.statusInfoSelectedRow = 0
+
+	lineNum := 0
+
+	// User Info fields
+	if d.userInfo != nil {
+		lineNum++ // Section header
+
+		if d.userInfo.Name != "" {
+			d.statusInfoFields = append(d.statusInfoFields, d.userInfo.Name)
+			d.statusInfoFieldLines = append(d.statusInfoFieldLines, lineNum)
+			lineNum++
+		}
+
+		if d.userInfo.Email != "" {
+			d.statusInfoFields = append(d.statusInfoFields, d.userInfo.Email)
+			d.statusInfoFieldLines = append(d.statusInfoFieldLines, lineNum)
+			lineNum++
+		}
+
+		if d.userInfo.GithubUsername != "" {
+			d.statusInfoFields = append(d.statusInfoFields, d.userInfo.GithubUsername)
+			d.statusInfoFieldLines = append(d.statusInfoFieldLines, lineNum)
+			lineNum++
+		}
+
+		// Tier
+		tierDisplay := d.userInfo.Tier
+		if tierDisplay == "" {
+			tierDisplay = "Free"
+		} else {
+			tierDisplay = strings.ToUpper(tierDisplay[:1]) + tierDisplay[1:]
+		}
+		d.statusInfoFields = append(d.statusInfoFields, tierDisplay)
+		d.statusInfoFieldLines = append(d.statusInfoFieldLines, lineNum)
+		lineNum++
+
+		// Runs remaining
+		var runsRemaining string
+		if d.userInfo.TierDetails != nil {
+			runsRemaining = fmt.Sprintf("%d Run / %d Plan",
+				d.userInfo.TierDetails.RemainingProRuns,
+				d.userInfo.TierDetails.RemainingPlanRuns)
+		} else {
+			runsRemaining = fmt.Sprintf("%d / %d",
+				d.userInfo.RemainingRuns,
+				d.userInfo.TotalRuns)
+		}
+		d.statusInfoFields = append(d.statusInfoFields, runsRemaining)
+		d.statusInfoFieldLines = append(d.statusInfoFieldLines, lineNum)
+		lineNum++
+
+		// Usage - skip the bar, just include percentage
+		if d.userInfo.TotalRuns > 0 {
+			usedRuns := d.userInfo.TotalRuns - d.userInfo.RemainingRuns
+			percentage := float64(usedRuns) / float64(d.userInfo.TotalRuns) * 100
+			d.statusInfoFields = append(d.statusInfoFields, fmt.Sprintf("%.1f%%", percentage))
+			d.statusInfoFieldLines = append(d.statusInfoFieldLines, lineNum)
+			lineNum++
+		} else {
+			d.statusInfoFields = append(d.statusInfoFields, "Unlimited")
+			d.statusInfoFieldLines = append(d.statusInfoFieldLines, lineNum)
+			lineNum++
+		}
+	}
+
+	// System Stats fields
+	lineNum++ // Section header
+
+	d.statusInfoFields = append(d.statusInfoFields, fmt.Sprintf("%d", len(d.repositories)))
+	d.statusInfoFieldLines = append(d.statusInfoFieldLines, lineNum)
+	lineNum++
+
+	d.statusInfoFields = append(d.statusInfoFields, fmt.Sprintf("%d", len(d.allRuns)))
+	d.statusInfoFieldLines = append(d.statusInfoFieldLines, lineNum)
+	lineNum++
+
+	// Run status counts
+	var running, completed, failed int
+	for _, run := range d.allRuns {
+		switch run.Status {
+		case "running", "pending":
+			running++
+		case "completed", "success":
+			completed++
+		case "failed", "error":
+			failed++
+		}
+	}
+	d.statusInfoFields = append(d.statusInfoFields, fmt.Sprintf("🔄 %d  ✅ %d  ❌ %d", running, completed, failed))
+	d.statusInfoFieldLines = append(d.statusInfoFieldLines, lineNum)
+	lineNum++
+
+	// Last refresh
+	if !d.lastDataRefresh.IsZero() {
+		timeSince := time.Since(d.lastDataRefresh)
+		refreshText := fmt.Sprintf("%d seconds ago", int(timeSince.Seconds()))
+		if timeSince.Minutes() > 1 {
+			refreshText = fmt.Sprintf("%.1f minutes ago", timeSince.Minutes())
+		}
+		d.statusInfoFields = append(d.statusInfoFields, refreshText)
+		d.statusInfoFieldLines = append(d.statusInfoFieldLines, lineNum)
+		lineNum++
+	}
+
+	// Connection Info fields
+	lineNum++ // Section header
+
+	d.statusInfoFields = append(d.statusInfoFields, d.client.GetAPIEndpoint())
+	d.statusInfoFieldLines = append(d.statusInfoFieldLines, lineNum)
+	lineNum++
+
+	d.statusInfoFields = append(d.statusInfoFields, "Connected ✅")
+	d.statusInfoFieldLines = append(d.statusInfoFieldLines, lineNum)
+
+	// Select first field if available
+	if len(d.statusInfoFields) > 0 {
+		d.statusInfoSelectedRow = 0
+	}
+}
+
+// handleStatusInfoNavigation handles navigation within the status info overlay
+func (d *DashboardView) handleStatusInfoNavigation(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "j", "down":
+		if d.statusInfoSelectedRow < len(d.statusInfoFields)-1 {
+			d.statusInfoSelectedRow++
+		}
+		return d, nil
+	case "k", "up":
+		if d.statusInfoSelectedRow > 0 {
+			d.statusInfoSelectedRow--
+		}
+		return d, nil
+	case "g":
+		d.statusInfoSelectedRow = 0
+		return d, nil
+	case "G":
+		if len(d.statusInfoFields) > 0 {
+			d.statusInfoSelectedRow = len(d.statusInfoFields) - 1
+		}
+		return d, nil
+	case "y":
+		// Copy selected field value
+		if d.statusInfoSelectedRow >= 0 && d.statusInfoSelectedRow < len(d.statusInfoFields) {
+			textToCopy := d.statusInfoFields[d.statusInfoSelectedRow]
+			if err := d.copyToClipboard(textToCopy); err == nil {
+				// Show what's actually copied, truncated for display
+				displayText := textToCopy
+				maxLen := 30
+				if len(displayText) > maxLen {
+					displayText = displayText[:maxLen-3] + "..."
+				}
+				d.copiedMessage = fmt.Sprintf("📋 Copied \"%s\"", displayText)
+			} else {
+				d.copiedMessage = "✗ Failed to copy"
+			}
+			d.copiedMessageTime = time.Now()
+			d.yankBlink = true
+			return d, tea.Batch(
+				d.startYankBlinkAnimation(),
+				d.startClearStatusTimer(),
+			)
+		}
+		return d, nil
+	case "s", "q", "escape":
+		// Close the overlay with q, s, or ESC
+		d.showStatusInfo = false
+		return d, nil
+	case "Q":
+		// Capital Q to force quit from anywhere
+		return d, tea.Quit
+	default:
+		// Ignore other keys while in status info
+		return d, nil
+	}
+}
+
 // renderStatusInfo renders the status/user info overlay
 func (d *DashboardView) renderStatusInfo() string {
 	// Calculate box dimensions - use most of the screen with some margin
@@ -1538,30 +1771,72 @@ func (d *DashboardView) renderStatusInfo() string {
 		Foreground(lipgloss.Color("255"))
 
 	var content []string
+	lineNum := 0
+	fieldIdx := 0
+
+	// Helper to render a field line with highlight if selected
+	renderField := func(label, value string, isField bool) string {
+		renderedValue := value
+
+		// Check if this field value should be highlighted
+		if isField && fieldIdx < len(d.statusInfoFieldLines) && lineNum == d.statusInfoFieldLines[fieldIdx] {
+			if fieldIdx == d.statusInfoSelectedRow {
+				// Custom blinking: toggle between bright and normal colors
+				if d.copiedMessage != "" && time.Since(d.copiedMessageTime) < 2*time.Second {
+					if d.yankBlink {
+						// Bright green when visible
+						highlightStyle := lipgloss.NewStyle().
+							Background(lipgloss.Color("82")). // Bright green
+							Foreground(lipgloss.Color("0")).  // Black text
+							Bold(true)
+						renderedValue = highlightStyle.Render(value)
+					} else {
+						// Normal highlight when "off"
+						highlightStyle := lipgloss.NewStyle().
+							Background(lipgloss.Color("63")).
+							Foreground(lipgloss.Color("255"))
+						renderedValue = highlightStyle.Render(value)
+					}
+				} else {
+					// Normal focused highlight (no blinking)
+					highlightStyle := lipgloss.NewStyle().
+						Background(lipgloss.Color("63")).
+						Foreground(lipgloss.Color("255"))
+					renderedValue = highlightStyle.Render(value)
+				}
+			} else {
+				// Apply normal value style
+				renderedValue = valueStyle.Render(value)
+			}
+			fieldIdx++
+		} else if isField {
+			// Apply normal value style for non-selected fields
+			renderedValue = valueStyle.Render(value)
+		}
+
+		lineNum++
+		// Return the label with the (potentially highlighted) value
+		return fmt.Sprintf("%s%s", labelStyle.Render(label), renderedValue)
+	}
 
 	// User Info Section
 	if d.userInfo != nil {
 		content = append(content, sectionStyle.Render("User Information"))
+		lineNum++
 
 		// Show name if available
 		if d.userInfo.Name != "" {
-			content = append(content, fmt.Sprintf("%s%s",
-				labelStyle.Render("Name:"),
-				valueStyle.Render(d.userInfo.Name)))
+			content = append(content, renderField("Name:", d.userInfo.Name, true))
 		}
 
 		// Show email
 		if d.userInfo.Email != "" {
-			content = append(content, fmt.Sprintf("%s%s",
-				labelStyle.Render("Email:"),
-				valueStyle.Render(d.userInfo.Email)))
+			content = append(content, renderField("Email:", d.userInfo.Email, true))
 		}
 
 		// Show GitHub username if available
 		if d.userInfo.GithubUsername != "" {
-			content = append(content, fmt.Sprintf("%s%s",
-				labelStyle.Render("GitHub:"),
-				valueStyle.Render(d.userInfo.GithubUsername)))
+			content = append(content, renderField("GitHub:", d.userInfo.GithubUsername, true))
 		}
 
 		// Show tier with better formatting
@@ -1572,22 +1847,20 @@ func (d *DashboardView) renderStatusInfo() string {
 			// Capitalize first letter
 			tierDisplay = strings.ToUpper(tierDisplay[:1]) + tierDisplay[1:]
 		}
-		content = append(content, fmt.Sprintf("%s%s",
-			labelStyle.Render("Account Tier:"),
-			valueStyle.Render(tierDisplay)))
+		content = append(content, renderField("Account Tier:", tierDisplay, true))
 
 		// Show remaining runs with tier details if available
+		var runsRemaining string
 		if d.userInfo.TierDetails != nil {
-			content = append(content, fmt.Sprintf("%s%d Run / %d Plan",
-				labelStyle.Render("Runs Remaining:"),
+			runsRemaining = fmt.Sprintf("%d Run / %d Plan",
 				d.userInfo.TierDetails.RemainingProRuns,
-				d.userInfo.TierDetails.RemainingPlanRuns))
+				d.userInfo.TierDetails.RemainingPlanRuns)
 		} else {
-			content = append(content, fmt.Sprintf("%s%d / %d",
-				labelStyle.Render("Runs Remaining:"),
+			runsRemaining = fmt.Sprintf("%d / %d",
 				d.userInfo.RemainingRuns,
-				d.userInfo.TotalRuns))
+				d.userInfo.TotalRuns)
 		}
+		content = append(content, renderField("Runs Remaining:", runsRemaining, true))
 
 		// Show usage percentage with visual bar
 		if d.userInfo.TotalRuns > 0 {
@@ -1607,29 +1880,25 @@ func (d *DashboardView) renderStatusInfo() string {
 			}
 			bar := strings.Repeat("█", filledBars) + strings.Repeat("░", emptyBars)
 
-			content = append(content, fmt.Sprintf("%s%s %.1f%%",
-				labelStyle.Render("Usage:"),
-				bar,
-				percentage))
+			usageValue := fmt.Sprintf("%s %.1f%%", bar, percentage)
+			content = append(content, renderField("Usage:", usageValue, true))
 		} else {
 			// Handle unlimited or zero total runs
-			content = append(content, fmt.Sprintf("%s%s",
-				labelStyle.Render("Usage:"),
-				valueStyle.Render("Unlimited")))
+			content = append(content, renderField("Usage:", "Unlimited", true))
 		}
 	} else {
 		content = append(content, sectionStyle.Render("User Information"))
+		lineNum++
 		content = append(content, "Loading user info...")
+		lineNum++
 	}
 
 	// System Stats Section
 	content = append(content, sectionStyle.Render("Dashboard Statistics"))
-	content = append(content, fmt.Sprintf("%s%d",
-		labelStyle.Render("Repositories:"),
-		len(d.repositories)))
-	content = append(content, fmt.Sprintf("%s%d",
-		labelStyle.Render("Total Runs:"),
-		len(d.allRuns)))
+	lineNum++
+
+	content = append(content, renderField("Repositories:", fmt.Sprintf("%d", len(d.repositories)), true))
+	content = append(content, renderField("Total Runs:", fmt.Sprintf("%d", len(d.allRuns)), true))
 
 	// Count run statuses
 	var running, completed, failed int
@@ -1644,9 +1913,8 @@ func (d *DashboardView) renderStatusInfo() string {
 		}
 	}
 
-	content = append(content, fmt.Sprintf("%s🔄 %d  ✅ %d  ❌ %d",
-		labelStyle.Render("Run Status:"),
-		running, completed, failed))
+	runStatus := fmt.Sprintf("🔄 %d  ✅ %d  ❌ %d", running, completed, failed)
+	content = append(content, renderField("Run Status:", runStatus, true))
 
 	// Last refresh time
 	if !d.lastDataRefresh.IsZero() {
@@ -1655,19 +1923,15 @@ func (d *DashboardView) renderStatusInfo() string {
 		if timeSince.Minutes() > 1 {
 			refreshText = fmt.Sprintf("%.1f minutes ago", timeSince.Minutes())
 		}
-		content = append(content, fmt.Sprintf("%s%s",
-			labelStyle.Render("Last Refresh:"),
-			valueStyle.Render(refreshText)))
+		content = append(content, renderField("Last Refresh:", refreshText, true))
 	}
 
 	// Connection Info Section
 	content = append(content, sectionStyle.Render("Connection Info"))
-	content = append(content, fmt.Sprintf("%s%s",
-		labelStyle.Render("API Endpoint:"),
-		valueStyle.Render(d.client.GetAPIEndpoint())))
-	content = append(content, fmt.Sprintf("%s%s",
-		labelStyle.Render("Status:"),
-		valueStyle.Render("Connected ✅")))
+	lineNum++
+
+	content = append(content, renderField("API Endpoint:", d.client.GetAPIEndpoint(), true))
+	content = append(content, renderField("Status:", "Connected ✅", true))
 
 	// Build the main content
 	mainContent := contentStyle.Render(strings.Join(content, "\n"))
@@ -1682,13 +1946,54 @@ func (d *DashboardView) renderStatusInfo() string {
 	}
 
 	// Create status line at bottom (inside the box)
-	statusLineStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("240")).
-		Background(lipgloss.Color("235")).
-		Width(boxWidth - 2). // Account for border
-		Align(lipgloss.Center)
+	var statusLine string
 
-	statusLine := statusLineStyle.Render("Press 's' or ESC to close")
+	// Show copied message prominently if recent (same as dashboard)
+	if d.copiedMessage != "" && time.Since(d.copiedMessageTime) < 3*time.Second {
+		// Custom blinking: toggle visibility of the message
+		var copiedStyle lipgloss.Style
+		if time.Since(d.copiedMessageTime) < 2*time.Second {
+			if d.yankBlink {
+				// Bright and bold when visible
+				copiedStyle = lipgloss.NewStyle().
+					Foreground(lipgloss.Color("82")).
+					Background(lipgloss.Color("235")).
+					Bold(true).
+					Padding(0, 1)
+			} else {
+				// Dimmer when "off" for blinking effect
+				copiedStyle = lipgloss.NewStyle().
+					Foreground(lipgloss.Color("240")). // Dim gray
+					Background(lipgloss.Color("235")).
+					Padding(0, 1)
+			}
+		} else {
+			// After blinking period, show normally
+			copiedStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("82")).
+				Background(lipgloss.Color("235")).
+				Bold(true).
+				Padding(0, 1)
+		}
+
+		// Create a custom status line just for the clipboard message
+		statusStyle := lipgloss.NewStyle().
+			Width(boxWidth - 2).
+			Background(lipgloss.Color("235")).
+			Align(lipgloss.Center)
+
+		message := copiedStyle.Render(d.copiedMessage)
+		statusLine = statusStyle.Render(message)
+	} else {
+		// Normal status line
+		statusLineStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("240")).
+			Background(lipgloss.Color("235")).
+			Width(boxWidth - 2). // Account for border
+			Align(lipgloss.Center)
+
+		statusLine = statusLineStyle.Render("[j/k]navigate [y]copy [s/q/ESC]close [Q]uit")
+	}
 
 	// Join everything together inside the box
 	innerContent := lipgloss.JoinVertical(lipgloss.Left, title, mainContent, spacing, statusLine)
@@ -1852,15 +2157,30 @@ func (d *DashboardView) wrapTextWithLimit(text string, width int, maxLines int) 
 func (d *DashboardView) renderStatusLine(layoutName string) string {
 	// Show copied message prominently if recent
 	if d.copiedMessage != "" && time.Since(d.copiedMessageTime) < 3*time.Second {
-		copiedStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("82")).
-			Background(lipgloss.Color("235")).
-			Bold(true).
-			Padding(0, 1)
-
-		// Apply blinking effect for the first second
-		if time.Since(d.copiedMessageTime) < 1*time.Second && d.yankBlink {
-			copiedStyle = copiedStyle.Blink(true)
+		// Custom blinking: toggle visibility of the message
+		var copiedStyle lipgloss.Style
+		if time.Since(d.copiedMessageTime) < 2*time.Second {
+			if d.yankBlink {
+				// Bright and bold when visible
+				copiedStyle = lipgloss.NewStyle().
+					Foreground(lipgloss.Color("82")).
+					Background(lipgloss.Color("235")).
+					Bold(true).
+					Padding(0, 1)
+			} else {
+				// Dimmer when "off" for blinking effect
+				copiedStyle = lipgloss.NewStyle().
+					Foreground(lipgloss.Color("240")). // Dim gray
+					Background(lipgloss.Color("235")).
+					Padding(0, 1)
+			}
+		} else {
+			// After blinking period, show normally
+			copiedStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("82")).
+				Background(lipgloss.Color("235")).
+				Bold(true).
+				Padding(0, 1)
 		}
 
 		// Create a custom status line just for the clipboard message
@@ -1892,9 +2212,9 @@ func (d *DashboardView) renderStatusLine(layoutName string) string {
 	}
 
 	// Compact help text
-	shortHelp := "n:new f:fuzzy y:copy ?:help r:refresh q:quit"
+	shortHelp := "n:new f:fuzzy s:status y:copy ?:help r:refresh q:quit"
 	if d.showHelp {
-		shortHelp = "n:new f:fuzzy y:copy j/k:↑↓ h/l:←→ Enter:→ BS:← ?:help q:quit"
+		shortHelp = "n:new f:fuzzy s:status y:copy j/k:↑↓ h/l:←→ Enter:→ BS:← ?:help q:quit"
 	}
 
 	return components.DashboardStatusLine(d.width, layoutName, dataInfo, shortHelp)

@@ -36,9 +36,11 @@ repobird config set api-key KEY     # Set API key
 | `n` | New run |
 | `s` | Status info |
 | `r` | Refresh |
-| `y` | Copy selection |
+| `y` | Copy selection/field |
+| `Y` | Copy all content |
 | `?` | Help |
-| `q` | Quit |
+| `q` | Go back / Quit (from dashboard) |
+| `Q` | Force quit (from anywhere) |
 
 ## Create Run View
 
@@ -58,7 +60,20 @@ repobird config set api-key KEY     # Set API key
 | `i` | Insert mode |
 | `j/k` | Navigate fields |
 | `Ctrl+S` | Submit |
-| `ESC ESC` | Exit to dashboard |
+| `q` or `ESC ESC` | Exit to dashboard |
+
+## Details View Navigation
+
+| Key | Action |
+|-----|--------|
+| `j/k` or `↑/↓` | Navigate fields |
+| `g` | Jump to first field |
+| `G` | Jump to last field |
+| `y` | Copy selected field |
+| `Y` | Copy all content |
+| `l` | Toggle logs view |
+| `q` | Back to dashboard |
+| `Q` | Force quit |
 
 ## FZF Mode Features
 

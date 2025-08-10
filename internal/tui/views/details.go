@@ -261,15 +261,16 @@ func (v *RunDetailsView) handleKeyInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch {
-	case key.Matches(msg, v.keys.Quit):
-		v.stopPolling()
-		return v, tea.Quit
-	case key.Matches(msg, v.keys.Back):
+	case key.Matches(msg, v.keys.Quit), key.Matches(msg, v.keys.Back):
 		v.stopPolling()
 		// Return to list view with cached data and current dimensions
 		return NewRunListViewWithCacheAndDimensions(
 			v.client, v.parentRuns, v.parentCached, v.parentCachedAt,
 			v.parentDetailsCache, -1, v.width, v.height), nil
+	case msg.String() == "Q":
+		// Capital Q to force quit from anywhere
+		v.stopPolling()
+		return v, tea.Quit
 	case key.Matches(msg, v.keys.Help):
 		v.showHelp = !v.showHelp
 	case key.Matches(msg, v.keys.Refresh):
@@ -486,12 +487,11 @@ func (v *RunDetailsView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, v.handlePolling(msg)...)
 
 	case yankBlinkMsg:
-		// Toggle blink state for animation effect
-		v.yankBlink = !v.yankBlink
-		// Continue blinking for the first second
-		if time.Since(v.copiedMessageTime) < 1*time.Second {
-			cmds = append(cmds, v.startYankBlinkAnimation())
+		// Single blink: toggle off after being on
+		if v.yankBlink {
+			v.yankBlink = false // Turn off after being on - completes the single blink
 		}
+		// No more blinking after the single on-off cycle
 
 	case spinner.TickMsg:
 		if v.loading || v.pollingStatus {
@@ -629,17 +629,25 @@ func (v *RunDetailsView) renderContentWithCursor() []string {
 
 		if shouldHighlight {
 			// Apply highlight style
-			highlightStyle := lipgloss.NewStyle().
-				Background(lipgloss.Color("63")).
-				Foreground(lipgloss.Color("255")).
-				Width(v.width)
-
-			// Apply blinking if copying
-			if v.yankBlink && v.copiedMessage != "" && time.Since(v.copiedMessageTime) < 1*time.Second {
-				highlightStyle = highlightStyle.Blink(true)
+			// Single blink: bright green briefly when yankBlink is true
+			var highlightedLine string
+			if v.yankBlink && v.copiedMessage != "" {
+				// Bright green flash
+				highlightStyle := lipgloss.NewStyle().
+					Background(lipgloss.Color("82")). // Bright green
+					Foreground(lipgloss.Color("0")).  // Black text
+					Bold(true).
+					Width(v.width)
+				highlightedLine = highlightStyle.Render(line)
+			} else {
+				// Normal focused highlight
+				highlightStyle := lipgloss.NewStyle().
+					Background(lipgloss.Color("63")).
+					Foreground(lipgloss.Color("255")).
+					Width(v.width)
+				highlightedLine = highlightStyle.Render(line)
 			}
-
-			visibleLines = append(visibleLines, highlightStyle.Render(line))
+			visibleLines = append(visibleLines, highlightedLine)
 		} else {
 			visibleLines = append(visibleLines, line)
 		}
@@ -691,21 +699,31 @@ func (v *RunDetailsView) renderHeader() string {
 }
 
 func (v *RunDetailsView) renderStatusBar() string {
-	options := "[b]ack [l]ogs [j/k]navigate [y]copy field [Y]copy all [r]efresh [?]help [q]uit"
+	options := "[q]back [l]ogs [j/k]navigate [y]copy field [Y]copy all [r]efresh [?]help [Q]uit"
 
 	if v.showLogs {
-		options = "[b]ack [l]details [j/k]navigate [y]copy field [Y]copy all [r]efresh [?]help [q]uit"
+		options = "[q]back [l]details [j/k]navigate [y]copy field [Y]copy all [r]efresh [?]help [Q]uit"
 	}
 
-	// Show copied message if recent with blinking effect
+	// Show copied message if recent with custom blinking effect
 	if v.copiedMessage != "" && time.Since(v.copiedMessageTime) < 3*time.Second {
-		copiedStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("82")).
-			Bold(true)
-
-		// Apply blinking effect for the first second
-		if time.Since(v.copiedMessageTime) < 1*time.Second && v.yankBlink {
-			copiedStyle = copiedStyle.Blink(true)
+		var copiedStyle lipgloss.Style
+		if time.Since(v.copiedMessageTime) < 2*time.Second {
+			if v.yankBlink {
+				// Bright and bold when visible
+				copiedStyle = lipgloss.NewStyle().
+					Foreground(lipgloss.Color("82")).
+					Bold(true)
+			} else {
+				// Dimmer when "off" for blinking effect
+				copiedStyle = lipgloss.NewStyle().
+					Foreground(lipgloss.Color("240")) // Dim gray
+			}
+		} else {
+			// After blinking period, show normally
+			copiedStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("82")).
+				Bold(true)
 		}
 
 		options = copiedStyle.Render(v.copiedMessage) + " | " + options
@@ -1038,9 +1056,10 @@ func (v *RunDetailsView) copyAllContent() error {
 	return utils.WriteToClipboard(v.fullContent)
 }
 
-// startYankBlinkAnimation starts the blinking animation for clipboard feedback
+// startYankBlinkAnimation starts the single blink animation for clipboard feedback
 func (v *RunDetailsView) startYankBlinkAnimation() tea.Cmd {
 	return func() tea.Msg {
+		// Single blink duration - quick flash (100ms)
 		time.Sleep(100 * time.Millisecond)
 		return yankBlinkMsg{}
 	}

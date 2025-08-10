@@ -343,23 +343,19 @@ func (v *CreateRunView) handleInsertMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // handleNormalMode handles keyboard input in normal mode
 func (v *CreateRunView) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
-	case key.Matches(msg, v.keys.Quit):
+	case msg.String() == "Q":
+		// Capital Q to force quit from anywhere
 		return v, tea.Quit
-	case key.Matches(msg, v.keys.Back) || msg.String() == "esc":
-		if v.exitRequested {
-			// Second ESC - actually exit
-			if !v.submitting {
-				v.saveFormData()
-				debug.LogToFile("DEBUG: CreateView double ESC - returning to dashboard\n")
-				// Return to dashboard view
-				dashboard := NewDashboardView(v.client)
-				dashboard.width = v.width
-				dashboard.height = v.height
-				return dashboard, dashboard.Init()
-			}
-		} else {
-			// First ESC in normal mode - prepare to exit
-			v.exitRequested = true
+	case key.Matches(msg, v.keys.Quit), key.Matches(msg, v.keys.Back), msg.String() == "esc":
+		// q, b, or ESC all go back to dashboard
+		if !v.submitting {
+			v.saveFormData()
+			debug.LogToFile("DEBUG: CreateView q/b/ESC - returning to dashboard\n")
+			// Return to dashboard view
+			dashboard := NewDashboardView(v.client)
+			dashboard.width = v.width
+			dashboard.height = v.height
+			return dashboard, dashboard.Init()
 		}
 	case key.Matches(msg, v.keys.Help):
 		v.showHelp = !v.showHelp
@@ -1094,16 +1090,14 @@ func (v *CreateRunView) renderStatusBar() string {
 			statusText = "[Enter] exit insert [Tab] next [Ctrl+S] submit [Ctrl+X] clear"
 		}
 	} else {
-		if v.exitRequested {
-			statusText = "[ESC] exit [Enter] select/toggle [j/k] navigate [c] context [Ctrl+S] submit"
-		} else if v.focusIndex == 0 {
+		if v.focusIndex == 0 {
 			// Run type field in normal mode
-			statusText = "[ESC] exit [Enter] toggle type [j/k] navigate [c] context [Ctrl+S] submit"
+			statusText = "[q]back [Enter] toggle type [j/k] navigate [c] context [Ctrl+S] submit [Q]uit"
 		} else if v.focusIndex == 1 {
 			// Repository field in normal mode
-			statusText = "[ESC] exit [Enter] edit [f] fuzzy [j/k] navigate [c] context [Ctrl+S] submit"
+			statusText = "[q]back [Enter] edit [f] fuzzy [j/k] navigate [c] context [Ctrl+S] submit [Q]uit"
 		} else {
-			statusText = "[ESC] exit [Enter] edit [j/k] navigate [c] context [Ctrl+S] submit [?] help"
+			statusText = "[q]back [Enter] edit [j/k] navigate [c] context [Ctrl+S] submit [?] help [Q]uit"
 		}
 	}
 

@@ -272,9 +272,15 @@ func (v *RunListView) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch {
-	case key.Matches(msg, v.keys.Quit):
+	case msg.String() == "Q":
+		// Capital Q to force quit from anywhere
 		v.stopPolling()
 		return v, tea.Quit
+	case key.Matches(msg, v.keys.Quit):
+		// q goes back to dashboard
+		v.stopPolling()
+		dashboard := NewDashboardView(v.client)
+		return dashboard, dashboard.Init()
 	case key.Matches(msg, v.keys.Help):
 		v.showHelp = !v.showHelp
 	case key.Matches(msg, v.keys.Refresh):
@@ -647,7 +653,7 @@ func (v *RunListView) renderStatusBar() string {
 		right += fmt.Sprintf("⟳ %d active ", activeCount)
 	}
 
-	right += "[n]ew [r]efresh [/]search [?]help [q]uit "
+	right += "[n]ew [r]efresh [/]search [?]help [q]back [Q]uit "
 
 	padding := v.width - len(left) - len(right)
 	if padding < 0 {

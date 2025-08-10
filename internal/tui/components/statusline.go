@@ -157,9 +157,24 @@ func DashboardStatusLine(width int, layoutName string, dataFreshness string, sho
 	// Data freshness without brackets to save space
 	right := dataFreshness
 
-	// Truncate help if needed
-	if width < 100 && len(shortHelp) > 40 {
-		shortHelp = "n:new y:copy ?:help q:quit"
+	// Calculate available space for help text
+	leftWidth := lipgloss.Width(left)
+	rightWidth := lipgloss.Width(right)
+	availableForHelp := width - leftWidth - rightWidth - 4 // 4 for padding/spacing
+	
+	// Dynamically adjust help text based on available space
+	if availableForHelp < lipgloss.Width(shortHelp) {
+		// Prioritize most important commands based on available space
+		if availableForHelp < 30 {
+			shortHelp = "?:help q:quit"
+		} else if availableForHelp < 40 {
+			shortHelp = "s:status ?:help q:quit"
+		} else if availableForHelp < 50 {
+			shortHelp = "n:new s:status ?:help q:quit"
+		} else if availableForHelp < 60 {
+			shortHelp = "n:new s:status y:copy ?:help q:quit"
+		}
+		// Otherwise use the full shortHelp passed in
 	}
 
 	statusLine := NewStatusLine().

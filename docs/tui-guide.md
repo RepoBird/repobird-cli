@@ -61,13 +61,23 @@ The TUI includes powerful fuzzy search capabilities for quick navigation:
 - **s** - Show status/user info overlay
 - **r** - Refresh data
 - **?** - Toggle help
-- **q** - Quit
+- **q** - Go back to parent view (or quit from dashboard)
+- **Q** - Force quit from anywhere
+
+### Navigation Hierarchy
+The TUI follows a consistent navigation pattern:
+- **q** (lowercase) - Always goes back to the parent view
+  - From Details → Dashboard/List
+  - From Create Run → Dashboard
+  - From Status View → Dashboard
+  - From Dashboard → Quit (top-level)
+- **Q** (uppercase/Shift+Q) - Force quit from any view
+- **ESC** or **b** - Alternative ways to go back
 
 ### Clipboard Operations
-- **y** - Copy current selection to clipboard
-- **yy** - Copy entire run details
-- **yp** - Copy prompt
-- **yc** - Copy context
+- **y** - Copy current selection/field value to clipboard
+- **Y** - Copy all content (in details view)
+- Navigation works on all selectable fields
 
 ## Create Run View
 
@@ -126,6 +136,30 @@ The repository field supports fuzzy search for quick selection:
 - **Ctrl+F** - Toggle between file input and form input
 - Allows loading task configuration from JSON file
 
+## Run Details View
+
+The details view provides comprehensive information about a selected run with enhanced navigation:
+
+### Field Navigation
+- **j/k** or **↑↓** - Navigate between selectable fields
+- **g** - Jump to first field
+- **G** - Jump to last field
+- **y** - Copy selected field value to clipboard
+- **Y** - Copy all content
+
+### Multi-line Field Handling
+- Multi-line fields (Plan, Prompt, Context, Error) are treated as single selectable units
+- The entire field is highlighted when selected
+- Pressing **y** copies the complete multi-line content
+- Navigation automatically scrolls to keep selected fields visible
+
+### Features
+- Row-based navigation for all selectable fields
+- Smart highlighting that spans multiple lines for multi-line content
+- Visual feedback when copying (green flash animation)
+- Automatic scrolling to keep selections in view
+- **q** returns to dashboard, **Q** force quits
+
 ## Status Info Overlay
 
 Press **s** in the dashboard to view:
@@ -134,6 +168,13 @@ Press **s** in the dashboard to view:
 - Usage statistics
 - Rate limits
 - Account details
+
+### Status Info Navigation
+- **j/k** - Navigate between fields
+- **g/G** - Jump to first/last field
+- **y** - Copy selected field value
+- **s/q/ESC** - Close overlay
+- **Q** - Force quit from overlay
 
 ## Tips and Tricks
 
