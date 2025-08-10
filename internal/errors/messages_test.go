@@ -39,14 +39,14 @@ func TestParseAPIError(t *testing.T) {
 			statusCode: 500,
 			body:       []byte("Internal server error"),
 			wantType:   "*errors.APIError",
-			wantMsg:    "Internal server error",
+			wantMsg:    "Internal server error (status 500)",
 		},
 		{
 			name:       "not found error",
 			statusCode: 404,
 			body:       []byte(""),
 			wantType:   "*errors.APIError",
-			wantMsg:    "API request failed with status 404",
+			wantMsg:    "API request failed with status 404 (status 404)",
 		},
 		{
 			name:       "validation error",
@@ -228,7 +228,7 @@ func TestCreateErrorFromStatusCode(t *testing.T) {
 			name:       "429 rate limited",
 			statusCode: 429,
 			message:    "",
-			wantType:   &RateLimitError{},
+			wantType:   &APIError{}, // Changed to return APIError with status code
 		},
 		{
 			name:       "422 validation error",

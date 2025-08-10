@@ -68,7 +68,7 @@ type DashboardView struct {
 	// FZF mode for each column
 	fzfMode   *components.FZFMode
 	fzfColumn int // Which column is in FZF mode (-1 = none)
-	
+
 	// Loading spinner
 	spinner spinner.Model
 }
@@ -95,7 +95,7 @@ func NewDashboardView(client *api.Client) *DashboardView {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("63"))
-	
+
 	dashboard := &DashboardView{
 		client:          client,
 		keys:            components.DefaultKeyMap,
@@ -451,7 +451,7 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			d.spinner, cmd = d.spinner.Update(msg)
 			return d, cmd
 		}
-		
+
 	case tea.WindowSizeMsg:
 		d.width = msg.Width
 		d.height = msg.Height
@@ -816,7 +816,7 @@ func (d *DashboardView) View() string {
 		// Use the animated spinner + loading text
 		loadingText := d.spinner.View() + " Loading dashboard data..."
 		loadingStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("63")).  // Bright cyan color
+			Foreground(lipgloss.Color("63")). // Bright cyan color
 			Bold(true).
 			Width(d.width).
 			Align(lipgloss.Center).

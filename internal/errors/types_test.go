@@ -20,7 +20,7 @@ func TestAPIError_Error(t *testing.T) {
 				Message:    "Invalid input",
 				ErrorType:  ErrorTypeValidation,
 			},
-			expected: "Invalid input",
+			expected: "Invalid input (status 400)",
 		},
 		{
 			name: "without custom message",

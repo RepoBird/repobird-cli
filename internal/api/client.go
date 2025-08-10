@@ -290,17 +290,35 @@ func (c *Client) VerifyAuth() (*models.UserInfo, error) {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
+	if c.debug {
+		logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
+		logger.Debug("VerifyAuth response", "body", string(body))
+	}
+
 	// First try the new nested structure
 	var authResponse models.AuthVerifyResponse
 	if err := json.Unmarshal(body, &authResponse); err == nil && authResponse.Data.User.Email != "" {
 		// Successfully parsed as new format
+		if c.debug {
+			logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
+			logger.Debug("Parsed as AuthVerifyResponse", "email", authResponse.Data.User.Email)
+		}
 		return authResponse.ToUserInfo(), nil
 	}
 
 	// Fall back to legacy flat structure
 	var userInfo models.UserInfo
 	if err := json.Unmarshal(body, &userInfo); err != nil {
+		if c.debug {
+			logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
+			logger.Debug("Failed to parse response", "error", err, "body", string(body))
+		}
 		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if c.debug {
+		logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
+		logger.Debug("Parsed as legacy UserInfo", "email", userInfo.Email)
 	}
 
 	return &userInfo, nil

@@ -77,14 +77,33 @@ func (m *MockAPIServer) SetGetRunResponse(runID string, run models.RunResponse) 
 
 // SetAuthVerifyResponse sets up a mock response for auth verification
 func (m *MockAPIServer) SetAuthVerifyResponse(valid bool) {
-	statusCode := 200
 	if !valid {
-		statusCode = 401
+		m.SetResponse("GET", "/api/v1/auth/verify", MockResponse{
+			StatusCode: 401,
+			Body:       map[string]string{"error": "Invalid API key"},
+		})
+		return
 	}
 
+	// Return proper nested response structure for valid auth
 	m.SetResponse("GET", "/api/v1/auth/verify", MockResponse{
-		StatusCode: statusCode,
-		Body:       map[string]bool{"valid": valid},
+		StatusCode: 200,
+		Body: map[string]interface{}{
+			"data": map[string]interface{}{
+				"user": map[string]interface{}{
+					"id":             "test-user-123",
+					"email":          "test@example.com",
+					"name":           "Test User",
+					"githubUsername": "testuser",
+				},
+				"tier": map[string]interface{}{
+					"name":                "pro",
+					"remainingProRuns":    10,
+					"remainingPlanRuns":   5,
+					"lastPeriodResetDate": "2024-01-01T00:00:00Z",
+				},
+			},
+		},
 	})
 }
 

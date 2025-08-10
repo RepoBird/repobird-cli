@@ -86,12 +86,6 @@ func TestAPIClient_Integration(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, userInfo)
 
-		// Debug output
-		t.Logf("UserInfo: %+v", userInfo)
-		if userInfo != nil {
-			t.Logf("Email: '%s', ID: %d", userInfo.Email, userInfo.ID)
-		}
-
 		// Mock server returns default user info in auth verify
 		assert.NotEmpty(t, userInfo.Email)
 	})

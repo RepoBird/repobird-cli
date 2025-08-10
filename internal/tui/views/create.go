@@ -167,7 +167,7 @@ func (v *CreateRunView) initializeInputFields() {
 	v.contextArea = contextArea
 	v.filePathInput = filePathInput
 	v.focusIndex = 0
-	v.showContext = false // Hide context by default
+	v.showContext = false         // Hide context by default
 	v.runType = models.RunTypeRun // Default to regular run
 }
 
@@ -292,8 +292,8 @@ func (v *CreateRunView) handleInsertMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// In insert mode, handle text input and field navigation
 	switch {
 	case msg.String() == "ctrl+f":
-		// Activate FZF mode for repository field if focused on it
-		if !v.useFileInput && v.focusIndex == 0 && !v.fzfActive {
+		// Activate FZF mode for repository field if focused on it (now index 1)
+		if !v.useFileInput && v.focusIndex == 1 && !v.fzfActive {
 			v.activateFZFMode()
 			return v, nil
 		} else {
@@ -303,29 +303,25 @@ func (v *CreateRunView) handleInsertMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				v.filePathInput.Focus()
 			} else {
 				v.fields[0].Focus()
-				v.focusIndex = 0
+				v.focusIndex = 1 // Repository is now at index 1
 			}
 		}
 	case msg.String() == "ctrl+r":
 		// Trigger repository selector when repository field is focused
-		if !v.useFileInput && v.focusIndex == 0 {
+		if !v.useFileInput && v.focusIndex == 1 {
 			return v, v.selectRepository()
-		}
-	case msg.String() == "c":
-		// Toggle context field visibility
-		v.showContext = !v.showContext
-	case msg.String() == "t":
-		// Toggle between run types
-		if v.runType == models.RunTypeRun {
-			v.runType = models.RunTypePlan
-		} else {
-			v.runType = models.RunTypeRun
 		}
 	case msg.String() == "ctrl+s" || msg.String() == "ctrl+enter":
 		if !v.submitting {
 			debug.LogToFile("DEBUG: Ctrl+S pressed in INSERT MODE - submitting run\n")
 			return v, v.submitRun()
 		}
+	case msg.String() == "enter":
+		// Exit insert mode when Enter is pressed
+		v.inputMode = components.NormalMode
+		v.exitRequested = false
+		v.blurAllFields()
+		return v, nil
 	case key.Matches(msg, v.keys.Tab):
 		v.nextField()
 	case key.Matches(msg, v.keys.ShiftTab):
@@ -367,16 +363,34 @@ func (v *CreateRunView) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case key.Matches(msg, v.keys.Help):
 		v.showHelp = !v.showHelp
-	case msg.String() == "i" || msg.String() == "enter":
+	case msg.String() == "i":
+		// 'i' enters insert mode
+		v.inputMode = components.InsertMode
+		v.exitRequested = false
+		v.updateFocus()
+	case msg.String() == "enter":
 		if v.backButtonFocused {
+			// Enter on back button returns to dashboard
 			v.saveFormData()
 			debug.LogToFile("DEBUG: Back button pressed - returning to dashboard\n")
-			// Return to dashboard view
 			dashboard := NewDashboardView(v.client)
 			dashboard.width = v.width
 			dashboard.height = v.height
 			return dashboard, dashboard.Init()
+		} else if v.focusIndex == 0 {
+			// Enter on run type field (index 0) toggles it
+			if v.runType == models.RunTypeRun {
+				v.runType = models.RunTypePlan
+			} else {
+				v.runType = models.RunTypeRun
+			}
+		} else if v.focusIndex == 1 {
+			// Repository field - enter insert mode
+			v.inputMode = components.InsertMode
+			v.exitRequested = false
+			v.updateFocus()
 		} else {
+			// Enter on other fields enters insert mode
 			v.inputMode = components.InsertMode
 			v.exitRequested = false
 			v.updateFocus()
@@ -395,8 +409,8 @@ func (v *CreateRunView) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case msg.String() == "ctrl+x":
 		v.clearCurrentField()
 	case msg.String() == "f":
-		// In normal mode, 'f' activates FZF for repository field
-		if v.focusIndex == 0 && !v.fzfActive {
+		// In normal mode, 'f' activates FZF for repository field (now at index 1)
+		if v.focusIndex == 1 && !v.fzfActive {
 			v.activateFZFMode()
 			return v, nil
 		}
@@ -501,7 +515,7 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case components.FZFSelectedMsg:
 		// Handle FZF selection result
-		if !msg.Result.Canceled && v.focusIndex == 0 {
+		if !msg.Result.Canceled && v.focusIndex == 1 {
 			// Update repository field with selected value
 			if msg.Result.Selected != "" {
 				// Extract just the repository name (remove any icons)
@@ -525,28 +539,31 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (v *CreateRunView) updateFields(msg tea.KeyMsg) []tea.Cmd {
 	var cmds []tea.Cmd
 
-	// Repository is at index 0
-	// Prompt is handled specially at index 1
-	// Other fields start at index 2
+	// Run type is at index 0 (not editable via text input)
+	// Repository is at index 1
+	// Prompt is at index 2
+	// Other fields start at index 3
 	if v.focusIndex == 0 {
+		// Run type field - no text input
+	} else if v.focusIndex == 1 {
 		// Repository field
 		var cmd tea.Cmd
 		v.fields[0], cmd = v.fields[0].Update(msg)
 		cmds = append(cmds, cmd)
-	} else if v.focusIndex == 1 {
+	} else if v.focusIndex == 2 {
 		// Prompt area
 		var cmd tea.Cmd
 		v.promptArea, cmd = v.promptArea.Update(msg)
 		cmds = append(cmds, cmd)
-	} else if v.focusIndex >= 2 && v.focusIndex < len(v.fields)+1 {
+	} else if v.focusIndex >= 3 && v.focusIndex < len(v.fields)+2 {
 		// Other fields (source, target, title, issue)
-		fieldIdx := v.focusIndex - 1 // Adjust for prompt being at position 1
+		fieldIdx := v.focusIndex - 2 // Adjust for run type at 0 and prompt at 2
 		if fieldIdx < len(v.fields) {
 			var cmd tea.Cmd
 			v.fields[fieldIdx], cmd = v.fields[fieldIdx].Update(msg)
 			cmds = append(cmds, cmd)
 		}
-	} else if v.showContext && v.focusIndex == len(v.fields)+1 {
+	} else if v.showContext && v.focusIndex == len(v.fields)+2 {
 		// Context area (only if visible)
 		var cmd tea.Cmd
 		v.contextArea, cmd = v.contextArea.Update(msg)
@@ -560,8 +577,8 @@ func (v *CreateRunView) nextField() {
 	v.backButtonFocused = false
 	v.focusIndex++
 
-	// Calculate total fields: 1 (repo) + 1 (prompt) + 4 (other fields) + context (if shown)
-	totalFields := len(v.fields) + 1 // +1 for prompt
+	// Calculate total fields: 1 (run type) + 1 (repo) + 1 (prompt) + 4 (other fields) + context (if shown)
+	totalFields := len(v.fields) + 2 // +1 for run type, +1 for prompt
 	if v.showContext {
 		totalFields++ // +1 for context
 	}
@@ -579,9 +596,9 @@ func (v *CreateRunView) prevField() {
 		// From back button, go to last field
 		v.backButtonFocused = false
 		if v.showContext {
-			v.focusIndex = len(v.fields) + 1 // context area
+			v.focusIndex = len(v.fields) + 2 // context area (+2 for run type and prompt)
 		} else {
-			v.focusIndex = len(v.fields) // last regular field
+			v.focusIndex = len(v.fields) + 1 // last regular field (+1 for run type, prompt counted in fields)
 		}
 	} else {
 		v.focusIndex--
@@ -605,9 +622,11 @@ func (v *CreateRunView) updateFocus() {
 
 		// Now focus the current field
 		if v.focusIndex == 0 {
+			// Run type field - not editable in insert mode
+		} else if v.focusIndex == 1 {
 			// Repository field
 			v.fields[0].Focus()
-		} else if v.focusIndex == 1 {
+		} else if v.focusIndex == 2 {
 			// Prompt area
 			v.promptArea.Focus()
 			// Expand if collapsed when focusing
@@ -615,17 +634,17 @@ func (v *CreateRunView) updateFocus() {
 				v.promptCollapsed = false
 				v.promptArea.SetHeight(5)
 			}
-		} else if v.focusIndex >= 2 && v.focusIndex < len(v.fields)+1 {
+		} else if v.focusIndex >= 3 && v.focusIndex < len(v.fields)+2 {
 			// Other fields - collapse prompt when moving away if it has content
 			if v.promptArea.Value() != "" && !v.promptCollapsed {
 				v.promptCollapsed = true
 				v.promptArea.SetHeight(1)
 			}
-			fieldIdx := v.focusIndex - 1
+			fieldIdx := v.focusIndex - 2 // Adjust for run type at 0 and prompt at 2
 			if fieldIdx < len(v.fields) {
 				v.fields[fieldIdx].Focus()
 			}
-		} else if v.showContext && v.focusIndex == len(v.fields)+1 {
+		} else if v.showContext && v.focusIndex == len(v.fields)+2 {
 			// Context area - also collapse prompt if needed
 			if v.promptArea.Value() != "" && !v.promptCollapsed {
 				v.promptCollapsed = true
@@ -680,20 +699,22 @@ func (v *CreateRunView) clearCurrentField() {
 	if v.useFileInput {
 		v.filePathInput.SetValue("")
 	} else if v.focusIndex == 0 {
+		// Run type field - can't clear, just toggle
+	} else if v.focusIndex == 1 {
 		// Repository field
 		v.fields[0].SetValue("")
-	} else if v.focusIndex == 1 {
+	} else if v.focusIndex == 2 {
 		// Prompt area
 		v.promptArea.SetValue("")
 		v.promptCollapsed = false
 		v.promptArea.SetHeight(5)
-	} else if v.focusIndex >= 2 && v.focusIndex < len(v.fields)+1 {
+	} else if v.focusIndex >= 3 && v.focusIndex < len(v.fields)+2 {
 		// Other fields
-		fieldIdx := v.focusIndex - 1
+		fieldIdx := v.focusIndex - 2
 		if fieldIdx < len(v.fields) {
 			v.fields[fieldIdx].SetValue("")
 		}
-	} else if v.showContext && v.focusIndex == len(v.fields)+1 {
+	} else if v.showContext && v.focusIndex == len(v.fields)+2 {
 		// Context area
 		v.contextArea.SetValue("")
 	}
@@ -718,7 +739,7 @@ func (v *CreateRunView) View() string {
 
 	// Calculate available height for content
 	// We have v.height total, minus:
-	// - 2 for title (1 line + spacing) 
+	// - 2 for title (1 line + spacing)
 	// - 1 for statusbar
 	availableHeight := v.height - 3
 	if availableHeight < 5 {
@@ -850,18 +871,18 @@ func (v *CreateRunView) renderSinglePanelLayout(availableHeight int) string {
 	if panelWidth < 60 {
 		panelWidth = 60
 	}
-	
+
 	// Height should fill available space
 	panelHeight := availableHeight
 	if panelHeight < 3 {
 		panelHeight = 3
 	}
-	
+
 	// Content dimensions (accounting for border and padding)
 	// Border takes 2 from width and height, padding takes another 2 from each
 	contentWidth := panelWidth - 4
 	contentHeight := panelHeight - 4
-	
+
 	if contentWidth < 40 {
 		contentWidth = 40
 	}
@@ -887,26 +908,38 @@ func (v *CreateRunView) renderSinglePanelLayout(availableHeight int) string {
 func (v *CreateRunView) renderCompactForm(width, height int) string {
 	var b strings.Builder
 
-	// Run type indicator at the top
-	runTypeStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("33")).
-		Bold(true).
-		PaddingBottom(1)
-	
-	runTypeText := "Run Type: 🚀 Run (execution)"
-	if v.runType == models.RunTypePlan {
-		runTypeText = "Run Type: 📋 Plan (pro-plan)"
-	}
-	b.WriteString(runTypeStyle.Render(runTypeText))
-	b.WriteString("\n")
-
-	// Repository field (first)
 	labelStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("252")).
 		Width(15)
 
-	b.WriteString(labelStyle.Render("Repository:"))
+	// Run type field (selectable, at index 0)
+	b.WriteString(labelStyle.Render("Run Type:"))
 	if v.focusIndex == 0 {
+		b.WriteString(v.renderFieldIndicator())
+	} else {
+		b.WriteString("   ")
+	}
+
+	runTypeValue := "🚀 Run (execution)"
+	if v.runType == models.RunTypePlan {
+		runTypeValue = "📋 Plan (pro-plan)"
+	}
+
+	// Style the run type value based on focus
+	runTypeStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("33")).
+		Bold(v.focusIndex == 0)
+
+	if v.focusIndex == 0 && v.inputMode == components.NormalMode {
+		runTypeStyle = runTypeStyle.Background(lipgloss.Color("236"))
+	}
+
+	b.WriteString(runTypeStyle.Render(runTypeValue))
+	b.WriteString("\n")
+
+	// Repository field (now at index 1)
+	b.WriteString(labelStyle.Render("Repository:"))
+	if v.focusIndex == 1 {
 		b.WriteString(v.renderFieldIndicator())
 	} else {
 		b.WriteString("   ")
@@ -915,9 +948,9 @@ func (v *CreateRunView) renderCompactForm(width, height int) string {
 	b.WriteString(v.fields[0].View())
 	b.WriteString("\n")
 
-	// Prompt area (second) - can be collapsed
+	// Prompt area (now at index 2) - can be collapsed
 	b.WriteString(labelStyle.Render("Prompt:"))
-	if v.focusIndex == 1 {
+	if v.focusIndex == 2 {
 		b.WriteString(v.renderFieldIndicator())
 	} else {
 		b.WriteString("   ")
@@ -961,7 +994,7 @@ func (v *CreateRunView) renderCompactForm(width, height int) string {
 
 	for _, field := range fieldInfo {
 		b.WriteString(labelStyle.Render(field.label))
-		adjustedIndex := field.index + 1 // +1 because prompt is at index 1
+		adjustedIndex := field.index + 2 // +2 because run type is at 0, prompt is at index 2
 		if v.focusIndex == adjustedIndex {
 			b.WriteString(v.renderFieldIndicator())
 		} else {
@@ -976,7 +1009,7 @@ func (v *CreateRunView) renderCompactForm(width, height int) string {
 	if v.showContext {
 		b.WriteString("\n")
 		b.WriteString(labelStyle.Render("Context:"))
-		if v.focusIndex == len(v.fields)+1 {
+		if v.focusIndex == len(v.fields)+2 {
 			b.WriteString(v.renderFieldIndicator())
 		} else {
 			b.WriteString("   ")
@@ -1054,20 +1087,23 @@ func (v *CreateRunView) renderFileInputMode() string {
 func (v *CreateRunView) renderStatusBar() string {
 	var statusText string
 	if v.inputMode == components.InsertMode {
-		if !v.useFileInput && v.focusIndex == 0 {
+		if !v.useFileInput && v.focusIndex == 1 {
 			// When repository field is focused, show FZF options
-			statusText = "[ESC] normal [Tab] next [Ctrl+F] fuzzy [Ctrl+R] browse [t] type [c] context [Ctrl+S] submit"
+			statusText = "[Enter] exit insert [Tab] next [Ctrl+F] fuzzy [Ctrl+R] browse [Ctrl+S] submit"
 		} else {
-			statusText = "[ESC] normal [Tab] next [t] toggle type [c] toggle context [Ctrl+S] submit [Ctrl+X] clear"
+			statusText = "[Enter] exit insert [Tab] next [Ctrl+S] submit [Ctrl+X] clear"
 		}
 	} else {
 		if v.exitRequested {
-			statusText = "[ESC] exit [Enter] select [j/k] navigate [t] type [c] context [Ctrl+S] submit"
+			statusText = "[ESC] exit [Enter] select/toggle [j/k] navigate [c] context [Ctrl+S] submit"
 		} else if v.focusIndex == 0 {
+			// Run type field in normal mode
+			statusText = "[ESC] exit [Enter] toggle type [j/k] navigate [c] context [Ctrl+S] submit"
+		} else if v.focusIndex == 1 {
 			// Repository field in normal mode
-			statusText = "[ESC] exit [Enter] edit [f] fuzzy [j/k] navigate [t] type [c] context [Ctrl+S] submit"
+			statusText = "[ESC] exit [Enter] edit [f] fuzzy [j/k] navigate [c] context [Ctrl+S] submit"
 		} else {
-			statusText = "[ESC] exit [Enter] edit [j/k] navigate [t] type [c] context [Ctrl+S] submit [?] help"
+			statusText = "[ESC] exit [Enter] edit [j/k] navigate [c] context [Ctrl+S] submit [?] help"
 		}
 	}
 
