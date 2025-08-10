@@ -819,7 +819,24 @@ func (d *DashboardView) renderTripleColumnLayout() string {
 	statusline := d.renderStatusLine("Miller Columns")
 	debug.LogToFilef("Statusline width: %d\n", lipgloss.Width(statusline))
 
-	finalLayout := lipgloss.JoinVertical(lipgloss.Left, columns, statusline)
+	// Calculate how much vertical space we have used
+	columnsHeight := lipgloss.Height(columns)
+	statusHeight := 1
+	totalUsed := columnsHeight + statusHeight
+	remainingHeight := d.height - 2 - totalUsed // -2 for title
+	
+	debug.LogToFilef("Heights: columns=%d, status=%d, total=%d, remaining=%d\n",
+		columnsHeight, statusHeight, totalUsed, remainingHeight)
+	
+	// If we have remaining space, add it as padding
+	var finalLayout string
+	if remainingHeight > 0 {
+		padding := strings.Repeat("\n", remainingHeight)
+		finalLayout = lipgloss.JoinVertical(lipgloss.Left, columns, padding, statusline)
+	} else {
+		finalLayout = lipgloss.JoinVertical(lipgloss.Left, columns, statusline)
+	}
+	
 	debug.LogToFilef("Triple column layout dimensions: width=%d, height=%d\n",
 		lipgloss.Width(finalLayout), lipgloss.Height(finalLayout))
 	return finalLayout
