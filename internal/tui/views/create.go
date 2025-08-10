@@ -87,7 +87,7 @@ func NewCreateRunViewWithConfig(config CreateRunViewConfig) *CreateRunView {
 	v.repoSelector = components.NewRepositorySelector()
 	v.initializeInputFields()
 	v.loadFormData()
-	
+
 	// If a repository was selected in the dashboard, use it
 	if config.SelectedRepository != "" {
 		if len(v.fields) >= 2 {
@@ -96,7 +96,7 @@ func NewCreateRunViewWithConfig(config CreateRunViewConfig) *CreateRunView {
 	} else {
 		v.autofillRepository()
 	}
-	
+
 	return v
 }
 

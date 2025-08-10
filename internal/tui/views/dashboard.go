@@ -544,12 +544,12 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			config := CreateRunViewConfig{
 				Client: d.client,
 			}
-			
+
 			// Pass the selected repository if one is selected
 			if d.selectedRepo != nil {
 				config.SelectedRepository = d.selectedRepo.Name
 			}
-			
+
 			createView := NewCreateRunViewWithConfig(config)
 			createView.width = d.width
 			createView.height = d.height

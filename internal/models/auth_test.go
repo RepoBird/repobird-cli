@@ -109,7 +109,7 @@ func TestHashStringToInt(t *testing.T) {
 			assert.GreaterOrEqual(t, result, 0)
 			// Running again should produce same result
 			assert.Equal(t, result, HashStringToInt(tt.input))
-			
+
 			if tt.input == "" {
 				assert.Equal(t, 0, result)
 			}
