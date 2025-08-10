@@ -39,7 +39,7 @@ func InitClipboard() error {
 // It uses CGO clipboard if available, otherwise falls back to OS commands
 func WriteToClipboard(text string) error {
 	if !clipboardInitialized {
-		InitClipboard()
+		_ = InitClipboard()
 	}
 
 	if cgoAvailable {

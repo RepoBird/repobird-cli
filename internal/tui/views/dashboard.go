@@ -648,6 +648,44 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return d, tea.Batch(cmds...)
 }
 
+// isEmptyLine checks if a line in the details column is empty or just whitespace
+func (d *DashboardView) isEmptyLine(line string) bool {
+	return strings.TrimSpace(line) == ""
+}
+
+// findNextNonEmptyLine finds the next non-empty line starting from current index
+func (d *DashboardView) findNextNonEmptyLine(startIdx int, direction int) int {
+	if len(d.detailLines) == 0 {
+		return startIdx
+	}
+
+	idx := startIdx
+	for {
+		idx += direction
+
+		// Check bounds
+		if idx < 0 {
+			return startIdx // No non-empty line found upward
+		}
+		if idx >= len(d.detailLines) {
+			return startIdx // No non-empty line found downward
+		}
+
+		// Check if line is non-empty
+		if !d.isEmptyLine(d.detailLines[idx]) {
+			return idx
+		}
+
+		// Prevent infinite loop (shouldn't happen but safety check)
+		if idx == 0 && direction < 0 {
+			return startIdx
+		}
+		if idx == len(d.detailLines)-1 && direction > 0 {
+			return startIdx
+		}
+	}
+}
+
 // handleMillerColumnsNavigation handles navigation in the Miller Columns layout
 func (d *DashboardView) handleMillerColumnsNavigation(msg tea.KeyMsg) tea.Cmd {
 	switch {
@@ -669,7 +707,14 @@ func (d *DashboardView) handleMillerColumnsNavigation(msg tea.KeyMsg) tea.Cmd {
 			}
 		case 2: // Details column
 			if d.selectedDetailLine > 0 {
-				d.selectedDetailLine--
+				// Try to find previous non-empty line
+				newIdx := d.findNextNonEmptyLine(d.selectedDetailLine, -1)
+				if newIdx != d.selectedDetailLine {
+					d.selectedDetailLine = newIdx
+				} else {
+					// If no non-empty line found, just move up one
+					d.selectedDetailLine--
+				}
 			}
 		}
 
@@ -691,7 +736,14 @@ func (d *DashboardView) handleMillerColumnsNavigation(msg tea.KeyMsg) tea.Cmd {
 			}
 		case 2: // Details column
 			if d.selectedDetailLine < len(d.detailLines)-1 {
-				d.selectedDetailLine++
+				// Try to find next non-empty line
+				newIdx := d.findNextNonEmptyLine(d.selectedDetailLine, 1)
+				if newIdx != d.selectedDetailLine {
+					d.selectedDetailLine = newIdx
+				} else {
+					// If no non-empty line found, just move down one
+					d.selectedDetailLine++
+				}
 			}
 		}
 
@@ -704,8 +756,15 @@ func (d *DashboardView) handleMillerColumnsNavigation(msg tea.KeyMsg) tea.Cmd {
 			d.selectedRunData = d.filteredRuns[0]
 			d.updateDetailLines()
 		} else if d.focusedColumn == 2 {
-			// Moving to details column, select first line
+			// Moving to details column, select first non-empty line
 			d.selectedDetailLine = 0
+			// Skip empty lines at the beginning
+			if len(d.detailLines) > 0 && d.isEmptyLine(d.detailLines[0]) {
+				newIdx := d.findNextNonEmptyLine(-1, 1) // Start from -1 to check from index 0
+				if newIdx >= 0 && newIdx < len(d.detailLines) {
+					d.selectedDetailLine = newIdx
+				}
+			}
 		}
 
 	case key.Matches(msg, d.keys.Enter):
@@ -720,8 +779,15 @@ func (d *DashboardView) handleMillerColumnsNavigation(msg tea.KeyMsg) tea.Cmd {
 					d.updateDetailLines()
 				}
 			} else if d.focusedColumn == 2 {
-				// Moving to details column, select first line
+				// Moving to details column, select first non-empty line
 				d.selectedDetailLine = 0
+				// Skip empty lines at the beginning
+				if len(d.detailLines) > 0 && d.isEmptyLine(d.detailLines[0]) {
+					newIdx := d.findNextNonEmptyLine(-1, 1) // Start from -1 to check from index 0
+					if newIdx >= 0 && newIdx < len(d.detailLines) {
+						d.selectedDetailLine = newIdx
+					}
+				}
 			}
 		}
 
@@ -777,7 +843,14 @@ func (d *DashboardView) handleMillerColumnsNavigation(msg tea.KeyMsg) tea.Cmd {
 				d.selectedRunData = d.filteredRuns[0]
 				d.updateDetailLines()
 			} else if d.focusedColumn == 2 {
+				// Select first non-empty line when moving to details
 				d.selectedDetailLine = 0
+				if len(d.detailLines) > 0 && d.isEmptyLine(d.detailLines[0]) {
+					newIdx := d.findNextNonEmptyLine(-1, 1)
+					if newIdx >= 0 && newIdx < len(d.detailLines) {
+						d.selectedDetailLine = newIdx
+					}
+				}
 			}
 		}
 
@@ -1026,10 +1099,29 @@ func (d *DashboardView) updateDetailLines() {
 	}
 
 	run := d.selectedRunData
+	// Calculate available width for text (accounting for padding)
+	columnWidth := d.width / 3
+	if columnWidth < 10 {
+		columnWidth = 10
+	}
+	textWidth := columnWidth - 4 // Account for padding and borders
+	if textWidth < 10 {
+		textWidth = 10
+	}
+
+	// Helper function to truncate text to single line
+	truncateLine := func(text string) string {
+		if len(text) > textWidth {
+			return text[:textWidth-3] + "..."
+		}
+		return text
+	}
+
+	// Add single-line fields (truncated if needed)
 	d.detailLines = []string{
-		fmt.Sprintf("ID: %s", run.GetIDString()),
-		fmt.Sprintf("Status: %s", run.Status),
-		fmt.Sprintf("Repository: %s", run.GetRepositoryName()),
+		truncateLine(fmt.Sprintf("ID: %s", run.GetIDString())),
+		truncateLine(fmt.Sprintf("Status: %s", run.Status)),
+		truncateLine(fmt.Sprintf("Repository: %s", run.GetRepositoryName())),
 	}
 
 	// Show run type - normalize API values to display values
@@ -1039,39 +1131,48 @@ func (d *DashboardView) updateDetailLines() {
 		if strings.Contains(runTypeLower, "plan") {
 			displayType = "Plan"
 		}
-		d.detailLines = append(d.detailLines, fmt.Sprintf("Type: %s", displayType))
+		d.detailLines = append(d.detailLines, truncateLine(fmt.Sprintf("Type: %s", displayType)))
 	}
 
 	if run.Source != "" && run.Target != "" {
-		d.detailLines = append(d.detailLines, fmt.Sprintf("Branch: %s → %s", run.Source, run.Target))
+		d.detailLines = append(d.detailLines, truncateLine(fmt.Sprintf("Branch: %s → %s", run.Source, run.Target)))
 	}
 
-	d.detailLines = append(d.detailLines, fmt.Sprintf("Created: %s", run.CreatedAt.Format("Jan 2 15:04")))
-	d.detailLines = append(d.detailLines, fmt.Sprintf("Updated: %s", run.UpdatedAt.Format("Jan 2 15:04")))
+	d.detailLines = append(d.detailLines, truncateLine(fmt.Sprintf("Created: %s", run.CreatedAt.Format("Jan 2 15:04"))))
+	d.detailLines = append(d.detailLines, truncateLine(fmt.Sprintf("Updated: %s", run.UpdatedAt.Format("Jan 2 15:04"))))
 
+	// Title - single line truncated
 	if run.Title != "" {
-		d.detailLines = append(d.detailLines, "", "Title:", run.Title)
+		d.detailLines = append(d.detailLines, "", "Title:")
+		d.detailLines = append(d.detailLines, truncateLine(run.Title))
 	}
 
+	// Prompt - single line truncated
 	if run.Prompt != "" {
 		d.detailLines = append(d.detailLines, "", "Prompt:")
-		// Wrap prompt text - use a reasonable width
-		wrapped := d.wrapText(run.Prompt, 50)
-		d.detailLines = append(d.detailLines, wrapped...)
+		d.detailLines = append(d.detailLines, truncateLine(run.Prompt))
 	}
 
-	// Show plan for plan-type runs that are completed
-	if strings.Contains(strings.ToLower(run.RunType), "plan") && run.Status == models.StatusDone && run.Plan != "" {
-		d.detailLines = append(d.detailLines, "", "Plan:")
-		// Wrap plan text
-		wrapped := d.wrapText(run.Plan, 50)
-		d.detailLines = append(d.detailLines, wrapped...)
-	}
-
+	// Error - single line truncated
 	if run.Error != "" {
 		d.detailLines = append(d.detailLines, "", "Error:")
-		wrapped := d.wrapText(run.Error, 50)
-		d.detailLines = append(d.detailLines, wrapped...)
+		d.detailLines = append(d.detailLines, truncateLine(run.Error))
+	}
+
+	// Plan field - special handling (can be multi-line if space available)
+	// This should be last so it can use remaining space
+	if strings.Contains(strings.ToLower(run.RunType), "plan") && run.Status == models.StatusDone && run.Plan != "" {
+		d.detailLines = append(d.detailLines, "", "Plan:")
+		// For now, just show first line with ellipsis if there's more
+		// The renderDetailsColumn will handle proper multi-line display
+		lines := strings.Split(run.Plan, "\n")
+		if len(lines) > 0 {
+			firstLine := truncateLine(lines[0])
+			if len(lines) > 1 {
+				firstLine = firstLine + " (...)"
+			}
+			d.detailLines = append(d.detailLines, firstLine)
+		}
 	}
 }
 
@@ -1273,17 +1374,65 @@ func (d *DashboardView) renderDetailsColumn(width, height int) string {
 	if d.selectedRunData == nil {
 		displayLines = []string{"Select a run"}
 	} else {
-		// Build lines with selection highlighting
+		// Calculate available content width
+		contentWidth := width - 2 // Account for padding
+		if contentWidth < 5 {
+			contentWidth = 5
+		}
+
+		// Build lines with selection highlighting and proper width constraints
 		for i, line := range d.detailLines {
+			// Apply width constraint using lipgloss to prevent overflow
+			styledLine := lipgloss.NewStyle().
+				MaxWidth(contentWidth).
+				Inline(true). // Force single line
+				Render(line)
+
 			if d.focusedColumn == 2 && i == d.selectedDetailLine {
 				// Highlight selected line
-				line = lipgloss.NewStyle().
-					Width(width - 2).
+				styledLine = lipgloss.NewStyle().
+					MaxWidth(contentWidth).
+					Inline(true).
 					Background(lipgloss.Color("63")).
 					Foreground(lipgloss.Color("255")).
 					Render(line)
 			}
-			displayLines = append(displayLines, line)
+			displayLines = append(displayLines, styledLine)
+		}
+
+		// Special handling for plan field if it's the last item
+		// Calculate remaining vertical space
+		contentHeight := height - 2 // Subtract title height
+		usedLines := len(displayLines)
+		remainingLines := contentHeight - usedLines
+
+		// If we have a plan field and remaining space, expand it
+		if d.selectedRunData != nil &&
+			strings.Contains(strings.ToLower(d.selectedRunData.RunType), "plan") &&
+			d.selectedRunData.Status == models.StatusDone &&
+			d.selectedRunData.Plan != "" &&
+			remainingLines > 0 {
+			// Find the plan line (should be last)
+			for i := len(d.detailLines) - 1; i >= 0; i-- {
+				if strings.HasPrefix(d.detailLines[i], "Plan:") || (i > 0 && d.detailLines[i-1] == "Plan:") {
+					// Replace the truncated plan with wrapped version
+					wrapped := d.wrapTextWithLimit(d.selectedRunData.Plan, contentWidth, remainingLines)
+					if len(wrapped) > 0 {
+						// Remove the truncated plan line
+						if i < len(displayLines) {
+							displayLines = displayLines[:i]
+						}
+						// Add wrapped lines
+						for _, wLine := range wrapped {
+							styledLine := lipgloss.NewStyle().
+								MaxWidth(contentWidth).
+								Render(wLine)
+							displayLines = append(displayLines, styledLine)
+						}
+					}
+					break
+				}
+			}
 		}
 	}
 
@@ -1627,8 +1776,61 @@ func (d *DashboardView) wrapText(text string, width int) []string {
 	return lines
 }
 
+// wrapTextWithLimit wraps text to fit within width and max lines
+func (d *DashboardView) wrapTextWithLimit(text string, width int, maxLines int) []string {
+	if width <= 0 || maxLines <= 0 {
+		return []string{}
+	}
+
+	// First wrap normally
+	lines := d.wrapText(text, width)
+
+	// If it fits within maxLines, return as is
+	if len(lines) <= maxLines {
+		return lines
+	}
+
+	// Truncate to maxLines with ellipsis
+	result := lines[:maxLines-1]
+	lastLine := lines[maxLines-1]
+	if len(lastLine) > width-5 {
+		lastLine = lastLine[:width-5]
+	}
+	result = append(result, lastLine+" (...)")
+
+	return result
+}
+
 // renderStatusLine renders the universal status line
 func (d *DashboardView) renderStatusLine(layoutName string) string {
+	// Show copied message prominently if recent
+	if d.copiedMessage != "" && time.Since(d.copiedMessageTime) < 3*time.Second {
+		copiedStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("82")).
+			Background(lipgloss.Color("235")).
+			Bold(true).
+			Padding(0, 1)
+
+		// Apply blinking effect for the first second
+		if time.Since(d.copiedMessageTime) < 1*time.Second && d.yankBlink {
+			copiedStyle = copiedStyle.Blink(true)
+		}
+
+		// Create a custom status line just for the clipboard message
+		statusStyle := lipgloss.NewStyle().
+			Width(d.width).
+			Background(lipgloss.Color("235"))
+
+		message := copiedStyle.Render(d.copiedMessage)
+		padding := d.width - lipgloss.Width(message)
+		if padding > 0 {
+			message = message + strings.Repeat(" ", padding)
+		}
+
+		return statusStyle.Render(message)
+	}
+
+	// Normal status line when no clipboard message
 	// Data freshness indicator - keep it very short
 	dataInfo := ""
 	if d.loading && len(d.repositories) > 0 {
@@ -1646,20 +1848,6 @@ func (d *DashboardView) renderStatusLine(layoutName string) string {
 	shortHelp := "n:new f:fuzzy y:copy ?:help r:refresh q:quit"
 	if d.showHelp {
 		shortHelp = "n:new f:fuzzy y:copy j/k:↑↓ h/l:←→ Enter:→ BS:← ?:help q:quit"
-	}
-
-	// Show copied message if recent with blinking effect
-	if d.copiedMessage != "" && time.Since(d.copiedMessageTime) < 3*time.Second {
-		copiedStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("82")).
-			Bold(true)
-
-		// Apply blinking effect for the first second
-		if time.Since(d.copiedMessageTime) < 1*time.Second && d.yankBlink {
-			copiedStyle = copiedStyle.Blink(true)
-		}
-
-		shortHelp = copiedStyle.Render(d.copiedMessage) + " | " + shortHelp
 	}
 
 	return components.DashboardStatusLine(d.width, layoutName, dataInfo, shortHelp)
