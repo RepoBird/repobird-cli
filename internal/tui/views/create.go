@@ -82,7 +82,7 @@ func NewCreateRunViewWithConfig(config CreateRunViewConfig) *CreateRunView {
 		client:             config.Client,
 		keys:               components.DefaultKeyMap,
 		help:               help.New(),
-		inputMode:          components.InsertMode,
+		inputMode:          components.NormalMode, // Start in normal mode to show selector
 		parentRuns:         config.ParentRuns,
 		parentCached:       config.ParentCached,
 		parentCachedAt:     config.ParentCachedAt,
@@ -112,7 +112,7 @@ func (v *CreateRunView) initializeInputFields() {
 	repoInput.Placeholder = "org/repo (required, leave empty to auto-detect)"
 	repoInput.CharLimit = 100
 	repoInput.Width = 50
-	repoInput.Focus()
+	// Don't focus by default - we start in normal mode
 
 	// Prompt area (second)
 	promptArea := textarea.New()
