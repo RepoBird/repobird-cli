@@ -11,6 +11,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/repobird/repobird-cli/internal/api"
@@ -67,6 +68,9 @@ type DashboardView struct {
 	// FZF mode for each column
 	fzfMode   *components.FZFMode
 	fzfColumn int // Which column is in FZF mode (-1 = none)
+	
+	// Loading spinner
+	spinner spinner.Model
 }
 
 type dashboardDataLoadedMsg struct {
@@ -87,6 +91,11 @@ type dashboardUserInfoLoadedMsg struct {
 
 // NewDashboardView creates a new dashboard view
 func NewDashboardView(client *api.Client) *DashboardView {
+	// Initialize spinner
+	s := spinner.New()
+	s.Spinner = spinner.Dot
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("63"))
+	
 	dashboard := &DashboardView{
 		client:          client,
 		keys:            components.DefaultKeyMap,
@@ -97,6 +106,7 @@ func NewDashboardView(client *api.Client) *DashboardView {
 		refreshInterval: 30 * time.Second,
 		apiRepositories: make(map[int]models.APIRepository),
 		fzfColumn:       -1, // No FZF mode initially
+		spinner:         s,
 	}
 
 	// Initialize cache system
@@ -114,6 +124,7 @@ func (d *DashboardView) Init() tea.Cmd {
 		d.loadDashboardData(),
 		d.loadUserInfo(),
 		d.runListView.Init(),
+		d.spinner.Tick,
 	)
 }
 
@@ -434,6 +445,13 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
+	case spinner.TickMsg:
+		if d.loading || d.initializing {
+			var cmd tea.Cmd
+			d.spinner, cmd = d.spinner.Update(msg)
+			return d, cmd
+		}
+		
 	case tea.WindowSizeMsg:
 		d.width = msg.Width
 		d.height = msg.Height
@@ -755,7 +773,11 @@ func (d *DashboardView) cycleLayout() {
 // View implements the tea.Model interface
 func (d *DashboardView) View() string {
 	if d.width <= 0 || d.height <= 0 {
-		return "Initializing dashboard..."
+		// Return a styled loading message instead of plain text
+		return lipgloss.NewStyle().
+			Foreground(lipgloss.Color("63")).
+			Bold(true).
+			Render("⟳ Initializing dashboard...")
 	}
 
 	var content string
@@ -791,13 +813,15 @@ func (d *DashboardView) View() string {
 	}
 
 	if d.loading || d.initializing {
-		content = "Loading dashboard data..."
+		// Use the animated spinner + loading text
+		loadingText := d.spinner.View() + " Loading dashboard data..."
 		loadingStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("240")).
+			Foreground(lipgloss.Color("63")).  // Bright cyan color
+			Bold(true).
 			Width(d.width).
 			Align(lipgloss.Center).
 			MarginTop((d.height - 2) / 2)
-		content = loadingStyle.Render(content)
+		content = loadingStyle.Render(loadingText)
 		return lipgloss.JoinVertical(lipgloss.Left, title, content)
 	}
 

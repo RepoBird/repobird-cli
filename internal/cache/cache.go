@@ -21,6 +21,7 @@ type FormData struct {
 	Issue      string
 	Prompt     string
 	Context    string
+	RunType    string
 }
 
 // Global cache for run list and details to persist across view transitions

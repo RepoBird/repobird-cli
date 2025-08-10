@@ -30,7 +30,7 @@ type APIError struct {
 
 func (e *APIError) Error() string {
 	if e.Message != "" {
-		return e.Message
+		return fmt.Sprintf("%s (status %d)", e.Message, e.StatusCode)
 	}
 	return fmt.Sprintf("API error: %s (status %d)", e.Status, e.StatusCode)
 }

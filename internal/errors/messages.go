@@ -166,7 +166,13 @@ func createErrorFromStatusCode(statusCode int, message string) error {
 		if message == "" {
 			message = StatusMessages["RATE_LIMIT_EXCEEDED"]
 		}
-		return &RateLimitError{}
+		// Return APIError with status code for consistency
+		return &APIError{
+			StatusCode: statusCode,
+			Status:     "Too Many Requests",
+			Message:    message,
+			ErrorType:  errorType,
+		}
 
 	case 408:
 		errorType = ErrorTypeTimeout

@@ -11,6 +11,7 @@ type RunType string
 
 const (
 	RunTypeRun      RunType = "run"
+	RunTypePlan     RunType = "plan"
 	RunTypeApproval RunType = "approval"
 )
 

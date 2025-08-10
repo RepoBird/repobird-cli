@@ -58,6 +58,8 @@ type CreateRunView struct {
 	// Prompt collapsed state
 	promptCollapsed bool
 	showContext     bool // Whether to show context field
+	// Run type toggle
+	runType models.RunType
 }
 
 func NewCreateRunView(client *api.Client) *CreateRunView {
@@ -166,6 +168,7 @@ func (v *CreateRunView) initializeInputFields() {
 	v.filePathInput = filePathInput
 	v.focusIndex = 0
 	v.showContext = false // Hide context by default
+	v.runType = models.RunTypeRun // Default to regular run
 }
 
 // loadFormData loads saved form data from cache
@@ -181,6 +184,10 @@ func (v *CreateRunView) loadFormData() {
 		v.contextArea.SetValue(savedData.Context)
 		if savedData.Context != "" {
 			v.showContext = true
+		}
+		// Load saved run type if available
+		if savedData.RunType != "" {
+			v.runType = models.RunType(savedData.RunType)
 		}
 	}
 }
@@ -307,6 +314,13 @@ func (v *CreateRunView) handleInsertMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case msg.String() == "c":
 		// Toggle context field visibility
 		v.showContext = !v.showContext
+	case msg.String() == "t":
+		// Toggle between run types
+		if v.runType == models.RunTypeRun {
+			v.runType = models.RunTypePlan
+		} else {
+			v.runType = models.RunTypeRun
+		}
 	case msg.String() == "ctrl+s" || msg.String() == "ctrl+enter":
 		if !v.submitting {
 			debug.LogToFile("DEBUG: Ctrl+S pressed in INSERT MODE - submitting run\n")
@@ -389,6 +403,13 @@ func (v *CreateRunView) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case msg.String() == "c":
 		// Toggle context field visibility
 		v.showContext = !v.showContext
+	case msg.String() == "t":
+		// Toggle between run types
+		if v.runType == models.RunTypeRun {
+			v.runType = models.RunTypePlan
+		} else {
+			v.runType = models.RunTypeRun
+		}
 	default:
 		// Block vim navigation keys from doing anything else
 	}
@@ -636,6 +657,7 @@ func (v *CreateRunView) saveFormData() {
 		Issue:      v.fields[4].Value(),
 		Prompt:     v.promptArea.Value(),
 		Context:    v.contextArea.Value(),
+		RunType:    string(v.runType),
 	}
 	cache.SaveFormData(formData)
 }
@@ -679,7 +701,11 @@ func (v *CreateRunView) clearCurrentField() {
 
 func (v *CreateRunView) View() string {
 	if v.width <= 0 || v.height <= 0 {
-		return "Initializing..."
+		// Return a styled loading message instead of plain text
+		return lipgloss.NewStyle().
+			Foreground(lipgloss.Color("63")).
+			Bold(true).
+			Render("⟳ Initializing...")
 	}
 
 	// Consistent title style with dashboard
@@ -861,6 +887,19 @@ func (v *CreateRunView) renderSinglePanelLayout(availableHeight int) string {
 func (v *CreateRunView) renderCompactForm(width, height int) string {
 	var b strings.Builder
 
+	// Run type indicator at the top
+	runTypeStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("33")).
+		Bold(true).
+		PaddingBottom(1)
+	
+	runTypeText := "Run Type: 🚀 Run (execution)"
+	if v.runType == models.RunTypePlan {
+		runTypeText = "Run Type: 📋 Plan (pro-plan)"
+	}
+	b.WriteString(runTypeStyle.Render(runTypeText))
+	b.WriteString("\n")
+
 	// Repository field (first)
 	labelStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("252")).
@@ -1017,18 +1056,18 @@ func (v *CreateRunView) renderStatusBar() string {
 	if v.inputMode == components.InsertMode {
 		if !v.useFileInput && v.focusIndex == 0 {
 			// When repository field is focused, show FZF options
-			statusText = "[ESC] normal [Tab] next [Ctrl+F] fuzzy [Ctrl+R] browse [c] context [Ctrl+S] submit"
+			statusText = "[ESC] normal [Tab] next [Ctrl+F] fuzzy [Ctrl+R] browse [t] type [c] context [Ctrl+S] submit"
 		} else {
-			statusText = "[ESC] normal [Tab] next [c] toggle context [Ctrl+S] submit [Ctrl+X] clear field"
+			statusText = "[ESC] normal [Tab] next [t] toggle type [c] toggle context [Ctrl+S] submit [Ctrl+X] clear"
 		}
 	} else {
 		if v.exitRequested {
-			statusText = "[ESC] exit [Enter] select [j/k] navigate [c] context [Ctrl+S] submit"
+			statusText = "[ESC] exit [Enter] select [j/k] navigate [t] type [c] context [Ctrl+S] submit"
 		} else if v.focusIndex == 0 {
 			// Repository field in normal mode
-			statusText = "[ESC] exit [Enter] edit [f] fuzzy [j/k] navigate [c] context [Ctrl+S] submit"
+			statusText = "[ESC] exit [Enter] edit [f] fuzzy [j/k] navigate [t] type [c] context [Ctrl+S] submit"
 		} else {
-			statusText = "[ESC] exit [Enter] edit [j/k] navigate [c] context [Ctrl+S] submit [?] help"
+			statusText = "[ESC] exit [Enter] edit [j/k] navigate [t] type [c] context [Ctrl+S] submit [?] help"
 		}
 	}
 
@@ -1063,7 +1102,7 @@ func (v *CreateRunView) prepareTaskFromForm() models.RunRequest {
 		Title:      v.fields[3].Value(),
 		Prompt:     v.promptArea.Value(),
 		Context:    v.contextArea.Value(),
-		RunType:    models.RunTypeRun,
+		RunType:    v.runType,
 	}
 
 	// Debug logging - check each field individually

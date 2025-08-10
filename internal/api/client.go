@@ -415,6 +415,10 @@ func (c *Client) GetUserInfoWithContext(ctx context.Context) (*models.UserInfo, 
 	// Fall back to legacy flat structure
 	var userInfo models.UserInfo
 	if err := json.Unmarshal(body, &userInfo); err != nil {
+		// If both fail, return error with body for debugging
+		if c.debug {
+			return nil, fmt.Errorf("failed to decode response (body: %s): %w", string(body), err)
+		}
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 

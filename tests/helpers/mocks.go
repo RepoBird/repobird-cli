@@ -162,9 +162,25 @@ func (m *MockAPIServer) handleAuthVerify(w http.ResponseWriter, r *http.Request)
 				Body:       map[string]string{"error": "Invalid API key"},
 			}
 		} else {
+			// Return proper nested response structure for auth verify
 			response = MockResponse{
 				StatusCode: 200,
-				Body:       map[string]bool{"valid": true},
+				Body: map[string]interface{}{
+					"data": map[string]interface{}{
+						"user": map[string]interface{}{
+							"id":             "test-user-123",
+							"email":          "test@example.com",
+							"name":           "Test User",
+							"githubUsername": "testuser",
+						},
+						"tier": map[string]interface{}{
+							"name":                "pro",
+							"remainingProRuns":    10,
+							"remainingPlanRuns":   5,
+							"lastPeriodResetDate": "2024-01-01T00:00:00Z",
+						},
+					},
+				},
 			}
 		}
 	}
