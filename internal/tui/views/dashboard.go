@@ -29,7 +29,7 @@ type DashboardView struct {
 	// Dashboard state
 	currentLayout      models.LayoutType
 	showHelp           bool
-	showStatusInfo     bool      // Show status/user info overlay
+	showStatusInfo     bool // Show status/user info overlay
 	selectedRepo       *models.Repository
 	selectedRepoIdx    int
 	selectedRunIdx     int
@@ -59,7 +59,7 @@ type DashboardView struct {
 	// Cache management
 	lastDataRefresh time.Time
 	refreshInterval time.Duration
-	
+
 	// User info
 	userInfo *models.UserInfo
 }
@@ -455,7 +455,7 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			d.selectedRunIdx = 0
 			d.updateDetailLines()
 		}
-		
+
 	case dashboardUserInfoLoadedMsg:
 		if msg.error == nil {
 			d.userInfo = msg.userInfo
@@ -736,12 +736,12 @@ func (d *DashboardView) View() string {
 	}
 
 	finalView := lipgloss.JoinVertical(lipgloss.Left, title, content)
-	
+
 	// Overlay status info if requested
 	if d.showStatusInfo {
 		return d.renderStatusInfo()
 	}
-	
+
 	debug.LogToFilef("Final view dimensions: width=%d, height=%d\n",
 		lipgloss.Width(finalView), lipgloss.Height(finalView))
 	return finalView
@@ -1167,16 +1167,16 @@ func (d *DashboardView) renderDetailsColumn(width, height int) string {
 // renderStatusInfo renders the status/user info overlay
 func (d *DashboardView) renderStatusInfo() string {
 	// Calculate box dimensions - use most of the screen with some margin
-	boxWidth := d.width - 4  // Leave 2 chars margin on each side
+	boxWidth := d.width - 4   // Leave 2 chars margin on each side
 	boxHeight := d.height - 2 // Leave 1 char margin top and bottom
-	
+
 	// Box style with rounded border
 	boxStyle := lipgloss.NewStyle().
 		Width(boxWidth).
 		Height(boxHeight).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("63"))
-	
+
 	// Title bar (inside the box)
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
@@ -1185,42 +1185,42 @@ func (d *DashboardView) renderStatusInfo() string {
 		Width(boxWidth-2). // Account for border
 		Align(lipgloss.Center).
 		Padding(0, 1)
-	
+
 	title := titleStyle.Render("System Status & User Information")
-	
+
 	// Content styles
 	contentStyle := lipgloss.NewStyle().
 		Width(boxWidth-2). // Account for border
 		Padding(1, 2)
-	
+
 	sectionStyle := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("63")).
 		MarginTop(1)
-	
+
 	labelStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("240")).
 		Width(25)
-	
+
 	valueStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("255"))
-	
+
 	var content []string
-	
+
 	// User Info Section
 	if d.userInfo != nil {
 		content = append(content, sectionStyle.Render("User Information"))
-		content = append(content, fmt.Sprintf("%s%s", 
-			labelStyle.Render("Email:"), 
+		content = append(content, fmt.Sprintf("%s%s",
+			labelStyle.Render("Email:"),
 			valueStyle.Render(d.userInfo.Email)))
-		content = append(content, fmt.Sprintf("%s%s", 
-			labelStyle.Render("Account Tier:"), 
+		content = append(content, fmt.Sprintf("%s%s",
+			labelStyle.Render("Account Tier:"),
 			valueStyle.Render(d.userInfo.Tier)))
-		content = append(content, fmt.Sprintf("%s%d / %d", 
-			labelStyle.Render("Runs Remaining:"), 
-			d.userInfo.RemainingRuns, 
+		content = append(content, fmt.Sprintf("%s%d / %d",
+			labelStyle.Render("Runs Remaining:"),
+			d.userInfo.RemainingRuns,
 			d.userInfo.TotalRuns))
-		
+
 		// Show usage percentage with visual bar
 		if d.userInfo.TotalRuns > 0 {
 			usedRuns := d.userInfo.TotalRuns - d.userInfo.RemainingRuns
@@ -1238,31 +1238,31 @@ func (d *DashboardView) renderStatusInfo() string {
 				emptyBars = 0
 			}
 			bar := strings.Repeat("█", filledBars) + strings.Repeat("░", emptyBars)
-			
-			content = append(content, fmt.Sprintf("%s%s %.1f%%", 
-				labelStyle.Render("Usage:"), 
-				bar, 
+
+			content = append(content, fmt.Sprintf("%s%s %.1f%%",
+				labelStyle.Render("Usage:"),
+				bar,
 				percentage))
 		} else {
 			// Handle unlimited or zero total runs
-			content = append(content, fmt.Sprintf("%s%s", 
-				labelStyle.Render("Usage:"), 
+			content = append(content, fmt.Sprintf("%s%s",
+				labelStyle.Render("Usage:"),
 				valueStyle.Render("Unlimited")))
 		}
 	} else {
 		content = append(content, sectionStyle.Render("User Information"))
 		content = append(content, "Loading user info...")
 	}
-	
+
 	// System Stats Section
 	content = append(content, sectionStyle.Render("Dashboard Statistics"))
-	content = append(content, fmt.Sprintf("%s%d", 
-		labelStyle.Render("Repositories:"), 
+	content = append(content, fmt.Sprintf("%s%d",
+		labelStyle.Render("Repositories:"),
 		len(d.repositories)))
-	content = append(content, fmt.Sprintf("%s%d", 
-		labelStyle.Render("Total Runs:"), 
+	content = append(content, fmt.Sprintf("%s%d",
+		labelStyle.Render("Total Runs:"),
 		len(d.allRuns)))
-	
+
 	// Count run statuses
 	var running, completed, failed int
 	for _, run := range d.allRuns {
@@ -1275,11 +1275,11 @@ func (d *DashboardView) renderStatusInfo() string {
 			failed++
 		}
 	}
-	
-	content = append(content, fmt.Sprintf("%s🔄 %d  ✅ %d  ❌ %d", 
+
+	content = append(content, fmt.Sprintf("%s🔄 %d  ✅ %d  ❌ %d",
 		labelStyle.Render("Run Status:"),
 		running, completed, failed))
-	
+
 	// Last refresh time
 	if !d.lastDataRefresh.IsZero() {
 		timeSince := time.Since(d.lastDataRefresh)
@@ -1287,53 +1287,53 @@ func (d *DashboardView) renderStatusInfo() string {
 		if timeSince.Minutes() > 1 {
 			refreshText = fmt.Sprintf("%.1f minutes ago", timeSince.Minutes())
 		}
-		content = append(content, fmt.Sprintf("%s%s", 
-			labelStyle.Render("Last Refresh:"), 
+		content = append(content, fmt.Sprintf("%s%s",
+			labelStyle.Render("Last Refresh:"),
 			valueStyle.Render(refreshText)))
 	}
-	
+
 	// Connection Info Section
 	content = append(content, sectionStyle.Render("Connection Info"))
-	content = append(content, fmt.Sprintf("%s%s", 
-		labelStyle.Render("API Endpoint:"), 
+	content = append(content, fmt.Sprintf("%s%s",
+		labelStyle.Render("API Endpoint:"),
 		valueStyle.Render(d.client.GetAPIEndpoint())))
-	content = append(content, fmt.Sprintf("%s%s", 
-		labelStyle.Render("Status:"), 
+	content = append(content, fmt.Sprintf("%s%s",
+		labelStyle.Render("Status:"),
 		valueStyle.Render("Connected ✅")))
-	
+
 	// Build the main content
 	mainContent := contentStyle.Render(strings.Join(content, "\n"))
-	
+
 	// Calculate remaining height for spacing inside the box
-	innerHeight := boxHeight - 2 // Account for border
+	innerHeight := boxHeight - 2                                               // Account for border
 	contentHeight := lipgloss.Height(title) + lipgloss.Height(mainContent) + 1 // +1 for statusline
 	remainingHeight := innerHeight - contentHeight
 	spacing := ""
 	if remainingHeight > 0 {
 		spacing = strings.Repeat("\n", remainingHeight)
 	}
-	
+
 	// Create status line at bottom (inside the box)
 	statusLineStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("240")).
 		Background(lipgloss.Color("235")).
-		Width(boxWidth-2). // Account for border
+		Width(boxWidth - 2). // Account for border
 		Align(lipgloss.Center)
-	
+
 	statusLine := statusLineStyle.Render("Press 's' or ESC to close")
-	
+
 	// Join everything together inside the box
 	innerContent := lipgloss.JoinVertical(lipgloss.Left, title, mainContent, spacing, statusLine)
-	
+
 	// Wrap in the box
 	boxedContent := boxStyle.Render(innerContent)
-	
+
 	// Center the box on screen
 	finalStyle := lipgloss.NewStyle().
 		Width(d.width).
 		Height(d.height).
 		Align(lipgloss.Center, lipgloss.Center)
-	
+
 	return finalStyle.Render(boxedContent)
 }
 

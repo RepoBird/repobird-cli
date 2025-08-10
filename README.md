@@ -1,6 +1,6 @@
 # RepoBird CLI
 
-A command-line interface for interacting with the https://RepoBird.ai AI platform to automate code generation and modifications.
+A command-line interface for interacting with the [RepoBird.ai](https://repobird.ai) platform to automate code generation and modifications.
 
 ## Quick Start
 
