@@ -645,7 +645,40 @@ func (v *RunListView) renderStatusBar() string {
 		if tier == "" {
 			tier = "free"
 		}
-		dataInfo += fmt.Sprintf(" | %s: %d/%d runs", tier, v.userInfo.RemainingRuns, v.userInfo.TotalRuns)
+
+		// Show tier-specific runs with hardcoded totals
+		if v.userInfo.TierDetails != nil {
+			// Hardcoded tier totals
+			var totalProRuns, totalPlanRuns int
+			switch strings.ToLower(tier) {
+			case "free":
+				totalProRuns = 3
+				totalPlanRuns = 5
+			case "pro":
+				totalProRuns = 30
+				totalPlanRuns = 35
+			default:
+				totalProRuns = 30
+				totalPlanRuns = 35
+			}
+
+			// Handle admin credits that exceed defaults
+			actualProTotal := totalProRuns
+			actualPlanTotal := totalPlanRuns
+			if v.userInfo.TierDetails.RemainingProRuns > totalProRuns {
+				actualProTotal = v.userInfo.TierDetails.RemainingProRuns
+			}
+			if v.userInfo.TierDetails.RemainingPlanRuns > totalPlanRuns {
+				actualPlanTotal = v.userInfo.TierDetails.RemainingPlanRuns
+			}
+
+			dataInfo += fmt.Sprintf(" | %s: %d/%d pro, %d/%d plan", tier,
+				v.userInfo.TierDetails.RemainingProRuns, actualProTotal,
+				v.userInfo.TierDetails.RemainingPlanRuns, actualPlanTotal)
+		} else {
+			// Fallback to legacy display
+			dataInfo += fmt.Sprintf(" | %s: %d/%d runs", tier, v.userInfo.RemainingRuns, v.userInfo.TotalRuns)
+		}
 	}
 
 	if activeCount > 0 {
