@@ -856,6 +856,43 @@ func (d *DashboardView) handleMillerColumnsNavigation(msg tea.KeyMsg) tea.Cmd {
 			)
 		}
 
+	case msg.Type == tea.KeyRunes && string(msg.Runes) == "o":
+		// Open URL in browser if current selection contains a URL
+		var urlText string
+
+		switch d.focusedColumn {
+		case 0: // Repository column - repositories don't typically have URLs
+			// No URL handling for repositories currently
+		case 1: // Runs column - could check for PR URLs in run data
+			if d.selectedRunIdx < len(d.filteredRuns) {
+				run := d.filteredRuns[d.selectedRunIdx]
+				if run.PrURL != nil && *run.PrURL != "" {
+					urlText = *run.PrURL
+				}
+			}
+		case 2: // Details column - check if selected line contains a URL
+			if d.selectedDetailLine < len(d.detailLinesOriginal) {
+				lineText := d.detailLinesOriginal[d.selectedDetailLine]
+				if utils.IsURL(lineText) {
+					urlText = utils.ExtractURL(lineText)
+				}
+			}
+		}
+
+		if urlText != "" {
+			if err := utils.OpenURL(urlText); err == nil {
+				d.copiedMessage = "🌐 Opened URL in browser"
+			} else {
+				d.copiedMessage = fmt.Sprintf("✗ Failed to open URL: %v", err)
+			}
+			d.copiedMessageTime = time.Now()
+			d.yankBlink = true
+			return tea.Batch(
+				d.startYankBlinkAnimation(),
+				d.startClearStatusTimer(),
+			)
+		}
+
 	case key.Matches(msg, d.keys.Right) || (msg.Type == tea.KeyRunes && string(msg.Runes) == "l"):
 		// Move focus to the right
 		if d.focusedColumn < 2 {
@@ -1168,6 +1205,16 @@ func (d *DashboardView) updateDetailLines() {
 
 	addLine(fmt.Sprintf("Created: %s", run.CreatedAt.Format("Jan 2 15:04")))
 	addLine(fmt.Sprintf("Updated: %s", run.UpdatedAt.Format("Jan 2 15:04")))
+
+	// Show PR URL if available
+	if run.PrURL != nil && *run.PrURL != "" {
+		addLine(fmt.Sprintf("PR URL: %s", *run.PrURL))
+	}
+
+	// Show trigger source if available
+	if run.TriggerSource != nil && *run.TriggerSource != "" {
+		addLine(fmt.Sprintf("Trigger: %s", *run.TriggerSource))
+	}
 
 	// Title - single line truncated
 	if run.Title != "" {
@@ -2205,6 +2252,25 @@ func (d *DashboardView) wrapTextWithLimit(text string, width int, maxLines int) 
 	return result
 }
 
+// hasCurrentSelectionURL checks if the current selection contains a URL
+func (d *DashboardView) hasCurrentSelectionURL() bool {
+	switch d.focusedColumn {
+	case 0: // Repository column - no URLs typically
+		return false
+	case 1: // Runs column - check for PR URL
+		if d.selectedRunIdx < len(d.filteredRuns) {
+			run := d.filteredRuns[d.selectedRunIdx]
+			return run.PrURL != nil && *run.PrURL != ""
+		}
+	case 2: // Details column - check if selected line contains URL
+		if d.selectedDetailLine < len(d.detailLinesOriginal) {
+			lineText := d.detailLinesOriginal[d.selectedDetailLine]
+			return utils.IsURL(lineText)
+		}
+	}
+	return false
+}
+
 // renderStatusLine renders the universal status line
 func (d *DashboardView) renderStatusLine(layoutName string) string {
 	// Show copied message prominently if recent
@@ -2267,6 +2333,11 @@ func (d *DashboardView) renderStatusLine(layoutName string) string {
 	shortHelp := "n:new f:fuzzy s:status y:copy ?:help r:refresh q:quit"
 	if d.showHelp {
 		shortHelp = "n:new f:fuzzy s:status y:copy j/k:↑↓ h/l:←→ Enter:→ BS:← ?:help q:quit"
+	}
+
+	// Add URL opening hint if current selection has a URL
+	if d.hasCurrentSelectionURL() {
+		shortHelp = "o:open-url " + shortHelp
 	}
 
 	return components.DashboardStatusLine(d.width, layoutName, dataInfo, shortHelp)

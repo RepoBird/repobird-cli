@@ -79,6 +79,7 @@ type RunResponse struct {
 	Context        string    `json:"context,omitempty"`
 	Error          string    `json:"error,omitempty"`
 	PrURL          *string   `json:"prUrl,omitempty"`
+	TriggerSource  *string   `json:"triggerSource,omitempty"`
 	RunType        string    `json:"runType,omitempty"`
 	Plan           string    `json:"plan,omitempty"`
 }

@@ -3,14 +3,14 @@ module github.com/repobird/repobird-cli
 go 1.24.5
 
 require (
-	github.com/charmbracelet/bubbles v0.21.0      // Pre-built UI components for Bubble Tea (text inputs, spinners, progress bars)
-	github.com/charmbracelet/bubbletea v1.3.6     // Terminal UI framework based on Elm architecture - powers the TUI mode
-	github.com/charmbracelet/lipgloss v1.1.0      // Terminal styling library for colors, borders, and layout in TUI
-	github.com/spf13/cobra v1.9.1                 // CLI framework for building commands and subcommands structure
-	github.com/spf13/viper v1.20.1                // Configuration management - handles config files and environment variables
-	github.com/stretchr/testify v1.10.0           // Testing toolkit with assertions and mocking capabilities
-	github.com/zalando/go-keyring v0.2.6          // Secure credential storage using OS keychain (macOS, Windows, Linux)
-	golang.org/x/term v0.34.0                     // Terminal handling utilities for raw mode and terminal size detection
+	github.com/charmbracelet/bubbles v0.21.0 // Pre-built UI components for Bubble Tea (text inputs, spinners, progress bars)
+	github.com/charmbracelet/bubbletea v1.3.6 // Terminal UI framework based on Elm architecture - powers the TUI mode
+	github.com/charmbracelet/lipgloss v1.1.0 // Terminal styling library for colors, borders, and layout in TUI
+	github.com/spf13/cobra v1.9.1 // CLI framework for building commands and subcommands structure
+	github.com/spf13/viper v1.20.1 // Configuration management - handles config files and environment variables
+	github.com/stretchr/testify v1.10.0 // Testing toolkit with assertions and mocking capabilities
+	github.com/zalando/go-keyring v0.2.6 // Secure credential storage using OS keychain (macOS, Windows, Linux)
+	golang.org/x/term v0.34.0 // Terminal handling utilities for raw mode and terminal size detection
 )
 
 require (
@@ -65,3 +65,5 @@ require (
 	golang.org/x/text v0.28.0 // indirect - Text processing, encoding, and Unicode support
 	gopkg.in/yaml.v3 v3.0.1 // indirect - YAML parsing and serialization (config and test files)
 )
+
+require github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect

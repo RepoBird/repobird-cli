@@ -94,12 +94,78 @@ components:
           type: string
           nullable: true
           description: The generated plan for the run (applicable to all run types)
+        researchNotes:
+          type: string
+          nullable: true
+          description: Research and analysis notes generated during the run
         prUrl:
           type: string
           nullable: true
+        prId:
+          type: string
+          nullable: true
+          description: Pull request ID if one was created
         commandLogUrl:
           type: string
           nullable: true
+        errors:
+          type: array
+          nullable: true
+          items:
+            type: string
+          description: Array of errors encountered during the run
+        exitEarly:
+          type: boolean
+          nullable: true
+          description: Whether the run exited early
+        exitEarlyReason:
+          type: string
+          nullable: true
+          description: Reason for early exit if applicable
+        filesModified:
+          type: array
+          nullable: true
+          items:
+            type: string
+          description: List of files modified during the run
+        issueNumber:
+          type: integer
+          nullable: true
+          description: GitHub issue number if associated with an issue
+        timeSpentSeconds:
+          type: integer
+          nullable: true
+          description: Time spent executing the run in seconds
+        totalDuration:
+          type: integer
+          nullable: true
+          description: Total duration of the run in milliseconds
+        totalCost:
+          type: number
+          nullable: true
+          format: float
+          description: Total cost of the run in dollars
+        totalTokens:
+          type: integer
+          nullable: true
+          description: Total number of tokens used
+        totalInputTokens:
+          type: integer
+          nullable: true
+          description: Total number of input tokens used
+        totalOutputTokens:
+          type: integer
+          nullable: true
+          description: Total number of output tokens used
+        triggerSource:
+          type: string
+          nullable: true
+          enum: [cli, ui, issue, pr, demo_issue, demo_plan, demo_pr]
+          description: Source that triggered the run
+        url:
+          type: string
+          nullable: true
+          description: URL of the associated GitHub issue or PR if applicable
         createdAt:
           type: string
           format: date-time

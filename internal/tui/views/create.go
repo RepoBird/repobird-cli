@@ -330,11 +330,17 @@ func (v *CreateRunView) handleInsertMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return v, v.submitRun()
 		}
 	case msg.String() == "enter":
-		// Exit insert mode when Enter is pressed
-		v.inputMode = components.NormalMode
-		v.exitRequested = false
-		v.blurAllFields()
-		return v, nil
+		// For prompt area (index 2) or context area, allow Enter for newlines
+		if v.focusIndex == 2 || (v.showContext && v.focusIndex == len(v.fields)+2) {
+			// Handle text input for prompt/context areas - Enter creates newlines
+			cmds = append(cmds, v.updateFields(msg)...)
+		} else {
+			// For other fields, Exit insert mode when Enter is pressed
+			v.inputMode = components.NormalMode
+			v.exitRequested = false
+			v.blurAllFields()
+			return v, nil
+		}
 	case key.Matches(msg, v.keys.Tab):
 		v.nextField()
 	case key.Matches(msg, v.keys.ShiftTab):
@@ -443,6 +449,11 @@ func (v *CreateRunView) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			v.runType = models.RunTypePlan
 		} else {
 			v.runType = models.RunTypeRun
+		}
+	case msg.String() == "d":
+		// Delete current field value for string input fields only (not run type)
+		if v.focusIndex != 0 { // Skip run type field (index 0)
+			v.clearCurrentField()
 		}
 	default:
 		// Block vim navigation keys from doing anything else

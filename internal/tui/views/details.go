@@ -416,6 +416,33 @@ func (v *RunDetailsView) handleClipboardOperations(key string) tea.Cmd {
 		v.copiedMessageTime = time.Now()
 		v.yankBlink = true
 		return v.startYankBlinkAnimation()
+	case "o":
+		// Open URL in browser if current selection contains a URL
+		var urlText string
+		if v.navigationMode && v.selectedRow >= 0 && v.selectedRow < len(v.fieldValues) {
+			// Check if the selected field contains a URL
+			fieldValue := v.fieldValues[v.selectedRow]
+			if utils.IsURL(fieldValue) {
+				urlText = utils.ExtractURL(fieldValue)
+			}
+		} else {
+			// Fallback to current line (old behavior)
+			currentLine := v.getCurrentLine()
+			if utils.IsURL(currentLine) {
+				urlText = utils.ExtractURL(currentLine)
+			}
+		}
+
+		if urlText != "" {
+			if err := utils.OpenURL(urlText); err == nil {
+				v.copiedMessage = "🌐 Opened URL in browser"
+			} else {
+				v.copiedMessage = fmt.Sprintf("✗ Failed to open URL: %v", err)
+			}
+			v.copiedMessageTime = time.Now()
+			v.yankBlink = true
+			return v.startYankBlinkAnimation()
+		}
 	}
 	return nil
 }
@@ -698,11 +725,31 @@ func (v *RunDetailsView) renderHeader() string {
 	return header
 }
 
+// hasCurrentSelectionURL checks if the current selection contains a URL
+func (v *RunDetailsView) hasCurrentSelectionURL() bool {
+	if v.navigationMode && v.selectedRow >= 0 && v.selectedRow < len(v.fieldValues) {
+		fieldValue := v.fieldValues[v.selectedRow]
+		return utils.IsURL(fieldValue)
+	}
+	// Fallback to current line
+	currentLine := v.getCurrentLine()
+	return utils.IsURL(currentLine)
+}
+
 func (v *RunDetailsView) renderStatusBar() string {
 	options := "[q]back [l]ogs [j/k]navigate [y]copy field [Y]copy all [r]efresh [?]help [Q]uit"
 
 	if v.showLogs {
 		options = "[q]back [l]details [j/k]navigate [y]copy field [Y]copy all [r]efresh [?]help [Q]uit"
+	}
+
+	// Add URL opening hint if current selection has a URL
+	if v.hasCurrentSelectionURL() {
+		if v.showLogs {
+			options = "[o]open-url [q]back [l]details [j/k]navigate [y]copy field [Y]copy all [r]efresh [?]help [Q]uit"
+		} else {
+			options = "[o]open-url [q]back [l]ogs [j/k]navigate [y]copy field [Y]copy all [r]efresh [?]help [Q]uit"
+		}
 	}
 
 	// Show copied message if recent with custom blinking effect
@@ -782,6 +829,12 @@ func (v *RunDetailsView) updateContent() {
 		}
 		if v.run.RunType != "" {
 			addField("Run Type", v.run.RunType)
+		}
+		if v.run.PrURL != nil && *v.run.PrURL != "" {
+			addField("PR URL", *v.run.PrURL)
+		}
+		if v.run.TriggerSource != nil && *v.run.TriggerSource != "" {
+			addField("Trigger Source", *v.run.TriggerSource)
 		}
 		addField("Created", v.run.CreatedAt.Format(time.RFC3339))
 
