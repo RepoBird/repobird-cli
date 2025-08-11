@@ -1,0 +1,14 @@
+{
+  "prompt": "Fix the authentication bug in the login flow",
+  "repository": "org/repo",
+  "source": "main",
+  "target": "fix/auth-bug",
+  "runType": "run",
+  "title": "Fix authentication bug",
+  "context": "Users are unable to login with valid credentials. The error occurs when attempting to validate JWT tokens.",
+  "files": [
+    "src/auth.js",
+    "src/login.js",
+    "src/middleware/auth.js"
+  ]
+}

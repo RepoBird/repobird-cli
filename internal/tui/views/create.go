@@ -79,6 +79,7 @@ type CreateRunView struct {
 	// Config file loading
 	configLoader             *config.ConfigLoader
 	fileSelector             *components.FileSelector
+	configFileSelector       *components.ConfigFileSelector
 	lastLoadedFile           string
 	configFileSelectorActive bool
 	fileSelectorLoading      bool
@@ -112,6 +113,7 @@ func NewCreateRunViewWithConfig(cfg CreateRunViewConfig) *CreateRunView {
 		statusLine:         components.NewStatusLine(),
 		configLoader:       config.NewConfigLoader(),
 		fileSelector:       components.NewFileSelector(80, 10), // Default dimensions
+		configFileSelector: components.NewConfigFileSelector(80, 20), // Enhanced selector with preview
 	}
 
 	v.repoSelector = components.NewRepositorySelector()
@@ -280,6 +282,11 @@ func (v *CreateRunView) handleWindowSizeMsg(msg tea.WindowSizeMsg) {
 	v.width = msg.Width
 	v.height = msg.Height
 	v.help.Width = msg.Width
+
+	// Update config file selector dimensions if it exists
+	if v.configFileSelector != nil {
+		v.configFileSelector.SetDimensions(msg.Width, msg.Height)
+	}
 
 	// Make text areas use most of the available width with some padding
 	textAreaWidth := msg.Width - 20
@@ -603,7 +610,14 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		v.handleWindowSizeMsg(msg)
 
 	case tea.KeyMsg:
-		// If file selector is active, handle input there first
+		// If enhanced config file selector is active, handle input there first
+		if v.configFileSelector != nil && v.configFileSelector.IsActive() {
+			newConfigFileSelector, cmd := v.configFileSelector.Update(msg)
+			v.configFileSelector = newConfigFileSelector
+			return v, cmd
+		}
+
+		// If old file selector is active, handle input there first (fallback)
 		if v.fileSelector != nil && v.fileSelector.IsActive() {
 			newFileSelector, cmd := v.fileSelector.Update(msg)
 			v.fileSelector = newFileSelector
@@ -1003,6 +1017,11 @@ func (v *CreateRunView) View() string {
 		content,
 		statusBar,
 	)
+
+	// If enhanced config file selector is active, show it as an overlay
+	if v.configFileSelector != nil && v.configFileSelector.IsActive() {
+		return v.configFileSelector.View()
+	}
 
 	// If file selector is active, show modal instead of overlay
 	if v.fileSelector != nil && v.fileSelector.IsActive() {
@@ -1878,16 +1897,16 @@ func (v *CreateRunView) activateFZFMode() {
 // activateConfigFileSelector activates the file selector for loading config files
 func (v *CreateRunView) activateConfigFileSelector() tea.Cmd {
 	return func() tea.Msg {
-		// Set file selector dimensions
-		v.fileSelector.SetDimensions(v.width, v.height)
+		// Set config file selector dimensions
+		v.configFileSelector.SetDimensions(v.width, v.height)
 
-		// Activate JSON file selector
-		if err := v.fileSelector.ActivateJSONFileSelector(); err != nil {
-			debug.LogToFilef("DEBUG: Failed to activate file selector: %v\n", err)
+		// Activate the enhanced config file selector with preview
+		if err := v.configFileSelector.Activate(); err != nil {
+			debug.LogToFilef("DEBUG: Failed to activate config file selector: %v\n", err)
 			return configLoadErrorMsg{err: fmt.Errorf("failed to show file selector: %w", err)}
 		}
 
-		debug.LogToFile("DEBUG: Config file selector activated\n")
+		debug.LogToFile("DEBUG: Config file selector with preview activated\n")
 		return fileSelectorActivatedMsg{}
 	}
 }

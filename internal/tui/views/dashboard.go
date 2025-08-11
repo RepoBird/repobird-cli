@@ -693,6 +693,16 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				d.activateFZFMode()
 				return d, nil
 			}
+		case msg.Type == tea.KeyRunes && string(msg.Runes) == "v":
+			// Open file viewer
+			fileViewerView, err := NewFileViewerView(d.client)
+			if err == nil {
+				fileViewerView.width = d.width
+				fileViewerView.height = d.height
+				return fileViewerView, nil
+			}
+			d.statusLine.SetTemporaryMessageWithType(fmt.Sprintf("✗ Failed to open file viewer: %v", err), components.MessageError, 2*time.Second)
+			return d, nil
 		default:
 			// Handle navigation in Miller Columns layout
 			switch d.currentLayout {

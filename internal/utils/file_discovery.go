@@ -41,12 +41,12 @@ func FindJSONFiles(rootPath string) ([]string, error) {
 	return FindFiles(rootPath, opts)
 }
 
-// FindConfigFiles finds all config files (JSON and Markdown) in a directory structure
+// FindConfigFiles finds all config files (JSON, YAML, and Markdown) in a directory structure
 func FindConfigFiles(rootPath string) ([]string, error) {
 	opts := FileDiscoveryOptions{
 		MaxDepth:       3,
 		IgnorePatterns: DefaultIgnorePatterns,
-		FileExtensions: []string{".json", ".md", ".markdown"},
+		FileExtensions: []string{".json", ".yaml", ".yml", ".md", ".markdown"},
 		SortByModTime:  true,
 		MaxFiles:       100,
 	}

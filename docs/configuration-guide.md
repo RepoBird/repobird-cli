@@ -126,7 +126,7 @@ This allows developers to seamlessly work with local frontend instances while ma
 
 ## Run Configuration Files
 
-RepoBird CLI supports two formats for defining run configurations: JSON and Markdown with YAML frontmatter. These files can be used with the `run` command or loaded through the TUI's file selector.
+RepoBird CLI supports three formats for defining run configurations: JSON, YAML, and Markdown with YAML frontmatter. These files can be used with the `run` command or loaded through the TUI's file selector.
 
 ### JSON Configuration Format
 
@@ -143,6 +143,52 @@ Traditional JSON format for defining run configurations:
   "context": "Users are unable to login with valid credentials",
   "files": ["src/auth.js", "src/login.js"]
 }
+```
+
+### YAML Configuration Format
+
+YAML provides a cleaner syntax with excellent support for multiline strings:
+
+```yaml
+# Full example with all fields
+prompt: |
+  Refactor the payment processing module with the following goals:
+  - Improve error handling and retry logic
+  - Add support for multiple payment providers
+  - Implement idempotency for all transactions
+  - Add comprehensive logging and monitoring
+  
+  Ensure all changes are backward compatible.
+  
+repository: fintech/payment-service
+source: develop
+target: refactor/payment-module
+runType: approval
+title: Refactor payment processing module
+context: |
+  Current issues:
+  - Single point of failure with one payment provider
+  - Inconsistent error handling
+  - Missing transaction logs
+  
+  Tech stack: Node.js, TypeScript, PostgreSQL
+  
+files:
+  - src/payments/processor.ts
+  - src/payments/providers/
+  - src/utils/retry.ts
+  - tests/payments/
+```
+
+Minimal YAML with defaults:
+```yaml
+# Only required fields
+prompt: Add input validation to the API endpoints
+repository: myapp/backend
+target: feature/api-validation
+title: Add API input validation
+# source defaults to "main"
+# runType defaults to "run"
 ```
 
 ### Markdown Configuration Format
@@ -198,24 +244,36 @@ The markdown body content is automatically appended to the `context` field, allo
 # Run with JSON config
 repobird run config.json
 
+# Run with YAML config
+repobird run task.yaml
+repobird run task.yml
+
 # Run with Markdown config
 repobird run task.md
 
 # Follow run status after creation
-repobird run task.md --follow
+repobird run task.yaml --follow
+
+# Validate configuration without creating run
+repobird run task.yml --dry-run
 ```
 
 #### TUI File Selector
 In the Create Run view:
 1. Navigate to "Load Config" field
 2. Press `Enter` or `f` to open file selector
-3. Browse and select `.json`, `.md`, or `.markdown` files
+3. Browse and select `.json`, `.yaml`, `.yml`, `.md`, or `.markdown` files
 4. The form will be populated with the configuration
+
+File type indicators:
+- 📄 JSON files
+- 📋 YAML files
+- 📝 Markdown files
 
 ### File Discovery
 The file selector searches for configuration files with these settings:
 - **Max depth**: 3 directories deep
-- **File types**: `.json`, `.md`, `.markdown`
+- **File types**: `.json`, `.yaml`, `.yml`, `.md`, `.markdown`
 - **Ignored**: `node_modules`, `.git`, `vendor`, etc.
 - **Sorting**: By modification time (newest first)
 - **Limit**: 100 files maximum

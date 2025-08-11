@@ -74,43 +74,26 @@ func ParseMarkdownConfigFromReader(r io.Reader) (*models.RunConfig, string, erro
 
 // validateMarkdownConfig validates required fields in the markdown configuration
 func validateMarkdownConfig(config *MarkdownConfig) error {
-	var errors []string
-
-	// Required fields validation
-	if config.Prompt == "" {
-		errors = append(errors, "prompt is required")
+	// Convert to RunConfig for validation
+	runConfig := &models.RunConfig{
+		Prompt:     config.Prompt,
+		Repository: config.Repository,
+		Source:     config.Source,
+		Target:     config.Target,
+		RunType:    config.RunType,
+		Title:      config.Title,
+		Context:    config.Context,
+		Files:      config.Files,
 	}
 
-	if config.Repository == "" {
-		errors = append(errors, "repository is required")
+	// Use shared validation
+	if err := ValidateRunConfig(runConfig); err != nil {
+		return err
 	}
 
-	if config.Source == "" {
-		config.Source = "main" // Default to main if not specified
-	}
-
-	if config.Target == "" {
-		errors = append(errors, "target branch is required")
-	}
-
-	if config.RunType == "" {
-		config.RunType = "run" // Default to "run" if not specified
-	} else if config.RunType != "run" && config.RunType != "approval" {
-		errors = append(errors, fmt.Sprintf("invalid runType '%s', must be 'run' or 'approval'", config.RunType))
-	}
-
-	if config.Title == "" {
-		errors = append(errors, "title is required")
-	}
-
-	// Validate repository format (basic check)
-	if config.Repository != "" && !strings.Contains(config.Repository, "/") {
-		errors = append(errors, "repository must be in format 'owner/repo'")
-	}
-
-	if len(errors) > 0 {
-		return fmt.Errorf("validation errors:\n  - %s", strings.Join(errors, "\n  - "))
-	}
+	// Apply defaults back to the markdown config
+	config.Source = runConfig.Source
+	config.RunType = runConfig.RunType
 
 	return nil
 }
@@ -132,10 +115,11 @@ func LoadMarkdownOrJSONConfig(filepath string) (*models.RunConfig, string, error
 	return config, "", nil
 }
 
-// ValidateRunConfig validates a RunConfig structure
+// ValidateRunConfig validates a RunConfig structure and applies defaults
 func ValidateRunConfig(config *models.RunConfig) error {
 	var errors []string
 
+	// Required fields validation
 	if config.Prompt == "" {
 		errors = append(errors, "prompt is required")
 	}
@@ -144,16 +128,28 @@ func ValidateRunConfig(config *models.RunConfig) error {
 		errors = append(errors, "repository is required")
 	}
 
+	// Apply defaults
+	if config.Source == "" {
+		config.Source = "main" // Default to main if not specified
+	}
+
 	if config.Target == "" {
 		errors = append(errors, "target branch is required")
+	}
+
+	if config.RunType == "" {
+		config.RunType = "run" // Default to "run" if not specified
+	} else if config.RunType != "run" && config.RunType != "approval" {
+		errors = append(errors, fmt.Sprintf("invalid runType '%s', must be 'run' or 'approval'", config.RunType))
 	}
 
 	if config.Title == "" {
 		errors = append(errors, "title is required")
 	}
 
-	if config.RunType != "" && config.RunType != "run" && config.RunType != "approval" {
-		errors = append(errors, fmt.Sprintf("invalid runType '%s'", config.RunType))
+	// Validate repository format (basic check)
+	if config.Repository != "" && !strings.Contains(config.Repository, "/") {
+		errors = append(errors, "repository must be in format 'owner/repo'")
 	}
 
 	if len(errors) > 0 {

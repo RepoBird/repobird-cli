@@ -69,6 +69,8 @@ require (
 require (
 	github.com/BurntSushi/toml v0.3.1 // indirect
 	github.com/adrg/frontmatter v0.2.0 // indirect
+	github.com/alecthomas/chroma/v2 v2.20.0 // indirect
+	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	gopkg.in/yaml.v2 v2.3.0 // indirect
 )

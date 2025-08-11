@@ -1,0 +1,15 @@
+prompt: Implement a new feature for user profile management
+repository: myorg/myrepo
+source: develop
+target: feature/user-profile
+runType: plan
+title: User Profile Feature
+context: |
+  We need to add user profile management capabilities including:
+  - Profile picture upload
+  - Bio and personal information editing
+  - Privacy settings
+files:
+  - src/components/Profile.tsx
+  - src/api/userProfile.ts
+  - src/types/user.ts

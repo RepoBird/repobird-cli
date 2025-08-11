@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -23,9 +22,14 @@ var (
 
 var runCmd = &cobra.Command{
 	Use:   "run [file]",
-	Short: "Create a new run from a JSON or Markdown file",
-	Long: `Create a new run from a JSON or Markdown file containing the task details.
-Supports both JSON format and Markdown files with YAML frontmatter.
+	Short: "Create a new run from a JSON, YAML, or Markdown file",
+	Long: `Create a new run from a configuration file containing the task details.
+
+Supported formats:
+  - JSON (.json)
+  - YAML (.yaml, .yml)
+  - Markdown with YAML frontmatter (.md, .markdown)
+
 If no file is specified, reads JSON from stdin.`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: runCommand,
@@ -46,39 +50,11 @@ func runCommand(cmd *cobra.Command, args []string) error {
 	var err error
 
 	if len(args) > 0 {
-		// Check if it's a markdown or JSON file
+		// Load configuration from file (supports JSON, YAML, and Markdown)
 		filename := args[0]
-		if strings.HasSuffix(strings.ToLower(filename), ".md") ||
-			strings.HasSuffix(strings.ToLower(filename), ".markdown") {
-			// Parse markdown file with frontmatter
-			runConfig, additionalContext, err = utils.ParseMarkdownConfig(filename)
-			if err != nil {
-				return fmt.Errorf("failed to parse markdown file: %w", err)
-			}
-		} else {
-			// Parse JSON file
-			file, err := os.Open(filename)
-			if err != nil {
-				return fmt.Errorf("failed to open file: %w", err)
-			}
-			defer func() { _ = file.Close() }()
-
-			var runReq models.RunRequest
-			if err := json.NewDecoder(file).Decode(&runReq); err != nil {
-				return fmt.Errorf("failed to parse JSON: %w", err)
-			}
-
-			// Convert RunRequest to RunConfig
-			runConfig = &models.RunConfig{
-				Prompt:     runReq.Prompt,
-				Repository: runReq.Repository,
-				Source:     runReq.Source,
-				Target:     runReq.Target,
-				RunType:    string(runReq.RunType),
-				Title:      runReq.Title,
-				Context:    runReq.Context,
-				Files:      runReq.Files,
-			}
+		runConfig, additionalContext, err = utils.LoadConfigFromFile(filename)
+		if err != nil {
+			return fmt.Errorf("failed to load configuration file: %w", err)
 		}
 	} else {
 		// Read JSON from stdin

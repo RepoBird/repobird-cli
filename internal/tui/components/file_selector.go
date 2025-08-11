@@ -58,6 +58,8 @@ func (fs *FileSelector) ActivateJSONFileSelector() error {
 		switch {
 		case strings.HasSuffix(file, ".json"):
 			icon = "📄"
+		case strings.HasSuffix(file, ".yaml") || strings.HasSuffix(file, ".yml"):
+			icon = "📋"
 		case strings.HasSuffix(file, ".md") || strings.HasSuffix(file, ".markdown"):
 			icon = "📝"
 		default:
@@ -68,7 +70,7 @@ func (fs *FileSelector) ActivateJSONFileSelector() error {
 
 	// If no config files found, create an empty list with a helpful message
 	if len(formattedFiles) == 0 {
-		formattedFiles = []string{"📝 No config files (.json, .md) found - type full path"}
+		formattedFiles = []string{"📝 No config files (.json, .yaml, .md) found - type full path"}
 	}
 
 	// Add manual entry hint at the top
@@ -144,12 +146,14 @@ func (fs *FileSelector) Update(msg tea.Msg) (*FileSelector, tea.Cmd) {
 func (fs *FileSelector) isManualPath(input string) bool {
 	// Consider it a manual path if:
 	// 1. It contains path separators
-	// 2. It ends with .json, .md, or .markdown
+	// 2. It ends with .json, .yaml, .yml, .md, or .markdown
 	// 3. It starts with / or . or ~
 	// 4. It doesn't match any of the filtered items exactly
 
 	if strings.Contains(input, string(filepath.Separator)) ||
 		strings.HasSuffix(input, ".json") ||
+		strings.HasSuffix(input, ".yaml") ||
+		strings.HasSuffix(input, ".yml") ||
 		strings.HasSuffix(input, ".md") ||
 		strings.HasSuffix(input, ".markdown") ||
 		strings.HasPrefix(input, "/") ||
