@@ -76,9 +76,8 @@ type DashboardView struct {
 	yankBlink         bool      // Toggle for blinking effect
 	yankBlinkTime     time.Time // Time when blink started (separate from message timing)
 
-	// Temporary status line messages (for URL opening, etc.)
-	statusMessage     string
-	statusMessageTime time.Time
+	// Unified status line component
+	statusLine *components.StatusLine
 
 	// Store original untruncated detail lines for copying
 	detailLinesOriginal []string
@@ -110,7 +109,6 @@ type dashboardUserInfoLoadedMsg struct {
 	error    error
 }
 
-type clearStatusMessageMsg struct{}
 
 // NewDashboardView creates a new dashboard view
 func NewDashboardView(client *api.Client) *DashboardView {
@@ -130,6 +128,7 @@ func NewDashboardView(client *api.Client) *DashboardView {
 		apiRepositories: make(map[int]models.APIRepository),
 		fzfColumn:       -1, // No FZF mode initially
 		spinner:         s,
+		statusLine:      components.NewStatusLine(),
 	}
 
 	// Initialize cache system
@@ -547,9 +546,6 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		d.copiedMessage = ""
 		d.yankBlink = false
 
-	case clearStatusMessageMsg:
-		// Clear the temporary status message after timeout
-		d.statusMessage = ""
 
 	case components.FZFSelectedMsg:
 		// Handle FZF selection result
@@ -963,12 +959,11 @@ func (d *DashboardView) handleMillerColumnsNavigation(msg tea.KeyMsg) tea.Cmd {
 
 		if urlText != "" {
 			if err := utils.OpenURL(urlText); err == nil {
-				d.statusMessage = "🌐 Opened URL in browser"
+				d.statusLine.SetTemporaryMessageWithType("🌐 Opened URL in browser", components.MessageSuccess, 3*time.Second)
 			} else {
-				d.statusMessage = fmt.Sprintf("✗ Failed to open URL: %v", err)
+				d.statusLine.SetTemporaryMessageWithType(fmt.Sprintf("✗ Failed to open URL: %v", err), components.MessageError, 3*time.Second)
 			}
-			d.statusMessageTime = time.Now()
-			return d.startClearStatusMessageTimer()
+			return nil
 		}
 
 	case key.Matches(msg, d.keys.Right) || (msg.Type == tea.KeyRunes && string(msg.Runes) == "l"):
@@ -1038,7 +1033,8 @@ func (d *DashboardView) View() string {
 
 	if d.error != nil {
 		content = fmt.Sprintf("Error loading dashboard data: %s\n\nPress 'r' to retry, 'q' to quit", d.error.Error())
-		return lipgloss.JoinVertical(lipgloss.Left, title, content)
+		statusline := d.renderStatusLine("DASH")
+		return lipgloss.JoinVertical(lipgloss.Left, title, content, statusline)
 	}
 
 	// Show cached content while loading new data
@@ -1065,9 +1061,12 @@ func (d *DashboardView) View() string {
 			Bold(true).
 			Width(d.width).
 			Align(lipgloss.Center).
-			MarginTop((d.height - 2) / 2)
+			MarginTop((d.height - 4) / 2) // Account for title and status line
 		content = loadingStyle.Render(loadingText)
-		return lipgloss.JoinVertical(lipgloss.Left, title, content)
+
+		// Always show status line even during loading
+		statusline := d.renderStatusLine("DASH")
+		return lipgloss.JoinVertical(lipgloss.Left, title, content, statusline)
 	}
 
 	// Render based on current layout
@@ -1364,13 +1363,6 @@ func (d *DashboardView) startClearStatusTimer() tea.Cmd {
 	}
 }
 
-// startClearStatusMessageTimer starts a timer to clear the temporary status message
-func (d *DashboardView) startClearStatusMessageTimer() tea.Cmd {
-	return func() tea.Msg {
-		time.Sleep(1 * time.Second)
-		return clearStatusMessageMsg{}
-	}
-}
 
 // renderAllRunsLayout renders the timeline layout
 func (d *DashboardView) renderAllRunsLayout() string {
@@ -2224,14 +2216,13 @@ func (d *DashboardView) renderStatusInfo() string {
 	var statusLine string
 	shortHelp := "[j/k]navigate [y]copy [s/q/b/ESC]back [Q]uit"
 
-	// Show copied message prominently if recent
-	if d.copiedMessage != "" && time.Since(d.copiedMessageTime) < 250*time.Millisecond {
-		// Use the renderStatusLine method which handles copied messages
-		statusLine = d.renderStatusLine("STATUS")
-	} else {
-		// Use components.DashboardStatusLine for consistent formatting
-		statusLine = components.DashboardStatusLine(d.width, "STATUS", "", shortHelp)
-	}
+	// Use unified status line for status overlay
+	statusLine = d.statusLine.
+		SetWidth(d.width).
+		SetLeft("[STATUS]").
+		SetRight("").
+		SetHelp(shortHelp).
+		Render()
 
 	// Join the centered box and statusline
 	return lipgloss.JoinVertical(lipgloss.Left, centeredBox, statusLine)
@@ -2383,7 +2374,7 @@ func (d *DashboardView) wrapTextWithLimit(text string, width int, maxLines int) 
 // renderNotificationLine renders a notification line if there's a message to show
 func (d *DashboardView) renderNotificationLine() string {
 	// If we're showing a status message in the status line, don't show notification
-	if d.statusMessage != "" && time.Since(d.statusMessageTime) < 1*time.Second {
+	if d.statusLine.HasActiveMessage() {
 		return ""
 	}
 
@@ -2464,35 +2455,6 @@ func (d *DashboardView) hasCurrentSelectionURL() bool {
 
 // renderStatusLine renders the universal status line
 func (d *DashboardView) renderStatusLine(layoutName string) string {
-	// Check for temporary status message (URL opening, copying, etc.) - highest priority
-	if d.statusMessage != "" && time.Since(d.statusMessageTime) < 1*time.Second {
-		// Create green status line for successful operations or red for errors
-		var statusStyle lipgloss.Style
-		if strings.Contains(d.statusMessage, "✗") {
-			// Red for errors
-			statusStyle = lipgloss.NewStyle().
-				Background(lipgloss.Color("196")).
-				Foreground(lipgloss.Color("255")).
-				Padding(0, 1)
-		} else {
-			// Green for success
-			statusStyle = lipgloss.NewStyle().
-				Background(lipgloss.Color("82")).
-				Foreground(lipgloss.Color("232")).
-				Padding(0, 1)
-		}
-
-		statusLine := components.NewStatusLine().
-			SetWidth(d.width).
-			SetLeft(fmt.Sprintf("[%s]", layoutName)).
-			SetRight("").
-			SetHelp(d.statusMessage).
-			SetStyle(statusStyle)
-
-		return statusLine.Render()
-	}
-
-	// Always show normal status line now - notifications are shown above
 	// Data freshness indicator - keep it very short
 	dataInfo := ""
 	if d.loading && len(d.repositories) > 0 {
@@ -2506,23 +2468,21 @@ func (d *DashboardView) renderStatusLine(layoutName string) string {
 		}
 	}
 
-	// Handle URL selection prompt
+	// Handle URL selection prompt with yellow background
 	if d.showURLSelectionPrompt {
 		promptHelp := "Open URL: (o)RepoBird (g)GitHub [ESC]cancel"
-		// Create yellow status line for URL selection prompt
 		yellowStyle := lipgloss.NewStyle().
 			Background(lipgloss.Color("220")).
 			Foreground(lipgloss.Color("232")).
 			Padding(0, 1)
 
-		statusLine := components.NewStatusLine().
+		return d.statusLine.
 			SetWidth(d.width).
 			SetLeft(fmt.Sprintf("[%s]", layoutName)).
 			SetRight(dataInfo).
 			SetHelp(promptHelp).
-			SetStyle(yellowStyle)
-
-		return statusLine.Render()
+			SetStyle(yellowStyle).
+			Render()
 	}
 
 	// Compact help text
@@ -2536,7 +2496,13 @@ func (d *DashboardView) renderStatusLine(layoutName string) string {
 		shortHelp = "o:open-url " + shortHelp
 	}
 
-	return components.DashboardStatusLine(d.width, layoutName, dataInfo, shortHelp)
+	// Use the unified status line with temporary message support
+	return d.statusLine.
+		SetWidth(d.width).
+		SetLeft(fmt.Sprintf("[%s]", layoutName)).
+		SetRight(dataInfo).
+		SetHelp(shortHelp).
+		Render()
 }
 
 // activateFZFMode activates FZF mode for the current column

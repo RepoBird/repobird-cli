@@ -100,6 +100,7 @@ func NewCreateRunViewWithConfig(config CreateRunViewConfig) *CreateRunView {
 		parentCached:       config.ParentCached,
 		parentCachedAt:     config.ParentCachedAt,
 		parentDetailsCache: config.ParentDetailsCache,
+		statusLine:         components.NewStatusLine(),
 	}
 
 	v.repoSelector = components.NewRepositorySelector()
@@ -622,11 +623,6 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return v, nil
 
-	case clearStatusMsg:
-		// Clear the clipboard message after timeout
-		v.copiedMessage = ""
-		v.yankBlink = false
-		return v, nil
 
 	case clipboardResultMsg:
 		// Handle clipboard result
@@ -637,12 +633,12 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(displayText) > maxLen {
 				displayText = displayText[:maxLen-3] + "..."
 			}
-			v.copiedMessage = fmt.Sprintf("📋 Copied \"%s\"", displayText)
+			v.statusLine.SetTemporaryMessageWithType(fmt.Sprintf("📋 Copied \"%s\"", displayText), components.MessageSuccess, 3*time.Second)
 		} else {
-			v.copiedMessage = "✗ Failed to copy"
+			v.statusLine.SetTemporaryMessageWithType("✗ Failed to copy", components.MessageError, 3*time.Second)
 		}
-		v.copiedMessageTime = time.Now()
 		v.yankBlink = true
+		v.yankBlinkTime = time.Now()
 		// Start blink animation and clear timer
 		return v, tea.Batch(
 			v.startYankBlinkAnimation(),
@@ -1378,10 +1374,6 @@ func (v *CreateRunView) renderStatusBar() string {
 
 	// Handle error mode status
 	if v.error != nil && !v.submitting {
-		// Check if we should show clipboard message
-		if v.copiedMessage != "" && time.Since(v.copiedMessageTime) < 3*time.Second {
-			return v.renderClipboardStatusLine()
-		}
 
 		if v.errorRowFocused {
 			statusText = "[Enter] back to form [j/k] navigate [y] copy error [q] back to form [r] retry [Q]uit"
@@ -1422,48 +1414,14 @@ func (v *CreateRunView) renderStatusBar() string {
 	}
 
 	// Use DashboardStatusLine for consistent formatting with [CREATE] label
-	return components.DashboardStatusLine(v.width, "CREATE", "", statusText)
+	return v.statusLine.
+		SetWidth(v.width).
+		SetLeft("[CREATE]").
+		SetRight("").
+		SetHelp(statusText).
+		Render()
 }
 
-// renderClipboardStatusLine renders the status line with clipboard message
-func (v *CreateRunView) renderClipboardStatusLine() string {
-	// Custom blinking: toggle visibility of the message
-	var copiedStyle lipgloss.Style
-	if time.Since(v.copiedMessageTime) < 2*time.Second {
-		if v.yankBlink {
-			// Bright and bold when visible
-			copiedStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("82")).
-				Background(lipgloss.Color("235")).
-				Bold(true).
-				Padding(0, 1)
-		} else {
-			// Dimmer when "off" for blinking effect
-			copiedStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("240")). // Dim gray
-				Background(lipgloss.Color("235")).
-				Padding(0, 1)
-		}
-	} else {
-		// After blinking period, show normally
-		copiedStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("82")).
-			Background(lipgloss.Color("235")).
-			Bold(true).
-			Padding(0, 1)
-	}
-
-	// Create a custom status line just for the clipboard message
-	statusStyle := lipgloss.NewStyle().
-		Width(v.width).
-		Background(lipgloss.Color("235"))
-	message := copiedStyle.Render(v.copiedMessage)
-	padding := v.width - lipgloss.Width(message)
-	if padding > 0 {
-		message = message + strings.Repeat(" ", padding)
-	}
-	return statusStyle.Render(message)
-}
 
 // prepareTaskFromFile loads and parses task from a JSON file
 func (v *CreateRunView) prepareTaskFromFile(filePath string) (models.RunRequest, error) {

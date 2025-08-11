@@ -46,10 +46,11 @@ type RunDetailsView struct {
 	// Cache retry mechanism
 	cacheRetryCount int
 	maxCacheRetries int
-	// Clipboard feedback
-	copiedMessage     string
-	copiedMessageTime time.Time
-	yankBlink         bool // Toggle for blinking effect
+	// Unified status line component
+	statusLine *components.StatusLine
+	// Clipboard feedback (still need blink timing)
+	yankBlink     bool
+	yankBlinkTime time.Time
 	// Store full content for clipboard operations
 	fullContent string
 	// Row navigation
@@ -117,6 +118,7 @@ func NewRunDetailsViewWithConfig(config RunDetailsViewConfig) *RunDetailsView {
 		statusHistory:      make([]string, 0),
 		cacheRetryCount:    0,
 		maxCacheRetries:    3,
+		statusLine:         components.NewStatusLine(),
 	}
 
 	// Initialize status history with current status if we have cached data
@@ -238,9 +240,6 @@ func (v *RunDetailsView) handleWindowSizeMsg(msg tea.WindowSizeMsg) {
 	nonViewportHeight := 6 // Base: title(2) + header(2) + separator(1) + status bar(1)
 	if v.showHelp {
 		nonViewportHeight += 4
-	}
-	if v.copiedMessage != "" {
-		nonViewportHeight++ // Feedback message takes a line
 	}
 
 	viewportHeight := msg.Height - nonViewportHeight
@@ -380,9 +379,9 @@ func (v *RunDetailsView) handleClipboardOperations(key string) tea.Cmd {
 				if len(displayText) > maxLen {
 					displayText = displayText[:maxLen-3] + "..."
 				}
-				v.copiedMessage = fmt.Sprintf("📋 Copied \"%s\"", displayText)
+				v.statusLine.SetTemporaryMessageWithType(fmt.Sprintf("📋 Copied \"%s\"", displayText), components.MessageSuccess, 3*time.Second)
 			} else {
-				v.copiedMessage = "✗ Failed to copy"
+				v.statusLine.SetTemporaryMessageWithType("✗ Failed to copy", components.MessageError, 3*time.Second)
 			}
 		} else {
 			// Copy current line to clipboard (old behavior)
@@ -395,26 +394,26 @@ func (v *RunDetailsView) handleClipboardOperations(key string) tea.Cmd {
 					if len(displayText) > maxLen {
 						displayText = displayText[:maxLen-3] + "..."
 					}
-					v.copiedMessage = fmt.Sprintf("📋 Copied \"%s\"", displayText)
+					v.statusLine.SetTemporaryMessageWithType(fmt.Sprintf("📋 Copied \"%s\"", displayText), components.MessageSuccess, 3*time.Second)
 				} else {
-					v.copiedMessage = "✗ Failed to copy"
+					v.statusLine.SetTemporaryMessageWithType("✗ Failed to copy", components.MessageError, 3*time.Second)
 				}
 			} else {
-				v.copiedMessage = "✗ No line to copy"
+				v.statusLine.SetTemporaryMessageWithType("✗ No line to copy", components.MessageError, 3*time.Second)
 			}
 		}
-		v.copiedMessageTime = time.Now()
 		v.yankBlink = true
+		v.yankBlinkTime = time.Now()
 		return v.startYankBlinkAnimation()
 	case "Y":
 		// Copy all content to clipboard
 		if err := v.copyAllContent(); err == nil {
-			v.copiedMessage = "📋 Copied all content"
+			v.statusLine.SetTemporaryMessageWithType("📋 Copied all content", components.MessageSuccess, 3*time.Second)
 		} else {
-			v.copiedMessage = "✗ Failed to copy"
+			v.statusLine.SetTemporaryMessageWithType("✗ Failed to copy", components.MessageError, 3*time.Second)
 		}
-		v.copiedMessageTime = time.Now()
 		v.yankBlink = true
+		v.yankBlinkTime = time.Now()
 		return v.startYankBlinkAnimation()
 	case "o":
 		// Open URL in browser if current selection contains a URL
@@ -435,12 +434,12 @@ func (v *RunDetailsView) handleClipboardOperations(key string) tea.Cmd {
 
 		if urlText != "" {
 			if err := utils.OpenURL(urlText); err == nil {
-				v.copiedMessage = "🌐 Opened URL in browser"
+				v.statusLine.SetTemporaryMessageWithType("🌐 Opened URL in browser", components.MessageSuccess, 3*time.Second)
 			} else {
-				v.copiedMessage = fmt.Sprintf("✗ Failed to open URL: %v", err)
+				v.statusLine.SetTemporaryMessageWithType(fmt.Sprintf("✗ Failed to open URL: %v", err), components.MessageError, 3*time.Second)
 			}
-			v.copiedMessageTime = time.Now()
 			v.yankBlink = true
+			v.yankBlinkTime = time.Now()
 			return v.startYankBlinkAnimation()
 		}
 	}
@@ -608,40 +607,6 @@ func (v *RunDetailsView) View() string {
 		}
 	}
 
-	// Add notification above status bar if there's a message
-	notificationIdx := len(lines) - 1
-	if v.copiedMessage != "" && time.Since(v.copiedMessageTime) < 3*time.Second {
-		// Show notification on the second-to-last line
-		if len(lines) > 1 {
-			notificationIdx = len(lines) - 2
-			var notificationStyle lipgloss.Style
-			if time.Since(v.copiedMessageTime) < 2*time.Second {
-				if v.yankBlink {
-					// Bright and bold when visible
-					notificationStyle = lipgloss.NewStyle().
-						Foreground(lipgloss.Color("82")).
-						Background(lipgloss.Color("235")).
-						Bold(true).
-						Width(v.width)
-				} else {
-					// Dimmer when "off" for blinking effect
-					notificationStyle = lipgloss.NewStyle().
-						Foreground(lipgloss.Color("240")).
-						Background(lipgloss.Color("235")).
-						Width(v.width)
-				}
-			} else {
-				// After blinking period, show normally
-				notificationStyle = lipgloss.NewStyle().
-					Foreground(lipgloss.Color("82")).
-					Background(lipgloss.Color("235")).
-					Bold(true).
-					Width(v.width)
-			}
-
-			lines[notificationIdx] = notificationStyle.Render(" " + v.copiedMessage)
-		}
-	}
 
 	// Status bar always goes in the last line
 	if len(lines) > 0 {
@@ -693,7 +658,7 @@ func (v *RunDetailsView) renderContentWithCursor() []string {
 			// Apply highlight style
 			// Single blink: bright green briefly when yankBlink is true
 			var highlightedLine string
-			if v.yankBlink && v.copiedMessage != "" {
+			if v.yankBlink && !v.yankBlinkTime.IsZero() && time.Since(v.yankBlinkTime) < 2*time.Second {
 				// Bright green flash
 				highlightStyle := lipgloss.NewStyle().
 					Background(lipgloss.Color("82")). // Bright green
@@ -787,10 +752,13 @@ func (v *RunDetailsView) renderStatusBar() string {
 		}
 	}
 
-	// Notifications are now shown above the status bar, not in it
-
-	// Use DashboardStatusLine for consistent formatting with [DETAILS] label
-	return components.DashboardStatusLine(v.width, "DETAILS", "", options)
+	// Use unified status line system
+	return v.statusLine.
+		SetWidth(v.width).
+		SetLeft("[DETAILS]").
+		SetRight("").
+		SetHelp(options).
+		Render()
 }
 
 func (v *RunDetailsView) updateContent() {

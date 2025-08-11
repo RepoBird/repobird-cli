@@ -43,7 +43,9 @@ type RunListView struct {
 	detailsCache map[string]*models.RunResponse
 	preloading   map[string]bool
 	// User info for remaining runs counter
-	userInfo *models.UserInfo
+	userInfo   *models.UserInfo
+	// Unified status line component
+	statusLine *components.StatusLine
 }
 
 func NewRunListView(client *api.Client) *RunListView {
@@ -135,6 +137,7 @@ func NewRunListViewWithCache(
 		cachedAt:     cachedAt,
 		detailsCache: detailsCache,
 		preloading:   make(map[string]bool),
+		statusLine:   components.NewStatusLine(),
 	}
 
 	// If we have cached data, update the table
@@ -692,8 +695,13 @@ func (v *RunListView) renderStatusBar() string {
 	// Help text
 	helpText := "[n]ew [r]efresh [/]search [?]help [q]back [Q]uit"
 
-	// Use DashboardStatusLine for consistent formatting with [LIST] label
-	return components.DashboardStatusLine(v.width, "LIST", dataInfo, helpText)
+	// Use unified status line system
+	return v.statusLine.
+		SetWidth(v.width).
+		SetLeft("[LIST]").
+		SetRight(dataInfo).
+		SetHelp(helpText).
+		Render()
 }
 
 func (v *RunListView) loadRuns() tea.Cmd {
