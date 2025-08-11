@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/repobird/repobird-cli/internal/api"
 	"github.com/repobird/repobird-cli/internal/cache"
+	"github.com/repobird/repobird-cli/internal/config"
 	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/repobird/repobird-cli/internal/tui/components"
 	"github.com/repobird/repobird-cli/internal/tui/debug"
@@ -54,10 +56,11 @@ type CreateRunView struct {
 	prevFocusIndex          int
 	prevBackButtonFocused   bool
 	prevSubmitButtonFocused bool
-	// Clipboard feedback
-	copiedMessage     string
-	copiedMessageTime time.Time
-	yankBlink         bool
+	// Unified status line component
+	statusLine *components.StatusLine
+	// Clipboard feedback (still need blink timing)
+	yankBlink     bool
+	yankBlinkTime time.Time
 	// Cache from parent list view
 	parentRuns         []models.RunResponse
 	parentCached       bool
@@ -73,6 +76,12 @@ type CreateRunView struct {
 	showContext     bool // Whether to show context field
 	// Run type toggle
 	runType models.RunType
+	// Config file loading
+	configLoader             *config.ConfigLoader
+	fileSelector             *components.FileSelector
+	lastLoadedFile           string
+	configFileSelectorActive bool
+	fileSelectorLoading      bool
 }
 
 func NewCreateRunView(client *api.Client) *CreateRunView {
@@ -90,17 +99,19 @@ type CreateRunViewConfig struct {
 }
 
 // NewCreateRunViewWithConfig creates a new CreateRunView with the given configuration
-func NewCreateRunViewWithConfig(config CreateRunViewConfig) *CreateRunView {
+func NewCreateRunViewWithConfig(cfg CreateRunViewConfig) *CreateRunView {
 	v := &CreateRunView{
-		client:             config.Client,
+		client:             cfg.Client,
 		keys:               components.DefaultKeyMap,
 		help:               help.New(),
 		inputMode:          components.NormalMode, // Start in normal mode to show selector
-		parentRuns:         config.ParentRuns,
-		parentCached:       config.ParentCached,
-		parentCachedAt:     config.ParentCachedAt,
-		parentDetailsCache: config.ParentDetailsCache,
+		parentRuns:         cfg.ParentRuns,
+		parentCached:       cfg.ParentCached,
+		parentCachedAt:     cfg.ParentCachedAt,
+		parentDetailsCache: cfg.ParentDetailsCache,
 		statusLine:         components.NewStatusLine(),
+		configLoader:       config.NewConfigLoader(),
+		fileSelector:       components.NewFileSelector(80, 10), // Default dimensions
 	}
 
 	v.repoSelector = components.NewRepositorySelector()
@@ -108,9 +119,9 @@ func NewCreateRunViewWithConfig(config CreateRunViewConfig) *CreateRunView {
 	v.loadFormData()
 
 	// If a repository was selected in the dashboard, use it
-	if config.SelectedRepository != "" {
+	if cfg.SelectedRepository != "" {
 		if len(v.fields) >= 1 {
-			v.fields[0].SetValue(config.SelectedRepository)
+			v.fields[0].SetValue(cfg.SelectedRepository)
 		}
 	} else {
 		v.autofillRepository()
@@ -405,13 +416,16 @@ func (v *CreateRunView) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return v, v.submitRun()
 			}
 		} else if v.focusIndex == 0 {
-			// Enter on run type field (index 0) toggles it
+			// Enter on load config field (index 0) activates file selector
+			return v, v.activateConfigFileSelector()
+		} else if v.focusIndex == 1 {
+			// Enter on run type field (index 1) toggles it
 			if v.runType == models.RunTypeRun {
 				v.runType = models.RunTypePlan
 			} else {
 				v.runType = models.RunTypeRun
 			}
-		} else if v.focusIndex == 1 {
+		} else if v.focusIndex == 2 {
 			// Repository field - enter insert mode
 			v.inputMode = components.InsertMode
 			v.exitRequested = false
@@ -436,8 +450,12 @@ func (v *CreateRunView) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case msg.String() == "ctrl+x":
 		v.clearCurrentField()
 	case msg.String() == "f":
-		// In normal mode, 'f' activates FZF for repository field (now at index 1)
-		if v.focusIndex == 1 && !v.fzfActive {
+		// In normal mode, 'f' activates FZF
+		if v.focusIndex == 0 {
+			// Load config field - activate file selector
+			return v, v.activateConfigFileSelector()
+		} else if v.focusIndex == 2 && !v.fzfActive {
+			// Repository field - activate FZF for repository selection
 			v.activateFZFMode()
 			return v, nil
 		}
@@ -452,8 +470,8 @@ func (v *CreateRunView) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			v.runType = models.RunTypeRun
 		}
 	case msg.String() == "d":
-		// Delete current field value for string input fields only (not run type)
-		if v.focusIndex != 0 { // Skip run type field (index 0)
+		// Delete current field value for string input fields only (not load config or run type)
+		if v.focusIndex != 0 && v.focusIndex != 1 { // Skip load config field (index 0) and run type field (index 1)
 			v.clearCurrentField()
 		}
 	default:
@@ -577,6 +595,13 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		v.handleWindowSizeMsg(msg)
 
 	case tea.KeyMsg:
+		// If file selector is active, handle input there first
+		if v.fileSelector != nil && v.fileSelector.IsActive() {
+			newFileSelector, cmd := v.fileSelector.Update(msg)
+			v.fileSelector = newFileSelector
+			return v, cmd
+		}
+
 		// If FZF mode is active, handle input there first
 		if v.fzfMode != nil && v.fzfMode.IsActive() {
 			newFzf, cmd := v.fzfMode.Update(msg)
@@ -599,8 +624,24 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case components.FZFSelectedMsg:
 		// Handle FZF selection result
-		if !msg.Result.Canceled && v.focusIndex == 1 {
-			// Update repository field with selected value
+		if v.configFileSelectorActive {
+			// Handle file selector result
+			v.configFileSelectorActive = false
+			if !msg.Result.Canceled && msg.Result.Selected != "" {
+				// Clean the selected file path (remove any icon prefixes)
+				filePath := msg.Result.Selected
+				if idx := strings.Index(filePath, " "); idx > 0 {
+					filePath = filePath[idx+1:] // Skip icon
+				}
+
+				// Clean up any remaining emoji or prefixes
+				filePath = strings.TrimSpace(strings.TrimLeft(filePath, "📁📝🔍"))
+
+				debug.LogToFilef("DEBUG: File selected from FZF: %s\n", filePath)
+				return v, v.loadConfigFromFile(filePath)
+			}
+		} else if !msg.Result.Canceled && v.focusIndex == 2 {
+			// Handle repository field selection (focusIndex 2 is repository now)
 			if msg.Result.Selected != "" {
 				// Extract just the repository name (remove any icons)
 				repoName := msg.Result.Selected
@@ -623,7 +664,6 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return v, nil
 
-
 	case clipboardResultMsg:
 		// Handle clipboard result
 		if msg.success {
@@ -633,9 +673,9 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(displayText) > maxLen {
 				displayText = displayText[:maxLen-3] + "..."
 			}
-			v.statusLine.SetTemporaryMessageWithType(fmt.Sprintf("📋 Copied \"%s\"", displayText), components.MessageSuccess, 3*time.Second)
+			v.statusLine.SetTemporaryMessageWithType(fmt.Sprintf("📋 Copied \"%s\"", displayText), components.MessageSuccess, 100*time.Millisecond)
 		} else {
-			v.statusLine.SetTemporaryMessageWithType("✗ Failed to copy", components.MessageError, 3*time.Second)
+			v.statusLine.SetTemporaryMessageWithType("✗ Failed to copy", components.MessageError, 100*time.Millisecond)
 		}
 		v.yankBlink = true
 		v.yankBlinkTime = time.Now()
@@ -644,6 +684,23 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			v.startYankBlinkAnimation(),
 			v.startClearStatusTimer(),
 		)
+
+	case configLoadedMsg:
+		// Handle successful config loading
+		v.populateFormFromConfig(msg.config, msg.filePath)
+		v.statusLine.SetTemporaryMessageWithType(
+			fmt.Sprintf("✅ Config loaded from %s", filepath.Base(msg.filePath)),
+			components.MessageSuccess,
+			3*time.Second,
+		)
+		return v, nil
+
+	case configLoadErrorMsg:
+		// Handle config loading error
+		v.error = msg.err
+		v.initErrorFocus()
+		debug.LogToFilef("DEBUG: Config loading failed: %v\n", msg.err)
+		return v, nil
 	}
 
 	return v, tea.Batch(cmds...)
@@ -652,31 +709,34 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (v *CreateRunView) updateFields(msg tea.KeyMsg) []tea.Cmd {
 	var cmds []tea.Cmd
 
-	// Run type is at index 0 (not editable via text input)
-	// Repository is at index 1
-	// Prompt is at index 2
-	// Other fields start at index 3
+	// Load config is at index 0 (not editable via text input)
+	// Run type is at index 1 (not editable via text input)
+	// Repository is at index 2
+	// Prompt is at index 3
+	// Other fields start at index 4
 	if v.focusIndex == 0 {
-		// Run type field - no text input
+		// Load config field - no text input
 	} else if v.focusIndex == 1 {
+		// Run type field - no text input
+	} else if v.focusIndex == 2 {
 		// Repository field
 		var cmd tea.Cmd
 		v.fields[0], cmd = v.fields[0].Update(msg)
 		cmds = append(cmds, cmd)
-	} else if v.focusIndex == 2 {
+	} else if v.focusIndex == 3 {
 		// Prompt area
 		var cmd tea.Cmd
 		v.promptArea, cmd = v.promptArea.Update(msg)
 		cmds = append(cmds, cmd)
-	} else if v.focusIndex >= 3 && v.focusIndex < len(v.fields)+2 {
+	} else if v.focusIndex >= 4 && v.focusIndex < len(v.fields)+3 {
 		// Other fields (source, target, title, issue)
-		fieldIdx := v.focusIndex - 2 // Adjust for run type at 0 and prompt at 2
+		fieldIdx := v.focusIndex - 3 // Adjust for load config at 0, run type at 1, and prompt at 3
 		if fieldIdx < len(v.fields) {
 			var cmd tea.Cmd
 			v.fields[fieldIdx], cmd = v.fields[fieldIdx].Update(msg)
 			cmds = append(cmds, cmd)
 		}
-	} else if v.showContext && v.focusIndex == len(v.fields)+2 {
+	} else if v.showContext && v.focusIndex == len(v.fields)+3 {
 		// Context area (only if visible)
 		var cmd tea.Cmd
 		v.contextArea, cmd = v.contextArea.Update(msg)
@@ -687,11 +747,11 @@ func (v *CreateRunView) updateFields(msg tea.KeyMsg) []tea.Cmd {
 }
 
 func (v *CreateRunView) nextField() {
-	// Handle cycling from back button to first field (run type)
+	// Handle cycling from back button to first field (load config)
 	if v.backButtonFocused {
 		v.backButtonFocused = false
 		v.submitButtonFocused = false
-		v.focusIndex = 0 // Go to run type field
+		v.focusIndex = 0 // Go to load config field
 		v.updateFocus()
 		return
 	}
@@ -700,8 +760,8 @@ func (v *CreateRunView) nextField() {
 	v.submitButtonFocused = false
 	v.focusIndex++
 
-	// Calculate total fields: 1 (run type) + 1 (repo) + 1 (prompt) + 4 (other fields) + context (if shown)
-	totalFields := len(v.fields) + 2 // +1 for run type, +1 for prompt
+	// Calculate total fields: 1 (load config) + 1 (run type) + 1 (repo) + 1 (prompt) + 4 (other fields) + context (if shown)
+	totalFields := len(v.fields) + 3 // +1 for load config, +1 for run type, +1 for prompt
 	if v.showContext {
 		totalFields++ // +1 for context
 	}
@@ -723,7 +783,7 @@ func (v *CreateRunView) prevField() {
 		// From back button, go to submit button
 		v.backButtonFocused = false
 		v.submitButtonFocused = true
-		totalFields := len(v.fields) + 2
+		totalFields := len(v.fields) + 3 // +1 for load config, +1 for run type, +1 for prompt
 		if v.showContext {
 			totalFields++
 		}
@@ -732,9 +792,9 @@ func (v *CreateRunView) prevField() {
 		// From submit button, go to last field
 		v.submitButtonFocused = false
 		if v.showContext {
-			v.focusIndex = len(v.fields) + 2 // context area (+2 for run type and prompt)
+			v.focusIndex = len(v.fields) + 3 // context area (+3 for load config, run type and prompt)
 		} else {
-			v.focusIndex = len(v.fields) + 1 // last regular field (+1 for run type, prompt counted in fields)
+			v.focusIndex = len(v.fields) + 2 // last regular field (+2 for load config and run type, prompt counted in fields)
 		}
 	} else {
 		v.focusIndex--
@@ -758,11 +818,13 @@ func (v *CreateRunView) updateFocus() {
 
 		// Now focus the current field
 		if v.focusIndex == 0 {
-			// Run type field - not editable in insert mode
+			// Load config field - not editable in insert mode
 		} else if v.focusIndex == 1 {
+			// Run type field - not editable in insert mode
+		} else if v.focusIndex == 2 {
 			// Repository field
 			v.fields[0].Focus()
-		} else if v.focusIndex == 2 {
+		} else if v.focusIndex == 3 {
 			// Prompt area
 			v.promptArea.Focus()
 			// Expand if collapsed when focusing
@@ -770,17 +832,17 @@ func (v *CreateRunView) updateFocus() {
 				v.promptCollapsed = false
 				v.promptArea.SetHeight(5)
 			}
-		} else if v.focusIndex >= 3 && v.focusIndex < len(v.fields)+2 {
+		} else if v.focusIndex >= 4 && v.focusIndex < len(v.fields)+3 {
 			// Other fields - collapse prompt when moving away if it has content
 			if v.promptArea.Value() != "" && !v.promptCollapsed {
 				v.promptCollapsed = true
 				v.promptArea.SetHeight(1)
 			}
-			fieldIdx := v.focusIndex - 2 // Adjust for run type at 0 and prompt at 2
+			fieldIdx := v.focusIndex - 3 // Adjust for load config at 0, run type at 1, and prompt at 3
 			if fieldIdx < len(v.fields) {
 				v.fields[fieldIdx].Focus()
 			}
-		} else if v.showContext && v.focusIndex == len(v.fields)+2 {
+		} else if v.showContext && v.focusIndex == len(v.fields)+3 {
 			// Context area - also collapse prompt if needed
 			if v.promptArea.Value() != "" && !v.promptCollapsed {
 				v.promptCollapsed = true
@@ -835,22 +897,25 @@ func (v *CreateRunView) clearCurrentField() {
 	if v.useFileInput {
 		v.filePathInput.SetValue("")
 	} else if v.focusIndex == 0 {
-		// Run type field - can't clear, just toggle
+		// Load config field - can clear loaded file info
+		v.lastLoadedFile = ""
 	} else if v.focusIndex == 1 {
+		// Run type field - can't clear, just toggle
+	} else if v.focusIndex == 2 {
 		// Repository field
 		v.fields[0].SetValue("")
-	} else if v.focusIndex == 2 {
+	} else if v.focusIndex == 3 {
 		// Prompt area
 		v.promptArea.SetValue("")
 		v.promptCollapsed = false
 		v.promptArea.SetHeight(5)
-	} else if v.focusIndex >= 3 && v.focusIndex < len(v.fields)+2 {
+	} else if v.focusIndex >= 4 && v.focusIndex < len(v.fields)+3 {
 		// Other fields
-		fieldIdx := v.focusIndex - 2
+		fieldIdx := v.focusIndex - 3
 		if fieldIdx < len(v.fields) {
 			v.fields[fieldIdx].SetValue("")
 		}
-	} else if v.showContext && v.focusIndex == len(v.fields)+2 {
+	} else if v.showContext && v.focusIndex == len(v.fields)+3 {
 		// Context area
 		v.contextArea.SetValue("")
 	}
@@ -935,6 +1000,11 @@ func (v *CreateRunView) View() string {
 		statusBar,
 	)
 
+	// If file selector is active, overlay it
+	if v.fileSelector != nil && v.fileSelector.IsActive() {
+		return v.renderWithFileSelectorOverlay(finalView)
+	}
+
 	// If FZF mode is active, overlay the dropdown
 	if v.fzfMode != nil && v.fzfMode.IsActive() {
 		return v.renderWithFZFOverlay(finalView)
@@ -943,26 +1013,44 @@ func (v *CreateRunView) View() string {
 	return finalView
 }
 
+// renderWithFileSelectorOverlay renders the view with file selector overlay
+func (v *CreateRunView) renderWithFileSelectorOverlay(baseView string) string {
+	if v.fileSelector == nil || !v.fileSelector.IsActive() {
+		return baseView
+	}
+
+	// Calculate position for file selector dropdown (Load Config field is at index 0)
+	// Title + border + load config field = about 3 lines
+	yOffset := 3
+	xOffset := 19 // After "Load Config:    " label and indicator
+
+	return v.renderOverlayDropdown(baseView, v.fileSelector.View(), yOffset, xOffset)
+}
+
 // renderWithFZFOverlay renders the view with FZF dropdown overlay
 func (v *CreateRunView) renderWithFZFOverlay(baseView string) string {
 	if v.fzfMode == nil || !v.fzfMode.IsActive() {
 		return baseView
 	}
 
+	// Calculate position for FZF dropdown (repository field)
+	// Title + border + load config + run type + repository field = about 5 lines
+	yOffset := 5
+	xOffset := 19 // After "Repository:    " label and indicator
+
+	return v.renderOverlayDropdown(baseView, v.fzfMode.View(), yOffset, xOffset)
+}
+
+// renderOverlayDropdown renders a dropdown overlay on the base view
+func (v *CreateRunView) renderOverlayDropdown(baseView, overlayView string, yOffset, xOffset int) string {
 	// Split base view into lines
 	baseLines := strings.Split(baseView, "\n")
 
-	// Calculate position for FZF dropdown (repository field is now first)
-	// Title + border + repository field = about 3 lines
-	yOffset := 3
-	xOffset := 19 // After "Repository:    " label and indicator
+	// Create overlay dropdown view lines
+	overlayLines := strings.Split(overlayView, "\n")
 
-	// Create FZF dropdown view
-	fzfView := v.fzfMode.View()
-	fzfLines := strings.Split(fzfView, "\n")
-
-	// Create a new view with the FZF dropdown overlaid
-	result := make([]string, max(len(baseLines), yOffset+len(fzfLines)))
+	// Create a new view with the dropdown overlaid
+	result := make([]string, max(len(baseLines), yOffset+len(overlayLines)))
 	copy(result, baseLines)
 
 	// Ensure we have enough lines
@@ -970,8 +1058,8 @@ func (v *CreateRunView) renderWithFZFOverlay(baseView string) string {
 		result[i] = ""
 	}
 
-	// Insert FZF dropdown at the calculated position
-	for i, fzfLine := range fzfLines {
+	// Insert dropdown at the calculated position
+	for i, overlayLine := range overlayLines {
 		lineIdx := yOffset + i
 		if lineIdx >= 0 && lineIdx < len(result) {
 			// Create the overlay line
@@ -981,12 +1069,12 @@ func (v *CreateRunView) renderWithFZFOverlay(baseView string) string {
 				if xOffset > 0 {
 					basePart = result[lineIdx][:min(xOffset, len(result[lineIdx]))]
 				}
-				// Add the FZF line
-				result[lineIdx] = basePart + fzfLine
+				// Add the overlay line
+				result[lineIdx] = basePart + overlayLine
 			} else {
-				// Line is shorter than offset, pad and add FZF
+				// Line is shorter than offset, pad and add overlay
 				padding := strings.Repeat(" ", max(0, xOffset-len(result[lineIdx])))
-				result[lineIdx] = result[lineIdx] + padding + fzfLine
+				result[lineIdx] = result[lineIdx] + padding + overlayLine
 			}
 		}
 	}
@@ -1043,9 +1131,34 @@ func (v *CreateRunView) renderCompactForm(width, height int) string {
 		Foreground(lipgloss.Color("252")).
 		Width(20)
 
-	// Run type field (selectable, at index 0)
-	b.WriteString(labelStyle.Render("⚙️ Run Type:"))
+	// Load from Config field (new, at index 0)
+	b.WriteString(labelStyle.Render("📄 Load Config:"))
 	if v.focusIndex == 0 && !v.backButtonFocused && !v.submitButtonFocused {
+		b.WriteString(v.renderFieldIndicator())
+	} else {
+		b.WriteString("   ")
+	}
+
+	loadConfigValue := "Press Enter or 'f' to select JSON file"
+	if v.lastLoadedFile != "" {
+		loadConfigValue = fmt.Sprintf("Loaded: %s", v.lastLoadedFile)
+	}
+
+	// Style the load config value based on focus
+	loadConfigStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("33")).
+		Bold(v.focusIndex == 0 && !v.backButtonFocused && !v.submitButtonFocused)
+
+	if v.focusIndex == 0 && !v.backButtonFocused && !v.submitButtonFocused && v.inputMode == components.NormalMode {
+		loadConfigStyle = loadConfigStyle.Background(lipgloss.Color("236"))
+	}
+
+	b.WriteString(loadConfigStyle.Render(loadConfigValue))
+	b.WriteString("\n")
+
+	// Run type field (selectable, now at index 1)
+	b.WriteString(labelStyle.Render("⚙️ Run Type:"))
+	if v.focusIndex == 1 && !v.backButtonFocused && !v.submitButtonFocused {
 		b.WriteString(v.renderFieldIndicator())
 	} else {
 		b.WriteString("   ")
@@ -1059,18 +1172,18 @@ func (v *CreateRunView) renderCompactForm(width, height int) string {
 	// Style the run type value based on focus
 	runTypeStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("33")).
-		Bold(v.focusIndex == 0 && !v.backButtonFocused && !v.submitButtonFocused)
+		Bold(v.focusIndex == 1 && !v.backButtonFocused && !v.submitButtonFocused)
 
-	if v.focusIndex == 0 && !v.backButtonFocused && !v.submitButtonFocused && v.inputMode == components.NormalMode {
+	if v.focusIndex == 1 && !v.backButtonFocused && !v.submitButtonFocused && v.inputMode == components.NormalMode {
 		runTypeStyle = runTypeStyle.Background(lipgloss.Color("236"))
 	}
 
 	b.WriteString(runTypeStyle.Render(runTypeValue))
 	b.WriteString("\n")
 
-	// Repository field (now at index 1)
+	// Repository field (now at index 2)
 	b.WriteString(labelStyle.Render("📁 Repository:"))
-	if v.focusIndex == 1 {
+	if v.focusIndex == 2 {
 		b.WriteString(v.renderFieldIndicator())
 	} else {
 		b.WriteString("   ")
@@ -1079,9 +1192,9 @@ func (v *CreateRunView) renderCompactForm(width, height int) string {
 	b.WriteString(v.fields[0].View())
 	b.WriteString("\n")
 
-	// Prompt area (now at index 2) - can be collapsed
+	// Prompt area (now at index 3) - can be collapsed
 	b.WriteString(labelStyle.Render("✏️ Prompt:"))
-	if v.focusIndex == 2 {
+	if v.focusIndex == 3 {
 		b.WriteString(v.renderFieldIndicator())
 	} else {
 		b.WriteString("   ")
@@ -1125,7 +1238,7 @@ func (v *CreateRunView) renderCompactForm(width, height int) string {
 
 	for _, field := range fieldInfo {
 		b.WriteString(labelStyle.Render(field.label))
-		adjustedIndex := field.index + 2 // +2 because run type is at 0, prompt is at index 2
+		adjustedIndex := field.index + 3 // +3 because load config is at 0, run type is at 1, repository is at 2, prompt is at index 3
 		if v.focusIndex == adjustedIndex {
 			b.WriteString(v.renderFieldIndicator())
 		} else {
@@ -1140,7 +1253,7 @@ func (v *CreateRunView) renderCompactForm(width, height int) string {
 	if v.showContext {
 		b.WriteString("\n")
 		b.WriteString(labelStyle.Render("💭 Context (optional):"))
-		if v.focusIndex == len(v.fields)+2 {
+		if v.focusIndex == len(v.fields)+3 { // +3 for load config, run type, and prompt
 			b.WriteString(v.renderFieldIndicator())
 		} else {
 			b.WriteString("   ")
@@ -1230,7 +1343,7 @@ func (v *CreateRunView) renderErrorLayout(availableHeight int) string {
 			Render(" ● "))
 
 		// Add blinking effect if recently copied
-		if v.copiedMessage != "" && time.Since(v.copiedMessageTime) < 2*time.Second {
+		if v.yankBlink && !v.yankBlinkTime.IsZero() && time.Since(v.yankBlinkTime) < 2*time.Second {
 			if v.yankBlink {
 				// Bright green flash
 				errorRowStyle = errorRowStyle.
@@ -1374,7 +1487,6 @@ func (v *CreateRunView) renderStatusBar() string {
 
 	// Handle error mode status
 	if v.error != nil && !v.submitting {
-
 		if v.errorRowFocused {
 			statusText = "[Enter] back to form [j/k] navigate [y] copy error [q] back to form [r] retry [Q]uit"
 		} else if v.errorButtonFocused {
@@ -1386,8 +1498,8 @@ func (v *CreateRunView) renderStatusBar() string {
 	}
 
 	if v.inputMode == components.InsertMode {
-		if !v.useFileInput && v.focusIndex == 1 {
-			// When repository field is focused, show FZF options
+		if !v.useFileInput && v.focusIndex == 2 {
+			// When repository field is focused (now at index 2), show FZF options
 			statusText = "[Enter] exit insert [Tab] next [Ctrl+F] fuzzy [Ctrl+R] browse [Ctrl+S] submit"
 		} else {
 			statusText = "[Enter] exit insert [Tab] next [Ctrl+S] submit [Ctrl+X] clear"
@@ -1402,10 +1514,13 @@ func (v *CreateRunView) renderStatusBar() string {
 		} else {
 			switch v.focusIndex {
 			case 0:
-				// Run type field in normal mode
-				statusText = "[q]back [Enter] toggle type [j/k] navigate [c] context [Ctrl+S] submit [Q]uit"
+				// Load config field in normal mode (index 0)
+				statusText = "[q]back [Enter] load config [f] file select [j/k] navigate [c] context [Ctrl+S] submit [Q]uit"
 			case 1:
-				// Repository field in normal mode
+				// Run type field in normal mode (index 1)
+				statusText = "[q]back [Enter] toggle type [j/k] navigate [c] context [Ctrl+S] submit [Q]uit"
+			case 2:
+				// Repository field in normal mode (index 2)
 				statusText = "[q]back [Enter] edit [f] fuzzy [j/k] navigate [c] context [Ctrl+S] submit [Q]uit"
 			default:
 				statusText = "[q]back [Enter] edit [j/k] navigate [c] context [Ctrl+S] submit [?] help [Q]uit"
@@ -1421,7 +1536,6 @@ func (v *CreateRunView) renderStatusBar() string {
 		SetHelp(statusText).
 		Render()
 }
-
 
 // prepareTaskFromFile loads and parses task from a JSON file
 func (v *CreateRunView) prepareTaskFromFile(filePath string) (models.RunRequest, error) {
@@ -1613,6 +1727,15 @@ type clipboardResultMsg struct {
 	text    string
 }
 
+type configLoadedMsg struct {
+	config   *models.RunRequest
+	filePath string
+}
+
+type configLoadErrorMsg struct {
+	err error
+}
+
 // startYankBlinkAnimation starts the blink animation for clipboard feedback
 func (v *CreateRunView) startYankBlinkAnimation() tea.Cmd {
 	return func() tea.Msg {
@@ -1684,4 +1807,89 @@ func (v *CreateRunView) activateFZFMode() {
 	v.fzfMode = components.NewFZFMode(items, fieldWidth, 10)
 	v.fzfMode.Activate()
 	v.fzfActive = true
+}
+
+// activateConfigFileSelector activates the file selector for loading config files
+func (v *CreateRunView) activateConfigFileSelector() tea.Cmd {
+	return func() tea.Msg {
+		// Set file selector dimensions
+		v.fileSelector.SetDimensions(v.width, v.height)
+
+		// Activate JSON file selector
+		if err := v.fileSelector.ActivateJSONFileSelector(); err != nil {
+			debug.LogToFilef("DEBUG: Failed to activate file selector: %v\n", err)
+			return configLoadErrorMsg{err: fmt.Errorf("failed to show file selector: %w", err)}
+		}
+
+		v.configFileSelectorActive = true
+		debug.LogToFile("DEBUG: Config file selector activated\n")
+		return nil
+	}
+}
+
+// loadConfigFromFile loads a configuration file and populates the form
+func (v *CreateRunView) loadConfigFromFile(filePath string) tea.Cmd {
+	return func() tea.Msg {
+		debug.LogToFilef("DEBUG: Loading config from file: %s\n", filePath)
+
+		// Load the config
+		config, err := v.configLoader.LoadConfig(filePath)
+		if err != nil {
+			debug.LogToFilef("DEBUG: Failed to load config: %v\n", err)
+			return configLoadErrorMsg{err: err}
+		}
+
+		debug.LogToFilef("DEBUG: Config loaded successfully from %s\n", filePath)
+		return configLoadedMsg{
+			config:   config,
+			filePath: filePath,
+		}
+	}
+}
+
+// populateFormFromConfig populates the form fields from loaded config
+func (v *CreateRunView) populateFormFromConfig(config *models.RunRequest, filePath string) {
+	debug.LogToFile("DEBUG: Populating form from config\n")
+
+	// Store the loaded file path
+	v.lastLoadedFile = filepath.Base(filePath)
+
+	// Populate form fields
+	if config.Repository != "" {
+		v.fields[0].SetValue(config.Repository) // Repository field
+	}
+
+	if config.Prompt != "" {
+		v.promptArea.SetValue(config.Prompt)
+		// Expand prompt area if it was collapsed
+		if v.promptCollapsed {
+			v.promptCollapsed = false
+			v.promptArea.SetHeight(5)
+		}
+	}
+
+	if config.Source != "" {
+		v.fields[1].SetValue(config.Source) // Source field
+	}
+
+	if config.Target != "" {
+		v.fields[2].SetValue(config.Target) // Target field
+	}
+
+	if config.Title != "" {
+		v.fields[3].SetValue(config.Title) // Title field
+	}
+
+	if config.Context != "" {
+		v.contextArea.SetValue(config.Context)
+		v.showContext = true // Show context field if it has content
+	}
+
+	// Set run type
+	if config.RunType != "" {
+		v.runType = config.RunType
+	}
+
+	debug.LogToFilef("DEBUG: Form populated - Repository: %s, Prompt length: %d\n",
+		config.Repository, len(config.Prompt))
 }

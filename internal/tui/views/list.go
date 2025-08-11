@@ -43,7 +43,7 @@ type RunListView struct {
 	detailsCache map[string]*models.RunResponse
 	preloading   map[string]bool
 	// User info for remaining runs counter
-	userInfo   *models.UserInfo
+	userInfo *models.UserInfo
 	// Unified status line component
 	statusLine *components.StatusLine
 }

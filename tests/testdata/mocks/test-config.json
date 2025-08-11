@@ -1,0 +1,10 @@
+{
+  "prompt": "Add a new authentication feature to the login system",
+  "repository": "example/test-repo",
+  "source": "main",
+  "target": "feature/auth-enhancement",
+  "runType": "run",
+  "title": "Enhance Authentication System",
+  "context": "Users are requesting better security options for login",
+  "files": ["src/auth.js", "src/login.js", "src/security.js"]
+}

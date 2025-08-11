@@ -379,9 +379,9 @@ func (v *RunDetailsView) handleClipboardOperations(key string) tea.Cmd {
 				if len(displayText) > maxLen {
 					displayText = displayText[:maxLen-3] + "..."
 				}
-				v.statusLine.SetTemporaryMessageWithType(fmt.Sprintf("📋 Copied \"%s\"", displayText), components.MessageSuccess, 3*time.Second)
+				v.statusLine.SetTemporaryMessageWithType(fmt.Sprintf("📋 Copied \"%s\"", displayText), components.MessageSuccess, 100*time.Millisecond)
 			} else {
-				v.statusLine.SetTemporaryMessageWithType("✗ Failed to copy", components.MessageError, 3*time.Second)
+				v.statusLine.SetTemporaryMessageWithType("✗ Failed to copy", components.MessageError, 100*time.Millisecond)
 			}
 		} else {
 			// Copy current line to clipboard (old behavior)
@@ -394,12 +394,12 @@ func (v *RunDetailsView) handleClipboardOperations(key string) tea.Cmd {
 					if len(displayText) > maxLen {
 						displayText = displayText[:maxLen-3] + "..."
 					}
-					v.statusLine.SetTemporaryMessageWithType(fmt.Sprintf("📋 Copied \"%s\"", displayText), components.MessageSuccess, 3*time.Second)
+					v.statusLine.SetTemporaryMessageWithType(fmt.Sprintf("📋 Copied \"%s\"", displayText), components.MessageSuccess, 100*time.Millisecond)
 				} else {
-					v.statusLine.SetTemporaryMessageWithType("✗ Failed to copy", components.MessageError, 3*time.Second)
+					v.statusLine.SetTemporaryMessageWithType("✗ Failed to copy", components.MessageError, 100*time.Millisecond)
 				}
 			} else {
-				v.statusLine.SetTemporaryMessageWithType("✗ No line to copy", components.MessageError, 3*time.Second)
+				v.statusLine.SetTemporaryMessageWithType("✗ No line to copy", components.MessageError, 100*time.Millisecond)
 			}
 		}
 		v.yankBlink = true
@@ -408,9 +408,9 @@ func (v *RunDetailsView) handleClipboardOperations(key string) tea.Cmd {
 	case "Y":
 		// Copy all content to clipboard
 		if err := v.copyAllContent(); err == nil {
-			v.statusLine.SetTemporaryMessageWithType("📋 Copied all content", components.MessageSuccess, 3*time.Second)
+			v.statusLine.SetTemporaryMessageWithType("📋 Copied all content", components.MessageSuccess, 100*time.Millisecond)
 		} else {
-			v.statusLine.SetTemporaryMessageWithType("✗ Failed to copy", components.MessageError, 3*time.Second)
+			v.statusLine.SetTemporaryMessageWithType("✗ Failed to copy", components.MessageError, 100*time.Millisecond)
 		}
 		v.yankBlink = true
 		v.yankBlinkTime = time.Now()
@@ -434,13 +434,13 @@ func (v *RunDetailsView) handleClipboardOperations(key string) tea.Cmd {
 
 		if urlText != "" {
 			if err := utils.OpenURL(urlText); err == nil {
-				v.statusLine.SetTemporaryMessageWithType("🌐 Opened URL in browser", components.MessageSuccess, 3*time.Second)
+				v.statusLine.SetTemporaryMessageWithType("🌐 Opened URL in browser", components.MessageSuccess, 1*time.Second)
 			} else {
-				v.statusLine.SetTemporaryMessageWithType(fmt.Sprintf("✗ Failed to open URL: %v", err), components.MessageError, 3*time.Second)
+				v.statusLine.SetTemporaryMessageWithType(fmt.Sprintf("✗ Failed to open URL: %v", err), components.MessageError, 1*time.Second)
 			}
 			v.yankBlink = true
 			v.yankBlinkTime = time.Now()
-			return v.startYankBlinkAnimation()
+			return tea.Batch(v.startYankBlinkAnimation(), v.startMessageClearTimer(1*time.Second))
 		}
 	}
 	return nil
@@ -518,6 +518,9 @@ func (v *RunDetailsView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			v.yankBlink = false // Turn off after being on - completes the single blink
 		}
 		// No more blinking after the single on-off cycle
+
+	case messageClearMsg:
+		// Trigger UI refresh when message expires (no action needed - just refresh)
 
 	case spinner.TickMsg:
 		if v.loading || v.pollingStatus {
@@ -606,7 +609,6 @@ func (v *RunDetailsView) View() string {
 			}
 		}
 	}
-
 
 	// Status bar always goes in the last line
 	if len(lines) > 0 {
@@ -1049,7 +1051,6 @@ type runDetailsLoadedMsg struct {
 	err error
 }
 
-type yankBlinkMsg struct{}
 type clearStatusMsg struct{}
 
 // getCurrentLine gets the current visible line
@@ -1097,5 +1098,13 @@ func (v *RunDetailsView) startYankBlinkAnimation() tea.Cmd {
 		// Single blink duration - quick flash (100ms)
 		time.Sleep(100 * time.Millisecond)
 		return yankBlinkMsg{}
+	}
+}
+
+// startMessageClearTimer starts a timer to trigger UI refresh when message expires
+func (v *RunDetailsView) startMessageClearTimer(duration time.Duration) tea.Cmd {
+	return func() tea.Msg {
+		time.Sleep(duration)
+		return messageClearMsg{}
 	}
 }

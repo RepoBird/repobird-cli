@@ -74,6 +74,15 @@ func (s *StatusLine) SetStyle(style lipgloss.Style) *StatusLine {
 	return s
 }
 
+// ResetStyle resets the style to the default
+func (s *StatusLine) ResetStyle() *StatusLine {
+	s.style = lipgloss.NewStyle().
+		Background(lipgloss.Color("235")).
+		Foreground(lipgloss.Color("252")).
+		Padding(0, 1)
+	return s
+}
+
 // SetTemporaryMessage sets a temporary message with color and duration
 func (s *StatusLine) SetTemporaryMessage(message string, color lipgloss.Color, duration time.Duration) *StatusLine {
 	s.tempMessage = message

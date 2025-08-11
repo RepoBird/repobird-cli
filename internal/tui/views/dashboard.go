@@ -109,6 +109,8 @@ type dashboardUserInfoLoadedMsg struct {
 	error    error
 }
 
+type yankBlinkMsg struct{}
+type messageClearMsg struct{}
 
 // NewDashboardView creates a new dashboard view
 func NewDashboardView(client *api.Client) *DashboardView {
@@ -541,11 +543,13 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		// No more blinking after the single on-off cycle
 
+	case messageClearMsg:
+		// Trigger UI refresh when message expires (no action needed - just refresh)
+
 	case clearStatusMsg:
 		// Clear the clipboard message after timeout
 		d.copiedMessage = ""
 		d.yankBlink = false
-
 
 	case components.FZFSelectedMsg:
 		// Handle FZF selection result
@@ -615,12 +619,11 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			if urlText != "" {
 				if err := utils.OpenURL(urlText); err == nil {
-					d.statusMessage = message
+					d.statusLine.SetTemporaryMessageWithType(message, components.MessageSuccess, 1*time.Second)
 				} else {
-					d.statusMessage = fmt.Sprintf("✗ Failed to open URL: %v", err)
+					d.statusLine.SetTemporaryMessageWithType(fmt.Sprintf("✗ Failed to open URL: %v", err), components.MessageError, 1*time.Second)
 				}
-				d.statusMessageTime = time.Now()
-				return d, d.startClearStatusMessageTimer()
+				return d, d.startMessageClearTimer(1*time.Second)
 			}
 			return d, nil
 		case msg.Type == tea.KeyEsc && d.showStatusInfo:
@@ -890,17 +893,13 @@ func (d *DashboardView) handleMillerColumnsNavigation(msg tea.KeyMsg) tea.Cmd {
 				if len(displayText) > maxLen {
 					displayText = displayText[:maxLen-3] + "..."
 				}
-				d.statusMessage = fmt.Sprintf("📋 Copied \"%s\"", displayText)
+				d.statusLine.SetTemporaryMessageWithType(fmt.Sprintf("📋 Copied \"%s\"", displayText), components.MessageSuccess, 150*time.Millisecond)
 			} else {
-				d.statusMessage = "✗ Failed to copy"
+				d.statusLine.SetTemporaryMessageWithType("✗ Failed to copy", components.MessageError, 150*time.Millisecond)
 			}
-			d.statusMessageTime = time.Now()
 			d.yankBlink = true
 			d.yankBlinkTime = time.Now()
-			return tea.Batch(
-				d.startYankBlinkAnimation(),
-				d.startClearStatusMessageTimer(),
-			)
+			return d.startYankBlinkAnimation()
 		}
 
 	case msg.Type == tea.KeyRunes && string(msg.Runes) == "o":
@@ -959,11 +958,11 @@ func (d *DashboardView) handleMillerColumnsNavigation(msg tea.KeyMsg) tea.Cmd {
 
 		if urlText != "" {
 			if err := utils.OpenURL(urlText); err == nil {
-				d.statusLine.SetTemporaryMessageWithType("🌐 Opened URL in browser", components.MessageSuccess, 3*time.Second)
+				d.statusLine.SetTemporaryMessageWithType("🌐 Opened URL in browser", components.MessageSuccess, 1*time.Second)
 			} else {
-				d.statusLine.SetTemporaryMessageWithType(fmt.Sprintf("✗ Failed to open URL: %v", err), components.MessageError, 3*time.Second)
+				d.statusLine.SetTemporaryMessageWithType(fmt.Sprintf("✗ Failed to open URL: %v", err), components.MessageError, 1*time.Second)
 			}
-			return nil
+			return d.startMessageClearTimer(1*time.Second)
 		}
 
 	case key.Matches(msg, d.keys.Right) || (msg.Type == tea.KeyRunes && string(msg.Runes) == "l"):
@@ -1056,12 +1055,19 @@ func (d *DashboardView) View() string {
 	if d.loading || d.initializing {
 		// Use the animated spinner + loading text
 		loadingText := d.spinner.View() + " Loading dashboard data..."
+
+		// Calculate available height for content (total - title - status line)
+		titleHeight := lipgloss.Height(title)
+		statusLineHeight := 1 // Status line is always 1 line
+		availableHeight := d.height - titleHeight - statusLineHeight
+
+		// Center the loading text vertically in the available space
 		loadingStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("63")). // Bright cyan color
 			Bold(true).
 			Width(d.width).
-			Align(lipgloss.Center).
-			MarginTop((d.height - 4) / 2) // Account for title and status line
+			Height(availableHeight).
+			Align(lipgloss.Center, lipgloss.Center)
 		content = loadingStyle.Render(loadingText)
 
 		// Always show status line even during loading
@@ -1355,6 +1361,14 @@ func (d *DashboardView) startYankBlinkAnimation() tea.Cmd {
 	}
 }
 
+// startMessageClearTimer starts a timer to trigger UI refresh when message expires
+func (d *DashboardView) startMessageClearTimer(duration time.Duration) tea.Cmd {
+	return func() tea.Msg {
+		time.Sleep(duration)
+		return messageClearMsg{}
+	}
+}
+
 // startClearStatusTimer starts a timer to clear the status message
 func (d *DashboardView) startClearStatusTimer() tea.Cmd {
 	return func() tea.Msg {
@@ -1362,7 +1376,6 @@ func (d *DashboardView) startClearStatusTimer() tea.Cmd {
 		return clearStatusMsg{}
 	}
 }
-
 
 // renderAllRunsLayout renders the timeline layout
 func (d *DashboardView) renderAllRunsLayout() string {
@@ -2497,11 +2510,13 @@ func (d *DashboardView) renderStatusLine(layoutName string) string {
 	}
 
 	// Use the unified status line with temporary message support
+	// Reset to default style (not URL prompt)
 	return d.statusLine.
 		SetWidth(d.width).
 		SetLeft(fmt.Sprintf("[%s]", layoutName)).
 		SetRight(dataInfo).
 		SetHelp(shortHelp).
+		ResetStyle().
 		Render()
 }
 
