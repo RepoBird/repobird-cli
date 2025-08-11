@@ -153,7 +153,7 @@ func (v *CreateRunView) initializeInputFields() {
 	promptArea := textarea.New()
 	promptArea.Placeholder = "Describe what you want the AI to do..."
 	promptArea.SetWidth(60)
-	promptArea.SetHeight(5)
+	promptArea.SetHeight(5) // Default expanded height
 	promptArea.CharLimit = 5000
 
 	// Optional fields at the end
@@ -180,7 +180,7 @@ func (v *CreateRunView) initializeInputFields() {
 	contextArea := textarea.New()
 	contextArea.Placeholder = "Additional context (optional, press 'c' to show/hide)..."
 	contextArea.SetWidth(60)
-	contextArea.SetHeight(1) // Default to 1 line, but allows multiline input
+	contextArea.SetHeight(2) // Minimum 2 lines to prevent layout shifts
 	contextArea.CharLimit = 2000
 
 	filePathInput := textinput.New()
@@ -210,6 +210,9 @@ func (v *CreateRunView) initializeInputFields() {
 func (v *CreateRunView) loadFormData() {
 	savedData := cache.GetFormData()
 	if savedData != nil && len(v.fields) >= 5 {
+		debug.LogToFilef("DEBUG: Loading form data - Repository: %s, Prompt: %d chars, Source: %s, Target: %s, Title: %s\n",
+			savedData.Repository, len(savedData.Prompt), savedData.Source, savedData.Target, savedData.Title)
+
 		v.fields[0].SetValue(savedData.Repository)
 		v.fields[1].SetValue(savedData.Source)
 		v.fields[2].SetValue(savedData.Target)
@@ -224,6 +227,8 @@ func (v *CreateRunView) loadFormData() {
 		if savedData.RunType != "" {
 			v.runType = models.RunType(savedData.RunType)
 		}
+	} else {
+		debug.LogToFile("DEBUG: No saved form data found or fields not initialized\n")
 	}
 }
 
@@ -310,11 +315,13 @@ func (v *CreateRunView) handleWindowSizeMsg(msg tea.WindowSizeMsg) {
 	v.promptArea.SetWidth(min(textAreaWidth, 100))
 	v.contextArea.SetWidth(min(textAreaWidth, 100))
 
-	// Set appropriate heights - prompt can be 1 line when collapsed, 5 when expanded
+	// Set appropriate heights - prompt can be 2 lines when collapsed, 5 when expanded
 	if !v.promptCollapsed {
 		v.promptArea.SetHeight(5)
+	} else {
+		v.promptArea.SetHeight(2) // Minimum 2 lines even when collapsed
 	}
-	v.contextArea.SetHeight(1) // Default to 1 line, but allows multiline input
+	v.contextArea.SetHeight(2) // Minimum 2 lines to prevent layout shifts
 }
 
 // handleInsertMode handles keyboard input in insert mode
@@ -718,6 +725,11 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case configLoadedMsg:
 		// Handle successful config loading
 		v.populateFormFromConfig(msg.config, msg.filePath)
+
+		// IMPORTANT: Save the loaded config data to cache immediately
+		// so it persists when navigating away
+		v.saveFormData()
+
 		v.statusLine.SetTemporaryMessageWithType(
 			fmt.Sprintf("✅ Config loaded from %s", filepath.Base(msg.filePath)),
 			components.MessageSuccess,
@@ -873,7 +885,7 @@ func (v *CreateRunView) updateFocus() {
 			// Other fields - collapse prompt when moving away if it has content
 			if v.promptArea.Value() != "" && !v.promptCollapsed {
 				v.promptCollapsed = true
-				v.promptArea.SetHeight(1)
+				v.promptArea.SetHeight(2) // Minimum 2 lines even when collapsed
 			}
 			fieldIdx := v.focusIndex - 3 // Adjust for load config at 0, run type at 1, and prompt at 3
 			if fieldIdx < len(v.fields) {
@@ -883,7 +895,7 @@ func (v *CreateRunView) updateFocus() {
 			// Context area - also collapse prompt if needed
 			if v.promptArea.Value() != "" && !v.promptCollapsed {
 				v.promptCollapsed = true
-				v.promptArea.SetHeight(1)
+				v.promptArea.SetHeight(2) // Minimum 2 lines even when collapsed
 			}
 			v.contextArea.Focus()
 		}
@@ -913,6 +925,11 @@ func (v *CreateRunView) saveFormData() {
 		Context:    v.contextArea.Value(),
 		RunType:    string(v.runType),
 	}
+
+	// Debug logging to verify what we're saving
+	debug.LogToFilef("DEBUG: Saving form data - Repository: %s, Prompt: %d chars, Source: %s, Target: %s, Title: %s\n",
+		formData.Repository, len(formData.Prompt), formData.Source, formData.Target, formData.Title)
+
 	cache.SaveFormData(formData)
 }
 
@@ -945,7 +962,7 @@ func (v *CreateRunView) clearCurrentField() {
 		// Prompt area
 		v.promptArea.SetValue("")
 		v.promptCollapsed = false
-		v.promptArea.SetHeight(5)
+		v.promptArea.SetHeight(5) // Expanded height when cleared
 	} else if v.focusIndex >= 4 && v.focusIndex < len(v.fields)+3 {
 		// Other fields
 		fieldIdx := v.focusIndex - 3
@@ -968,8 +985,8 @@ func (v *CreateRunView) View() string {
 	}
 
 	// Calculate available height for content
-	// We have v.height total, minus 1 for statusbar
-	availableHeight := v.height - 1
+	// We have v.height total, minus 1 for statusbar, minus 2 for margin
+	availableHeight := v.height - 3
 	if availableHeight < 5 {
 		availableHeight = 5
 	}
@@ -1193,7 +1210,9 @@ func (v *CreateRunView) renderSinglePanelLayout(availableHeight int) string {
 		BorderForeground(lipgloss.Color("63")).
 		Padding(1)
 
-	return panelStyle.Render(panelContent)
+	// Wrap with margin top to prevent border cutoff
+	panel := panelStyle.Render(panelContent)
+	return lipgloss.NewStyle().MarginTop(2).Render(panel)
 }
 
 // renderCompactForm renders all fields in a compact single-column layout
@@ -1288,20 +1307,32 @@ func (v *CreateRunView) renderCompactForm(width, height int) string {
 
 	// Show collapsed or full prompt
 	if v.promptCollapsed && v.promptArea.Value() != "" {
-		// Show first line only when collapsed
+		// Show first two lines when collapsed
 		promptLines := strings.Split(v.promptArea.Value(), "\n")
-		if len(promptLines) > 0 {
-			truncated := promptLines[0]
-			if len(truncated) > width-24 {
-				truncated = truncated[:width-27] + "..."
+		collapsedStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("250")).
+			Italic(true)
+
+		// Show up to 2 lines
+		linesToShow := 2
+		if len(promptLines) < linesToShow {
+			linesToShow = len(promptLines)
+		}
+
+		for i := 0; i < linesToShow; i++ {
+			line := promptLines[i]
+			if len(line) > width-24 {
+				line = line[:width-27] + "..."
 			}
-			collapsedStyle := lipgloss.NewStyle().
-				Foreground(lipgloss.Color("250")).
-				Italic(true)
-			b.WriteString(collapsedStyle.Render(truncated))
-			if len(promptLines) > 1 || len(promptLines[0]) > width-24 {
-				b.WriteString(" [+]")
+			b.WriteString(collapsedStyle.Render(line))
+			if i < linesToShow-1 {
+				b.WriteString("\n                           ") // Indent continuation
 			}
+		}
+
+		// Show [+] indicator if there's more content
+		if len(promptLines) > 2 {
+			b.WriteString(" [+]")
 		}
 	} else {
 		b.WriteString(v.promptArea.View())
