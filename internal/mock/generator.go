@@ -156,28 +156,29 @@ var (
 
 // GenerateMockRuns creates a large set of mock runs for testing
 func GenerateMockRuns(numRepos, runsPerRepo int) []*models.RunResponse {
-	rand.Seed(time.Now().UnixNano())
+	// rand.Seed is deprecated in Go 1.20+, no longer needed
 	runs := make([]*models.RunResponse, 0, numRepos*runsPerRepo)
-	
+
 	fmt.Printf("[MOCK DEBUG] Generating runs for %d repos (max available: %d)\n", numRepos, len(repositories))
 
 	// Generate runs for each repository
 	for i := 0; i < numRepos && i < len(repositories); i++ {
 		repo := repositories[i]
-		
+
 		// Vary the number of runs per repo for more realistic data
 		var actualRunsForRepo int
-		if i == 0 {
+		switch i {
+		case 0:
 			// First repo gets 30 runs
 			actualRunsForRepo = 30
-		} else if i == 1 {
+		case 1:
 			// Second repo gets only 5 runs
 			actualRunsForRepo = 5
-		} else {
+		default:
 			// All other repos get random number of runs between 1 and 60
 			actualRunsForRepo = rand.Intn(60) + 1
 		}
-		
+
 		fmt.Printf("[MOCK DEBUG] Repo[%d] %s: generating %d runs\n", i, repo, actualRunsForRepo)
 
 		for j := 0; j < actualRunsForRepo; j++ {
@@ -231,9 +232,9 @@ func GenerateMockRuns(numRepos, runsPerRepo int) []*models.RunResponse {
 			runs = append(runs, run)
 		}
 	}
-	
+
 	fmt.Printf("[MOCK DEBUG] Total runs generated: %d\n", len(runs))
-	
+
 	// Debug: Count runs per repository
 	runCounts := make(map[string]int)
 	for _, run := range runs {
@@ -391,4 +392,15 @@ func (m *MockClient) ListRepositories(ctx context.Context) ([]models.APIReposito
 		}
 	}
 	return repos, nil
+}
+
+// GetFileHashes returns mock file hashes
+func (m *MockClient) GetFileHashes(ctx context.Context) ([]models.FileHashEntry, error) {
+	// Return some mock file hashes for testing
+	hashes := []models.FileHashEntry{
+		{IssueRunID: 1, FileHash: "abc123def456789"},
+		{IssueRunID: 2, FileHash: "xyz789ghi012345"},
+		{IssueRunID: 3, FileHash: "qwe456rty789012"},
+	}
+	return hashes, nil
 }

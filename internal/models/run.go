@@ -95,6 +95,7 @@ type RunResponse struct {
 	TriggerSource  *string   `json:"triggerSource,omitempty"`
 	RunType        string    `json:"runType,omitempty"`
 	Plan           string    `json:"plan,omitempty"`
+	FileHash       string    `json:"fileHash,omitempty"`
 }
 
 // GetIDString returns the ID as a string
@@ -169,6 +170,17 @@ type PaginationMetadata struct {
 	CurrentPage int `json:"currentPage"`
 	Total       int `json:"total"`
 	TotalPages  int `json:"totalPages"`
+}
+
+// FileHashEntry represents a file hash entry from the API
+type FileHashEntry struct {
+	IssueRunID int    `json:"issueRunId"`
+	FileHash   string `json:"fileHash"`
+}
+
+// FileHashesResponse represents the response from /api/v1/runs/hashes
+type FileHashesResponse struct {
+	Data []FileHashEntry `json:"data"`
 }
 
 // LoadRunConfigFromFile loads a RunConfig from a JSON file

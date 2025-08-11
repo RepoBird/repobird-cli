@@ -551,3 +551,23 @@ func (c *Client) ListRepositories(ctx context.Context) ([]models.APIRepository, 
 
 	return repoListResp.Data, nil
 }
+
+// GetFileHashes retrieves all file hashes for the authenticated user's runs
+func (c *Client) GetFileHashes(ctx context.Context) ([]models.FileHashEntry, error) {
+	resp, err := c.doRequestWithRetry(ctx, "GET", EndpointRunsHashes, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if err := ValidateResponseOK(resp); err != nil {
+		return nil, err
+	}
+
+	var hashesResp models.FileHashesResponse
+	if err := json.NewDecoder(resp.Body).Decode(&hashesResp); err != nil {
+		return nil, fmt.Errorf("failed to decode file hashes response: %w", err)
+	}
+
+	return hashesResp.Data, nil
+}

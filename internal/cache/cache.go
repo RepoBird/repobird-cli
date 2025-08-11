@@ -48,6 +48,9 @@ type GlobalCache struct {
 
 	// Persistent file cache
 	persistentCache *PersistentCache
+	
+	// File hash cache for duplicate detection
+	fileHashCache *FileHashCache
 
 	// In-memory repository history for testing
 	repoHistory []string
@@ -81,6 +84,7 @@ func initializeCacheForUser(userID *int) {
 		detailsAt:       make(map[string]time.Time),
 		terminalDetails: make(map[string]*models.RunResponse),
 		persistentCache: pc,
+		fileHashCache:   NewFileHashCache(),
 	}
 
 	// Load persisted terminal runs on startup
@@ -416,4 +420,11 @@ func SetCachedUserInfo(userInfo *models.UserInfo) {
 
 	globalCache.userInfo = userInfo
 	globalCache.userInfoTime = time.Now()
+}
+
+// GetFileHashCache returns the global file hash cache instance
+func GetFileHashCache() *FileHashCache {
+	globalCache.mu.RLock()
+	defer globalCache.mu.RUnlock()
+	return globalCache.fileHashCache
 }

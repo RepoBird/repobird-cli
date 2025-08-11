@@ -122,6 +122,10 @@ components:
           type: string
           nullable: true
           description: Reason for early exit if applicable
+        fileHash:
+          type: string
+          nullable: true
+          description: SHA-256 hash of the issue run task file
         filesModified:
           type: array
           nullable: true
@@ -547,6 +551,44 @@ paths:
                         nullable: true
                       logs:
                         type: string
+
+  /api/v1/runs/hashes:
+    get:
+      summary: Get all file hashes for user's runs
+      description: Returns all non-empty fileHash values for the authenticated user's runs. Used by CLI to cache known file hashes.
+      tags:
+        - Runs
+      responses:
+        '200':
+          description: List of file hashes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        issueRunId:
+                          type: integer
+                          description: The ID of the issue run
+                        fileHash:
+                          type: string
+                          description: SHA-256 hash of the issue run task file
+                  metadata:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                        description: Total number of hashes returned
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /api/v1/runs/{id}/diff:
     get:

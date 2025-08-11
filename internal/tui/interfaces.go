@@ -17,4 +17,5 @@ type APIClient interface {
 	GetAPIEndpoint() string
 	VerifyAuth() (*models.UserInfo, error)
 	CreateRunAPI(request *models.APIRunRequest) (*models.RunResponse, error)
+	GetFileHashes(ctx context.Context) ([]models.FileHashEntry, error)
 }

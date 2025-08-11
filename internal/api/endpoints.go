@@ -21,6 +21,9 @@ const (
 
 	// EndpointUser is the endpoint for getting user information
 	EndpointUser = "/api/v1/user"
+
+	// EndpointRunsHashes is the endpoint for getting all file hashes
+	EndpointRunsHashes = "/api/v1/runs/hashes"
 )
 
 // RunDetailsURL builds the URL for getting a specific run by ID

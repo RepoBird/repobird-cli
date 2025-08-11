@@ -1,6 +1,7 @@
 package views
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -86,6 +87,9 @@ type CreateRunView struct {
 	// Vim keybinding state for 'gg' command
 	lastGPressTime time.Time // Time when 'g' was last pressed
 	waitingForG    bool      // Whether we're waiting for second 'g' in 'gg' command
+	// File hash tracking for duplicate detection
+	currentFileHash string
+	isDuplicateRun  bool
 }
 
 func NewCreateRunView(client APIClient) *CreateRunView {
@@ -315,6 +319,9 @@ func (v *CreateRunView) Init() tea.Cmd {
 			return tea.WindowSizeMsg{Width: v.width, Height: v.height}
 		})
 	}
+	
+	// Load file hash cache in the background
+	cmds = append(cmds, v.loadFileHashCache())
 
 	cmds = append(cmds, textinput.Blink)
 	return tea.Batch(cmds...)
@@ -643,6 +650,15 @@ func (v *CreateRunView) handleRunCreated(msg runCreatedMsg) (tea.Model, tea.Cmd)
 	cache.ClearFormData()
 	v.success = true
 	v.createdRun = &msg.run
+	
+	// Add the file hash to cache if we have one
+	if v.currentFileHash != "" {
+		fileHashCache := cache.GetFileHashCache()
+		if fileHashCache != nil {
+			fileHashCache.AddHash(v.currentFileHash)
+			debug.LogToFilef("DEBUG: Added file hash %s to cache after successful submission\n", v.currentFileHash)
+		}
+	}
 
 	debug.LogToFilef("DEBUG: Run created successfully with ID='%s', navigating to details\n", runID)
 	// Pass the cache data and current dimensions to the details view
@@ -832,6 +848,16 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case configLoadedMsg:
 		// Handle successful config loading
 		v.populateFormFromConfig(msg.config, msg.filePath)
+		
+		// Store the file hash and check if it's a duplicate
+		v.currentFileHash = msg.fileHash
+		if msg.fileHash != "" {
+			fileHashCache := cache.GetFileHashCache()
+			v.isDuplicateRun = fileHashCache.HasHash(msg.fileHash)
+			debug.LogToFilef("DEBUG: File hash %s - isDuplicate: %v\n", msg.fileHash, v.isDuplicateRun)
+		} else {
+			v.isDuplicateRun = false
+		}
 
 		// Debug: Log field values AFTER populating from config
 		debug.LogToFilef("DEBUG: After populateFormFromConfig - fields[0]=%s, fields[1]=%s, fields[2]=%s, fields[3]=%s, promptArea=%d chars\n",
@@ -1504,7 +1530,7 @@ func (v *CreateRunView) renderCompactForm(width, height int) string {
 		b.WriteString(contextHint)
 	}
 
-	// Submit button
+	// Submit button and validation on same line
 	b.WriteString("\n\n")
 	submitStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("33")).
@@ -1519,6 +1545,21 @@ func (v *CreateRunView) renderCompactForm(width, height int) string {
 	}
 
 	b.WriteString(submitStyle.Render("🚀 Submit Run"))
+	
+	// Validation indicator to the right of submit button
+	isValid, validationError := v.validateForm()
+	validationStyle := lipgloss.NewStyle().
+		Padding(0, 0, 0, 2) // Add left padding to separate from submit button
+	
+	if isValid {
+		// Show checkmark when valid
+		validationStyle = validationStyle.Foreground(lipgloss.Color("82")) // Green
+		b.WriteString(validationStyle.Render("✓ Ready to submit"))
+	} else {
+		// Show error message when invalid
+		validationStyle = validationStyle.Foreground(lipgloss.Color("203")) // Red
+		b.WriteString(validationStyle.Render("✗ " + validationError))
+	}
 
 	// Back button at bottom
 	b.WriteString("\n\n")
@@ -1985,6 +2026,7 @@ type clipboardResultMsg struct {
 type configLoadedMsg struct {
 	config   *models.RunRequest
 	filePath string
+	fileHash string
 }
 
 type configLoadErrorMsg struct {
@@ -2095,11 +2137,73 @@ func (v *CreateRunView) loadConfigFromFile(filePath string) tea.Cmd {
 			return configLoadErrorMsg{err: err}
 		}
 
-		debug.LogToFilef("DEBUG: Config loaded successfully from %s\n", filePath)
+		
+		// Calculate file hash for duplicate detection
+		fileHash, hashErr := cache.CalculateFileHash(filePath)
+		if hashErr != nil {
+			debug.LogToFilef("DEBUG: Failed to calculate file hash: %v\n", hashErr)
+			// Continue without hash - not a critical error
+			fileHash = ""
+		}
+		
+		debug.LogToFilef("DEBUG: Config loaded successfully from %s with hash %s\n", filePath, fileHash)
 		return configLoadedMsg{
 			config:   config,
 			filePath: filePath,
+			fileHash: fileHash,
 		}
+	}
+}
+
+// validateForm checks if the form is valid and returns any validation errors
+func (v *CreateRunView) validateForm() (bool, string) {
+	// Check required fields
+	if strings.TrimSpace(v.promptArea.Value()) == "" {
+		return false, "Prompt is required"
+	}
+	
+	if strings.TrimSpace(v.fields[0].Value()) == "" {
+		return false, "Repository is required"
+	}
+	
+	if strings.TrimSpace(v.fields[1].Value()) == "" {
+		return false, "Source branch is required"
+	}
+	
+	if strings.TrimSpace(v.fields[2].Value()) == "" {
+		return false, "Target branch is required"
+	}
+	
+	// Check for duplicate file hash if a config file was loaded
+	if v.isDuplicateRun && v.currentFileHash != "" {
+		return false, "This task file has already been submitted (duplicate detected)"
+	}
+	
+	return true, ""
+}
+
+// loadFileHashCache loads the file hash cache from the API
+func (v *CreateRunView) loadFileHashCache() tea.Cmd {
+	return func() tea.Msg {
+		fileHashCache := cache.GetFileHashCache()
+		if fileHashCache == nil {
+			return nil
+		}
+		
+		// Check if already loaded
+		if fileHashCache.IsLoaded() {
+			return nil
+		}
+		
+		// Load from API
+		ctx := context.Background()
+		err := fileHashCache.EnsureLoaded(ctx, v.client)
+		if err != nil {
+			debug.LogToFilef("DEBUG: Failed to load file hash cache: %v\n", err)
+			// Non-critical error, continue without cache
+		}
+		
+		return nil
 	}
 }
 
