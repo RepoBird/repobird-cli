@@ -1314,7 +1314,7 @@ func (v *CreateRunView) renderCompactForm(width, height int) string {
 		} else {
 			b.WriteString("   ")
 		}
-		v.contextArea.SetWidth(min(width-18, 100))
+		v.contextArea.SetWidth(min(width-22, 100))
 		b.WriteString(v.contextArea.View())
 	} else if v.contextArea.Value() != "" {
 		// Show hint that context exists
