@@ -83,6 +83,8 @@ type CreateRunView struct {
 	lastLoadedFile           string
 	configFileSelectorActive bool
 	fileSelectorLoading      bool
+	// Reset confirmation state
+	resetConfirmMode bool
 }
 
 func NewCreateRunView(client *api.Client) *CreateRunView {
@@ -101,6 +103,8 @@ type CreateRunViewConfig struct {
 
 // NewCreateRunViewWithConfig creates a new CreateRunView with the given configuration
 func NewCreateRunViewWithConfig(cfg CreateRunViewConfig) *CreateRunView {
+	debug.LogToFile("DEBUG: NewCreateRunViewWithConfig called\n")
+	
 	v := &CreateRunView{
 		client:             cfg.Client,
 		keys:               components.DefaultKeyMap,
@@ -117,10 +121,20 @@ func NewCreateRunViewWithConfig(cfg CreateRunViewConfig) *CreateRunView {
 	}
 
 	v.repoSelector = components.NewRepositorySelector()
+	
+	// Initialize fields BEFORE loading form data
+	debug.LogToFile("DEBUG: Calling initializeInputFields\n")
 	v.initializeInputFields()
 
-	// Load saved form data first
+	// Load saved form data first - this should populate the fields
+	debug.LogToFile("DEBUG: Calling loadFormData\n")
 	v.loadFormData()
+	
+	// Debug: Check what values are in fields after loading
+	if len(v.fields) >= 5 {
+		debug.LogToFilef("DEBUG: After loadFormData in NewCreateRunViewWithConfig - fields[0]=%s, fields[1]=%s, fields[2]=%s, fields[3]=%s, promptArea=%d chars\n",
+			v.fields[0].Value(), v.fields[1].Value(), v.fields[2].Value(), v.fields[3].Value(), len(v.promptArea.Value()))
+	}
 
 	// Only override repository with dashboard selection if appropriate
 	if cfg.SelectedRepository != "" {
@@ -128,6 +142,9 @@ func NewCreateRunViewWithConfig(cfg CreateRunViewConfig) *CreateRunView {
 		// Only use it if the current repository field is empty
 		if len(v.fields) >= 1 && v.fields[0].Value() == "" {
 			v.fields[0].SetValue(cfg.SelectedRepository)
+			debug.LogToFilef("DEBUG: Set repository from dashboard: %s\n", cfg.SelectedRepository)
+		} else {
+			debug.LogToFilef("DEBUG: Keeping existing repository: %s (dashboard had: %s)\n", v.fields[0].Value(), cfg.SelectedRepository)
 		}
 		// Otherwise keep the loaded form data
 	} else {
@@ -188,7 +205,8 @@ func (v *CreateRunView) initializeInputFields() {
 	filePathInput.CharLimit = 200
 	filePathInput.Width = 50
 
-	autoDetectGit(repoInput, sourceInput)
+	// DON'T call autoDetectGit here - it overwrites saved form data!
+	// We'll only auto-detect when fields are actually empty after loading
 
 	// Reorder: repository, then prompt area is handled separately, then other fields
 	v.fields = []textinput.Model{
@@ -210,7 +228,7 @@ func (v *CreateRunView) initializeInputFields() {
 func (v *CreateRunView) loadFormData() {
 	savedData := cache.GetFormData()
 	if savedData != nil && len(v.fields) >= 5 {
-		debug.LogToFilef("DEBUG: Loading form data - Repository: %s, Prompt: %d chars, Source: %s, Target: %s, Title: %s\n",
+		debug.LogToFilef("DEBUG: loadFormData START - Repository: %s, Prompt: %d chars, Source: %s, Target: %s, Title: %s\n",
 			savedData.Repository, len(savedData.Prompt), savedData.Source, savedData.Target, savedData.Title)
 
 		v.fields[0].SetValue(savedData.Repository)
@@ -227,18 +245,40 @@ func (v *CreateRunView) loadFormData() {
 		if savedData.RunType != "" {
 			v.runType = models.RunType(savedData.RunType)
 		}
+		
+		// Debug: Verify fields were actually set
+		debug.LogToFilef("DEBUG: loadFormData AFTER SET - fields[0]=%s, fields[1]=%s, fields[2]=%s, fields[3]=%s, promptArea=%d chars\n",
+			v.fields[0].Value(), v.fields[1].Value(), v.fields[2].Value(), v.fields[3].Value(), len(v.promptArea.Value()))
 	} else {
-		debug.LogToFile("DEBUG: No saved form data found or fields not initialized\n")
+		if savedData == nil {
+			debug.LogToFile("DEBUG: loadFormData - savedData is nil!\n")
+		} else {
+			debug.LogToFilef("DEBUG: loadFormData - fields not initialized, len(v.fields)=%d\n", len(v.fields))
+		}
 	}
 }
 
 // autofillRepository sets the repository field with the most appropriate default
 func (v *CreateRunView) autofillRepository() {
 	// Only autofill if the repository field is empty (now at index 0)
-	if len(v.fields) >= 1 && v.fields[0].Value() == "" {
-		defaultRepo := v.repoSelector.GetDefaultRepository()
-		if defaultRepo != "" {
-			v.fields[0].SetValue(defaultRepo)
+	if len(v.fields) >= 2 {
+		// Auto-detect from git if fields are empty
+		if repo, branch, err := pkgutils.GetGitInfo(); err == nil {
+			if v.fields[0].Value() == "" && repo != "" {
+				v.fields[0].SetValue(repo)
+				debug.LogToFilef("DEBUG: Auto-filled repository from git: %s\n", repo)
+			}
+			if v.fields[1].Value() == "" && branch != "" {
+				v.fields[1].SetValue(branch)
+				debug.LogToFilef("DEBUG: Auto-filled source branch from git: %s\n", branch)
+			}
+		} else if v.fields[0].Value() == "" {
+			// Fallback to repository selector if git detection fails
+			defaultRepo := v.repoSelector.GetDefaultRepository()
+			if defaultRepo != "" {
+				v.fields[0].SetValue(defaultRepo)
+				debug.LogToFilef("DEBUG: Auto-filled repository from selector: %s\n", defaultRepo)
+			}
 		}
 	}
 }
@@ -263,17 +303,6 @@ func NewCreateRunViewWithCache(
 	}
 
 	return NewCreateRunViewWithConfig(config)
-}
-
-func autoDetectGit(repoInput, sourceInput textinput.Model) {
-	if repo, branch, err := pkgutils.GetGitInfo(); err == nil {
-		if repo != "" {
-			repoInput.SetValue(repo)
-		}
-		if branch != "" {
-			sourceInput.SetValue(branch)
-		}
-	}
 }
 
 func (v *CreateRunView) Init() tea.Cmd {
@@ -400,6 +429,31 @@ func (v *CreateRunView) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return v.handleErrorMode(msg)
 	}
 
+	// Handle reset confirmation mode
+	if v.resetConfirmMode {
+		switch msg.String() {
+		case "y":
+			// Confirm reset - clear all fields and cache
+			v.clearAllFields()
+			cache.ClearFormData()
+			v.resetConfirmMode = false
+			v.lastLoadedFile = ""
+			v.runType = models.RunTypeRun
+			v.showContext = false
+			v.promptCollapsed = false
+			debug.LogToFile("DEBUG: User confirmed reset - all fields cleared\n")
+			return v, nil
+		case "n", "esc":
+			// Cancel reset
+			v.resetConfirmMode = false
+			debug.LogToFile("DEBUG: User cancelled reset\n")
+			return v, nil
+		default:
+			// Ignore other keys in reset confirm mode
+			return v, nil
+		}
+	}
+
 	switch {
 	case msg.String() == "Q":
 		// Capital Q to force quit from anywhere
@@ -504,6 +558,11 @@ func (v *CreateRunView) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if v.focusIndex != 0 && v.focusIndex != 1 { // Skip load config field (index 0) and run type field (index 1)
 			v.clearCurrentField()
 		}
+	case msg.String() == "r":
+		// Enter reset confirmation mode
+		v.resetConfirmMode = true
+		debug.LogToFile("DEBUG: Entering reset confirmation mode\n")
+		return v, nil
 	default:
 		// Block vim navigation keys from doing anything else
 	}
@@ -726,9 +785,22 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Handle successful config loading
 		v.populateFormFromConfig(msg.config, msg.filePath)
 
+		// Debug: Log field values AFTER populating from config
+		debug.LogToFilef("DEBUG: After populateFormFromConfig - fields[0]=%s, fields[1]=%s, fields[2]=%s, fields[3]=%s, promptArea=%d chars\n",
+			v.fields[0].Value(), v.fields[1].Value(), v.fields[2].Value(), v.fields[3].Value(), len(v.promptArea.Value()))
+
 		// IMPORTANT: Save the loaded config data to cache immediately
 		// so it persists when navigating away
 		v.saveFormData()
+		
+		// Debug: Verify what was saved
+		savedData := cache.GetFormData()
+		if savedData != nil {
+			debug.LogToFilef("DEBUG: Verified saved data - Repository=%s, Prompt=%d chars, Source=%s, Target=%s, Title=%s\n",
+				savedData.Repository, len(savedData.Prompt), savedData.Source, savedData.Target, savedData.Title)
+		} else {
+			debug.LogToFile("DEBUG: WARNING - savedData is nil after saveFormData!\n")
+		}
 
 		v.statusLine.SetTemporaryMessageWithType(
 			fmt.Sprintf("✅ Config loaded from %s", filepath.Base(msg.filePath)),
@@ -1607,6 +1679,19 @@ func (v *CreateRunView) renderFileInputMode() string {
 func (v *CreateRunView) renderStatusBar() string {
 	var statusText string
 
+	// Handle reset confirmation mode - yellow styling like URL mode
+	if v.resetConfirmMode {
+		// Use yellow background color (226) to match URL opener style
+		resetStyle := lipgloss.NewStyle().
+			Background(lipgloss.Color("226")).
+			Foreground(lipgloss.Color("0")).
+			Width(v.width).
+			Align(lipgloss.Center)
+		
+		statusContent := fmt.Sprintf("[RESET] ⚠️  RESET ALL FIELDS? [y] confirm [n] cancel")
+		return resetStyle.Render(statusContent)
+	}
+
 	// Handle error mode status
 	if v.error != nil && !v.submitting {
 		if v.errorRowFocused {
@@ -1637,15 +1722,15 @@ func (v *CreateRunView) renderStatusBar() string {
 			switch v.focusIndex {
 			case 0:
 				// Load config field in normal mode (index 0)
-				statusText = "[q]back [Enter] load config [f] file select [j/k] navigate [c] context [Ctrl+S] submit [Q]uit"
+				statusText = "[q]back [Enter] load config [f] file select [j/k] navigate [c] context [r] reset [Ctrl+S] submit [Q]uit"
 			case 1:
 				// Run type field in normal mode (index 1)
-				statusText = "[q]back [Enter] toggle type [j/k] navigate [c] context [Ctrl+S] submit [Q]uit"
+				statusText = "[q]back [Enter] toggle type [j/k] navigate [c] context [r] reset [Ctrl+S] submit [Q]uit"
 			case 2:
 				// Repository field in normal mode (index 2)
-				statusText = "[q]back [Enter] edit [f] fuzzy [j/k] navigate [c] context [Ctrl+S] submit [Q]uit"
+				statusText = "[q]back [Enter] edit [f] fuzzy [j/k] navigate [c] context [r] reset [Ctrl+S] submit [Q]uit"
 			default:
-				statusText = "[q]back [Enter] edit [j/k] navigate [c] context [Ctrl+S] submit [?] help [Q]uit"
+				statusText = "[q]back [Enter] edit [j/k] navigate [c] context [r] reset [Ctrl+S] submit [?] help [Q]uit"
 			}
 		}
 	}
@@ -1972,7 +2057,8 @@ func (v *CreateRunView) loadConfigFromFile(filePath string) tea.Cmd {
 
 // populateFormFromConfig populates the form fields from loaded config
 func (v *CreateRunView) populateFormFromConfig(config *models.RunRequest, filePath string) {
-	debug.LogToFile("DEBUG: Populating form from config\n")
+	debug.LogToFilef("DEBUG: populateFormFromConfig START - config.Repository=%s, config.Source=%s, config.Target=%s, config.Title=%s, config.Prompt=%d chars\n",
+		config.Repository, config.Source, config.Target, config.Title, len(config.Prompt))
 
 	// Store the loaded file path
 	v.lastLoadedFile = filepath.Base(filePath)
@@ -1983,36 +2069,43 @@ func (v *CreateRunView) populateFormFromConfig(config *models.RunRequest, filePa
 	// Populate form fields
 	if config.Repository != "" {
 		v.fields[0].SetValue(config.Repository) // Repository field
+		debug.LogToFilef("DEBUG: Set fields[0] to %s, actual value: %s\n", config.Repository, v.fields[0].Value())
 	}
 
 	if config.Prompt != "" {
 		v.promptArea.SetValue(config.Prompt)
+		debug.LogToFilef("DEBUG: Set promptArea to %d chars, actual value: %d chars\n", len(config.Prompt), len(v.promptArea.Value()))
 		// Don't change collapsed state when loading config
 		// This prevents layout shifts that hide the top rows
 	}
 
 	if config.Source != "" {
 		v.fields[1].SetValue(config.Source) // Source field
+		debug.LogToFilef("DEBUG: Set fields[1] to %s, actual value: %s\n", config.Source, v.fields[1].Value())
 	}
 
 	if config.Target != "" {
 		v.fields[2].SetValue(config.Target) // Target field
+		debug.LogToFilef("DEBUG: Set fields[2] to %s, actual value: %s\n", config.Target, v.fields[2].Value())
 	}
 
 	if config.Title != "" {
 		v.fields[3].SetValue(config.Title) // Title field
+		debug.LogToFilef("DEBUG: Set fields[3] to %s, actual value: %s\n", config.Title, v.fields[3].Value())
 	}
 
 	if config.Context != "" {
 		v.contextArea.SetValue(config.Context)
 		v.showContext = true // Show context field if it has content
+		debug.LogToFilef("DEBUG: Set contextArea to %d chars, showContext=%v\n", len(config.Context), v.showContext)
 	}
 
 	// Set run type
 	if config.RunType != "" {
 		v.runType = config.RunType
+		debug.LogToFilef("DEBUG: Set runType to %s\n", v.runType)
 	}
 
-	debug.LogToFilef("DEBUG: Form populated - Repository: %s, Prompt length: %d\n",
-		config.Repository, len(config.Prompt))
+	debug.LogToFilef("DEBUG: populateFormFromConfig END - fields[0]=%s, fields[1]=%s, fields[2]=%s, fields[3]=%s\n",
+		v.fields[0].Value(), v.fields[1].Value(), v.fields[2].Value(), v.fields[3].Value())
 }

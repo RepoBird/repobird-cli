@@ -655,6 +655,15 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Navigate to create new run view
 			// Check if we have existing form data to determine if this is a navigation back
 			existingFormData := cache.GetFormData()
+			
+			// Debug: Log what form data exists when navigating to create view
+			if existingFormData != nil {
+				debug.LogToFilef("DEBUG: Dashboard 'n' - Found existing form data: Repository=%s, Prompt=%d chars, Source=%s, Target=%s, Title=%s\n",
+					existingFormData.Repository, len(existingFormData.Prompt), existingFormData.Source, existingFormData.Target, existingFormData.Title)
+			} else {
+				debug.LogToFile("DEBUG: Dashboard 'n' - No existing form data found\n")
+			}
+			
 			config := CreateRunViewConfig{
 				Client: d.client,
 			}
@@ -665,6 +674,9 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if d.selectedRepo != nil {
 				if existingFormData == nil || existingFormData.Repository == "" {
 					config.SelectedRepository = d.selectedRepo.Name
+					debug.LogToFilef("DEBUG: Dashboard passing selected repository: %s\n", d.selectedRepo.Name)
+				} else {
+					debug.LogToFilef("DEBUG: Dashboard preserving existing repository: %s\n", existingFormData.Repository)
 				}
 				// Otherwise preserve the existing form data repository
 			}
@@ -1055,7 +1067,6 @@ func (d *DashboardView) View() string {
 		PaddingLeft(1)
 
 	title := titleStyle.Render("Repobird.ai CLI")
-	debug.LogToFilef("Title width: %d\n", lipgloss.Width(title))
 
 	if d.error != nil {
 		content = fmt.Sprintf("Error loading dashboard data: %s\n\nPress 'r' to retry, 'q' to quit", d.error.Error())
@@ -1126,15 +1137,11 @@ func (d *DashboardView) View() string {
 		return d.renderStatusInfo()
 	}
 
-	debug.LogToFilef("Final view dimensions: width=%d, height=%d\n",
-		lipgloss.Width(finalView), lipgloss.Height(finalView))
 	return finalView
 }
 
 // renderTripleColumnLayout renders the Miller Columns layout with real data
 func (d *DashboardView) renderTripleColumnLayout() string {
-	// Debug logging
-	debug.LogToFilef("Dashboard Layout: width=%d, height=%d\n", d.width, d.height)
 
 	// Calculate available height for columns
 	// We have d.height total, minus:
@@ -1164,8 +1171,6 @@ func (d *DashboardView) renderTripleColumnLayout() string {
 		rightWidth = 10
 	}
 
-	debug.LogToFilef("Column widths: left=%d, center=%d, right=%d, total=%d\n",
-		leftWidth, centerWidth, rightWidth, leftWidth+centerWidth+rightWidth)
 
 	// Make columns with rounded borders - use full available height
 	// The Height() method in lipgloss includes borders in the total height
@@ -1174,7 +1179,6 @@ func (d *DashboardView) renderTripleColumnLayout() string {
 		columnHeight = 3
 	}
 
-	debug.LogToFilef("Column height: available=%d, column=%d\n", availableHeight, columnHeight)
 
 	// Create column content with titles
 	// Account for borders (2 chars for left/right, 2 for top/bottom)
@@ -1188,8 +1192,6 @@ func (d *DashboardView) renderTripleColumnLayout() string {
 	centerContent := d.renderRunsColumn(contentWidth2, contentHeight)
 	rightContent := d.renderDetailsColumn(contentWidth3, contentHeight)
 
-	debug.LogToFilef("Content dimensions: w1=%d, w2=%d, w3=%d, h=%d\n",
-		contentWidth1, contentWidth2, contentWidth3, contentHeight)
 
 	// Create styles for columns
 	// Width() and Height() in lipgloss include the border in the total dimensions
@@ -1216,8 +1218,6 @@ func (d *DashboardView) renderTripleColumnLayout() string {
 	centerBox := centerStyle.Render(centerContent)
 	rightBox := rightStyle.Render(rightContent)
 
-	debug.LogToFilef("Box widths: left=%d, center=%d, right=%d\n",
-		lipgloss.Width(leftBox), lipgloss.Width(centerBox), lipgloss.Width(rightBox))
 
 	// Join columns horizontally - they should already fit the width exactly
 	columns := lipgloss.JoinHorizontal(
@@ -1228,23 +1228,19 @@ func (d *DashboardView) renderTripleColumnLayout() string {
 	)
 
 	finalWidth := lipgloss.Width(columns)
-	debug.LogToFilef("Final columns width=%d (terminal width=%d)\n", finalWidth, d.width)
 
 	// If columns still exceed terminal width (shouldn't happen with correct calculation)
 	// Use PlaceHorizontal to constrain them
 	if finalWidth > d.width {
-		debug.LogToFilef("WARNING: Columns width %d exceeds terminal width %d, constraining...\n", finalWidth, d.width)
 		columns = lipgloss.PlaceHorizontal(d.width, lipgloss.Left, columns)
 	}
 
 	// Create statusline
 	statusline := d.renderStatusLine("DASH")
-	debug.LogToFilef("Statusline width: %d\n", lipgloss.Width(statusline))
 
 	// The statusline should be placed at the bottom with proper spacing
 	// Place the columns and statusline in the available space
-	columnsHeight := lipgloss.Height(columns)
-	debug.LogToFilef("Heights: columns=%d, availableHeight=%d\n", columnsHeight, availableHeight)
+	_ = lipgloss.Height(columns) // columnsHeight not used right now
 
 	// Add notification line if there's a message to show
 	var parts []string
@@ -1261,8 +1257,6 @@ func (d *DashboardView) renderTripleColumnLayout() string {
 	// The available height already accounts for title and statusline
 	finalLayout := lipgloss.JoinVertical(lipgloss.Left, parts...)
 
-	debug.LogToFilef("Triple column layout dimensions: width=%d, height=%d\n",
-		lipgloss.Width(finalLayout), lipgloss.Height(finalLayout))
 	return finalLayout
 }
 
