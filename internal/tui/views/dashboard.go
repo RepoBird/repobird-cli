@@ -618,16 +618,12 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			if urlText != "" {
 				if err := utils.OpenURL(urlText); err == nil {
-					d.copiedMessage = message
+					d.statusMessage = message
 				} else {
-					d.copiedMessage = fmt.Sprintf("✗ Failed to open URL: %v", err)
+					d.statusMessage = fmt.Sprintf("✗ Failed to open URL: %v", err)
 				}
-				d.copiedMessageTime = time.Now()
-				d.yankBlink = true
-				return d, tea.Batch(
-					d.startYankBlinkAnimation(),
-					d.startClearStatusTimer(),
-				)
+				d.statusMessageTime = time.Now()
+				return d, d.startClearStatusMessageTimer()
 			}
 			return d, nil
 		case msg.Type == tea.KeyEsc && d.showStatusInfo:
@@ -1357,7 +1353,7 @@ func (d *DashboardView) startYankBlinkAnimation() tea.Cmd {
 // startClearStatusTimer starts a timer to clear the status message
 func (d *DashboardView) startClearStatusTimer() tea.Cmd {
 	return func() tea.Msg {
-		time.Sleep(3 * time.Second)
+		time.Sleep(500 * time.Millisecond)
 		return clearStatusMsg{}
 	}
 }
@@ -1365,7 +1361,7 @@ func (d *DashboardView) startClearStatusTimer() tea.Cmd {
 // startClearStatusMessageTimer starts a timer to clear the temporary status message
 func (d *DashboardView) startClearStatusMessageTimer() tea.Cmd {
 	return func() tea.Msg {
-		time.Sleep(3 * time.Second)
+		time.Sleep(1 * time.Second)
 		return clearStatusMessageMsg{}
 	}
 }
@@ -1527,7 +1523,7 @@ func (d *DashboardView) renderRunsColumn(width, height int) string {
 			if i == d.selectedRunIdx {
 				if d.focusedColumn == 1 {
 					// Custom blinking: toggle between bright and normal colors
-					if d.copiedMessage != "" && time.Since(d.copiedMessageTime) < 2*time.Second {
+					if d.copiedMessage != "" && time.Since(d.copiedMessageTime) < 500*time.Millisecond {
 						if d.yankBlink {
 							// Bright green when visible
 							item = lipgloss.NewStyle().
@@ -2223,7 +2219,7 @@ func (d *DashboardView) renderStatusInfo() string {
 	shortHelp := "[j/k]navigate [y]copy [s/q/b/ESC]back [Q]uit"
 
 	// Show copied message prominently if recent
-	if d.copiedMessage != "" && time.Since(d.copiedMessageTime) < 3*time.Second {
+	if d.copiedMessage != "" && time.Since(d.copiedMessageTime) < 500*time.Millisecond {
 		// Use the renderStatusLine method which handles copied messages
 		statusLine = d.renderStatusLine("STATUS")
 	} else {
@@ -2381,16 +2377,16 @@ func (d *DashboardView) wrapTextWithLimit(text string, width int, maxLines int) 
 // renderNotificationLine renders a notification line if there's a message to show
 func (d *DashboardView) renderNotificationLine() string {
 	// If we're showing a status message in the status line, don't show notification
-	if d.statusMessage != "" && time.Since(d.statusMessageTime) < 3*time.Second {
+	if d.statusMessage != "" && time.Since(d.statusMessageTime) < 1*time.Second {
 		return ""
 	}
 
-	if d.copiedMessage == "" || time.Since(d.copiedMessageTime) >= 3*time.Second {
+	if d.copiedMessage == "" || time.Since(d.copiedMessageTime) >= 500*time.Millisecond {
 		return ""
 	}
 
 	var notificationStyle lipgloss.Style
-	if time.Since(d.copiedMessageTime) < 2*time.Second {
+	if time.Since(d.copiedMessageTime) < 500*time.Millisecond {
 		if d.yankBlink {
 			// Bright and bold when visible
 			notificationStyle = lipgloss.NewStyle().
@@ -2463,7 +2459,7 @@ func (d *DashboardView) hasCurrentSelectionURL() bool {
 // renderStatusLine renders the universal status line
 func (d *DashboardView) renderStatusLine(layoutName string) string {
 	// Check for temporary status message (URL opening, copying, etc.) - highest priority
-	if d.statusMessage != "" && time.Since(d.statusMessageTime) < 3*time.Second {
+	if d.statusMessage != "" && time.Since(d.statusMessageTime) < 1*time.Second {
 		// Create green status line for successful operations or red for errors
 		var statusStyle lipgloss.Style
 		if strings.Contains(d.statusMessage, "✗") {
