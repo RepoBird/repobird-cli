@@ -43,6 +43,7 @@ All configuration options can be set via environment variables with the `REPOBIR
 |----------|-------------|---------|
 | `REPOBIRD_API_KEY` | API authentication key | - |
 | `REPOBIRD_API_URL` | API endpoint URL | `https://api.repobird.ai` |
+| `REPOBIRD_ENV` | Environment (prod/dev) - affects frontend URL generation | `prod` |
 | `REPOBIRD_DEBUG` | Enable debug logging | `false` |
 | `REPOBIRD_TIMEOUT` | Request timeout | `45m` |
 | `REPOBIRD_OUTPUT_FORMAT` | Output format (table/json/yaml) | `table` |
@@ -57,10 +58,12 @@ All configuration options can be set via environment variables with the `REPOBIR
 ```bash
 # Temporary (current session)
 export REPOBIRD_API_KEY="your-key-here"
+export REPOBIRD_ENV=dev
 export REPOBIRD_DEBUG=true
 
 # Permanent (add to ~/.bashrc or ~/.zshrc)
 echo 'export REPOBIRD_API_KEY="your-key-here"' >> ~/.bashrc
+echo 'export REPOBIRD_ENV=dev' >> ~/.bashrc
 source ~/.bashrc
 ```
 
@@ -68,11 +71,58 @@ source ~/.bashrc
 ```powershell
 # Temporary (current session)
 $env:REPOBIRD_API_KEY = "your-key-here"
+$env:REPOBIRD_ENV = "dev"
 $env:REPOBIRD_DEBUG = "true"
 
 # Permanent (user level)
 [System.Environment]::SetEnvironmentVariable("REPOBIRD_API_KEY", "your-key-here", "User")
+[System.Environment]::SetEnvironmentVariable("REPOBIRD_ENV", "dev", "User")
 ```
+
+## Environment-Specific Configuration
+
+### REPOBIRD_ENV Variable
+
+The `REPOBIRD_ENV` environment variable controls environment-specific behavior:
+
+#### Production (Default)
+```bash
+export REPOBIRD_ENV=prod
+# or leave unset (defaults to production)
+```
+- **Frontend URLs**: Generated URLs point to `https://repobird.ai`
+- **Example**: Run ID 927 → `https://repobird.ai/repos/issue-runs/927`
+
+#### Development
+```bash
+export REPOBIRD_ENV=dev
+```
+- **Frontend URLs**: Generated URLs point to `http://localhost:3000`
+- **Example**: Run ID 927 → `http://localhost:3000/repos/issue-runs/927`
+
+### Makefile Integration
+
+The project Makefile automatically sets the appropriate environment:
+```bash
+# Development commands (set REPOBIRD_ENV=dev automatically)
+make build          # Development build
+make test           # Run tests in dev mode
+make run            # Run application in dev mode
+make tui            # Launch TUI in dev mode
+
+# Production commands (set REPOBIRD_ENV=prod)
+make build-prod     # Production build
+make build-all-prod # Production build for all platforms
+```
+
+### URL Generation Behavior
+
+When using the CLI's URL generation features (such as the 'o' key in the dashboard to open run URLs), the environment setting affects which frontend URLs are generated:
+
+- **Production**: URLs open to the live RepoBird web application
+- **Development**: URLs open to your local development server
+
+This allows developers to seamlessly work with local frontend instances while maintaining production behavior for end users.
 
 ## API Key Management
 

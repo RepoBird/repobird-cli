@@ -13,6 +13,10 @@ COMMIT=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 DATE=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS=-ldflags "-s -w -X github.com/repobird/repobird-cli/pkg/version.Version=$(VERSION) -X github.com/repobird/repobird-cli/pkg/version.GitCommit=$(COMMIT) -X github.com/repobird/repobird-cli/pkg/version.BuildDate=$(DATE)"
 
+# Environment variables for development vs production
+DEV_ENV=REPOBIRD_ENV=dev
+PROD_ENV=REPOBIRD_ENV=prod
+
 # Go parameters
 GOCMD=go
 GOBUILD=$(GOCMD) build
@@ -57,48 +61,71 @@ deps:
 	$(GOMOD) download
 	$(GOMOD) verify
 
-## build: Build the binary for current platform (without CGO for portability)
+## build: Build the binary for current platform (development, without CGO for portability)
 build:
 	@mkdir -p $(BUILD_DIR)
-	CGO_ENABLED=0 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) $(MAIN_PATH)
-	@echo "Build complete: $(BUILD_DIR)/$(BINARY_NAME)"
+	$(DEV_ENV) CGO_ENABLED=0 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) $(MAIN_PATH)
+	@echo "Development build complete: $(BUILD_DIR)/$(BINARY_NAME)"
 
-## build-cgo: Build the binary with CGO enabled (better clipboard support)
+## build-cgo: Build the binary with CGO enabled (development, better clipboard support)
 build-cgo:
 	@mkdir -p $(BUILD_DIR)
-	CGO_ENABLED=1 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) $(MAIN_PATH)
-	@echo "Build complete with CGO: $(BUILD_DIR)/$(BINARY_NAME)"
+	$(DEV_ENV) CGO_ENABLED=1 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) $(MAIN_PATH)
+	@echo "Development build complete with CGO: $(BUILD_DIR)/$(BINARY_NAME)"
 
-## build-all: Build binaries for all platforms
+## build-prod: Build the binary for production (current platform)
+build-prod:
+	@mkdir -p $(BUILD_DIR)
+	$(PROD_ENV) CGO_ENABLED=0 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) $(MAIN_PATH)
+	@echo "Production build complete: $(BUILD_DIR)/$(BINARY_NAME)"
+
+## build-prod-cgo: Build the binary for production with CGO enabled
+build-prod-cgo:
+	@mkdir -p $(BUILD_DIR)
+	$(PROD_ENV) CGO_ENABLED=1 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) $(MAIN_PATH)
+	@echo "Production build complete with CGO: $(BUILD_DIR)/$(BINARY_NAME)"
+
+## build-all: Build binaries for all platforms (development)
 build-all:
 	@mkdir -p $(BUILD_DIR)
 	@for platform in $(PLATFORMS); do \
-		GOOS=$${platform%/*} GOARCH=$${platform#*/} \
+		$(DEV_ENV) GOOS=$${platform%/*} GOARCH=$${platform#*/} \
 		CGO_ENABLED=0 $(GOBUILD) $(LDFLAGS) \
 		-o $(BUILD_DIR)/$(BINARY_NAME)-$${platform%/*}-$${platform#*/}$${ext} \
 		$(MAIN_PATH); \
 		echo "Built: $(BUILD_DIR)/$(BINARY_NAME)-$${platform%/*}-$${platform#*/}"; \
 	done
 
-## run: Run the application
+## build-all-prod: Build production binaries for all platforms
+build-all-prod:
+	@mkdir -p $(BUILD_DIR)
+	@for platform in $(PLATFORMS); do \
+		$(PROD_ENV) GOOS=$${platform%/*} GOARCH=$${platform#*/} \
+		CGO_ENABLED=0 $(GOBUILD) $(LDFLAGS) \
+		-o $(BUILD_DIR)/$(BINARY_NAME)-$${platform%/*}-$${platform#*/}$${ext} \
+		$(MAIN_PATH); \
+		echo "Built: $(BUILD_DIR)/$(BINARY_NAME)-$${platform%/*}-$${platform#*/}"; \
+	done
+
+## run: Run the application (development)
 run:
-	$(GOCMD) run $(LDFLAGS) $(MAIN_PATH)
+	$(DEV_ENV) $(GOCMD) run $(LDFLAGS) $(MAIN_PATH)
 
-## tui: Build and run the TUI interface (portable build)
+## tui: Build and run the TUI interface (development, portable build)
 tui: build
-	./$(BUILD_DIR)/$(BINARY_NAME) tui
+	$(DEV_ENV) ./$(BUILD_DIR)/$(BINARY_NAME) tui
 
-## tui-cgo: Build and run the TUI interface with CGO (better clipboard support)
+## tui-cgo: Build and run the TUI interface with CGO (development, better clipboard support)
 tui-cgo: build-cgo
-	./$(BUILD_DIR)/$(BINARY_NAME) tui
+	$(DEV_ENV) ./$(BUILD_DIR)/$(BINARY_NAME) tui
 
-## status: Build and run status command
+## status: Build and run status command (development)
 status: build
-	./$(BUILD_DIR)/$(BINARY_NAME) status
+	$(DEV_ENV) ./$(BUILD_DIR)/$(BINARY_NAME) status
 
-## status-debug: Build and run status command with debug output
+## status-debug: Build and run status command with debug output (development)
 status-debug: build
-	./$(BUILD_DIR)/$(BINARY_NAME) status --debug
+	$(DEV_ENV) ./$(BUILD_DIR)/$(BINARY_NAME) status --debug
 
 ## install: Install repobird to ~/.local/bin with rb alias
 install: build
@@ -140,64 +167,64 @@ clean:
 	@rm -f coverage.out coverage.html
 	@echo "Clean complete"
 
-## test: Run all tests
+## test: Run all tests (development)
 test:
-	$(GOTEST) -v -race -timeout 30s ./...
+	$(DEV_ENV) $(GOTEST) -v -race -timeout 30s ./...
 
-## test-unit: Run unit tests only
+## test-unit: Run unit tests only (development)
 test-unit:
-	$(GOTEST) -v -race -timeout 30s -short ./internal/... ./pkg/...
+	$(DEV_ENV) $(GOTEST) -v -race -timeout 30s -short ./internal/... ./pkg/...
 
-## test-integration: Run integration tests only
+## test-integration: Run integration tests only (development)
 test-integration:
-	$(GOTEST) -v -race -timeout 2m -tags=integration ./tests/integration/...
+	$(DEV_ENV) $(GOTEST) -v -race -timeout 2m -tags=integration ./tests/integration/...
 
-## test-commands: Run command tests only
+## test-commands: Run command tests only (development)
 test-commands:
-	$(GOTEST) -v -race -timeout 30s ./internal/commands/...
+	$(DEV_ENV) $(GOTEST) -v -race -timeout 30s ./internal/commands/...
 
-## test-api: Run API tests only
+## test-api: Run API tests only (development)
 test-api:
-	$(GOTEST) -v -race -timeout 30s ./internal/api/...
+	$(DEV_ENV) $(GOTEST) -v -race -timeout 30s ./internal/api/...
 
-## test-config: Run config tests only
+## test-config: Run config tests only (development)
 test-config:
-	$(GOTEST) -v -race -timeout 30s ./internal/config/...
+	$(DEV_ENV) $(GOTEST) -v -race -timeout 30s ./internal/config/...
 
-## test-short: Run short tests only
+## test-short: Run short tests only (development)
 test-short:
-	$(GOTEST) -v -short ./...
+	$(DEV_ENV) $(GOTEST) -v -short ./...
 
-## test-verbose: Run tests with verbose output
+## test-verbose: Run tests with verbose output (development)
 test-verbose:
-	$(GOTEST) -v -race -timeout 30s -count=1 ./...
+	$(DEV_ENV) $(GOTEST) -v -race -timeout 30s -count=1 ./...
 
-## coverage: Run tests with coverage
+## coverage: Run tests with coverage (development)
 coverage:
-	$(GOTEST) -v -race -coverprofile=coverage.out -covermode=atomic ./...
+	$(DEV_ENV) $(GOTEST) -v -race -coverprofile=coverage.out -covermode=atomic ./...
 	$(GOCMD) tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report: coverage.html"
 	@$(GOCMD) tool cover -func=coverage.out | grep total | awk '{print "Total coverage: " $$3}'
 
-## coverage-unit: Generate coverage for unit tests only
+## coverage-unit: Generate coverage for unit tests only (development)
 coverage-unit:
-	$(GOTEST) -v -race -coverprofile=coverage-unit.out -covermode=atomic -short ./internal/... ./pkg/...
+	$(DEV_ENV) $(GOTEST) -v -race -coverprofile=coverage-unit.out -covermode=atomic -short ./internal/... ./pkg/...
 	$(GOCMD) tool cover -html=coverage-unit.out -o coverage-unit.html
 	@echo "Unit test coverage report: coverage-unit.html"
 	@$(GOCMD) tool cover -func=coverage-unit.out | grep total | awk '{print "Unit test coverage: " $$3}'
 
-## benchmark: Run benchmarks
+## benchmark: Run benchmarks (development)
 benchmark:
-	$(GOTEST) -bench=. -benchmem ./...
+	$(DEV_ENV) $(GOTEST) -bench=. -benchmem ./...
 
-## benchmark-api: Run API benchmarks only
+## benchmark-api: Run API benchmarks only (development)
 benchmark-api:
-	$(GOTEST) -bench=. -benchmem ./internal/api/...
+	$(DEV_ENV) $(GOTEST) -bench=. -benchmem ./internal/api/...
 
-## fuzz: Run fuzz tests
+## fuzz: Run fuzz tests (development)
 fuzz:
-	$(GOTEST) -fuzz=. -fuzztime=30s ./internal/models/...
-	$(GOTEST) -fuzz=. -fuzztime=30s ./pkg/utils/...
+	$(DEV_ENV) $(GOTEST) -fuzz=. -fuzztime=30s ./internal/models/...
+	$(DEV_ENV) $(GOTEST) -fuzz=. -fuzztime=30s ./pkg/utils/...
 
 ## fmt: Format code
 fmt:
@@ -260,7 +287,7 @@ docker-run:
 ## dev: Start development with file watching
 dev:
 	@which air > /dev/null || go install github.com/cosmtrek/air@latest
-	air -c .air.toml
+	$(DEV_ENV) air -c .air.toml
 
 ## docs: Generate documentation
 docs:

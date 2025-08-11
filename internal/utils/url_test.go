@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"os"
 	"testing"
 )
 
@@ -123,6 +124,131 @@ func TestOpenURL(t *testing.T) {
 			if (err != nil) != tt.wantErr {
 				// In test environments, commands might fail - that's expected
 				t.Logf("OpenURL(%q) error = %v (may be expected in test environment)", tt.input, err)
+			}
+		})
+	}
+}
+
+func TestGenerateRepoBirdURL(t *testing.T) {
+	// Save original environment
+	originalEnv := os.Getenv("REPOBIRD_ENV")
+	defer func() {
+		if originalEnv != "" {
+			os.Setenv("REPOBIRD_ENV", originalEnv)
+		} else {
+			os.Unsetenv("REPOBIRD_ENV")
+		}
+	}()
+
+	tests := []struct {
+		name     string
+		env      string
+		runID    string
+		expected string
+	}{
+		// Production environment (default)
+		{"Production - Numeric ID", "", "927", "https://repobird.ai/repos/issue-runs/927"},
+		{"Production explicit - String ID", "prod", "abc123", "https://repobird.ai/repos/issue-runs/abc123"},
+		{"Production - Empty ID", "", "", ""},
+		{"Production - Null ID", "", "null", ""},
+		{"Production - Large numeric ID", "", "123456789", "https://repobird.ai/repos/issue-runs/123456789"},
+
+		// Development environment
+		{"Development - Numeric ID", "dev", "927", "http://localhost:3000/repos/issue-runs/927"},
+		{"Development - String ID", "development", "abc123", "http://localhost:3000/repos/issue-runs/abc123"},
+		{"Development - Empty ID", "dev", "", ""},
+		{"Development - Null ID", "dev", "null", ""},
+		{"Development - Large numeric ID", "dev", "123456789", "http://localhost:3000/repos/issue-runs/123456789"},
+
+		// Case sensitivity tests
+		{"Development uppercase", "DEV", "927", "http://localhost:3000/repos/issue-runs/927"},
+		{"Development mixed case", "Dev", "927", "http://localhost:3000/repos/issue-runs/927"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Set environment for this test
+			if tt.env != "" {
+				os.Setenv("REPOBIRD_ENV", tt.env)
+			} else {
+				os.Unsetenv("REPOBIRD_ENV")
+			}
+
+			result := GenerateRepoBirdURL(tt.runID)
+			if result != tt.expected {
+				t.Errorf("GenerateRepoBirdURL(%q) with REPOBIRD_ENV=%q = %q, want %q", tt.runID, tt.env, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGetRepoBirdBaseURL(t *testing.T) {
+	// Save original environment
+	originalEnv := os.Getenv("REPOBIRD_ENV")
+	defer func() {
+		if originalEnv != "" {
+			os.Setenv("REPOBIRD_ENV", originalEnv)
+		} else {
+			os.Unsetenv("REPOBIRD_ENV")
+		}
+	}()
+
+	tests := []struct {
+		name     string
+		env      string
+		expected string
+	}{
+		{"Default (empty)", "", "https://repobird.ai"},
+		{"Production explicit", "prod", "https://repobird.ai"},
+		{"Production uppercase", "PROD", "https://repobird.ai"},
+		{"Development", "dev", "http://localhost:3000"},
+		{"Development full", "development", "http://localhost:3000"},
+		{"Development uppercase", "DEV", "http://localhost:3000"},
+		{"Development mixed case", "Dev", "http://localhost:3000"},
+		{"Unknown environment defaults to prod", "staging", "https://repobird.ai"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Set environment for this test
+			if tt.env != "" {
+				os.Setenv("REPOBIRD_ENV", tt.env)
+			} else {
+				os.Unsetenv("REPOBIRD_ENV")
+			}
+
+			result := getRepoBirdBaseURL()
+			if result != tt.expected {
+				t.Errorf("getRepoBirdBaseURL() with REPOBIRD_ENV=%q = %q, want %q", tt.env, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestIsNonEmptyNumber(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected bool
+	}{
+		{"Valid number", "927", true},
+		{"Large number", "123456789", true},
+		{"Single digit", "5", true},
+		{"Zero", "0", true},
+		{"Empty string", "", false},
+		{"String with letters", "abc123", false},
+		{"Mixed alphanumeric", "12a34", false},
+		{"String with spaces", "1 2 3", false},
+		{"Negative number", "-123", false},
+		{"Decimal number", "12.34", false},
+		{"Just letters", "abc", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IsNonEmptyNumber(tt.input)
+			if result != tt.expected {
+				t.Errorf("IsNonEmptyNumber(%q) = %v, want %v", tt.input, result, tt.expected)
 			}
 		})
 	}

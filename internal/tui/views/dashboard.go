@@ -75,6 +75,10 @@ type DashboardView struct {
 	copiedMessageTime time.Time
 	yankBlink         bool // Toggle for blinking effect
 
+	// Temporary status line messages (for URL opening, etc.)
+	statusMessage     string
+	statusMessageTime time.Time
+
 	// Store original untruncated detail lines for copying
 	detailLinesOriginal []string
 
@@ -82,6 +86,11 @@ type DashboardView struct {
 	statusInfoSelectedRow int      // Currently selected row in status info
 	statusInfoFields      []string // Field values that can be copied
 	statusInfoFieldLines  []int    // Line numbers for each field
+
+	// URL selection for repositories
+	showURLSelectionPrompt bool                  // Show URL selection prompt in status line
+	pendingRepoForURL      *models.Repository    // Repository pending URL selection
+	pendingAPIRepoForURL   *models.APIRepository // API repository data for URL generation
 }
 
 type dashboardDataLoadedMsg struct {
@@ -99,6 +108,8 @@ type dashboardUserInfoLoadedMsg struct {
 	userInfo *models.UserInfo
 	error    error
 }
+
+type clearStatusMessageMsg struct{}
 
 // NewDashboardView creates a new dashboard view
 func NewDashboardView(client *api.Client) *DashboardView {
@@ -535,6 +546,10 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		d.copiedMessage = ""
 		d.yankBlink = false
 
+	case clearStatusMessageMsg:
+		// Clear the temporary status message after timeout
+		d.statusMessage = ""
+
 	case components.FZFSelectedMsg:
 		// Handle FZF selection result
 		if !msg.Result.Canceled {
@@ -575,6 +590,46 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// Handle dashboard-specific keys
 		switch {
+		case msg.Type == tea.KeyEsc && d.showURLSelectionPrompt:
+			// Close URL selection prompt with ESC
+			d.showURLSelectionPrompt = false
+			d.pendingRepoForURL = nil
+			d.pendingAPIRepoForURL = nil
+			return d, nil
+		case d.showURLSelectionPrompt && (msg.Type == tea.KeyRunes && (string(msg.Runes) == "o" || string(msg.Runes) == "g")):
+			// Handle URL selection
+			var urlText string
+			var message string
+
+			if string(msg.Runes) == "o" && d.pendingAPIRepoForURL != nil {
+				// Open RepoBird URL
+				urlText = fmt.Sprintf("https://repobird.ai/repos/%d", d.pendingAPIRepoForURL.ID)
+				message = "🌐 Opened RepoBird URL in browser"
+			} else if string(msg.Runes) == "g" && d.pendingAPIRepoForURL != nil {
+				// Open GitHub URL
+				urlText = d.pendingAPIRepoForURL.RepoURL
+				message = "🌐 Opened GitHub URL in browser"
+			}
+
+			// Clear the prompt
+			d.showURLSelectionPrompt = false
+			d.pendingRepoForURL = nil
+			d.pendingAPIRepoForURL = nil
+
+			if urlText != "" {
+				if err := utils.OpenURL(urlText); err == nil {
+					d.copiedMessage = message
+				} else {
+					d.copiedMessage = fmt.Sprintf("✗ Failed to open URL: %v", err)
+				}
+				d.copiedMessageTime = time.Now()
+				d.yankBlink = true
+				return d, tea.Batch(
+					d.startYankBlinkAnimation(),
+					d.startClearStatusTimer(),
+				)
+			}
+			return d, nil
 		case msg.Type == tea.KeyEsc && d.showStatusInfo:
 			// Close status info overlay with ESC
 			d.showStatusInfo = false
@@ -837,23 +892,17 @@ func (d *DashboardView) handleMillerColumnsNavigation(msg tea.KeyMsg) tea.Cmd {
 		if textToCopy != "" {
 			if err := d.copyToClipboard(textToCopy); err == nil {
 				// Show what's actually on the clipboard, truncated for display if needed
-				// Use the actual text that was copied (textToCopy), not a truncated version
 				displayText := textToCopy
 				maxLen := 30
 				if len(displayText) > maxLen {
 					displayText = displayText[:maxLen-3] + "..."
 				}
-				d.copiedMessage = fmt.Sprintf("📋 Copied \"%s\"", displayText)
+				d.statusMessage = fmt.Sprintf("📋 Copied \"%s\"", displayText)
 			} else {
-				d.copiedMessage = "✗ Failed to copy"
+				d.statusMessage = "✗ Failed to copy"
 			}
-			d.copiedMessageTime = time.Now()
-			d.yankBlink = true
-			// Start blink animation and clear timer
-			return tea.Batch(
-				d.startYankBlinkAnimation(),
-				d.startClearStatusTimer(),
-			)
+			d.statusMessageTime = time.Now()
+			return d.startClearStatusMessageTimer()
 		}
 
 	case msg.Type == tea.KeyRunes && string(msg.Runes) == "o":
@@ -861,8 +910,19 @@ func (d *DashboardView) handleMillerColumnsNavigation(msg tea.KeyMsg) tea.Cmd {
 		var urlText string
 
 		switch d.focusedColumn {
-		case 0: // Repository column - repositories don't typically have URLs
-			// No URL handling for repositories currently
+		case 0: // Repository column - handle repository URLs
+			if d.selectedRepoIdx < len(d.repositories) {
+				repo := d.repositories[d.selectedRepoIdx]
+				// Check if we can provide URL options
+				apiRepo := d.getAPIRepositoryForRepo(&repo)
+				if apiRepo != nil {
+					// Show URL selection prompt in status line
+					d.showURLSelectionPrompt = true
+					d.pendingRepoForURL = &repo
+					d.pendingAPIRepoForURL = apiRepo
+					return nil
+				}
+			}
 		case 1: // Runs column - could check for PR URLs in run data
 			if d.selectedRunIdx < len(d.filteredRuns) {
 				run := d.filteredRuns[d.selectedRunIdx]
@@ -870,27 +930,43 @@ func (d *DashboardView) handleMillerColumnsNavigation(msg tea.KeyMsg) tea.Cmd {
 					urlText = *run.PrURL
 				}
 			}
-		case 2: // Details column - check if selected line contains a URL
+		case 2: // Details column - check if selected line contains a URL or is an ID field
 			if d.selectedDetailLine < len(d.detailLinesOriginal) {
 				lineText := d.detailLinesOriginal[d.selectedDetailLine]
 				if utils.IsURL(lineText) {
 					urlText = utils.ExtractURL(lineText)
+				} else if d.selectedDetailLine == 0 && d.selectedRunData != nil {
+					// First line is the ID field, generate RepoBird URL
+					runID := d.selectedRunData.GetIDString()
+					if utils.IsNonEmptyNumber(runID) {
+						urlText = utils.GenerateRepoBirdURL(runID)
+					}
+				} else if d.selectedDetailLine == 2 && d.selectedRunData != nil {
+					// Repository line - show URL selection prompt
+					repoName := d.selectedRunData.GetRepositoryName()
+					if repoName != "" {
+						repo := d.getRepositoryByName(repoName)
+						apiRepo := d.getAPIRepositoryForRepo(repo)
+						if apiRepo != nil {
+							// Show URL selection prompt in status line
+							d.showURLSelectionPrompt = true
+							d.pendingRepoForURL = repo
+							d.pendingAPIRepoForURL = apiRepo
+							return nil
+						}
+					}
 				}
 			}
 		}
 
 		if urlText != "" {
 			if err := utils.OpenURL(urlText); err == nil {
-				d.copiedMessage = "🌐 Opened URL in browser"
+				d.statusMessage = "🌐 Opened URL in browser"
 			} else {
-				d.copiedMessage = fmt.Sprintf("✗ Failed to open URL: %v", err)
+				d.statusMessage = fmt.Sprintf("✗ Failed to open URL: %v", err)
 			}
-			d.copiedMessageTime = time.Now()
-			d.yankBlink = true
-			return tea.Batch(
-				d.startYankBlinkAnimation(),
-				d.startClearStatusTimer(),
-			)
+			d.statusMessageTime = time.Now()
+			return d.startClearStatusMessageTimer()
 		}
 
 	case key.Matches(msg, d.keys.Right) || (msg.Type == tea.KeyRunes && string(msg.Runes) == "l"):
@@ -1286,6 +1362,14 @@ func (d *DashboardView) startClearStatusTimer() tea.Cmd {
 	}
 }
 
+// startClearStatusMessageTimer starts a timer to clear the temporary status message
+func (d *DashboardView) startClearStatusMessageTimer() tea.Cmd {
+	return func() tea.Msg {
+		time.Sleep(3 * time.Second)
+		return clearStatusMessageMsg{}
+	}
+}
+
 // renderAllRunsLayout renders the timeline layout
 func (d *DashboardView) renderAllRunsLayout() string {
 	// Use the existing run list view
@@ -1528,11 +1612,30 @@ func (d *DashboardView) renderDetailsColumn(width, height int) string {
 
 		// Build lines with selection highlighting and proper width constraints
 		for i, line := range d.detailLines {
+			// Check if we should show RepoBird URL hint for ID line
+			displayLine := line
+			if d.focusedColumn == 2 && i == d.selectedDetailLine && i == 0 && d.selectedRunData != nil {
+				// This is the ID line and it's selected, add URL hint if possible
+				runID := d.selectedRunData.GetIDString()
+				if utils.IsNonEmptyNumber(runID) {
+					repobirdURL := utils.GenerateRepoBirdURL(runID)
+					// Truncate URL to fit within available width, keeping the line readable
+					maxURLLen := contentWidth - len(line) - 3 // 3 chars for " - "
+					if maxURLLen > 10 {                       // Only show if we have reasonable space
+						truncatedURL := repobirdURL
+						if len(truncatedURL) > maxURLLen {
+							truncatedURL = truncatedURL[:maxURLLen-3] + "..."
+						}
+						displayLine = line + " - " + truncatedURL
+					}
+				}
+			}
+
 			// Apply width constraint using lipgloss to prevent overflow
 			styledLine := lipgloss.NewStyle().
 				MaxWidth(contentWidth).
 				Inline(true). // Force single line
-				Render(line)
+				Render(displayLine)
 
 			if d.focusedColumn == 2 && i == d.selectedDetailLine {
 				// Custom blinking: toggle between bright and normal colors
@@ -1545,7 +1648,7 @@ func (d *DashboardView) renderDetailsColumn(width, height int) string {
 							Background(lipgloss.Color("82")). // Bright green
 							Foreground(lipgloss.Color("0")).  // Black text
 							Bold(true).
-							Render(line)
+							Render(displayLine)
 					} else {
 						// Normal highlight when "off"
 						styledLine = lipgloss.NewStyle().
@@ -1553,7 +1656,7 @@ func (d *DashboardView) renderDetailsColumn(width, height int) string {
 							Inline(true).
 							Background(lipgloss.Color("63")).
 							Foreground(lipgloss.Color("255")).
-							Render(line)
+							Render(displayLine)
 					}
 				} else {
 					// Normal focused highlight (no blinking)
@@ -1562,7 +1665,7 @@ func (d *DashboardView) renderDetailsColumn(width, height int) string {
 						Inline(true).
 						Background(lipgloss.Color("63")).
 						Foreground(lipgloss.Color("255")).
-						Render(line)
+						Render(displayLine)
 				}
 			}
 			displayLines = append(displayLines, styledLine)
@@ -2277,6 +2380,11 @@ func (d *DashboardView) wrapTextWithLimit(text string, width int, maxLines int) 
 
 // renderNotificationLine renders a notification line if there's a message to show
 func (d *DashboardView) renderNotificationLine() string {
+	// If we're showing a status message in the status line, don't show notification
+	if d.statusMessage != "" && time.Since(d.statusMessageTime) < 3*time.Second {
+		return ""
+	}
+
 	if d.copiedMessage == "" || time.Since(d.copiedMessageTime) >= 3*time.Second {
 		return ""
 	}
@@ -2309,20 +2417,44 @@ func (d *DashboardView) renderNotificationLine() string {
 	return notificationStyle.Render(" " + d.copiedMessage)
 }
 
-// hasCurrentSelectionURL checks if the current selection contains a URL
+// hasCurrentSelectionURL checks if the current selection contains a URL or can generate a RepoBird URL
 func (d *DashboardView) hasCurrentSelectionURL() bool {
 	switch d.focusedColumn {
-	case 0: // Repository column - no URLs typically
+	case 0: // Repository column - check if we have API repository data with URLs
+		if d.selectedRepoIdx < len(d.repositories) {
+			repo := d.repositories[d.selectedRepoIdx]
+			apiRepo := d.getAPIRepositoryForRepo(&repo)
+			return apiRepo != nil && apiRepo.RepoURL != ""
+		}
 		return false
 	case 1: // Runs column - check for PR URL
 		if d.selectedRunIdx < len(d.filteredRuns) {
 			run := d.filteredRuns[d.selectedRunIdx]
 			return run.PrURL != nil && *run.PrURL != ""
 		}
-	case 2: // Details column - check if selected line contains URL
+	case 2: // Details column - check if selected line contains URL or can generate RepoBird URL
 		if d.selectedDetailLine < len(d.detailLinesOriginal) {
 			lineText := d.detailLinesOriginal[d.selectedDetailLine]
-			return utils.IsURL(lineText)
+			if utils.IsURL(lineText) {
+				return true
+			}
+			// Check if this is the ID field (first line) and we can generate a RepoBird URL
+			if d.selectedDetailLine == 0 && d.selectedRunData != nil {
+				runID := d.selectedRunData.GetIDString()
+				return utils.IsNonEmptyNumber(runID)
+			}
+			// Check if this is the repository line (line 2) and we have repository data
+			if d.selectedDetailLine == 2 && d.selectedRunData != nil {
+				repoName := d.selectedRunData.GetRepositoryName()
+				if repoName != "" {
+					// Find the corresponding Repository object and check if it has URLs
+					repo := d.getRepositoryByName(repoName)
+					if repo != nil {
+						apiRepo := d.getAPIRepositoryForRepo(repo)
+						return apiRepo != nil && apiRepo.RepoURL != ""
+					}
+				}
+			}
 		}
 	}
 	return false
@@ -2330,6 +2462,34 @@ func (d *DashboardView) hasCurrentSelectionURL() bool {
 
 // renderStatusLine renders the universal status line
 func (d *DashboardView) renderStatusLine(layoutName string) string {
+	// Check for temporary status message (URL opening, copying, etc.) - highest priority
+	if d.statusMessage != "" && time.Since(d.statusMessageTime) < 3*time.Second {
+		// Create green status line for successful operations or red for errors
+		var statusStyle lipgloss.Style
+		if strings.Contains(d.statusMessage, "✗") {
+			// Red for errors
+			statusStyle = lipgloss.NewStyle().
+				Background(lipgloss.Color("196")).
+				Foreground(lipgloss.Color("255")).
+				Padding(0, 1)
+		} else {
+			// Green for success
+			statusStyle = lipgloss.NewStyle().
+				Background(lipgloss.Color("82")).
+				Foreground(lipgloss.Color("232")).
+				Padding(0, 1)
+		}
+
+		statusLine := components.NewStatusLine().
+			SetWidth(d.width).
+			SetLeft(fmt.Sprintf("[%s]", layoutName)).
+			SetRight("").
+			SetHelp(d.statusMessage).
+			SetStyle(statusStyle)
+
+		return statusLine.Render()
+	}
+
 	// Always show normal status line now - notifications are shown above
 	// Data freshness indicator - keep it very short
 	dataInfo := ""
@@ -2342,6 +2502,25 @@ func (d *DashboardView) renderStatusLine(layoutName string) string {
 		} else {
 			dataInfo = fmt.Sprintf("%dm ago", int(elapsed.Minutes()))
 		}
+	}
+
+	// Handle URL selection prompt
+	if d.showURLSelectionPrompt {
+		promptHelp := "Open URL: (o)RepoBird (g)GitHub [ESC]cancel"
+		// Create yellow status line for URL selection prompt
+		yellowStyle := lipgloss.NewStyle().
+			Background(lipgloss.Color("220")).
+			Foreground(lipgloss.Color("232")).
+			Padding(0, 1)
+
+		statusLine := components.NewStatusLine().
+			SetWidth(d.width).
+			SetLeft(fmt.Sprintf("[%s]", layoutName)).
+			SetRight(dataInfo).
+			SetHelp(promptHelp).
+			SetStyle(yellowStyle)
+
+		return statusLine.Render()
 	}
 
 	// Compact help text
@@ -2472,4 +2651,39 @@ func (d *DashboardView) renderWithFZFOverlay(baseView string) string {
 	}
 
 	return strings.Join(result, "\n")
+}
+
+// getAPIRepositoryForRepo finds the corresponding APIRepository for a Repository
+func (d *DashboardView) getAPIRepositoryForRepo(repo *models.Repository) *models.APIRepository {
+	if repo == nil || d.apiRepositories == nil {
+		return nil
+	}
+
+	// Find matching API repository by name
+	for _, apiRepo := range d.apiRepositories {
+		apiRepoName := apiRepo.Name
+		if apiRepoName == "" {
+			apiRepoName = fmt.Sprintf("%s/%s", apiRepo.RepoOwner, apiRepo.RepoName)
+		}
+		if apiRepoName == repo.Name {
+			return &apiRepo
+		}
+	}
+
+	return nil
+}
+
+// getRepositoryByName finds a Repository object by name
+func (d *DashboardView) getRepositoryByName(name string) *models.Repository {
+	if name == "" || len(d.repositories) == 0 {
+		return nil
+	}
+
+	for i := range d.repositories {
+		if d.repositories[i].Name == name {
+			return &d.repositories[i]
+		}
+	}
+
+	return nil
 }

@@ -2,6 +2,7 @@ package utils
 
 import (
 	"net/url"
+	"os"
 	"os/exec"
 	"regexp"
 	"runtime"
@@ -89,4 +90,37 @@ func ContainsURL(fieldLabel string) bool {
 		strings.Contains(labelLower, "link") ||
 		strings.Contains(labelLower, "pr") ||
 		strings.Contains(labelLower, "pull request")
+}
+
+// getRepoBirdBaseURL returns the base URL for RepoBird frontend based on environment
+func getRepoBirdBaseURL() string {
+	env := os.Getenv("REPOBIRD_ENV")
+	switch strings.ToLower(env) {
+	case "dev", "development":
+		return "http://localhost:3000"
+	default: // production
+		return "https://repobird.ai"
+	}
+}
+
+// GenerateRepoBirdURL generates a RepoBird URL for a given run ID
+func GenerateRepoBirdURL(runID string) string {
+	if runID == "" || runID == "null" {
+		return ""
+	}
+	baseURL := getRepoBirdBaseURL()
+	return baseURL + "/repos/issue-runs/" + runID
+}
+
+// IsNonEmptyNumber checks if a string contains a non-empty number (digits only)
+func IsNonEmptyNumber(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, char := range s {
+		if char < '0' || char > '9' {
+			return false
+		}
+	}
+	return true
 }

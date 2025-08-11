@@ -555,13 +555,10 @@ func (v *CreateRunView) handleErrorMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return v, nil
 		}
 	case "escape", "q", "b":
-		// ESC, q, b - go back to dashboard
-		v.saveFormData()
-		debug.LogToFile("DEBUG: CreateView error mode - returning to dashboard\n")
-		dashboard := NewDashboardView(v.client)
-		dashboard.width = v.width
-		dashboard.height = v.height
-		return dashboard, dashboard.Init()
+		// ESC, q, b - go back to form (clear error)
+		v.error = nil
+		v.restorePreviousFocus()
+		return v, nil
 	case "r":
 		// 'r' to retry (clear error and go back to form)
 		v.error = nil
@@ -1287,11 +1284,11 @@ func (v *CreateRunView) renderErrorLayout(availableHeight int) string {
 
 	var helpText string
 	if v.errorRowFocused {
-		helpText = "[j/k] navigate [Enter] back to form [y] copy error [q] dashboard [r] retry"
+		helpText = "[j/k] navigate [Enter] back to form [y] copy error [q] back to form [r] retry"
 	} else if v.errorButtonFocused {
-		helpText = "[j/k] navigate [Enter] back to form [q] dashboard [r] retry"
+		helpText = "[j/k] navigate [Enter] back to form [q] back to form [r] retry"
 	} else {
-		helpText = "[j/k] navigate [Enter] back to form [y] copy error [q] dashboard [r] retry"
+		helpText = "[j/k] navigate [Enter] back to form [y] copy error [q] back to form [r] retry"
 	}
 
 	b.WriteString(helpStyle.Render(helpText))
@@ -1387,11 +1384,11 @@ func (v *CreateRunView) renderStatusBar() string {
 		}
 
 		if v.errorRowFocused {
-			statusText = "[Enter] back to form [j/k] navigate [y] copy error [q] dashboard [r] retry [Q]uit"
+			statusText = "[Enter] back to form [j/k] navigate [y] copy error [q] back to form [r] retry [Q]uit"
 		} else if v.errorButtonFocused {
-			statusText = "[Enter] back to form [j/k] navigate [q] dashboard [r] retry [Q]uit"
+			statusText = "[Enter] back to form [j/k] navigate [q] back to form [r] retry [Q]uit"
 		} else {
-			statusText = "[Enter] back to form [j/k] navigate [y] copy error [q] dashboard [r] retry [Q]uit"
+			statusText = "[Enter] back to form [j/k] navigate [y] copy error [q] back to form [r] retry [Q]uit"
 		}
 		return components.DashboardStatusLine(v.width, "ERROR", "", statusText)
 	}

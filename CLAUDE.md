@@ -200,6 +200,7 @@ repobird version
 ### Environment Variables
 - `REPOBIRD_API_KEY` - API authentication key
 - `REPOBIRD_API_URL` - Override API endpoint (for development)
+- `REPOBIRD_ENV` - Environment setting (prod/dev) - affects frontend URL generation
 
 ### Config File
 - Location: `~/.repobird/config.yaml`
