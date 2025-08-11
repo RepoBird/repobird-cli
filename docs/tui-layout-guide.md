@@ -368,9 +368,159 @@ func (cfs *ConfigFileSelector) View() string {
 }
 ```
 
+## Viewport Scrolling with Scrollbar
+
+### Using Bubbles Viewport for Scrollable Content
+
+The viewport component from Bubbles provides smooth scrolling for content that exceeds the terminal height:
+
+```go
+import "github.com/charmbracelet/bubbles/viewport"
+
+// Initialize viewport
+vp := viewport.New(width, height)
+vp.SetContent(yourMultiLineContent)
+
+// Handle keyboard events for scrolling
+switch msg.String() {
+case "j", "down":
+    vp.ScrollDown(1)
+case "k", "up":
+    vp.ScrollUp(1)
+case "ctrl+d":
+    vp.HalfPageDown()
+case "ctrl+u":
+    vp.HalfPageUp()
+case "g", "home":
+    vp.GotoTop()
+case "G", "end":
+    vp.GotoBottom()
+}
+```
+
+### Adding a Custom Scrollbar
+
+Implementing a scrollbar outside the main content box provides visual feedback for scroll position:
+
+#### Key Implementation Points
+
+1. **Render scrollbar as separate component**: Don't try to embed it within the viewport content
+2. **Use NormalBorder for proper connection**: RoundedBorder corners (`╭╮╰╯`) don't connect to vertical bars (`│`)
+3. **Match heights exactly**: Scrollbar height should match the main content box height
+
+#### Complete Scrollbar Implementation
+
+```go
+// Build scrollbar lines matching the box height
+func buildScrollbarLines(totalHeight int, viewport viewport.Model, contentLines []string) []string {
+    // Use total height without subtracting for borders
+    innerHeight := totalHeight
+    
+    if innerHeight <= 0 {
+        return []string{}
+    }
+    
+    // Calculate thumb size and position
+    totalLines := len(contentLines)
+    visibleLines := viewport.Height
+    
+    thumbSize := max(1, (visibleLines * innerHeight) / totalLines)
+    if thumbSize > innerHeight {
+        thumbSize = innerHeight
+    }
+    
+    percentScrolled := viewport.ScrollPercent()
+    maxThumbPos := innerHeight - thumbSize
+    thumbPos := int(float64(maxThumbPos) * percentScrolled)
+    
+    // Build scrollbar characters
+    var lines []string
+    for i := 0; i < innerHeight; i++ {
+        if i >= thumbPos && i < thumbPos+thumbSize {
+            // Thumb - highlighted
+            lines = append(lines, lipgloss.NewStyle().
+                Foreground(lipgloss.Color("63")).
+                Render("█"))
+        } else {
+            // Track - dimmed
+            lines = append(lines, lipgloss.NewStyle().
+                Foreground(lipgloss.Color("238")).
+                Render("│"))
+        }
+    }
+    
+    return lines
+}
+
+// Render with scrollbar
+func renderWithScrollbar(viewportContent string, scrollbarNeeded bool) string {
+    // Main content box
+    boxStyle := lipgloss.NewStyle().
+        Border(lipgloss.RoundedBorder()).
+        BorderForeground(lipgloss.Color("63")).
+        Padding(0, 1).
+        Width(width - 4).  // Leave room for scrollbar
+        Height(height - 3)
+    
+    boxedContent := boxStyle.Render(viewportContent)
+    
+    if !scrollbarNeeded {
+        return boxedContent
+    }
+    
+    // Build scrollbar
+    boxHeight := height - 3
+    scrollbarLines := buildScrollbarLines(boxHeight, viewport, contentLines)
+    scrollbarContent := strings.Join(scrollbarLines, "\n")
+    
+    // Wrap scrollbar in border (use NormalBorder for proper connection)
+    scrollbarStyle := lipgloss.NewStyle().
+        Border(lipgloss.NormalBorder()).  // Critical: Use NormalBorder
+        BorderForeground(lipgloss.Color("238")).
+        BorderTop(true).
+        BorderBottom(true).
+        BorderLeft(false).
+        BorderRight(false)
+    
+    scrollbarBox := scrollbarStyle.Render(scrollbarContent)
+    
+    // Join horizontally
+    return lipgloss.JoinHorizontal(lipgloss.Top, boxedContent, scrollbarBox)
+}
+```
+
+### Border Type Compatibility
+
+**Important**: Border corners must visually connect to your content characters:
+
+| Border Type | Corner Chars | Compatible With | Use Case |
+|------------|--------------|-----------------|----------|
+| RoundedBorder | `╭╮╰╯` | Spaces only | Standalone boxes |
+| NormalBorder | `┌┐└┘` | `│─` chars | Scrollbars, connected elements |
+| DoubleBorder | `╔╗╚╝` | `║═` chars | Heavy emphasis |
+| ThickBorder | `┏┓┗┛` | `┃━` chars | Bold styling |
+
+### Debugging Tips
+
+1. **Use debug logging**: Write to `/tmp/repobird_debug.log` using `debug.LogToFilef()`
+2. **Snapshot rendered output**: Add a debug key to copy the entire rendered view to clipboard
+3. **Check height calculations**: Log viewport.Height, box height, and scrollbar line count
+4. **Verify character alignment**: Ensure border type matches content characters
+
+### Common Scrollbar Issues and Solutions
+
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| Gap between border and scrollbar | Using RoundedBorder with vertical bars | Use NormalBorder instead |
+| Scrollbar too short | Subtracting border height incorrectly | Use full height without subtraction |
+| Scrollbar misaligned | lipgloss.JoinHorizontal handling | Ensure equal heights for both components |
+| Thumb size incorrect | Wrong total lines calculation | Use actual content line count |
+
 ## References
 
 - [Lipgloss Documentation](https://github.com/charmbracelet/lipgloss)
 - [Bubble Tea Framework](https://github.com/charmbracelet/bubbletea)
+- [Bubbles Viewport Component](https://github.com/charmbracelet/bubbles/tree/master/viewport)
 - Dashboard implementation: `/internal/tui/views/dashboard.go`
 - Create view layouts: `/internal/tui/views/create.go`
+- Help view with scrollbar: `/internal/tui/components/help_view.go`

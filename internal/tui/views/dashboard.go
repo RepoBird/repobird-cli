@@ -2027,7 +2027,7 @@ func (d *DashboardView) handleStatusInfoNavigation(msg tea.KeyMsg) (tea.Model, t
 			// Move from value column to key column
 			d.statusInfoFocusColumn = 0
 		} else {
-			// Scroll key column left
+			// Scroll key column left only if we've scrolled
 			if d.statusInfoKeyOffset > 0 {
 				d.statusInfoKeyOffset--
 			}
@@ -2038,8 +2038,22 @@ func (d *DashboardView) handleStatusInfoNavigation(msg tea.KeyMsg) (tea.Model, t
 			// Move from key column to value column
 			d.statusInfoFocusColumn = 1
 		} else {
-			// Scroll value column right
-			d.statusInfoValueOffset++
+			// Only scroll value column right if text is longer than visible area
+			if d.statusInfoSelectedRow >= 0 && d.statusInfoSelectedRow < len(d.statusInfoFields) {
+				value := d.statusInfoFields[d.statusInfoSelectedRow]
+				// Calculate max width for value display
+				boxWidth := d.width - 4
+				valueMaxWidth := boxWidth - 25 - 6 // 25 for label, 6 for border/padding
+				
+				debug.LogToFilef("DEBUG: StatusInfo scroll check - Row %d, Value len=%d, MaxWidth=%d, Offset=%d\n", 
+					d.statusInfoSelectedRow, len(value), valueMaxWidth, d.statusInfoValueOffset)
+				
+				// Only allow scrolling if value is longer than display width
+				if len(value) > d.statusInfoValueOffset+valueMaxWidth {
+					d.statusInfoValueOffset++
+					debug.LogToFilef("DEBUG: Scrolling value to offset %d\n", d.statusInfoValueOffset)
+				}
+			}
 		}
 		return d, nil
 	case "g":
@@ -2183,25 +2197,33 @@ func (d *DashboardView) renderStatusInfo() string {
 			if fieldIdx == d.statusInfoSelectedRow {
 				// Apply horizontal scrolling only to selected row
 				if d.statusInfoFocusColumn == 0 {
-					// Scroll the label when focused
-					scrolledLabel = applyHorizontalScroll(label, d.statusInfoKeyOffset, labelMaxWidth)
-					// Add scroll indicators for label
-					if d.statusInfoKeyOffset > 0 && len(scrolledLabel) > 0 {
-						scrolledLabel = "◀" + scrolledLabel[1:]
+					// Only apply scrolling if label is longer than display width
+					if len(label) > labelMaxWidth {
+						// Scroll the label when focused
+						scrolledLabel = applyHorizontalScroll(label, d.statusInfoKeyOffset, labelMaxWidth)
+						// Add scroll indicators for label
+						if d.statusInfoKeyOffset > 0 && len(scrolledLabel) > 0 {
+							scrolledLabel = "◀" + scrolledLabel[1:]
+						}
+						if len(label) > d.statusInfoKeyOffset+labelMaxWidth && len(scrolledLabel) > 0 {
+							scrolledLabel = scrolledLabel[:len(scrolledLabel)-1] + "▶"
+						}
 					}
-					if len(label) > d.statusInfoKeyOffset+labelMaxWidth && len(scrolledLabel) > 0 {
-						scrolledLabel = scrolledLabel[:len(scrolledLabel)-1] + "▶"
-					}
+					// If label fits, use it as-is without scrolling
 				} else {
-					// Scroll the value when focused
-					scrolledValue = applyHorizontalScroll(value, d.statusInfoValueOffset, valueMaxWidth)
-					// Add scroll indicators for value
-					if d.statusInfoValueOffset > 0 && len(scrolledValue) > 0 {
-						scrolledValue = "◀" + scrolledValue[1:]
+					// Only apply scrolling if text is longer than display width
+					if len(value) > valueMaxWidth {
+						// Scroll the value when focused
+						scrolledValue = applyHorizontalScroll(value, d.statusInfoValueOffset, valueMaxWidth)
+						// Add scroll indicators for value
+						if d.statusInfoValueOffset > 0 && len(scrolledValue) > 0 {
+							scrolledValue = "◀" + scrolledValue[1:]
+						}
+						if len(value) > d.statusInfoValueOffset+valueMaxWidth && len(scrolledValue) > 0 {
+							scrolledValue = scrolledValue[:len(scrolledValue)-1] + "▶"
+						}
 					}
-					if len(value) > d.statusInfoValueOffset+valueMaxWidth && len(scrolledValue) > 0 {
-						scrolledValue = scrolledValue[:len(scrolledValue)-1] + "▶"
-					}
+					// If text fits, use it as-is without scrolling
 				}
 			}
 		}
