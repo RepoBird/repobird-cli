@@ -133,6 +133,17 @@ type yankBlinkMsg struct{}
 type messageClearMsg struct{}
 type gKeyTimeoutMsg struct{}
 
+// NewDashboardViewWithState creates a new dashboard view with restored state
+func NewDashboardViewWithState(client APIClient, selectedRepoIdx, selectedRunIdx, selectedDetailLine, focusedColumn int) *DashboardView {
+	dashboard := NewDashboardView(client)
+	// Set the state that will be restored after data loads
+	dashboard.selectedRepoIdx = selectedRepoIdx
+	dashboard.selectedRunIdx = selectedRunIdx
+	dashboard.selectedDetailLine = selectedDetailLine
+	dashboard.focusedColumn = focusedColumn
+	return dashboard
+}
+
 // NewDashboardView creates a new dashboard view
 func NewDashboardView(client APIClient) *DashboardView {
 	// Initialize spinner
@@ -590,10 +601,17 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Update viewport sizes based on window
 			d.updateViewportSizes()
 
-			// Select first repository by default
+			// Select first repository by default, or restore saved state
 			if len(d.repositories) > 0 {
-				d.selectedRepo = &d.repositories[0]
-				d.selectedRepoIdx = 0
+				// Check if we have saved state to restore
+				if d.selectedRepoIdx >= 0 && d.selectedRepoIdx < len(d.repositories) {
+					// Restore saved repository selection
+					d.selectedRepo = &d.repositories[d.selectedRepoIdx]
+				} else {
+					// Default to first repository
+					d.selectedRepo = &d.repositories[0]
+					d.selectedRepoIdx = 0
+				}
 				cmds = append(cmds, d.selectRepository(d.selectedRepo))
 			}
 		}
@@ -615,11 +633,22 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Update viewport content when repository changes
 		d.updateViewportContent()
 
-		// Select first run by default
+		// Select first run by default, or restore saved state
 		if len(d.filteredRuns) > 0 {
-			d.selectedRunData = d.filteredRuns[0]
-			d.selectedRunIdx = 0
+			// Check if we have saved run state to restore
+			if d.selectedRunIdx >= 0 && d.selectedRunIdx < len(d.filteredRuns) {
+				// Restore saved run selection
+				d.selectedRunData = d.filteredRuns[d.selectedRunIdx]
+			} else {
+				// Default to first run
+				d.selectedRunData = d.filteredRuns[0]
+				d.selectedRunIdx = 0
+			}
 			d.updateDetailLines()
+			// Restore detail line selection if available
+			if d.selectedDetailLine >= 0 {
+				// selectedDetailLine will be restored after updateDetailLines()
+			}
 		}
 
 	case dashboardUserInfoLoadedMsg:
@@ -813,8 +842,8 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 
-			// Open full details view for the selected run
-			detailsView := NewRunDetailsViewWithCacheAndDimensions(
+			// Open full details view for the selected run with dashboard state
+			detailsView := NewRunDetailsViewWithDashboardState(
 				d.client,
 				*d.selectedRunData,
 				runs,
@@ -823,6 +852,10 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				nil, // No details cache for now
 				d.width,
 				d.height,
+				d.selectedRepoIdx,
+				d.selectedRunIdx,
+				d.selectedDetailLine,
+				d.focusedColumn,
 			)
 			return detailsView, detailsView.Init()
 		case key.Matches(msg, d.keys.LayoutSwitch):
@@ -1570,6 +1603,13 @@ func (d *DashboardView) updateDetailLines() {
 		addLine(run.Title)
 	}
 
+	// Description - single line truncated
+	if run.Description != "" {
+		addLine("")
+		addLine("Description:")
+		addLine(run.Description)
+	}
+
 	// Prompt - single line truncated
 	if run.Prompt != "" {
 		addLine("")
@@ -1723,7 +1763,6 @@ func (d *DashboardView) updateViewportContent() {
 
 // updateRepoViewportContent updates the repository column viewport content
 func (d *DashboardView) updateRepoViewportContent() {
-	debug.LogToFilef("updateRepoViewportContent: Width=%d, Height=%d\n", d.repoViewport.Width, d.repoViewport.Height)
 
 	var items []string
 	for i, repo := range d.repositories {
@@ -1747,8 +1786,6 @@ func (d *DashboardView) updateRepoViewportContent() {
 			}
 		}
 
-		debug.LogToFilef("Repo[%d]: original=%d runes, truncated=%d runes, width=%d\n",
-			i, len([]rune(baseItem)), len([]rune(item)), maxWidth)
 
 		// Highlight selected repository
 		if i == d.selectedRepoIdx {
@@ -1808,11 +1845,6 @@ func (d *DashboardView) updateRepoViewportContent() {
 
 // updateRunsViewportContent updates the runs column viewport content
 func (d *DashboardView) updateRunsViewportContent() {
-	debug.LogToFilef("updateRunsViewportContent: Width=%d, Height=%d\n", d.runsViewport.Width, d.runsViewport.Height)
-
-	if d.selectedRepo != nil {
-		debug.LogToFilef("  Rendering runs for repo: '%s', count: %d\n", d.selectedRepo.Name, len(d.filteredRuns))
-	}
 
 	var items []string
 
@@ -1866,8 +1898,6 @@ func (d *DashboardView) updateRunsViewportContent() {
 				debug.LogToFilef("Run[%d]: Final safety truncation triggered\n", i)
 			}
 
-			debug.LogToFilef("Run[%d]: prefix=%d, title=%d, final=%d runes, width=%d\n",
-				i, prefixLen, len([]rune(title)), len(finalRunes), maxWidth)
 
 			// Highlight selected run
 			if i == d.selectedRunIdx {

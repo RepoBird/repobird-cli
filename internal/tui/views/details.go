@@ -58,6 +58,11 @@ type RunDetailsView struct {
 	fieldIndices   []int    // Line indices of selectable fields in the viewport
 	fieldRanges    [][2]int // Start and end line indices for each field (for multi-line fields)
 	navigationMode bool     // Whether we're in navigation mode
+	// Dashboard state for restoration
+	dashboardSelectedRepoIdx    int
+	dashboardSelectedRunIdx     int
+	dashboardSelectedDetailLine int
+	dashboardFocusedColumn      int
 }
 
 func NewRunDetailsView(client APIClient, run models.RunResponse) *RunDetailsView {
@@ -74,6 +79,11 @@ type RunDetailsViewConfig struct {
 	ParentCached       bool
 	ParentCachedAt     time.Time
 	ParentDetailsCache map[string]*models.RunResponse
+	// Dashboard state for restoration
+	DashboardSelectedRepoIdx    int
+	DashboardSelectedRunIdx     int
+	DashboardSelectedDetailLine int
+	DashboardFocusedColumn      int
 }
 
 // NewRunDetailsViewWithConfig creates a new RunDetailsView with the given configuration
@@ -101,22 +111,26 @@ func NewRunDetailsViewWithConfig(config RunDetailsViewConfig) *RunDetailsView {
 	}
 
 	v := &RunDetailsView{
-		client:             config.Client,
-		run:                run,
-		keys:               components.DefaultKeyMap,
-		help:               help.New(),
-		viewport:           vp,
-		spinner:            s,
-		loading:            needsLoading,
-		showLogs:           false,
-		parentRuns:         config.ParentRuns,
-		parentCached:       config.ParentCached,
-		parentCachedAt:     config.ParentCachedAt,
-		parentDetailsCache: config.ParentDetailsCache,
-		statusHistory:      make([]string, 0),
-		cacheRetryCount:    0,
-		maxCacheRetries:    3,
-		statusLine:         components.NewStatusLine(),
+		client:                      config.Client,
+		run:                         run,
+		keys:                        components.DefaultKeyMap,
+		help:                        help.New(),
+		viewport:                    vp,
+		spinner:                     s,
+		loading:                     needsLoading,
+		showLogs:                    false,
+		parentRuns:                  config.ParentRuns,
+		parentCached:                config.ParentCached,
+		parentCachedAt:              config.ParentCachedAt,
+		parentDetailsCache:          config.ParentDetailsCache,
+		statusHistory:               make([]string, 0),
+		cacheRetryCount:             0,
+		maxCacheRetries:             3,
+		statusLine:                  components.NewStatusLine(),
+		dashboardSelectedRepoIdx:    config.DashboardSelectedRepoIdx,
+		dashboardSelectedRunIdx:     config.DashboardSelectedRunIdx,
+		dashboardSelectedDetailLine: config.DashboardSelectedDetailLine,
+		dashboardFocusedColumn:      config.DashboardFocusedColumn,
 	}
 
 	// Initialize status history with current status if we have cached data
@@ -127,6 +141,47 @@ func NewRunDetailsViewWithConfig(config RunDetailsViewConfig) *RunDetailsView {
 
 	// Start in navigation mode
 	v.navigationMode = true
+
+	return v
+}
+
+// NewRunDetailsViewWithDashboardState creates a new details view with dashboard state for restoration
+func NewRunDetailsViewWithDashboardState(
+	client APIClient,
+	run models.RunResponse,
+	parentRuns []models.RunResponse,
+	parentCached bool,
+	parentCachedAt time.Time,
+	parentDetailsCache map[string]*models.RunResponse,
+	width int,
+	height int,
+	selectedRepoIdx int,
+	selectedRunIdx int,
+	selectedDetailLine int,
+	focusedColumn int,
+) *RunDetailsView {
+	config := RunDetailsViewConfig{
+		Client:                      client,
+		Run:                         run,
+		ParentRuns:                  parentRuns,
+		ParentCached:                parentCached,
+		ParentCachedAt:              parentCachedAt,
+		ParentDetailsCache:          parentDetailsCache,
+		DashboardSelectedRepoIdx:    selectedRepoIdx,
+		DashboardSelectedRunIdx:     selectedRunIdx,
+		DashboardSelectedDetailLine: selectedDetailLine,
+		DashboardFocusedColumn:      focusedColumn,
+	}
+
+	v := NewRunDetailsViewWithConfig(config)
+
+	// Set dimensions immediately if provided
+	if width > 0 && height > 0 {
+		v.width = width
+		v.height = height
+		// Apply dimensions to viewport immediately
+		v.handleWindowSizeMsg(tea.WindowSizeMsg{Width: width, Height: height})
+	}
 
 	return v
 }
@@ -255,10 +310,16 @@ func (v *RunDetailsView) handleKeyInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch {
-	case key.Matches(msg, v.keys.Quit), key.Matches(msg, v.keys.Back), msg.Type == tea.KeyEsc, msg.String() == "b":
+	case key.Matches(msg, v.keys.Quit), key.Matches(msg, v.keys.Back), msg.Type == tea.KeyEsc, msg.String() == "b", msg.Type == tea.KeyBackspace:
 		v.stopPolling()
-		// Return to dashboard view
-		dashboard := NewDashboardView(v.client)
+		// Return to dashboard view with restored state
+		dashboard := NewDashboardViewWithState(
+			v.client,
+			v.dashboardSelectedRepoIdx,
+			v.dashboardSelectedRunIdx,
+			v.dashboardSelectedDetailLine,
+			v.dashboardFocusedColumn,
+		)
 		// Set dimensions
 		dashboard.width = v.width
 		dashboard.height = v.height
@@ -277,9 +338,10 @@ func (v *RunDetailsView) handleKeyInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		v.error = nil
 		cmds = append(cmds, v.loadRunDetails())
 		cmds = append(cmds, v.spinner.Tick)
-	case msg.String() == "l":
-		v.showLogs = !v.showLogs
-		v.updateContent()
+	// Removed logs functionality - not supported yet
+	// case msg.String() == "l":
+	//	v.showLogs = !v.showLogs
+	//	v.updateContent()
 	default:
 		// Handle navigation in navigation mode
 		if v.navigationMode {
@@ -797,20 +859,12 @@ func (v *RunDetailsView) hasCurrentSelectionURL() bool {
 }
 
 func (v *RunDetailsView) renderStatusBar() string {
-	// Shorter options to fit better
-	options := "q:back l:logs j/k:nav y:copy Y:all r:refresh ?:help Q:quit"
-
-	if v.showLogs {
-		options = "q:back l:details j/k:nav y:copy Y:all r:refresh ?:help Q:quit"
-	}
+	// Shorter options to fit better (removed logs functionality)
+	options := "q:back j/k:nav y:copy Y:all r:refresh ?:help Q:quit"
 
 	// Add URL opening hint if current selection has a URL
 	if v.hasCurrentSelectionURL() {
-		if v.showLogs {
-			options = "o:url q:back l:details j/k:nav y:copy Y:all r:refresh ?:help Q:quit"
-		} else {
-			options = "o:url q:back l:logs j/k:nav y:copy Y:all r:refresh ?:help Q:quit"
-		}
+		options = "o:url q:back j/k:nav y:copy Y:all r:refresh ?:help Q:quit"
 	}
 
 	// Use unified status line system
@@ -863,16 +917,26 @@ func (v *RunDetailsView) updateContent() {
 		if v.run.Title != "" {
 			addField("Title", v.run.Title)
 		}
-		// Display description if it exists (with truncation)
+		// Display description if it exists (with truncation for display but full value for copying)
 		if v.run.Description != "" {
-			description := v.run.Description
-			// Truncate to single line with ellipsis if too long
-			if len(description) > 60 {
-				description = description[:57] + "..."
+			originalDescription := v.run.Description
+			displayDescription := originalDescription
+			// Truncate to single line with ellipsis if too long (for display only)
+			if len(displayDescription) > 60 {
+				displayDescription = displayDescription[:57] + "..."
 			}
-			// Remove newlines to keep it single line
-			description = strings.ReplaceAll(description, "\n", " ")
-			addField("Description", description)
+			// Remove newlines to keep it single line (for display only)
+			displayDescription = strings.ReplaceAll(displayDescription, "\n", " ")
+
+			// Add field with display text but store original value for copying
+			line := fmt.Sprintf("Description: %s", displayDescription)
+			content.WriteString(line + "\n")
+			lines = append(lines, line)
+			v.fieldLines = append(v.fieldLines, line)
+			v.fieldValues = append(v.fieldValues, originalDescription) // Store original for copying
+			v.fieldIndices = append(v.fieldIndices, lineCount)
+			v.fieldRanges = append(v.fieldRanges, [2]int{lineCount, lineCount})
+			lineCount++
 		}
 		addField("Run ID", v.run.GetIDString())
 		addField("Repository", v.run.Repository)
