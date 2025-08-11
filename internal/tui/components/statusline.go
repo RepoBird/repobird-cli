@@ -130,10 +130,10 @@ func (s *StatusLine) Render() string {
 
 	// Check for active temporary message
 	if s.HasActiveMessage() {
-		// Create temporary message style
+		// Create temporary message style - keep background consistent
 		tempStyle := lipgloss.NewStyle().
-			Background(s.tempMessageColor).
-			Foreground(lipgloss.Color("255")).
+			Background(lipgloss.Color("235")). // Keep same background as normal
+			Foreground(s.tempMessageColor).    // Only change text color
 			Padding(0, 1)
 
 		// For temporary messages, show the message in the help area

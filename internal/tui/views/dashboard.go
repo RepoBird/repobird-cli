@@ -2076,7 +2076,7 @@ func (d *DashboardView) handleDocsNavigation(msg tea.KeyMsg) (tea.Model, tea.Cmd
 		// Copy current row content
 		pages := d.getDocsPages()
 		currentPage := pages[d.docsCurrentPage]
-		
+
 		// Ensure selected row is within bounds
 		if d.docsSelectedRow >= 0 && d.docsSelectedRow < len(currentPage) {
 			textToCopy := currentPage[d.docsSelectedRow]
@@ -2583,13 +2583,19 @@ func (d *DashboardView) renderDocs() string {
 	centeredBox := lipgloss.Place(d.width, d.height-1, lipgloss.Center, lipgloss.Center, boxedContent)
 
 	// Create the statusline
-	shortHelp := "[h/l]pages [j/k]navigate [1-8]jump [?/q/b/ESC]back [Q]uit"
+	shortHelp := "[h/l]pages [j/k]navigate [y]copy [1-8]jump [?/q/b/ESC]back [Q]uit"
+
+	// Show copy message if active
+	statusText := shortHelp
+	if d.copiedMessage != "" && time.Since(d.copiedMessageTime) < 2*time.Second {
+		statusText = d.copiedMessage
+	}
 
 	statusLine := d.statusLine.
 		SetWidth(d.width).
 		SetLeft("[DOCS]").
 		SetRight(fmt.Sprintf("Page %d/%d", d.docsCurrentPage+1, len(pageTitles))).
-		SetHelp(shortHelp).
+		SetHelp(statusText).
 		Render()
 
 	// Join the centered box and statusline
