@@ -2,15 +2,14 @@ package tui
 
 import (
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/repobird/repobird-cli/internal/api"
 	"github.com/repobird/repobird-cli/internal/tui/views"
 )
 
 type App struct {
-	client *api.Client
+	client APIClient
 }
 
-func NewApp(client *api.Client) *App {
+func NewApp(client APIClient) *App {
 	return &App{
 		client: client,
 	}

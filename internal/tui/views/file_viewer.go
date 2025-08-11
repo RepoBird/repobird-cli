@@ -6,21 +6,20 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/repobird/repobird-cli/internal/api"
 	"github.com/repobird/repobird-cli/internal/tui/components"
 )
 
 // FileViewerView wraps the file viewer component as a full view
 type FileViewerView struct {
 	fileViewer *components.FileViewer
-	client     *api.Client
+	client     APIClient
 	width      int
 	height     int
 	statusLine string
 }
 
 // NewFileViewerView creates a new file viewer view
-func NewFileViewerView(client *api.Client) (*FileViewerView, error) {
+func NewFileViewerView(client APIClient) (*FileViewerView, error) {
 	fileViewer, err := components.NewFileViewer(".")
 	if err != nil {
 		return nil, err

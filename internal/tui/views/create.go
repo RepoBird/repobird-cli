@@ -15,7 +15,6 @@ import (
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/repobird/repobird-cli/internal/api"
 	"github.com/repobird/repobird-cli/internal/cache"
 	"github.com/repobird/repobird-cli/internal/config"
 	"github.com/repobird/repobird-cli/internal/models"
@@ -26,7 +25,7 @@ import (
 )
 
 type CreateRunView struct {
-	client        *api.Client
+	client        APIClient
 	keys          components.KeyMap
 	help          help.Model
 	width         int
@@ -89,13 +88,13 @@ type CreateRunView struct {
 	waitingForG    bool      // Whether we're waiting for second 'g' in 'gg' command
 }
 
-func NewCreateRunView(client *api.Client) *CreateRunView {
+func NewCreateRunView(client APIClient) *CreateRunView {
 	return NewCreateRunViewWithCache(client, nil, false, time.Time{}, nil)
 }
 
 // CreateRunViewConfig holds configuration for creating a new CreateRunView
 type CreateRunViewConfig struct {
-	Client             *api.Client
+	Client             APIClient
 	ParentRuns         []models.RunResponse
 	ParentCached       bool
 	ParentCachedAt     time.Time
@@ -287,7 +286,7 @@ func (v *CreateRunView) autofillRepository() {
 
 // NewCreateRunViewWithCache maintains backward compatibility
 func NewCreateRunViewWithCache(
-	client *api.Client,
+	client APIClient,
 	parentRuns []models.RunResponse,
 	parentCached bool,
 	parentCachedAt time.Time,

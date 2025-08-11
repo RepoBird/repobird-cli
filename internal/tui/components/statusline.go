@@ -234,7 +234,7 @@ func (s *StatusLine) Render() string {
 		Width(s.width).
 		MaxWidth(s.width).
 		MaxHeight(1)
-	
+
 	return finalStyle.Render(statusContent)
 }
 

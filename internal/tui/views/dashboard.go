@@ -9,9 +9,9 @@ import (
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/repobird/repobird-cli/internal/api"
 	"github.com/repobird/repobird-cli/internal/cache"
 	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/repobird/repobird-cli/internal/tui/components"
@@ -21,7 +21,7 @@ import (
 
 // DashboardView is the main dashboard controller that manages different layout views
 type DashboardView struct {
-	client *api.Client
+	client APIClient
 	keys   components.KeyMap
 	help   help.Model
 
@@ -106,6 +106,11 @@ type DashboardView struct {
 
 	// New scrollable help view
 	helpView *components.HelpView
+
+	// Viewports for scrolling
+	repoViewport    viewport.Model
+	runsViewport    viewport.Model
+	detailsViewport viewport.Model
 }
 
 type dashboardDataLoadedMsg struct {
@@ -129,7 +134,7 @@ type messageClearMsg struct{}
 type gKeyTimeoutMsg struct{}
 
 // NewDashboardView creates a new dashboard view
-func NewDashboardView(client *api.Client) *DashboardView {
+func NewDashboardView(client APIClient) *DashboardView {
 	// Initialize spinner
 	s := spinner.New()
 	s.Spinner = spinner.Dot
@@ -148,6 +153,9 @@ func NewDashboardView(client *api.Client) *DashboardView {
 		spinner:         s,
 		statusLine:      components.NewStatusLine(),
 		helpView:        components.NewHelpView(),
+		repoViewport:    viewport.New(0, 0), // Will be sized in Update
+		runsViewport:    viewport.New(0, 0),
+		detailsViewport: viewport.New(0, 0),
 	}
 
 	// Initialize cache system
@@ -1939,7 +1947,7 @@ func (d *DashboardView) initializeStatusInfoFields() {
 				totalProRuns = 30
 				totalPlanRuns = 35
 			}
-			
+
 			proUsed := totalProRuns - d.userInfo.TierDetails.RemainingProRuns
 			if d.userInfo.TierDetails.RemainingProRuns > totalProRuns {
 				proUsed = 0
@@ -1948,7 +1956,7 @@ func (d *DashboardView) initializeStatusInfoFields() {
 			if totalProRuns > 0 {
 				proPercentage = float64(proUsed) / float64(totalProRuns) * 100
 			}
-			
+
 			planUsed := totalPlanRuns - d.userInfo.TierDetails.RemainingPlanRuns
 			if d.userInfo.TierDetails.RemainingPlanRuns > totalPlanRuns {
 				planUsed = 0
@@ -1957,7 +1965,7 @@ func (d *DashboardView) initializeStatusInfoFields() {
 			if totalPlanRuns > 0 {
 				planPercentage = float64(planUsed) / float64(totalPlanRuns) * 100
 			}
-			
+
 			// Store simplified version without bars for scrolling
 			usageValue := fmt.Sprintf("Pro: %.0f%% | Plan: %.0f%%", proPercentage, planPercentage)
 			d.statusInfoKeys = append(d.statusInfoKeys, "Usage:")

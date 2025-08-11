@@ -119,6 +119,14 @@ tui: build
 tui-cgo: build-cgo
 	$(DEV_ENV) ./$(BUILD_DIR)/$(BINARY_NAME) tui
 
+## tui-debug: Build and run the TUI interface with debug user mode (mock data)
+tui-debug: build
+	$(DEV_ENV) ./$(BUILD_DIR)/$(BINARY_NAME) tui --debug-user
+
+## tui-debug-cgo: Build and run the TUI interface with debug user mode and CGO (mock data, better clipboard)
+tui-debug-cgo: build-cgo
+	$(DEV_ENV) ./$(BUILD_DIR)/$(BINARY_NAME) tui --debug-user
+
 ## status: Build and run status command (development)
 status: build
 	$(DEV_ENV) ./$(BUILD_DIR)/$(BINARY_NAME) status

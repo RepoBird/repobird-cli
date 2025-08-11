@@ -12,9 +12,10 @@ import (
 )
 
 var (
-	cfg     *config.SecureConfig
-	cfgFile string
-	debug   bool
+	cfg       *config.SecureConfig
+	cfgFile   string
+	debug     bool
+	debugUser bool
 )
 
 var rootCmd = &cobra.Command{
@@ -62,6 +63,7 @@ func Execute() {
 func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.repobird/config.yaml)")
 	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "enable debug output")
+	rootCmd.PersistentFlags().BoolVar(&debugUser, "debug-user", false, "enable debug user mode with mock data")
 
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(runCmd)

@@ -10,7 +10,6 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/repobird/repobird-cli/internal/api"
 	"github.com/repobird/repobird-cli/internal/cache"
 	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/repobird/repobird-cli/internal/services"
@@ -21,7 +20,7 @@ import (
 )
 
 type RunListView struct {
-	client       *api.Client
+	client       APIClient
 	runs         []models.RunResponse
 	table        *components.Table
 	keys         components.KeyMap
@@ -47,7 +46,7 @@ type RunListView struct {
 	statusLine *components.StatusLine
 }
 
-func NewRunListView(client *api.Client) *RunListView {
+func NewRunListView(client APIClient) *RunListView {
 	// Try to get cached data from global cache
 	runs, cached, cachedAt, detailsCache, selectedIndex := cache.GetCachedList()
 	return NewRunListViewWithCache(client, runs, cached, cachedAt, detailsCache, selectedIndex)
@@ -55,7 +54,7 @@ func NewRunListView(client *api.Client) *RunListView {
 
 // NewRunListViewWithCacheAndDimensions creates a new list view with cache and dimensions
 func NewRunListViewWithCacheAndDimensions(
-	client *api.Client,
+	client APIClient,
 	runs []models.RunResponse,
 	cached bool,
 	cachedAt time.Time,
@@ -78,7 +77,7 @@ func NewRunListViewWithCacheAndDimensions(
 }
 
 func NewRunListViewWithCache(
-	client *api.Client,
+	client APIClient,
 	runs []models.RunResponse,
 	cached bool,
 	cachedAt time.Time,

@@ -11,7 +11,6 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/repobird/repobird-cli/internal/api"
 	"github.com/repobird/repobird-cli/internal/cache"
 	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/repobird/repobird-cli/internal/tui/components"
@@ -21,7 +20,7 @@ import (
 )
 
 type RunDetailsView struct {
-	client        *api.Client
+	client        APIClient
 	run           models.RunResponse
 	keys          components.KeyMap
 	help          help.Model
@@ -61,7 +60,7 @@ type RunDetailsView struct {
 	navigationMode bool     // Whether we're in navigation mode
 }
 
-func NewRunDetailsView(client *api.Client, run models.RunResponse) *RunDetailsView {
+func NewRunDetailsView(client APIClient, run models.RunResponse) *RunDetailsView {
 	// Get the current global cache
 	runs, cached, cachedAt, detailsCache, _ := cache.GetCachedList()
 	return NewRunDetailsViewWithCache(client, run, runs, cached, cachedAt, detailsCache)
@@ -69,7 +68,7 @@ func NewRunDetailsView(client *api.Client, run models.RunResponse) *RunDetailsVi
 
 // RunDetailsViewConfig holds configuration for creating a new RunDetailsView
 type RunDetailsViewConfig struct {
-	Client             *api.Client
+	Client             APIClient
 	Run                models.RunResponse
 	ParentRuns         []models.RunResponse
 	ParentCached       bool
@@ -134,7 +133,7 @@ func NewRunDetailsViewWithConfig(config RunDetailsViewConfig) *RunDetailsView {
 
 // NewRunDetailsViewWithCacheAndDimensions creates a new details view with cache and dimensions
 func NewRunDetailsViewWithCacheAndDimensions(
-	client *api.Client,
+	client APIClient,
 	run models.RunResponse,
 	parentRuns []models.RunResponse,
 	parentCached bool,
@@ -158,7 +157,7 @@ func NewRunDetailsViewWithCacheAndDimensions(
 
 // NewRunDetailsViewWithCache maintains backward compatibility
 func NewRunDetailsViewWithCache(
-	client *api.Client,
+	client APIClient,
 	run models.RunResponse,
 	parentRuns []models.RunResponse,
 	parentCached bool,
