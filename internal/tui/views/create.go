@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -90,6 +91,13 @@ type CreateRunView struct {
 	// File hash tracking for duplicate detection
 	currentFileHash string
 	isDuplicateRun  bool
+	// Submission state tracking
+	isSubmitting bool
+	submitStartTime time.Time
+	// Duplicate run confirmation state
+	isDuplicateConfirm bool
+	duplicateRunID string
+	pendingTask models.RunRequest
 }
 
 func NewCreateRunView(client APIClient) *CreateRunView {
@@ -396,7 +404,7 @@ func (v *CreateRunView) handleInsertMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return v, v.selectRepository()
 		}
 	case msg.String() == "ctrl+s" || msg.String() == "ctrl+enter":
-		if !v.submitting {
+		if !v.submitting && !v.isSubmitting {
 			debug.LogToFile("DEBUG: Ctrl+S pressed in INSERT MODE - submitting run\n")
 			return v, v.submitRun()
 		}
@@ -501,7 +509,7 @@ func (v *CreateRunView) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return dashboard, dashboard.Init()
 		} else if v.submitButtonFocused {
 			// Enter on submit button submits the run
-			if !v.submitting {
+			if !v.submitting && !v.isSubmitting {
 				debug.LogToFile("DEBUG: Submit button pressed - submitting run\n")
 				return v, v.submitRun()
 			}
@@ -535,7 +543,7 @@ func (v *CreateRunView) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, v.keys.Down) || msg.String() == "j":
 		v.nextField()
 	case msg.String() == "ctrl+s":
-		if !v.submitting {
+		if !v.submitting && !v.isSubmitting {
 			debug.LogToFile("DEBUG: Ctrl+S pressed in NORMAL MODE - submitting run\n")
 			return v, v.submitRun()
 		}
@@ -631,7 +639,24 @@ func (v *CreateRunView) handleRunCreated(msg runCreatedMsg) (tea.Model, tea.Cmd)
 		}())
 
 	v.submitting = false
+	v.isSubmitting = false // Reset our new submitting state
 	if msg.err != nil {
+		// Check if this is a duplicate run error
+		errorMsg := msg.err.Error()
+		if strings.Contains(errorMsg, "Duplicate run detected") && strings.Contains(errorMsg, "Use --force to override") {
+			// Extract the run ID from the error message
+			// Pattern: "Duplicate run detected: A run with this file hash already exists (ID: 955). Use --force to override."
+			re := regexp.MustCompile(`\(ID: (\d+)\)`)
+			matches := re.FindStringSubmatch(errorMsg)
+			if len(matches) > 1 {
+				v.duplicateRunID = matches[1]
+				v.isDuplicateConfirm = true
+				debug.LogToFilef("DEBUG: Duplicate run detected - entering confirmation mode for run ID %s\n", v.duplicateRunID)
+				return v, nil
+			}
+		}
+		
+		// Regular error handling for non-duplicate errors
 		v.error = msg.err
 		v.initErrorFocus()
 		return v, nil
@@ -743,6 +768,45 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		v.handleWindowSizeMsg(msg)
 
 	case tea.KeyMsg:
+		// If submitting, only allow ESC and 'q' to quit
+		if v.isSubmitting {
+			switch msg.String() {
+			case "esc":
+				// Allow ESC to handle long running submit API
+				debug.LogToFilef("DEBUG: ESC pressed during submission - cancelling\n")
+				v.isSubmitting = false
+				return v, nil
+			case "q", "Q":
+				// Allow quit during submission
+				return v, tea.Quit
+			default:
+				// Ignore all other input during submission
+				return v, nil
+			}
+		}
+
+		// If in duplicate confirmation mode, only handle y/n
+		if v.isDuplicateConfirm {
+			switch msg.String() {
+			case "y", "Y":
+				// User confirmed - retry with force flag
+				debug.LogToFilef("DEBUG: User confirmed duplicate override - retrying with force\n")
+				v.isDuplicateConfirm = false
+				return v, v.submitWithForce()
+			case "n", "N", "esc":
+				// User cancelled - exit confirmation mode
+				debug.LogToFilef("DEBUG: User cancelled duplicate override\n")
+				v.isDuplicateConfirm = false
+				return v, nil
+			case "q", "Q":
+				// Allow quit during confirmation
+				return v, tea.Quit
+			default:
+				// Ignore all other input during duplicate confirmation
+				return v, nil
+			}
+		}
+
 		// If enhanced config file selector is active, handle input there first
 		if v.configFileSelector != nil && v.configFileSelector.IsActive() {
 			newConfigFileSelector, cmd := v.configFileSelector.Update(msg)
@@ -1557,7 +1621,12 @@ func (v *CreateRunView) renderCompactForm(width, height int) string {
 		}
 	}
 
-	b.WriteString(submitStyle.Render("🚀 Submit Run"))
+	// Change text based on submission state
+	submitText := "🚀 Submit Run"
+	if v.isSubmitting {
+		submitText = "⏳ SUBMITTING..."
+	}
+	b.WriteString(submitStyle.Render(submitText))
 
 	// Validation indicator to the right of submit button
 	isValid, validationError := v.validateForm()
@@ -1806,6 +1875,26 @@ func (v *CreateRunView) renderStatusBar() string {
 		return components.DashboardStatusLine(v.width, "ERROR", "", statusText)
 	}
 
+	// Handle submitting state
+	if v.isSubmitting {
+		statusText = "[ESC] cancel submission [Q] quit"
+		return components.DashboardStatusLine(v.width, "SUBMITTING", "", statusText)
+	}
+
+	// Handle duplicate confirmation mode
+	if v.isDuplicateConfirm {
+		// Create yellow status line similar to reset confirmation
+		duplicateStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("0")).   // Black text
+			Background(lipgloss.Color("11")).  // Yellow background
+			Bold(true).
+			Width(v.width).
+			Align(lipgloss.Center)
+
+		statusContent := fmt.Sprintf("[DUPLICATE] ⚠️  DUPLICATE RUN DETECTED (ID: %s) - Override? [y] yes [n] no", v.duplicateRunID)
+		return duplicateStyle.Render(statusContent)
+	}
+
 	if v.inputMode == components.InsertMode {
 		if !v.useFileInput && v.focusIndex == 2 {
 			// When repository field is focused (now at index 2), show FZF options
@@ -1958,6 +2047,42 @@ func (v *CreateRunView) submitToAPI(task models.RunRequest) (models.RunResponse,
 	return *runPtr, nil
 }
 
+// submitToAPIWithForce submits to API with the force flag to override duplicates
+func (v *CreateRunView) submitToAPIWithForce(task models.RunRequest) (models.RunResponse, error) {
+	// Convert to API-compatible format
+	apiTask := task.ToAPIRequest()
+
+	// Add file hash if we have one (from loaded config file)
+	if v.currentFileHash != "" {
+		apiTask.FileHash = v.currentFileHash
+		debug.LogToFilef("DEBUG: Including file hash in API request with force override: %s\n", v.currentFileHash)
+	}
+
+	// Set force flag to override duplicate detection
+	apiTask.Force = true
+
+	// Debug: Log the final task object being sent to API
+	debug.LogToFilef(
+		"DEBUG: Final API task object WITH FORCE - Title='%s', RepositoryName='%s', SourceBranch='%s', "+
+			"TargetBranch='%s', Prompt='%s', Context='%s', RunType='%s', FileHash='%s', Force=%v\\n",
+		apiTask.Title, apiTask.RepositoryName, apiTask.SourceBranch,
+		apiTask.TargetBranch, apiTask.Prompt, apiTask.Context, apiTask.RunType, apiTask.FileHash, apiTask.Force)
+
+	runPtr, err := v.client.CreateRunAPI(apiTask)
+
+	// Debug: Log the API response
+	debug.LogToFilef("DEBUG: API response with force - err=%v, runPtr!=nil=%v\\n", err, runPtr != nil)
+
+	if err != nil {
+		return models.RunResponse{}, err
+	}
+	if runPtr == nil {
+		return models.RunResponse{}, fmt.Errorf("API returned nil response")
+	}
+
+	return *runPtr, nil
+}
+
 // selectRepository triggers the repository selector
 func (v *CreateRunView) selectRepository() tea.Cmd {
 	return func() tea.Msg {
@@ -1974,6 +2099,10 @@ func (v *CreateRunView) selectRepository() tea.Cmd {
 }
 
 func (v *CreateRunView) submitRun() tea.Cmd {
+	// Set submitting state immediately
+	v.isSubmitting = true
+	v.submitStartTime = time.Now()
+
 	return func() tea.Msg {
 		debug.LogToFile("DEBUG: submitRun() called - starting submission process\n")
 
@@ -2005,6 +2134,50 @@ func (v *CreateRunView) submitRun() tea.Cmd {
 		}
 
 		run, err := v.submitToAPI(task)
+		if err != nil {
+			return runCreatedMsg{err: err}
+		}
+
+		return runCreatedMsg{run: run, err: nil}
+	}
+}
+
+// submitWithForce submits the run with force flag to override duplicate detection
+func (v *CreateRunView) submitWithForce() tea.Cmd {
+	// Set submitting state immediately
+	v.isSubmitting = true
+	v.submitStartTime = time.Now()
+
+	return func() tea.Msg {
+		debug.LogToFile("DEBUG: submitWithForce() called - retrying submission with force override\n")
+
+		// Use the pending task that was prepared during the initial submit
+		var task models.RunRequest
+		var err error
+
+		if v.useFileInput {
+			task, err = v.prepareTaskFromFile(v.filePathInput.Value())
+			if err != nil {
+				return runCreatedMsg{err: err}
+			}
+		} else {
+			task = v.prepareTaskFromForm()
+			v.autoDetectGitInfo(&task)
+
+			if err := v.validateTask(&task); err != nil {
+				return runCreatedMsg{err: err}
+			}
+
+			// Add repository to history after successful validation
+			if task.Repository != "" {
+				go func() {
+					_ = cache.AddRepositoryToHistory(task.Repository)
+				}()
+			}
+		}
+
+		// Submit to API with force flag
+		run, err := v.submitToAPIWithForce(task)
 		if err != nil {
 			return runCreatedMsg{err: err}
 		}
