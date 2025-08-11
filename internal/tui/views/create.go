@@ -945,19 +945,9 @@ func (v *CreateRunView) View() string {
 			Render("⟳ Initializing...")
 	}
 
-	// Consistent title style with dashboard
-	titleStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("63")).
-		PaddingLeft(1)
-
-	title := titleStyle.Render("Repobird.ai CLI - Create New Run")
-
 	// Calculate available height for content
-	// We have v.height total, minus:
-	// - 2 for title (1 line + spacing)
-	// - 1 for statusbar
-	availableHeight := v.height - 3
+	// We have v.height total, minus 1 for statusbar
+	availableHeight := v.height - 1
 	if availableHeight < 5 {
 		availableHeight = 5
 	}
@@ -1010,14 +1000,13 @@ func (v *CreateRunView) View() string {
 	// Join all components with status bar
 	finalView := lipgloss.JoinVertical(
 		lipgloss.Left,
-		title,
 		content,
 		statusBar,
 	)
 
 	// If file selector is active, show modal instead of overlay
 	if v.fileSelector != nil && v.fileSelector.IsActive() {
-		return v.renderFileSelectionModal(title, statusBar)
+		return v.renderFileSelectionModal(statusBar)
 	}
 
 	// If FZF mode is active, overlay the dropdown
@@ -1029,7 +1018,7 @@ func (v *CreateRunView) View() string {
 }
 
 // renderFileSelectionModal renders a modal for file selection, replacing the entire view
-func (v *CreateRunView) renderFileSelectionModal(title, statusBar string) string {
+func (v *CreateRunView) renderFileSelectionModal(statusBar string) string {
 	if v.fileSelector == nil || !v.fileSelector.IsActive() {
 		return ""
 	}
@@ -1075,10 +1064,9 @@ func (v *CreateRunView) renderFileSelectionModal(title, statusBar string) string
 		content,
 	)
 
-	// Join with title and status bar
+	// Join with status bar
 	return lipgloss.JoinVertical(
 		lipgloss.Left,
-		title,
 		modalContent,
 		statusBar,
 	)
@@ -1184,6 +1172,15 @@ func (v *CreateRunView) renderSinglePanelLayout(availableHeight int) string {
 // renderCompactForm renders all fields in a compact single-column layout
 func (v *CreateRunView) renderCompactForm(width, height int) string {
 	var b strings.Builder
+
+	// Add title header inside the form
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("63")).
+		MarginBottom(1)
+
+	b.WriteString(titleStyle.Render("Create New Run"))
+	b.WriteString("\n\n")
 
 	labelStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("252")).
@@ -1383,6 +1380,15 @@ func (v *CreateRunView) renderErrorLayout(availableHeight int) string {
 
 	// Error content
 	var b strings.Builder
+
+	// Add title header inside the error panel
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("63")).
+		MarginBottom(1)
+
+	b.WriteString(titleStyle.Render("Create New Run"))
+	b.WriteString("\n\n")
 
 	// Error header
 	errorHeaderStyle := lipgloss.NewStyle().
