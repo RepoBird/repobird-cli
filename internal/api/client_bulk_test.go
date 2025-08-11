@@ -421,14 +421,14 @@ func TestClient_PollBulkStatus(t *testing.T) {
 	t.Run("successful polling until completion", func(t *testing.T) {
 		batchID := "batch-123"
 		callCount := 0
-		
+
 		// Mock server that returns different statuses
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			assert.Equal(t, "GET", r.Method)
 			assert.Equal(t, fmt.Sprintf("/api/v1/runs/bulk/%s", batchID), r.URL.Path)
 
 			callCount++
-			
+
 			var response dto.BulkStatusResponse
 			switch callCount {
 			case 1:
@@ -470,7 +470,7 @@ func TestClient_PollBulkStatus(t *testing.T) {
 		defer server.Close()
 
 		client := NewClient("test-key", server.URL, false)
-		
+
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
@@ -496,7 +496,7 @@ func TestClient_PollBulkStatus(t *testing.T) {
 
 	t.Run("polling with context cancellation", func(t *testing.T) {
 		batchID := "batch-456"
-		
+
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			response := dto.BulkStatusResponse{
 				BatchID: batchID,
@@ -508,9 +508,9 @@ func TestClient_PollBulkStatus(t *testing.T) {
 		defer server.Close()
 
 		client := NewClient("test-key", server.URL, false)
-		
+
 		ctx, cancel := context.WithCancel(context.Background())
-		
+
 		statusChan, err := client.PollBulkStatus(ctx, batchID, 100*time.Millisecond)
 		require.NoError(t, err)
 
@@ -536,7 +536,7 @@ func TestClient_PollBulkStatus(t *testing.T) {
 
 	t.Run("polling with failed status", func(t *testing.T) {
 		batchID := "batch-789"
-		
+
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			response := dto.BulkStatusResponse{
 				BatchID: batchID,
@@ -552,7 +552,7 @@ func TestClient_PollBulkStatus(t *testing.T) {
 		defer server.Close()
 
 		client := NewClient("test-key", server.URL, false)
-		
+
 		ctx := context.Background()
 		statusChan, err := client.PollBulkStatus(ctx, batchID, 100*time.Millisecond)
 		require.NoError(t, err)
@@ -560,7 +560,7 @@ func TestClient_PollBulkStatus(t *testing.T) {
 		// Should get failed status and then channel closes
 		status := <-statusChan
 		assert.Equal(t, "failed", status.Status)
-		
+
 		// Channel should be closed
 		_, ok := <-statusChan
 		assert.False(t, ok)
@@ -576,10 +576,10 @@ func TestClient_PollBulkStatus(t *testing.T) {
 	t.Run("polling with API errors", func(t *testing.T) {
 		batchID := "batch-error"
 		callCount := 0
-		
+
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			callCount++
-			
+
 			if callCount == 1 {
 				// First call fails
 				w.WriteHeader(http.StatusInternalServerError)
@@ -597,7 +597,7 @@ func TestClient_PollBulkStatus(t *testing.T) {
 		defer server.Close()
 
 		client := NewClient("test-key", server.URL, false)
-		
+
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
@@ -634,7 +634,7 @@ func TestClient_BulkRetryBehavior(t *testing.T) {
 		defer server.Close()
 
 		client := NewClient("test-key", server.URL, false)
-		
+
 		result, err := client.CreateBulkRuns(context.Background(), &dto.BulkRunRequest{
 			RepositoryName: "org/repo",
 			Runs:           []dto.RunItem{{Prompt: "Test"}},
@@ -665,9 +665,9 @@ func TestClient_BulkRetryBehavior(t *testing.T) {
 		defer server.Close()
 
 		client := NewClient("test-key", server.URL, false)
-		
+
 		result, err := client.GetBulkStatus(context.Background(), "batch-123")
-		
+
 		require.NoError(t, err)
 		assert.Equal(t, "batch-123", result.BatchID)
 		assert.Equal(t, 2, callCount)

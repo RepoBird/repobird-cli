@@ -484,16 +484,16 @@ func TestParseBulkConfig_SingleToMultiConversion(t *testing.T) {
 	}`
 
 	tmpDir := t.TempDir()
-	
+
 	// First, we need to create the utils mock file that LoadConfigFromFile expects
 	// Since we can't easily mock utils.LoadConfigFromFile, we'll test the logic directly
 	// by creating a single-run JSON that doesn't have a "runs" field
-	
+
 	filePath := createTempFile(t, tmpDir, "single.json", singleConfig)
-	
+
 	// This should detect it's a single config and convert to bulk
-	config, err := ParseBulkConfig(filePath)
-	
+	_, err := ParseBulkConfig(filePath)
+
 	// Note: This will fail because utils.LoadConfigFromFile is not mocked
 	// In a real test, we'd need to refactor to inject the dependency
 	assert.Error(t, err) // Expected to fail without proper mocking
@@ -518,7 +518,7 @@ runs:
 
 	// Load multiple files
 	config, err := LoadBulkConfig([]string{file1, file2})
-	
+
 	require.NoError(t, err)
 	assert.Equal(t, "org/repo", config.Repository)
 	assert.Equal(t, 4, len(config.Runs))
@@ -736,7 +736,7 @@ func BenchmarkParseBulkConfig_JSON(b *testing.B) {
 			{"prompt": "Task 3", "title": "Title 3", "target": "branch3"}
 		]
 	}`
-	
+
 	tmpDir := b.TempDir()
 	filePath := filepath.Join(tmpDir, "bench.json")
 	os.WriteFile(filePath, []byte(content), 0644)
@@ -759,7 +759,7 @@ runs:
   - prompt: Task 3
     title: Title 3
     target: branch3`
-	
+
 	tmpDir := b.TempDir()
 	filePath := filepath.Join(tmpDir, "bench.yaml")
 	os.WriteFile(filePath, []byte(content), 0644)

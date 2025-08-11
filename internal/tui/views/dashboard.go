@@ -797,10 +797,10 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			createView.height = d.height
 			return createView, nil
 		case msg.Type == tea.KeyRunes && string(msg.Runes) == "b":
-			// Navigate to bulk runs view
+			// Navigate to bulk runs view with FZF
 			// Type assert the APIClient interface to *api.Client
 			if apiClient, ok := d.client.(*api.Client); ok {
-				bulkView := NewBulkView(apiClient)
+				bulkView := NewBulkFZFView(apiClient)
 				return bulkView, bulkView.Init()
 			} else {
 				// Fallback: if not a real API client, ignore
