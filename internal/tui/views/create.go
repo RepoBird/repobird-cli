@@ -120,13 +120,23 @@ func NewCreateRunViewWithConfig(cfg CreateRunViewConfig) *CreateRunView {
 	v.initializeInputFields()
 	v.loadFormData()
 
-	// If a repository was selected in the dashboard, use it
+	// Only override with dashboard selection if user explicitly selected a repository
+	// (not just navigating back to create view)
 	if cfg.SelectedRepository != "" {
-		if len(v.fields) >= 1 {
-			v.fields[0].SetValue(cfg.SelectedRepository)
+		// Check if we have saved form data - if yes, this is likely a navigation back
+		savedData := cache.GetFormData()
+		if savedData == nil || savedData.Repository == "" {
+			// No saved data or empty repository - use dashboard selection
+			if len(v.fields) >= 1 {
+				v.fields[0].SetValue(cfg.SelectedRepository)
+			}
 		}
+		// If we have saved data with a repository, keep it (user is navigating back)
 	} else {
-		v.autofillRepository()
+		// No dashboard selection - check if we need to autofill
+		if len(v.fields) >= 1 && v.fields[0].Value() == "" {
+			v.autofillRepository()
+		}
 	}
 
 	return v
@@ -1177,10 +1187,10 @@ func (v *CreateRunView) renderSinglePanelLayout(availableHeight int) string {
 	panelContent := v.renderCompactForm(contentWidth, contentHeight)
 
 	// Style for single panel - Width includes the border
-	// Don't set Height to allow content to determine it naturally
+	// Use Height to maintain consistent window size regardless of content
 	panelStyle := lipgloss.NewStyle().
 		Width(panelWidth).
-		MaxHeight(panelHeight). // Use MaxHeight instead of Height
+		Height(panelHeight). // Use Height to maintain consistent size
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("63")).
 		Padding(1)
