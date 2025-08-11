@@ -136,6 +136,27 @@ The repository field supports fuzzy search for quick selection:
 - **Ctrl+F** - Toggle between file input and form input
 - Allows loading task configuration from JSON file
 
+### Duplicate Run Detection
+
+When you load a task file, RepoBird automatically detects duplicates using file hashing:
+
+#### Visual Indicators
+- ✓ **Green checkmark** next to Submit button: Ready to submit (unique task)
+- ⚠️ **Yellow warning** next to Submit button: Duplicate detected
+
+#### Submission Behavior
+When submitting a duplicate task, instead of showing an error:
+1. **Friendly Prompt**: Yellow status bar appears: `[DUPLICATE] ⚠️ DUPLICATE RUN DETECTED (ID: 123) - Override? [y] yes [n] no`
+2. **Easy Override**: Press `y` to automatically retry with override, or `n` to cancel
+3. **No Error Page**: Clean user experience without confusing error messages
+
+#### File Type Support
+Works with any file type:
+- **JSON** task files (`.json`)
+- **YAML** configuration files (`.yaml`, `.yml`) 
+- **Markdown** documentation (`.md`)
+- **Any file type** - calculates SHA-256 hash of content
+
 ## Run Details View
 
 The details view provides comprehensive information about a selected run with enhanced navigation:

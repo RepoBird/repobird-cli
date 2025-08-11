@@ -195,6 +195,46 @@ gh repo view org/repo
 repobird auth info
 ```
 
+#### Duplicate Run Detection
+
+**Understanding Duplicate Detection:**
+When you load a task file (JSON, YAML, Markdown, etc.), RepoBird calculates a SHA-256 hash of the file content to detect duplicates.
+
+**Visual Indicators:**
+- ✓ **Green** next to Submit button: Ready to submit (not a duplicate)
+- ⚠️ **Yellow** next to Submit button: Duplicate detected, but can still submit
+
+**When Submitting a Duplicate:**
+Instead of showing an error page, RepoBird shows a friendly prompt:
+```
+[DUPLICATE] ⚠️ DUPLICATE RUN DETECTED (ID: 123) - Override? [y] yes [n] no
+```
+
+**Actions:**
+- Press `y` to override and submit the duplicate run
+- Press `n` or `ESC` to cancel and return to the form
+- The system automatically handles the retry with force flag
+
+**Troubleshooting Duplicate Issues:**
+
+1. **False Positives**: If you get duplicate warnings for different tasks:
+```bash
+# Clear the file hash cache
+rm -rf ~/.cache/repobird/users/user-*/file_hashes.json
+```
+
+2. **Cache Out of Sync**: If duplicate detection seems inconsistent:
+```bash
+# Force cache refresh by restarting the TUI
+repobird tui
+```
+
+3. **Intentional Duplicates**: To always allow duplicates without prompting:
+```bash
+# Edit your task file to make it unique (add a comment or timestamp)
+# Or use different file names for similar tasks
+```
+
 ### Cache Issues
 
 #### Stale or Corrupted Cache

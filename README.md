@@ -93,12 +93,15 @@ Create a `task.json` file:
 
 RepoBird CLI automatically detects and prevents duplicate task submissions using file hashing:
 
-- **Automatic Detection**: When loading a task configuration file, the CLI calculates a SHA-256 hash of the file content
-- **Visual Indicator**: The TUI shows a validation status indicator before the Submit button:
+- **Universal File Support**: Works with JSON, YAML, Markdown, or any file type - calculates SHA-256 hash of file content
+- **Visual Indicator**: The TUI shows a validation status indicator next to the Submit button:
   - ✓ Ready to submit (green) - Task is valid and not a duplicate
-  - ✗ This task file has already been submitted (red) - Duplicate detected
+  - ⚠️ Duplicate detected (yellow) - This task file has already been submitted
+- **User-Friendly Override**: When a duplicate is detected during submission:
+  - **No Error Page**: Instead of showing a confusing error, you get a clear prompt
+  - **Yellow Status Bar**: `[DUPLICATE] ⚠️ DUPLICATE RUN DETECTED (ID: 123) - Override? [y] yes [n] no`
+  - **One-Click Retry**: Press `y` to automatically override and submit, or `n` to cancel
 - **Smart Caching**: File hashes are cached locally and synced with the server to prevent accidental re-submissions
-- **Override Option**: If you need to re-run a task, you can still submit it manually by modifying the configuration
 
 This feature helps prevent:
 - Accidental double-clicks or re-submissions
