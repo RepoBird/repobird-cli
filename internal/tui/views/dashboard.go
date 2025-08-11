@@ -652,14 +652,21 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Handle navigation in status info overlay
 			return d.handleStatusInfoNavigation(msg)
 		case msg.Type == tea.KeyRunes && string(msg.Runes) == "n":
-			// Navigate to create new run view with selected repository
+			// Navigate to create new run view
+			// Check if we have existing form data to determine if this is a navigation back
+			existingFormData := cache.GetFormData()
 			config := CreateRunViewConfig{
 				Client: d.client,
 			}
 
-			// Pass the selected repository if one is selected
+			// Only pass selected repository if:
+			// 1. A repository is selected in dashboard AND
+			// 2. Either no form data exists OR the form repository is empty
 			if d.selectedRepo != nil {
-				config.SelectedRepository = d.selectedRepo.Name
+				if existingFormData == nil || existingFormData.Repository == "" {
+					config.SelectedRepository = d.selectedRepo.Name
+				}
+				// Otherwise preserve the existing form data repository
 			}
 
 			createView := NewCreateRunViewWithConfig(config)

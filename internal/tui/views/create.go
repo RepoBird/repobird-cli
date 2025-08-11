@@ -118,22 +118,20 @@ func NewCreateRunViewWithConfig(cfg CreateRunViewConfig) *CreateRunView {
 
 	v.repoSelector = components.NewRepositorySelector()
 	v.initializeInputFields()
+
+	// Load saved form data first
 	v.loadFormData()
 
-	// Only override with dashboard selection if user explicitly selected a repository
-	// (not just navigating back to create view)
+	// Only override repository with dashboard selection if appropriate
 	if cfg.SelectedRepository != "" {
-		// Check if we have saved form data - if yes, this is likely a navigation back
-		savedData := cache.GetFormData()
-		if savedData == nil || savedData.Repository == "" {
-			// No saved data or empty repository - use dashboard selection
-			if len(v.fields) >= 1 {
-				v.fields[0].SetValue(cfg.SelectedRepository)
-			}
+		// Dashboard passed a selected repository
+		// Only use it if the current repository field is empty
+		if len(v.fields) >= 1 && v.fields[0].Value() == "" {
+			v.fields[0].SetValue(cfg.SelectedRepository)
 		}
-		// If we have saved data with a repository, keep it (user is navigating back)
+		// Otherwise keep the loaded form data
 	} else {
-		// No dashboard selection - check if we need to autofill
+		// No dashboard selection - autofill if repository is still empty
 		if len(v.fields) >= 1 && v.fields[0].Value() == "" {
 			v.autofillRepository()
 		}
