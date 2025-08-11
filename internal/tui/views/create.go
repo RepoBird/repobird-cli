@@ -319,7 +319,7 @@ func (v *CreateRunView) Init() tea.Cmd {
 			return tea.WindowSizeMsg{Width: v.width, Height: v.height}
 		})
 	}
-	
+
 	// Load file hash cache in the background
 	cmds = append(cmds, v.loadFileHashCache())
 
@@ -650,7 +650,7 @@ func (v *CreateRunView) handleRunCreated(msg runCreatedMsg) (tea.Model, tea.Cmd)
 	cache.ClearFormData()
 	v.success = true
 	v.createdRun = &msg.run
-	
+
 	// Add the file hash to cache if we have one
 	if v.currentFileHash != "" {
 		fileHashCache := cache.GetFileHashCache()
@@ -848,7 +848,7 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case configLoadedMsg:
 		// Handle successful config loading
 		v.populateFormFromConfig(msg.config, msg.filePath)
-		
+
 		// Store the file hash and check if it's a duplicate
 		v.currentFileHash = msg.fileHash
 		if msg.fileHash != "" {
@@ -895,7 +895,20 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// File selector is now active, clear loading state
 		v.fileSelectorLoading = false
 		v.configFileSelectorActive = true
-		return v, nil
+		// Start the cursor blink animation
+		return v, v.tickCmd()
+
+	case configSelectorTickMsg:
+		// Forward tick to config file selector if it's active
+		if v.configFileSelector != nil && v.configFileSelector.IsActive() {
+			// Convert to the config file selector's tick message type
+			newSelector, cmd := v.configFileSelector.Update(components.TickMsg(time.Time(msg)))
+			v.configFileSelector = newSelector
+			cmds = append(cmds, cmd)
+			// Continue ticking
+			cmds = append(cmds, v.tickCmd())
+		}
+		return v, tea.Batch(cmds...)
 	}
 
 	return v, tea.Batch(cmds...)
@@ -1545,12 +1558,12 @@ func (v *CreateRunView) renderCompactForm(width, height int) string {
 	}
 
 	b.WriteString(submitStyle.Render("🚀 Submit Run"))
-	
+
 	// Validation indicator to the right of submit button
 	isValid, validationError := v.validateForm()
 	validationStyle := lipgloss.NewStyle().
 		Padding(0, 0, 0, 2) // Add left padding to separate from submit button
-	
+
 	if isValid {
 		// Show checkmark when valid
 		validationStyle = validationStyle.Foreground(lipgloss.Color("82")) // Green
@@ -2035,6 +2048,8 @@ type configLoadErrorMsg struct {
 
 type fileSelectorActivatedMsg struct{}
 
+type configSelectorTickMsg time.Time
+
 // startYankBlinkAnimation starts the blink animation for clipboard feedback
 func (v *CreateRunView) startYankBlinkAnimation() tea.Cmd {
 	return func() tea.Msg {
@@ -2050,6 +2065,13 @@ func (v *CreateRunView) startClearStatusTimer() tea.Cmd {
 		time.Sleep(3 * time.Second)
 		return clearStatusMsg{}
 	}
+}
+
+// tickCmd returns a command for the cursor blink animation
+func (v *CreateRunView) tickCmd() tea.Cmd {
+	return tea.Tick(200*time.Millisecond, func(t time.Time) tea.Msg {
+		return configSelectorTickMsg(t)
+	})
 }
 
 // activateFZFMode activates FZF mode for repository selection
@@ -2137,7 +2159,6 @@ func (v *CreateRunView) loadConfigFromFile(filePath string) tea.Cmd {
 			return configLoadErrorMsg{err: err}
 		}
 
-		
 		// Calculate file hash for duplicate detection
 		fileHash, hashErr := cache.CalculateFileHash(filePath)
 		if hashErr != nil {
@@ -2145,7 +2166,7 @@ func (v *CreateRunView) loadConfigFromFile(filePath string) tea.Cmd {
 			// Continue without hash - not a critical error
 			fileHash = ""
 		}
-		
+
 		debug.LogToFilef("DEBUG: Config loaded successfully from %s with hash %s\n", filePath, fileHash)
 		return configLoadedMsg{
 			config:   config,
@@ -2161,40 +2182,66 @@ func (v *CreateRunView) validateForm() (bool, string) {
 	if strings.TrimSpace(v.promptArea.Value()) == "" {
 		return false, "Prompt is required"
 	}
-	
+
 	if strings.TrimSpace(v.fields[0].Value()) == "" {
 		return false, "Repository is required"
 	}
-	
+
 	// Check for duplicate file hash if a config file was loaded
 	if v.isDuplicateRun && v.currentFileHash != "" {
 		return false, "This task file has already been submitted (duplicate detected)"
 	}
-	
+
 	return true, ""
 }
 
 // loadFileHashCache loads the file hash cache from the API
 func (v *CreateRunView) loadFileHashCache() tea.Cmd {
 	return func() tea.Msg {
+		debug.LogToFile("DEBUG: loadFileHashCache - starting\n")
+
+		// First ensure we have user info to set the correct cache directory
+		userInfo := cache.GetCachedUserInfo()
+		if userInfo == nil {
+			debug.LogToFile("DEBUG: loadFileHashCache - fetching user info first\n")
+			// Fetch user info to get user ID for cache directory
+			userInfo, err := v.client.GetUserInfo()
+			if err != nil {
+				debug.LogToFilef("DEBUG: loadFileHashCache - failed to get user info: %v\n", err)
+			} else if userInfo != nil {
+				cache.SetCachedUserInfo(userInfo)
+				// Update cache to use user-specific directory
+				if userInfo.ID > 0 {
+					userID := userInfo.ID
+					cache.InitializeCacheForUser(&userID)
+					debug.LogToFilef("DEBUG: loadFileHashCache - set cache user to %d\n", userID)
+				}
+			}
+		}
+
 		fileHashCache := cache.GetFileHashCache()
 		if fileHashCache == nil {
+			debug.LogToFile("DEBUG: loadFileHashCache - file hash cache is nil\n")
 			return nil
 		}
-		
+
 		// Check if already loaded
 		if fileHashCache.IsLoaded() {
+			debug.LogToFile("DEBUG: loadFileHashCache - already loaded from cache\n")
 			return nil
 		}
-		
+
 		// Load from API
+		debug.LogToFile("DEBUG: loadFileHashCache - calling EnsureLoaded to fetch from API\n")
 		ctx := context.Background()
 		err := fileHashCache.EnsureLoaded(ctx, v.client)
 		if err != nil {
 			debug.LogToFilef("DEBUG: Failed to load file hash cache: %v\n", err)
 			// Non-critical error, continue without cache
+		} else {
+			debug.LogToFile("DEBUG: loadFileHashCache - successfully loaded file hashes\n")
 		}
-		
+
 		return nil
 	}
 }

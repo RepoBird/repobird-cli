@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/alecthomas/chroma/v2/formatters"
 	"github.com/alecthomas/chroma/v2/lexers"
@@ -15,6 +16,16 @@ import (
 	"github.com/repobird/repobird-cli/internal/utils"
 	"github.com/sahilm/fuzzy"
 )
+
+// TickMsg is sent periodically to update the cursor blink
+type TickMsg time.Time
+
+// tick returns a command that sends a TickMsg after a delay
+func tick() tea.Cmd {
+	return tea.Tick(200*time.Millisecond, func(t time.Time) tea.Msg {
+		return TickMsg(t)
+	})
+}
 
 // ConfigFileSelector is an enhanced file selector with preview pane for config files
 type ConfigFileSelector struct {
@@ -28,6 +39,7 @@ type ConfigFileSelector struct {
 	active          bool
 	previewOffset   int
 	maxPreviewLines int
+	cursorVisible   bool // For blinking cursor animation
 }
 
 // NewConfigFileSelector creates a new config file selector with preview
@@ -58,6 +70,7 @@ func (cfs *ConfigFileSelector) Activate() error {
 	cfs.active = true
 	cfs.selectedIndex = 0
 	cfs.filterInput = ""
+	cfs.cursorVisible = true // Start with cursor visible
 
 	if len(configFiles) > 0 {
 		cfs.updatePreview()
@@ -116,13 +129,13 @@ func (cfs *ConfigFileSelector) Update(msg tea.Msg) (*ConfigFileSelector, tea.Cmd
 				}
 			}
 
-		case "up", "k", "ctrl+p":
+		case "up", "ctrl+p":
 			if cfs.selectedIndex > 0 {
 				cfs.selectedIndex--
 				cfs.updatePreview()
 			}
 
-		case "down", "j", "ctrl+n":
+		case "down", "ctrl+n":
 			if cfs.selectedIndex < len(cfs.filteredFiles)-1 {
 				cfs.selectedIndex++
 				cfs.updatePreview()
@@ -153,6 +166,7 @@ func (cfs *ConfigFileSelector) Update(msg tea.Msg) (*ConfigFileSelector, tea.Cmd
 			cfs.applyFilter()
 
 		default:
+			// Handle all single character input for filtering, including 'j' and 'k'
 			if len(msg.String()) == 1 {
 				cfs.filterInput += msg.String()
 				cfs.applyFilter()
@@ -162,6 +176,11 @@ func (cfs *ConfigFileSelector) Update(msg tea.Msg) (*ConfigFileSelector, tea.Cmd
 	case tea.WindowSizeMsg:
 		cfs.width = msg.Width
 		cfs.height = msg.Height
+
+	case TickMsg:
+		// Toggle cursor visibility for blinking effect
+		cfs.cursorVisible = !cfs.cursorVisible
+		return cfs, tick()
 	}
 
 	return cfs, nil
@@ -321,10 +340,21 @@ func (cfs *ConfigFileSelector) View() string {
 	// Build file list content
 	var fileListContent []string
 
-	// Add filter line
-	filterLine := fmt.Sprintf("Filter: %s", cfs.filterInput)
+	// Add filter line with blinking cursor
+	cursor := ""
+	if cfs.cursorVisible {
+		cursor = "█"
+	} else {
+		cursor = " "
+	}
+	filterLine := fmt.Sprintf("Filter: %s%s", cfs.filterInput, cursor)
 	if len(filterLine) > listWidth-4 {
-		filterLine = filterLine[:listWidth-7] + "..."
+		// Ensure cursor is always visible by truncating the input, not the cursor
+		maxInputLen := listWidth - 12 // "Filter: " + cursor + "..."
+		if len(cfs.filterInput) > maxInputLen {
+			filterLine = fmt.Sprintf("Filter: ...%s%s",
+				cfs.filterInput[len(cfs.filterInput)-maxInputLen+3:], cursor)
+		}
 	}
 	fileListContent = append(fileListContent, filterStyle.Render(filterLine))
 	fileListContent = append(fileListContent, "") // Empty line
@@ -472,7 +502,7 @@ func (cfs *ConfigFileSelector) View() string {
 		Padding(0, 1).
 		Height(1)
 
-	statusText := "↑↓/jk: nav • Enter: select • ESC: cancel • Type: filter"
+	statusText := "[FZF] ↑↓: nav • Enter: select • ESC: cancel • Type to filter"
 	statusBar := statusBarStyle.Render(statusText)
 
 	// Join content and status bar vertically - content aligned to top

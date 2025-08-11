@@ -16,12 +16,13 @@ import (
 
 // FileHashCache manages the cache of file hashes for duplicate detection
 type FileHashCache struct {
-	mu         sync.RWMutex
-	hashes     map[string]bool // Map of file hash to existence
-	loaded     bool
-	loadedAt   time.Time
-	cacheFile  string
-	apiClient  interface{} // Will be set to the API client interface
+	mu        sync.RWMutex
+	hashes    map[string]bool // Map of file hash to existence
+	loaded    bool
+	loadedAt  time.Time
+	cacheFile string
+	userID    *int        // User ID for user-specific caching
+	apiClient interface{} // Will be set to the API client interface
 }
 
 // FileHashCacheData represents the persistent cache structure
@@ -33,14 +34,64 @@ type FileHashCacheData struct {
 
 // NewFileHashCache creates a new file hash cache instance
 func NewFileHashCache() *FileHashCache {
-	homeDir, _ := os.UserHomeDir()
-	cacheDir := filepath.Join(homeDir, ".repobird", "cache")
-	_ = os.MkdirAll(cacheDir, 0755)
-	
+	return NewFileHashCacheForUser(nil)
+}
+
+// NewFileHashCacheForUser creates a new file hash cache instance for a specific user
+func NewFileHashCacheForUser(userID *int) *FileHashCache {
+	var cacheFile string
+
+	// Use os.UserCacheDir for cross-platform compatibility
+	baseDir, err := os.UserCacheDir()
+	if err != nil {
+		// Fallback to home directory if cache dir fails
+		homeDir, _ := os.UserHomeDir()
+		baseDir = filepath.Join(homeDir, ".cache")
+	}
+
+	if userID != nil {
+		// User-specific cache directory
+		cacheDir := filepath.Join(baseDir, "repobird", "users", fmt.Sprintf("user-%d", *userID))
+		_ = os.MkdirAll(cacheDir, 0755)
+		cacheFile = filepath.Join(cacheDir, "file_hashes.json")
+	} else {
+		// Fallback to shared cache directory
+		cacheDir := filepath.Join(baseDir, "repobird", "shared")
+		_ = os.MkdirAll(cacheDir, 0755)
+		cacheFile = filepath.Join(cacheDir, "file_hashes.json")
+	}
+
 	return &FileHashCache{
 		hashes:    make(map[string]bool),
-		cacheFile: filepath.Join(cacheDir, "file_hashes.json"),
+		cacheFile: cacheFile,
+		userID:    userID,
 	}
+}
+
+// SetUserID updates the cache to use a user-specific directory
+func (c *FileHashCache) SetUserID(userID *int) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if userID == nil || c.userID != nil && *c.userID == *userID {
+		return // No change needed
+	}
+
+	// Update to use user-specific cache directory
+	baseDir, err := os.UserCacheDir()
+	if err != nil {
+		homeDir, _ := os.UserHomeDir()
+		baseDir = filepath.Join(homeDir, ".cache")
+	}
+
+	cacheDir := filepath.Join(baseDir, "repobird", "users", fmt.Sprintf("user-%d", *userID))
+	_ = os.MkdirAll(cacheDir, 0755)
+	c.cacheFile = filepath.Join(cacheDir, "file_hashes.json")
+	c.userID = userID
+
+	// Reset loaded state to force reload from new location
+	c.loaded = false
+	c.hashes = make(map[string]bool)
 }
 
 // SetAPIClient sets the API client for fetching hashes from the server
@@ -98,7 +149,9 @@ func (c *FileHashCache) SaveToFile() error {
 }
 
 // FetchFromAPI fetches all file hashes from the API and updates the cache
-func (c *FileHashCache) FetchFromAPI(ctx context.Context, apiClient interface{ GetFileHashes(context.Context) ([]models.FileHashEntry, error) }) error {
+func (c *FileHashCache) FetchFromAPI(ctx context.Context, apiClient interface {
+	GetFileHashes(context.Context) ([]models.FileHashEntry, error)
+}) error {
 	hashes, err := apiClient.GetFileHashes(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to fetch file hashes from API: %w", err)
@@ -127,7 +180,9 @@ func (c *FileHashCache) FetchFromAPI(ctx context.Context, apiClient interface{ G
 }
 
 // EnsureLoaded ensures the cache is loaded, fetching from API if necessary
-func (c *FileHashCache) EnsureLoaded(ctx context.Context, apiClient interface{ GetFileHashes(context.Context) ([]models.FileHashEntry, error) }) error {
+func (c *FileHashCache) EnsureLoaded(ctx context.Context, apiClient interface {
+	GetFileHashes(context.Context) ([]models.FileHashEntry, error)
+}) error {
 	c.mu.RLock()
 	if c.loaded {
 		c.mu.RUnlock()

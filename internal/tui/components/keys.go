@@ -77,8 +77,8 @@ var DefaultKeyMap = KeyMap{
 		key.WithHelp("esc/b", "go back"),
 	),
 	Quit: key.NewBinding(
-		key.WithKeys("q", "ctrl+c"),
-		key.WithHelp("q", "quit"),
+		key.WithKeys("q", "Q", "ctrl+c"),
+		key.WithHelp("q/Q", "quit"),
 	),
 	Help: key.NewBinding(
 		key.WithKeys("?"),

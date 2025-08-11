@@ -198,7 +198,7 @@ func SetRepositoryData(repoName string, runs []*models.RunResponse, details map[
 // BuildRepositoryOverviewFromRuns builds repository overview from run data
 func BuildRepositoryOverviewFromRuns(runs []*models.RunResponse) []models.Repository {
 	debug.LogToFilef("\n[BuildRepositoryOverviewFromRuns] Building repos from %d runs\n", len(runs))
-	
+
 	repoMap := make(map[string]*models.Repository)
 	repoIDNameMap := make(map[int]string) // Track repo ID to name mapping
 
@@ -224,7 +224,7 @@ func BuildRepositoryOverviewFromRuns(runs []*models.RunResponse) []models.Reposi
 			repoMap[repoName] = repo
 		}
 	}
-	
+
 	debug.LogToFilef("  Found %d unique repositories\n", len(repoMap))
 	for name := range repoMap {
 		debug.LogToFilef("    - '%s'\n", name)

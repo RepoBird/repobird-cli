@@ -48,7 +48,7 @@ type GlobalCache struct {
 
 	// Persistent file cache
 	persistentCache *PersistentCache
-	
+
 	// File hash cache for duplicate detection
 	fileHashCache *FileHashCache
 
@@ -84,7 +84,7 @@ func initializeCacheForUser(userID *int) {
 		detailsAt:       make(map[string]time.Time),
 		terminalDetails: make(map[string]*models.RunResponse),
 		persistentCache: pc,
-		fileHashCache:   NewFileHashCache(),
+		fileHashCache:   NewFileHashCacheForUser(userID),
 	}
 
 	// Load persisted terminal runs on startup

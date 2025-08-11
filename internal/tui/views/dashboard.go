@@ -470,26 +470,26 @@ func (d *DashboardView) selectRepository(repo *models.Repository) tea.Cmd {
 		debug.LogToFilef("\n========== REPOSITORY SELECTION ==========\n")
 		debug.LogToFilef("[selectRepository] Selecting repo: '%s'\n", repo.Name)
 		debug.LogToFilef("[selectRepository] Total runs to filter: %d\n", len(d.allRuns))
-		
+
 		// Debug: Count all runs by repository to see distribution
 		runsByRepo := make(map[string]int)
 		for _, run := range d.allRuns {
 			repoName := run.GetRepositoryName()
 			runsByRepo[repoName]++
 		}
-		
+
 		debug.LogToFilef("[selectRepository] Run distribution across repos:\n")
 		for repoName, count := range runsByRepo {
 			if count > 0 {
 				debug.LogToFilef("  '%s': %d runs\n", repoName, count)
 			}
 		}
-		
+
 		// Debug: print first few runs to see their repo names
 		debug.LogToFilef("[selectRepository] Sample runs (first 10):\n")
 		for i, run := range d.allRuns {
 			if i < 10 {
-				debug.LogToFilef("  Run[%d]: Repository='%s', RepositoryName='%s', GetRepositoryName()='%s'\n", 
+				debug.LogToFilef("  Run[%d]: Repository='%s', RepositoryName='%s', GetRepositoryName()='%s'\n",
 					i, run.Repository, run.RepositoryName, run.GetRepositoryName())
 			}
 		}
@@ -576,13 +576,13 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			debug.LogToFilef("\n[DASHBOARD DATA LOADED]\n")
 			debug.LogToFilef("  Repositories loaded: %d\n", len(msg.repositories))
 			debug.LogToFilef("  Total runs loaded: %d\n", len(msg.allRuns))
-			
+
 			// Debug: Show repository names
 			debug.LogToFilef("  Repository list:\n")
 			for i, repo := range msg.repositories {
 				debug.LogToFilef("    [%d] '%s'\n", i, repo.Name)
 			}
-			
+
 			d.repositories = msg.repositories
 			d.allRuns = msg.allRuns
 			d.lastDataRefresh = time.Now()
@@ -601,7 +601,7 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case dashboardRepositorySelectedMsg:
 		d.selectedRepo = msg.repository
 		d.filteredRuns = msg.runs
-		
+
 		debug.LogToFilef("\n[REPO SELECTED] Repository: '%s'\n", msg.repository.Name)
 		debug.LogToFilef("  Filtered runs count: %d\n", len(msg.runs))
 		if len(msg.runs) > 0 {
@@ -1580,7 +1580,7 @@ func (d *DashboardView) updateDetailLines() {
 			d.detailLines[len(d.detailLines)-1] = firstLine // Update display version
 		}
 	}
-	
+
 	// Update the details viewport with new content
 	d.updateDetailsViewportContent()
 }
@@ -1675,13 +1675,13 @@ func (d *DashboardView) updateViewportSizes() {
 	// Width accounts for: border (2) + padding (2) = 4 total
 	d.repoViewport.Width = leftWidth - 4
 	d.repoViewport.Height = viewportHeight
-	
+
 	d.runsViewport.Width = centerWidth - 4
 	d.runsViewport.Height = viewportHeight
-	
+
 	d.detailsViewport.Width = rightWidth - 4
 	d.detailsViewport.Height = viewportHeight
-	
+
 	debug.LogToFilef("updateViewportSizes: terminal=%dx%d, cols=%d/%d/%d, viewports=%d/%d/%d\n",
 		d.width, d.height, leftWidth, centerWidth, rightWidth,
 		d.repoViewport.Width, d.runsViewport.Width, d.detailsViewport.Width)
@@ -1691,10 +1691,10 @@ func (d *DashboardView) updateViewportSizes() {
 func (d *DashboardView) updateViewportContent() {
 	// Update repositories viewport
 	d.updateRepoViewportContent()
-	
+
 	// Update runs viewport
 	d.updateRunsViewportContent()
-	
+
 	// Update details viewport
 	d.updateDetailsViewportContent()
 }
@@ -1702,18 +1702,18 @@ func (d *DashboardView) updateViewportContent() {
 // updateRepoViewportContent updates the repository column viewport content
 func (d *DashboardView) updateRepoViewportContent() {
 	debug.LogToFilef("updateRepoViewportContent: Width=%d, Height=%d\n", d.repoViewport.Width, d.repoViewport.Height)
-	
+
 	var items []string
 	for i, repo := range d.repositories {
 		statusIcon := d.getRepositoryStatusIcon(&repo)
 		baseItem := fmt.Sprintf("%s %s", statusIcon, repo.Name)
-		
+
 		// Calculate actual available width for text
 		maxWidth := d.repoViewport.Width
 		if maxWidth <= 0 {
 			maxWidth = 30 // Fallback minimum
 		}
-		
+
 		// Truncate using rune-safe method BEFORE styling
 		item := baseItem
 		runes := []rune(baseItem)
@@ -1724,8 +1724,8 @@ func (d *DashboardView) updateRepoViewportContent() {
 				item = "..."
 			}
 		}
-		
-		debug.LogToFilef("Repo[%d]: original=%d runes, truncated=%d runes, width=%d\n", 
+
+		debug.LogToFilef("Repo[%d]: original=%d runes, truncated=%d runes, width=%d\n",
 			i, len([]rune(baseItem)), len([]rune(item)), maxWidth)
 
 		// Highlight selected repository
@@ -1735,7 +1735,7 @@ func (d *DashboardView) updateRepoViewportContent() {
 				if d.yankBlink && time.Since(d.yankBlinkTime) < 250*time.Millisecond {
 					// Bright green flash
 					item = lipgloss.NewStyle().
-						Width(maxWidth).  // Use Width to ensure exact width
+						Width(maxWidth). // Use Width to ensure exact width
 						MaxWidth(maxWidth).
 						Inline(true).
 						Background(lipgloss.Color("82")). // Bright green
@@ -1745,7 +1745,7 @@ func (d *DashboardView) updateRepoViewportContent() {
 				} else {
 					// Normal focused highlight
 					item = lipgloss.NewStyle().
-						Width(maxWidth).  // Use Width to ensure exact width
+						Width(maxWidth). // Use Width to ensure exact width
 						MaxWidth(maxWidth).
 						Inline(true).
 						Background(lipgloss.Color("63")).
@@ -1754,7 +1754,7 @@ func (d *DashboardView) updateRepoViewportContent() {
 				}
 			} else {
 				item = lipgloss.NewStyle().
-					Width(maxWidth).  // Use Width to ensure exact width
+					Width(maxWidth). // Use Width to ensure exact width
 					MaxWidth(maxWidth).
 					Inline(true).
 					Background(lipgloss.Color("240")).
@@ -1764,7 +1764,7 @@ func (d *DashboardView) updateRepoViewportContent() {
 		} else {
 			// Non-selected items also need width constraint
 			item = lipgloss.NewStyle().
-				Width(maxWidth).  // Use Width to ensure exact width
+				Width(maxWidth). // Use Width to ensure exact width
 				MaxWidth(maxWidth).
 				Inline(true).
 				Render(item)
@@ -1779,7 +1779,7 @@ func (d *DashboardView) updateRepoViewportContent() {
 
 	content := strings.Join(items, "\n")
 	d.repoViewport.SetContent(content)
-	
+
 	// Auto-scroll to keep selected item visible
 	d.scrollToSelected(0)
 }
@@ -1787,13 +1787,13 @@ func (d *DashboardView) updateRepoViewportContent() {
 // updateRunsViewportContent updates the runs column viewport content
 func (d *DashboardView) updateRunsViewportContent() {
 	debug.LogToFilef("updateRunsViewportContent: Width=%d, Height=%d\n", d.runsViewport.Width, d.runsViewport.Height)
-	
+
 	if d.selectedRepo != nil {
 		debug.LogToFilef("  Rendering runs for repo: '%s', count: %d\n", d.selectedRepo.Name, len(d.filteredRuns))
 	}
-	
+
 	var items []string
-	
+
 	if d.selectedRepo != nil {
 		for i, run := range d.filteredRuns {
 			statusIcon := d.getRunStatusIcon(run.Status)
@@ -1802,19 +1802,19 @@ func (d *DashboardView) updateRunsViewportContent() {
 			if title == "" {
 				title = "Untitled"
 			}
-			
+
 			// Calculate actual available width
 			maxWidth := d.runsViewport.Width
 			if maxWidth <= 0 {
 				maxWidth = 40 // Fallback minimum
 			}
-			
+
 			// Build the item with proper truncation
 			// Format: "[icon] [id] - [title]"
 			prefix := fmt.Sprintf("%s %s - ", statusIcon, runID)
 			prefixRunes := []rune(prefix)
 			prefixLen := len(prefixRunes)
-			
+
 			// Calculate remaining space for title
 			remainingWidth := maxWidth - prefixLen
 			if remainingWidth < 5 {
@@ -1828,23 +1828,23 @@ func (d *DashboardView) updateRunsViewportContent() {
 				debug.LogToFilef("Run[%d]: Truncated whole, width=%d\n", i, maxWidth)
 				continue
 			}
-			
+
 			// Truncate title to fit
 			titleRunes := []rune(title)
 			if len(titleRunes) > remainingWidth {
 				title = string(titleRunes[:remainingWidth-3]) + "..."
 			}
-			
+
 			item := prefix + title
-			
+
 			// Final safety check
 			finalRunes := []rune(item)
 			if len(finalRunes) > maxWidth {
 				item = string(finalRunes[:maxWidth-3]) + "..."
 				debug.LogToFilef("Run[%d]: Final safety truncation triggered\n", i)
 			}
-			
-			debug.LogToFilef("Run[%d]: prefix=%d, title=%d, final=%d runes, width=%d\n", 
+
+			debug.LogToFilef("Run[%d]: prefix=%d, title=%d, final=%d runes, width=%d\n",
 				i, prefixLen, len([]rune(title)), len(finalRunes), maxWidth)
 
 			// Highlight selected run
@@ -1852,7 +1852,7 @@ func (d *DashboardView) updateRunsViewportContent() {
 				if d.focusedColumn == 1 {
 					if d.yankBlink && time.Since(d.yankBlinkTime) < 250*time.Millisecond {
 						item = lipgloss.NewStyle().
-							Width(maxWidth).  // Use Width to ensure exact width
+							Width(maxWidth). // Use Width to ensure exact width
 							MaxWidth(maxWidth).
 							Inline(true).
 							Background(lipgloss.Color("82")).
@@ -1861,7 +1861,7 @@ func (d *DashboardView) updateRunsViewportContent() {
 							Render(item)
 					} else {
 						item = lipgloss.NewStyle().
-							Width(maxWidth).  // Use Width to ensure exact width
+							Width(maxWidth). // Use Width to ensure exact width
 							MaxWidth(maxWidth).
 							Inline(true).
 							Background(lipgloss.Color("63")).
@@ -1870,7 +1870,7 @@ func (d *DashboardView) updateRunsViewportContent() {
 					}
 				} else {
 					item = lipgloss.NewStyle().
-						Width(maxWidth).  // Use Width to ensure exact width
+						Width(maxWidth). // Use Width to ensure exact width
 						MaxWidth(maxWidth).
 						Inline(true).
 						Background(lipgloss.Color("240")).
@@ -1880,7 +1880,7 @@ func (d *DashboardView) updateRunsViewportContent() {
 			} else {
 				// Non-selected items also need width constraint
 				item = lipgloss.NewStyle().
-					Width(maxWidth).  // Use Width to ensure exact width
+					Width(maxWidth). // Use Width to ensure exact width
 					MaxWidth(maxWidth).
 					Inline(true).
 					Render(item)
@@ -1896,7 +1896,7 @@ func (d *DashboardView) updateRunsViewportContent() {
 
 	content := strings.Join(items, "\n")
 	d.runsViewport.SetContent(content)
-	
+
 	// Auto-scroll to keep selected item visible
 	d.scrollToSelected(1)
 }
@@ -1904,9 +1904,9 @@ func (d *DashboardView) updateRunsViewportContent() {
 // updateDetailsViewportContent updates the details column viewport content
 func (d *DashboardView) updateDetailsViewportContent() {
 	debug.LogToFilef("updateDetailsViewportContent: Width=%d, Height=%d\n", d.detailsViewport.Width, d.detailsViewport.Height)
-	
+
 	var displayLines []string
-	
+
 	if d.selectedRunData == nil {
 		displayLines = []string{"Select a run"}
 	} else {
@@ -1942,7 +1942,7 @@ func (d *DashboardView) updateDetailsViewportContent() {
 			if len(displayRunes) > contentWidth {
 				displayLine = string(displayRunes[:contentWidth-3]) + "..."
 			}
-			
+
 			// Apply width constraint using lipgloss to prevent overflow
 			styledLine := displayLine
 
@@ -1952,7 +1952,7 @@ func (d *DashboardView) updateDetailsViewportContent() {
 					if d.yankBlink {
 						// Bright green when visible
 						styledLine = lipgloss.NewStyle().
-							Width(contentWidth).  // Use Width to ensure exact width
+							Width(contentWidth). // Use Width to ensure exact width
 							MaxWidth(contentWidth).
 							Inline(true).
 							Background(lipgloss.Color("82")). // Bright green
@@ -1962,7 +1962,7 @@ func (d *DashboardView) updateDetailsViewportContent() {
 					} else {
 						// Normal highlight when "off"
 						styledLine = lipgloss.NewStyle().
-							Width(contentWidth).  // Use Width to ensure exact width
+							Width(contentWidth). // Use Width to ensure exact width
 							MaxWidth(contentWidth).
 							Inline(true).
 							Background(lipgloss.Color("63")).
@@ -1972,7 +1972,7 @@ func (d *DashboardView) updateDetailsViewportContent() {
 				} else {
 					// Regular selection highlight
 					styledLine = lipgloss.NewStyle().
-						Width(contentWidth).  // Use Width to ensure exact width
+						Width(contentWidth). // Use Width to ensure exact width
 						MaxWidth(contentWidth).
 						Inline(true).
 						Background(lipgloss.Color("63")).
@@ -1982,12 +1982,12 @@ func (d *DashboardView) updateDetailsViewportContent() {
 			} else {
 				// Non-selected items - still apply Width to prevent overflow
 				styledLine = lipgloss.NewStyle().
-					Width(contentWidth).  // Use Width to ensure exact width
+					Width(contentWidth). // Use Width to ensure exact width
 					MaxWidth(contentWidth).
 					Inline(true).
 					Render(displayLine)
 			}
-			
+
 			debug.LogToFilef("Detail[%d]: len=%d runes, width=%d\n", i, len(displayRunes), contentWidth)
 
 			displayLines = append(displayLines, styledLine)
@@ -1996,7 +1996,7 @@ func (d *DashboardView) updateDetailsViewportContent() {
 
 	content := strings.Join(displayLines, "\n")
 	d.detailsViewport.SetContent(content)
-	
+
 	// Auto-scroll to keep selected item visible
 	d.scrollToSelected(2)
 }
@@ -2005,7 +2005,7 @@ func (d *DashboardView) updateDetailsViewportContent() {
 func (d *DashboardView) scrollToSelected(column int) {
 	var selectedIdx int
 	var viewport *viewport.Model
-	
+
 	switch column {
 	case 0:
 		selectedIdx = d.selectedRepoIdx
@@ -2019,11 +2019,11 @@ func (d *DashboardView) scrollToSelected(column int) {
 	default:
 		return
 	}
-	
+
 	// Calculate if we need to scroll
 	visibleStart := viewport.YOffset
 	visibleEnd := viewport.YOffset + viewport.Height - 1
-	
+
 	if selectedIdx < visibleStart {
 		// Scroll up to show selected item
 		viewport.YOffset = selectedIdx
