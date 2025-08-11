@@ -124,6 +124,102 @@ When using the CLI's URL generation features (such as the 'o' key in the dashboa
 
 This allows developers to seamlessly work with local frontend instances while maintaining production behavior for end users.
 
+## Run Configuration Files
+
+RepoBird CLI supports two formats for defining run configurations: JSON and Markdown with YAML frontmatter. These files can be used with the `run` command or loaded through the TUI's file selector.
+
+### JSON Configuration Format
+
+Traditional JSON format for defining run configurations:
+
+```json
+{
+  "prompt": "Fix the authentication bug in the login flow",
+  "repository": "org/repo",
+  "source": "main",
+  "target": "fix/auth-bug",
+  "runType": "run",
+  "title": "Fix authentication bug",
+  "context": "Users are unable to login with valid credentials",
+  "files": ["src/auth.js", "src/login.js"]
+}
+```
+
+### Markdown Configuration Format
+
+Markdown files with YAML frontmatter provide a more readable and documented approach:
+
+```markdown
+---
+prompt: "Implement user authentication with JWT tokens"
+repository: "acme/webapp"
+source: "main"
+target: "feature/jwt-auth"
+runType: "run"
+title: "Add JWT authentication system"
+context: "Need secure authentication with JWT tokens"
+files:
+  - "src/auth/jwt.go"
+  - "src/middleware/auth.go"
+---
+
+# JWT Authentication Implementation
+
+## Overview
+Implement a secure JWT-based authentication system...
+
+## Requirements
+- User login with credentials
+- Generate access and refresh tokens
+- Implement token rotation
+
+[Additional documentation...]
+```
+
+The markdown body content is automatically appended to the `context` field, allowing for rich documentation alongside configuration.
+
+### Configuration Fields
+
+| Field | Required | Description | Default |
+|-------|----------|-------------|---------|
+| `prompt` | Yes | The task description for the AI | - |
+| `repository` | Yes | Repository in `owner/repo` format | - |
+| `source` | No | Source branch | `main` |
+| `target` | Yes | Target branch for changes | - |
+| `runType` | No | Type of run: `run`, `approval` | `run` |
+| `title` | Yes | Short title for the run | - |
+| `context` | No | Additional context for the AI | - |
+| `files` | No | List of relevant files | `[]` |
+
+### Using Configuration Files
+
+#### Command Line
+```bash
+# Run with JSON config
+repobird run config.json
+
+# Run with Markdown config
+repobird run task.md
+
+# Follow run status after creation
+repobird run task.md --follow
+```
+
+#### TUI File Selector
+In the Create Run view:
+1. Navigate to "Load Config" field
+2. Press `Enter` or `f` to open file selector
+3. Browse and select `.json`, `.md`, or `.markdown` files
+4. The form will be populated with the configuration
+
+### File Discovery
+The file selector searches for configuration files with these settings:
+- **Max depth**: 3 directories deep
+- **File types**: `.json`, `.md`, `.markdown`
+- **Ignored**: `node_modules`, `.git`, `vendor`, etc.
+- **Sorting**: By modification time (newest first)
+- **Limit**: 100 files maximum
+
 ## API Key Management
 
 ### Secure Storage Methods

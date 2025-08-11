@@ -1039,7 +1039,7 @@ func (v *CreateRunView) renderFileSelectionModal(title, statusBar string) string
 		Bold(true).
 		Foreground(lipgloss.Color("63")).
 		PaddingLeft(1).
-		Render("📄 Select JSON Config File")
+		Render("📄 Select Config File (JSON/Markdown)")
 
 	// Get file selector view
 	fileSelectorView := v.fileSelector.View()
@@ -1197,7 +1197,7 @@ func (v *CreateRunView) renderCompactForm(width, height int) string {
 		b.WriteString("   ")
 	}
 
-	loadConfigValue := "Press Enter or 'f' to select JSON file"
+	loadConfigValue := "Press Enter or 'f' to select config file"
 	if v.fileSelectorLoading {
 		loadConfigValue = "⟳ Loading file selector..."
 	} else if v.lastLoadedFile != "" {

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/repobird/repobird-cli/internal/models"
+	"github.com/repobird/repobird-cli/internal/utils"
 )
 
 // ConfigLoader handles loading and validating run configuration files
@@ -18,12 +19,51 @@ func NewConfigLoader() *ConfigLoader {
 	return &ConfigLoader{}
 }
 
-// LoadConfig loads a run configuration from a JSON file
+// LoadConfig loads a run configuration from a JSON or Markdown file
 func (c *ConfigLoader) LoadConfig(filePath string) (*models.RunRequest, error) {
 	if filePath == "" {
 		return nil, fmt.Errorf("file path is required")
 	}
 
+	// Check if it's a markdown file
+	if strings.HasSuffix(strings.ToLower(filePath), ".md") ||
+		strings.HasSuffix(strings.ToLower(filePath), ".markdown") {
+		// Parse markdown with frontmatter
+		runConfig, additionalContext, err := utils.ParseMarkdownConfig(filePath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse markdown config: %w", err)
+		}
+
+		// Convert RunConfig to RunRequest
+		runRequest := &models.RunRequest{
+			Prompt:     runConfig.Prompt,
+			Repository: runConfig.Repository,
+			Source:     runConfig.Source,
+			Target:     runConfig.Target,
+			RunType:    models.RunType(runConfig.RunType),
+			Title:      runConfig.Title,
+			Context:    runConfig.Context,
+			Files:      runConfig.Files,
+		}
+
+		// Append markdown body to context if present
+		if additionalContext != "" {
+			if runRequest.Context != "" {
+				runRequest.Context = runRequest.Context + "\n\n" + additionalContext
+			} else {
+				runRequest.Context = additionalContext
+			}
+		}
+
+		// Validate the configuration
+		if err := c.ValidateConfig(runRequest); err != nil {
+			return nil, err
+		}
+
+		return runRequest, nil
+	}
+
+	// Original JSON loading logic
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config file: %w", err)

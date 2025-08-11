@@ -45,20 +45,35 @@ func (fs *FileSelector) ActivateJSONFileSelector() error {
 		return fmt.Errorf("failed to get current directory: %w", err)
 	}
 
-	// Find JSON files
-	jsonFiles, err := utils.FindJSONFiles(currentDir)
+	// Find config files (JSON and Markdown)
+	configFiles, err := utils.FindConfigFiles(currentDir)
 	if err != nil {
-		return fmt.Errorf("failed to find JSON files: %w", err)
+		return fmt.Errorf("failed to find config files: %w", err)
 	}
 
-	// If no JSON files found, create an empty list with a helpful message
-	if len(jsonFiles) == 0 {
-		jsonFiles = []string{"📝 No .json files found - type full path"}
+	// Add file type indicators
+	var formattedFiles []string
+	for _, file := range configFiles {
+		var icon string
+		switch {
+		case strings.HasSuffix(file, ".json"):
+			icon = "📄"
+		case strings.HasSuffix(file, ".md") || strings.HasSuffix(file, ".markdown"):
+			icon = "📝"
+		default:
+			icon = "📁"
+		}
+		formattedFiles = append(formattedFiles, fmt.Sprintf("%s %s", icon, file))
+	}
+
+	// If no config files found, create an empty list with a helpful message
+	if len(formattedFiles) == 0 {
+		formattedFiles = []string{"📝 No config files (.json, .md) found - type full path"}
 	}
 
 	// Add manual entry hint at the top
 	items := []string{"📁 Browse files or type full path..."}
-	items = append(items, jsonFiles...)
+	items = append(items, formattedFiles...)
 
 	// Create and activate FZF mode
 	fs.fzfMode = NewFZFMode(items, fs.width, fs.height)
@@ -129,12 +144,14 @@ func (fs *FileSelector) Update(msg tea.Msg) (*FileSelector, tea.Cmd) {
 func (fs *FileSelector) isManualPath(input string) bool {
 	// Consider it a manual path if:
 	// 1. It contains path separators
-	// 2. It ends with .json
+	// 2. It ends with .json, .md, or .markdown
 	// 3. It starts with / or . or ~
 	// 4. It doesn't match any of the filtered items exactly
 
 	if strings.Contains(input, string(filepath.Separator)) ||
 		strings.HasSuffix(input, ".json") ||
+		strings.HasSuffix(input, ".md") ||
+		strings.HasSuffix(input, ".markdown") ||
 		strings.HasPrefix(input, "/") ||
 		strings.HasPrefix(input, "./") ||
 		strings.HasPrefix(input, "../") ||
@@ -143,7 +160,7 @@ func (fs *FileSelector) isManualPath(input string) bool {
 		if fs.fzfMode != nil {
 			for _, item := range fs.fzfMode.FilteredItems {
 				// Remove any emoji prefixes for comparison
-				cleanItem := strings.TrimSpace(strings.TrimLeft(item, "📁📝🔍"))
+				cleanItem := strings.TrimSpace(strings.TrimLeft(item, "📁📄📝🔍"))
 				if cleanItem == input {
 					return false // It matches an existing item
 				}
