@@ -170,7 +170,7 @@ func (v *CreateRunView) initializeInputFields() {
 	contextArea := textarea.New()
 	contextArea.Placeholder = "Additional context (optional, press 'c' to show/hide)..."
 	contextArea.SetWidth(60)
-	contextArea.SetHeight(3)
+	contextArea.SetHeight(1) // Default to 1 line, but allows multiline input
 	contextArea.CharLimit = 2000
 
 	filePathInput := textinput.New()
@@ -299,7 +299,7 @@ func (v *CreateRunView) handleWindowSizeMsg(msg tea.WindowSizeMsg) {
 	if !v.promptCollapsed {
 		v.promptArea.SetHeight(5)
 	}
-	v.contextArea.SetHeight(3)
+	v.contextArea.SetHeight(1) // Default to 1 line, but allows multiline input
 }
 
 // handleInsertMode handles keyboard input in insert mode
@@ -342,8 +342,8 @@ func (v *CreateRunView) handleInsertMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return v, v.submitRun()
 		}
 	case msg.String() == "enter":
-		// For prompt area (index 2) or context area, allow Enter for newlines
-		if v.focusIndex == 2 || (v.showContext && v.focusIndex == len(v.fields)+2) {
+		// For prompt area (index 3) or context area, allow Enter for newlines
+		if v.focusIndex == 3 || (v.showContext && v.focusIndex == len(v.fields)+3) {
 			// Handle text input for prompt/context areas - Enter creates newlines
 			cmds = append(cmds, v.updateFields(msg)...)
 		} else {

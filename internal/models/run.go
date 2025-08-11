@@ -3,6 +3,7 @@ package models
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"strconv"
 	"time"
 )
@@ -35,6 +36,18 @@ type RunRequest struct {
 	Title      string   `json:"title,omitempty"`
 	Context    string   `json:"context,omitempty"`
 	Files      []string `json:"files,omitempty"`
+}
+
+// RunConfig is a unified configuration structure for both JSON and Markdown configs
+type RunConfig struct {
+	Prompt     string   `json:"prompt" yaml:"prompt"`
+	Repository string   `json:"repository" yaml:"repository"`
+	Source     string   `json:"source" yaml:"source"`
+	Target     string   `json:"target" yaml:"target"`
+	RunType    string   `json:"runType" yaml:"runType"`
+	Title      string   `json:"title,omitempty" yaml:"title,omitempty"`
+	Context    string   `json:"context,omitempty" yaml:"context,omitempty"`
+	Files      []string `json:"files,omitempty" yaml:"files,omitempty"`
 }
 
 // APIRunRequest is the structure that matches the actual API expectations
@@ -156,4 +169,30 @@ type PaginationMetadata struct {
 	CurrentPage int `json:"currentPage"`
 	Total       int `json:"total"`
 	TotalPages  int `json:"totalPages"`
+}
+
+// LoadRunConfigFromFile loads a RunConfig from a JSON file
+func LoadRunConfigFromFile(filepath string) (*RunConfig, error) {
+	file, err := os.Open(filepath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open file: %w", err)
+	}
+	defer file.Close()
+
+	var runReq RunRequest
+	if err := json.NewDecoder(file).Decode(&runReq); err != nil {
+		return nil, fmt.Errorf("failed to parse JSON: %w", err)
+	}
+
+	// Convert RunRequest to RunConfig
+	return &RunConfig{
+		Prompt:     runReq.Prompt,
+		Repository: runReq.Repository,
+		Source:     runReq.Source,
+		Target:     runReq.Target,
+		RunType:    string(runReq.RunType),
+		Title:      runReq.Title,
+		Context:    runReq.Context,
+		Files:      runReq.Files,
+	}, nil
 }

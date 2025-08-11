@@ -66,4 +66,9 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect - YAML parsing and serialization (config and test files)
 )
 
-require github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
+require (
+	github.com/BurntSushi/toml v0.3.1 // indirect
+	github.com/adrg/frontmatter v0.2.0 // indirect
+	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
+	gopkg.in/yaml.v2 v2.3.0 // indirect
+)
