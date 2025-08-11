@@ -19,7 +19,7 @@ This document outlines the tasks needed to implement a unified global status lin
 - Uses custom `renderStatusLine()` method instead of StatusLine component
 - Does NOT show status line during initial loading state
 - Has complex temporary message handling with `statusMessage` and `statusMessageTime`
-- Uses notification line above status line for some feedback
+- Has complex temporary message handling approach
 - Inconsistent with other views' approach
 
 **Current Status Line Logic:**
@@ -159,7 +159,7 @@ type TemporaryMessage struct {
 - Remove custom `renderStatusLine()` method
 - Remove `statusMessage`, `statusMessageTime` fields
 - Remove `clearStatusMessageMsg` type and timer
-- Remove notification line rendering for status messages
+- Migrate to unified temporary message system
 
 #### Task 3.2: Integrate with StatusLine Component
 **File**: `/internal/tui/views/dashboard.go`
@@ -198,14 +198,14 @@ func (m DashboardView) renderStatusLine() string {
 #### Task 4.1: Update URL Opening Feedback
 **Files**: All view files using URL opening
 **Changes:**
-- Replace notification line messages with temporary status messages
+- Use consistent temporary status messages
 - Use consistent green color for success messages
 - Maintain 3-second duration
 
 #### Task 4.2: Update Copy Feedback  
 **Files**: All view files using copy functionality
 **Changes:**
-- Replace notification line messages with temporary status messages
+- Use consistent temporary status messages
 - Use consistent color scheme
 - Standardize message text
 
@@ -248,7 +248,7 @@ func (m DashboardView) renderStatusLine() string {
 #### Task 6.2: Test Message Systems
 **Verification Needed:**
 - Temporary messages work correctly across all views
-- No double status lines appear
+- Status line remains consistent and stable
 - Message colors are consistent
 - Message timing (3 seconds) works properly
 
@@ -268,7 +268,7 @@ func (m DashboardView) renderStatusLine() string {
 
 #### Task 7.2: Remove Dead Code
 **Files to Clean:**
-- Remove any unused notification line code
+- Remove any duplicate status line code
 - Remove duplicate status line logic
 - Clean up imports
 
@@ -278,7 +278,7 @@ func (m DashboardView) renderStatusLine() string {
 These tasks fix the immediate issues:
 1. Enhanced StatusLine component with temporary messages
 2. Dashboard view integration (fixes loading state issue)
-3. Remove double status line problems
+3. Standardize message handling across views
 
 ### Medium Priority (Phase 4-5)  
 These tasks ensure consistency:

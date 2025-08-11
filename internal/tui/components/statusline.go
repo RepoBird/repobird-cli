@@ -3,18 +3,33 @@ package components
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/lipgloss"
 )
 
+// MessageType represents different types of temporary messages
+type MessageType int
+
+const (
+	MessageSuccess MessageType = iota
+	MessageError
+	MessageInfo
+	MessageWarning
+)
+
 // StatusLine represents a universal status line component
 type StatusLine struct {
-	width        int
-	leftContent  string
-	rightContent string
-	helpContent  string
-	style        lipgloss.Style
-	helpStyle    lipgloss.Style
+	width               int
+	leftContent         string
+	rightContent        string
+	helpContent         string
+	style               lipgloss.Style
+	helpStyle           lipgloss.Style
+	tempMessage         string
+	tempMessageTime     time.Time
+	tempMessageDuration time.Duration
+	tempMessageColor    lipgloss.Color
 }
 
 // NewStatusLine creates a new status line component
@@ -59,10 +74,78 @@ func (s *StatusLine) SetStyle(style lipgloss.Style) *StatusLine {
 	return s
 }
 
+// SetTemporaryMessage sets a temporary message with color and duration
+func (s *StatusLine) SetTemporaryMessage(message string, color lipgloss.Color, duration time.Duration) *StatusLine {
+	s.tempMessage = message
+	s.tempMessageTime = time.Now()
+	s.tempMessageDuration = duration
+	s.tempMessageColor = color
+	return s
+}
+
+// SetTemporaryMessageWithType sets a temporary message with predefined color for message type
+func (s *StatusLine) SetTemporaryMessageWithType(message string, msgType MessageType, duration time.Duration) *StatusLine {
+	color := GetMessageColor(msgType)
+	return s.SetTemporaryMessage(message, color, duration)
+}
+
+// GetMessageColor returns the color for a given message type
+func GetMessageColor(msgType MessageType) lipgloss.Color {
+	switch msgType {
+	case MessageSuccess:
+		return lipgloss.Color("46") // Green
+	case MessageError:
+		return lipgloss.Color("196") // Red
+	case MessageInfo:
+		return lipgloss.Color("33") // Blue
+	case MessageWarning:
+		return lipgloss.Color("226") // Yellow
+	default:
+		return lipgloss.Color("252") // Default
+	}
+}
+
+// HasActiveMessage returns true if there's an active temporary message
+func (s *StatusLine) HasActiveMessage() bool {
+	if s.tempMessage == "" {
+		return false
+	}
+	return time.Since(s.tempMessageTime) < s.tempMessageDuration
+}
+
 // Render renders the status line
 func (s *StatusLine) Render() string {
 	if s.width <= 0 {
 		return ""
+	}
+
+	// Check for active temporary message
+	if s.HasActiveMessage() {
+		// Create temporary message style
+		tempStyle := lipgloss.NewStyle().
+			Background(s.tempMessageColor).
+			Foreground(lipgloss.Color("255")).
+			Padding(0, 1)
+
+		// For temporary messages, show the message in the help area
+		// Keep left content for context
+		statusContent := fmt.Sprintf("%s  %s",
+			s.leftContent,
+			s.tempMessage)
+
+		// Pad to full width
+		contentWidth := lipgloss.Width(statusContent)
+		if contentWidth < s.width {
+			statusContent += strings.Repeat(" ", s.width-contentWidth)
+		} else if contentWidth > s.width {
+			statusContent = truncateWithEllipsis(statusContent, s.width)
+		}
+
+		return tempStyle.
+			Width(s.width).
+			MaxWidth(s.width).
+			MaxHeight(1).
+			Render(statusContent)
 	}
 
 	// Truncate individual parts if they're too long

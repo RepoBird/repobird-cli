@@ -73,7 +73,8 @@ type DashboardView struct {
 	// Clipboard feedback
 	copiedMessage     string
 	copiedMessageTime time.Time
-	yankBlink         bool // Toggle for blinking effect
+	yankBlink         bool      // Toggle for blinking effect
+	yankBlinkTime     time.Time // Time when blink started (separate from message timing)
 
 	// Temporary status line messages (for URL opening, etc.)
 	statusMessage     string
@@ -898,7 +899,12 @@ func (d *DashboardView) handleMillerColumnsNavigation(msg tea.KeyMsg) tea.Cmd {
 				d.statusMessage = "✗ Failed to copy"
 			}
 			d.statusMessageTime = time.Now()
-			return d.startClearStatusMessageTimer()
+			d.yankBlink = true
+			d.yankBlinkTime = time.Now()
+			return tea.Batch(
+				d.startYankBlinkAnimation(),
+				d.startClearStatusMessageTimer(),
+			)
 		}
 
 	case msg.Type == tea.KeyRunes && string(msg.Runes) == "o":
@@ -1344,8 +1350,8 @@ func (d *DashboardView) copyToClipboard(text string) error {
 // startYankBlinkAnimation starts the single blink animation for clipboard feedback
 func (d *DashboardView) startYankBlinkAnimation() tea.Cmd {
 	return func() tea.Msg {
-		// Single blink duration - quick flash (100ms)
-		time.Sleep(100 * time.Millisecond)
+		// Single blink duration - visible flash (150ms)
+		time.Sleep(150 * time.Millisecond)
 		return yankBlinkMsg{}
 	}
 }
@@ -1353,7 +1359,7 @@ func (d *DashboardView) startYankBlinkAnimation() tea.Cmd {
 // startClearStatusTimer starts a timer to clear the status message
 func (d *DashboardView) startClearStatusTimer() tea.Cmd {
 	return func() tea.Msg {
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(250 * time.Millisecond)
 		return clearStatusMsg{}
 	}
 }
@@ -1437,7 +1443,7 @@ func (d *DashboardView) renderRepositoriesColumn(width, height int) string {
 		if i == d.selectedRepoIdx {
 			if d.focusedColumn == 0 {
 				// Single blink: bright green briefly when yankBlink is true
-				if d.yankBlink && d.copiedMessage != "" {
+				if d.yankBlink && time.Since(d.yankBlinkTime) < 250*time.Millisecond {
 					// Bright green flash
 					item = lipgloss.NewStyle().
 						Width(width).
@@ -1523,7 +1529,7 @@ func (d *DashboardView) renderRunsColumn(width, height int) string {
 			if i == d.selectedRunIdx {
 				if d.focusedColumn == 1 {
 					// Custom blinking: toggle between bright and normal colors
-					if d.copiedMessage != "" && time.Since(d.copiedMessageTime) < 500*time.Millisecond {
+					if d.yankBlink && time.Since(d.yankBlinkTime) < 250*time.Millisecond {
 						if d.yankBlink {
 							// Bright green when visible
 							item = lipgloss.NewStyle().
@@ -1635,7 +1641,7 @@ func (d *DashboardView) renderDetailsColumn(width, height int) string {
 
 			if d.focusedColumn == 2 && i == d.selectedDetailLine {
 				// Custom blinking: toggle between bright and normal colors
-				if d.copiedMessage != "" && time.Since(d.copiedMessageTime) < 2*time.Second {
+				if d.copiedMessage != "" && time.Since(d.copiedMessageTime) < 250*time.Millisecond {
 					if d.yankBlink {
 						// Bright green when visible
 						styledLine = lipgloss.NewStyle().
@@ -1951,7 +1957,7 @@ func (d *DashboardView) renderStatusInfo() string {
 		if isField && fieldIdx < len(d.statusInfoFieldLines) && lineNum == d.statusInfoFieldLines[fieldIdx] {
 			if fieldIdx == d.statusInfoSelectedRow {
 				// Custom blinking: toggle between bright and normal colors
-				if d.copiedMessage != "" && time.Since(d.copiedMessageTime) < 2*time.Second {
+				if d.copiedMessage != "" && time.Since(d.copiedMessageTime) < 250*time.Millisecond {
 					if d.yankBlink {
 						// Bright green when visible
 						highlightStyle := lipgloss.NewStyle().
@@ -2219,7 +2225,7 @@ func (d *DashboardView) renderStatusInfo() string {
 	shortHelp := "[j/k]navigate [y]copy [s/q/b/ESC]back [Q]uit"
 
 	// Show copied message prominently if recent
-	if d.copiedMessage != "" && time.Since(d.copiedMessageTime) < 500*time.Millisecond {
+	if d.copiedMessage != "" && time.Since(d.copiedMessageTime) < 250*time.Millisecond {
 		// Use the renderStatusLine method which handles copied messages
 		statusLine = d.renderStatusLine("STATUS")
 	} else {
@@ -2381,12 +2387,12 @@ func (d *DashboardView) renderNotificationLine() string {
 		return ""
 	}
 
-	if d.copiedMessage == "" || time.Since(d.copiedMessageTime) >= 500*time.Millisecond {
+	if d.copiedMessage == "" || time.Since(d.copiedMessageTime) >= 250*time.Millisecond {
 		return ""
 	}
 
 	var notificationStyle lipgloss.Style
-	if time.Since(d.copiedMessageTime) < 500*time.Millisecond {
+	if time.Since(d.copiedMessageTime) < 250*time.Millisecond {
 		if d.yankBlink {
 			// Bright and bold when visible
 			notificationStyle = lipgloss.NewStyle().
