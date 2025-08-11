@@ -19,7 +19,7 @@ require (
 	github.com/atotto/clipboard v0.1.4 // indirect - Cross-platform clipboard access (used by Bubble Tea for copy/paste)
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect - OSC52 terminal clipboard protocol support
 	github.com/charmbracelet/colorprofile v0.2.3-0.20250311203215-f60798e515dc // indirect - Terminal color capability detection
-	github.com/charmbracelet/x/ansi v0.9.3 // indirect - ANSI escape sequence utilities for Bubble Tea
+	github.com/charmbracelet/x/ansi v0.10.1 // indirect - ANSI escape sequence utilities for Bubble Tea
 	github.com/charmbracelet/x/cellbuf v0.0.13-0.20250311204145-2c3ea96c31dd // indirect - Cell buffer management for terminal rendering
 	github.com/charmbracelet/x/term v0.2.1 // indirect - Terminal utilities for Bubble Tea framework
 	github.com/cpuguy83/go-md2man/v2 v2.0.6 // indirect - Markdown to man page conversion (Cobra dependency)

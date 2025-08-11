@@ -112,7 +112,7 @@ func NewCreateRunViewWithConfig(cfg CreateRunViewConfig) *CreateRunView {
 		parentDetailsCache: cfg.ParentDetailsCache,
 		statusLine:         components.NewStatusLine(),
 		configLoader:       config.NewConfigLoader(),
-		fileSelector:       components.NewFileSelector(80, 10), // Default dimensions
+		fileSelector:       components.NewFileSelector(80, 10),       // Default dimensions
 		configFileSelector: components.NewConfigFileSelector(80, 20), // Enhanced selector with preview
 	}
 

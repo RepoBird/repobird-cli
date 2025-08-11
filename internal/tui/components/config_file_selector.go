@@ -11,6 +11,7 @@ import (
 	"github.com/alecthomas/chroma/v2/styles"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/repobird/repobird-cli/internal/utils"
 	"github.com/sahilm/fuzzy"
 )
@@ -197,13 +198,19 @@ func (cfs *ConfigFileSelector) updatePreview() {
 		return
 	}
 
-	// For now, just use plain text to avoid ANSI issues
-	// TODO: Implement proper ANSI-aware rendering
-	cfs.previewContent = string(content)
+	// Apply syntax highlighting
+	highlightedContent, err := highlightConfigFile(string(content), filePath)
+	if err != nil {
+		// Fall back to plain text if highlighting fails
+		cfs.previewContent = string(content)
+	} else {
+		cfs.previewContent = highlightedContent
+	}
 	cfs.previewOffset = 0
 }
 
 func highlightConfigFile(code, filename string) (string, error) {
+	// Try to match lexer by filename first
 	lexer := lexers.Match(filename)
 	if lexer == nil {
 		// Try to determine lexer by extension
@@ -216,25 +223,37 @@ func highlightConfigFile(code, filename string) (string, error) {
 		case ".md", ".markdown":
 			lexer = lexers.Get("markdown")
 		default:
-			lexer = lexers.Fallback
+			// Try to analyze the content
+			lexer = lexers.Analyse(code)
+			if lexer == nil {
+				lexer = lexers.Fallback
+			}
 		}
 	}
 
+	// Use a terminal-friendly style
 	style := styles.Get("monokai")
 	if style == nil {
 		style = styles.Fallback
 	}
 
-	formatter := formatters.Get("terminal256")
+	// Use terminal formatter for ANSI color output
+	formatter := formatters.Get("terminal")
 	if formatter == nil {
-		formatter = formatters.Fallback
+		// Try terminal256 as fallback
+		formatter = formatters.Get("terminal256")
+		if formatter == nil {
+			formatter = formatters.Fallback
+		}
 	}
 
+	// Tokenize the code
 	iterator, err := lexer.Tokenise(nil, code)
 	if err != nil {
 		return code, err
 	}
 
+	// Format with colors
 	var buf strings.Builder
 	err = formatter.Format(&buf, style, iterator)
 	if err != nil {
@@ -268,20 +287,19 @@ func (cfs *ConfigFileSelector) View() string {
 		Bold(true)
 
 	// Use full terminal dimensions
-	// Status bar takes 1 line at bottom
-	availableHeight := cfs.height - 1
+	// Status bar takes 1 line at bottom, 2 lines at top for border visibility
+	availableHeight := cfs.height - 3
 	if availableHeight < 10 {
 		availableHeight = 10
 	}
-	
-	// Calculate box dimensions - boxes should fill available height
-	// Subtract 2 for the border characters that will be added
-	boxHeight := availableHeight - 2
-	
+
+	// Box height is the available height
+	boxHeight := availableHeight
+
 	// Account for border expansion: each box renders 2 chars wider than set width
 	// So we need to subtract 4 total (2 per box) from terminal width
 	totalWidth := cfs.width - 4
-	
+
 	// Split width between list and preview (40/60 split favoring preview)
 	// No gap between panes to maximize space usage
 	listWidth := int(float64(totalWidth) * 0.4)
@@ -292,17 +310,17 @@ func (cfs *ConfigFileSelector) View() string {
 		listWidth = 50
 	}
 	previewWidth := totalWidth - listWidth
-	
+
 	// Content height inside boxes (account for borders and headers)
-	// The box content area is boxHeight - 2 (for top/bottom borders)
+	// boxHeight includes the borders, so content is boxHeight - 2
 	contentHeight := boxHeight - 2
-	// Reserve space for header and spacing
-	listContentHeight := contentHeight - 2 // Header + filter line
-	previewContentHeight := contentHeight - 1 // Just header
+	// Reserve space for header and filter in list, just header in preview
+	listContentHeight := contentHeight - 3    // Header + filter line + spacing
+	previewContentHeight := contentHeight - 2 // Header + spacing
 
 	// Build file list content
 	var fileListContent []string
-	
+
 	// Add filter line
 	filterLine := fmt.Sprintf("Filter: %s", cfs.filterInput)
 	if len(filterLine) > listWidth-4 {
@@ -327,7 +345,7 @@ func (cfs *ConfigFileSelector) View() string {
 
 		for i := startIdx; i < endIdx; i++ {
 			file := cfs.filteredFiles[i]
-			
+
 			// Add icon based on file type
 			var icon string
 			switch {
@@ -340,18 +358,18 @@ func (cfs *ConfigFileSelector) View() string {
 			default:
 				icon = "📁 "
 			}
-			
+
 			// Use base name for display
 			displayName := filepath.Base(file)
-			
+
 			// Truncate if too long (account for icon)
 			maxNameLen := listWidth - 6 - len(icon)
 			if len(displayName) > maxNameLen {
 				displayName = displayName[:maxNameLen-3] + "..."
 			}
-			
+
 			line := icon + displayName
-			
+
 			if i == cfs.selectedIndex {
 				fileListContent = append(fileListContent, selectedStyle.Render(line))
 			} else {
@@ -367,7 +385,7 @@ func (cfs *ConfigFileSelector) View() string {
 
 	// Build preview content
 	var previewContent []string
-	
+
 	if len(cfs.filteredFiles) > 0 && cfs.selectedIndex < len(cfs.filteredFiles) {
 		lines := strings.Split(cfs.previewContent, "\n")
 		previewStart := cfs.previewOffset
@@ -377,33 +395,34 @@ func (cfs *ConfigFileSelector) View() string {
 		if previewStart >= len(lines) {
 			previewStart = max(0, len(lines)-1)
 		}
-		
+
 		for i := 0; i < previewContentHeight && previewStart+i < len(lines); i++ {
 			lineIdx := previewStart + i
 			if lineIdx >= len(lines) {
 				break
 			}
-			
+
 			line := lines[lineIdx]
-			
+
 			// Replace tabs with spaces for consistent display
 			line = strings.ReplaceAll(line, "\t", "    ")
-			
+
 			// Truncate long lines - ensure we don't exceed bounds
-			maxLineLen := previewWidth - 6
-			if maxLineLen < 10 {
-				maxLineLen = 10
+			// Use ANSI-aware truncation to preserve color codes
+			// Account for box borders (2 chars) and minimal padding (2 chars)
+			maxLineLen := previewWidth - 4
+			if maxLineLen < 20 {
+				maxLineLen = 20
 			}
-			
-			// Handle rune-safe truncation
-			runes := []rune(line)
-			if len(runes) > maxLineLen {
-				line = string(runes[:maxLineLen-3]) + "..."
+
+			// Use ANSI-aware width calculation and truncation
+			if ansi.StringWidth(line) > maxLineLen {
+				line = ansi.Truncate(line, maxLineLen, "...")
 			}
-			
+
 			previewContent = append(previewContent, line)
 		}
-		
+
 		// If no content was added, show placeholder
 		if len(previewContent) == 0 {
 			previewContent = append(previewContent, "")
@@ -440,6 +459,11 @@ func (cfs *ConfigFileSelector) View() string {
 	// Combine both panes horizontally - no gap between them
 	splitView := lipgloss.JoinHorizontal(lipgloss.Top, fileListBox, previewBox)
 
+	// Add top margin to ensure borders are fully visible
+	contentWithMargin := lipgloss.NewStyle().
+		MarginTop(2).
+		Render(splitView)
+
 	// Status bar at the bottom (full width, like other views)
 	statusBarStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("240")).
@@ -447,32 +471,18 @@ func (cfs *ConfigFileSelector) View() string {
 		Width(cfs.width).
 		Padding(0, 1).
 		Height(1)
-	
-	// Add selected file info to status
-	selectedInfo := ""
-	if len(cfs.filteredFiles) > 0 && cfs.selectedIndex < len(cfs.filteredFiles) {
-		selectedFile := cfs.filteredFiles[cfs.selectedIndex]
-		selectedInfo = fmt.Sprintf(" | Selected: %s", filepath.Base(selectedFile))
-	}
-	
-	statusText := fmt.Sprintf("↑↓/jk: nav • Enter: select • ESC: cancel • Type: filter%s", selectedInfo)
+
+	statusText := "↑↓/jk: nav • Enter: select • ESC: cancel • Type: filter"
 	statusBar := statusBarStyle.Render(statusText)
 
 	// Join content and status bar vertically - content aligned to top
 	fullView := lipgloss.JoinVertical(
 		lipgloss.Left,
-		splitView,
+		contentWithMargin,
 		statusBar,
 	)
 
 	return fullView
-}
-
-// stripANSI removes ANSI escape codes from a string
-func stripANSI(str string) string {
-	// For now, just return the original string since we're using plain text
-	// This avoids any issues with ANSI code handling
-	return str
 }
 
 // GetSelectedFile returns the currently selected file
