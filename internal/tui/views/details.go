@@ -541,63 +541,118 @@ func (v *RunDetailsView) View() string {
 	}
 
 	// For very small terminals, render minimal content
-	if v.height < 3 || v.width < 10 {
+	if v.height < 5 || v.width < 20 {
 		return "Run ID: " + v.run.GetIDString()
 	}
 
-	// Pre-allocate array for exactly terminal height lines
-	lines := make([]string, v.height)
-	lineIdx := 0
+	// Calculate box dimensions - leave room for statusline at bottom
+	boxWidth := v.width - 4   // Leave 2 chars margin on each side
+	boxHeight := v.height - 2 // Leave room for statusline at bottom
 
-	// Header
-	header := v.renderHeader()
-	if lineIdx < len(lines) {
-		lines[lineIdx] = header
-		lineIdx++
+	if boxWidth < 10 {
+		boxWidth = 10
+	}
+	if boxHeight < 3 {
+		boxHeight = 3
 	}
 
-	// Separator line
-	if lineIdx < len(lines) {
-		separatorWidth := v.width
-		if separatorWidth > 80 {
-			separatorWidth = 80 // Reasonable max width
+	// Box style with rounded border
+	boxStyle := lipgloss.NewStyle().
+		Width(boxWidth).
+		Height(boxHeight).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("63"))
+
+	// Title bar (inside the box)
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("255")).
+		Background(lipgloss.Color("63")).
+		Width(boxWidth-2). // Account for border
+		Align(lipgloss.Center).
+		Padding(0, 1)
+
+	// Create title with status
+	statusIcon := styles.GetStatusIcon(string(v.run.Status))
+	idStr := v.run.GetIDString()
+	if len(idStr) > 8 {
+		idStr = idStr[:8]
+	}
+	titleText := fmt.Sprintf("Run #%s", idStr)
+	if v.run.Title != "" {
+		maxTitleLen := boxWidth - 20 // Leave room for status and padding
+		if maxTitleLen > 0 && len(v.run.Title) > maxTitleLen {
+			titleText += " - " + v.run.Title[:maxTitleLen] + "..."
+		} else {
+			titleText += " - " + v.run.Title
 		}
-		lines[lineIdx] = strings.Repeat("─", separatorWidth)
-		lineIdx++
+	}
+	titleText = fmt.Sprintf("%s %s %s", statusIcon, titleText, string(v.run.Status))
+
+	// Add polling indicator if active
+	if models.IsActiveStatus(string(v.run.Status)) {
+		if v.pollingStatus {
+			titleText += " [Fetching... " + v.spinner.View() + "]"
+		} else {
+			titleText += " [Monitoring ⟳]"
+		}
 	}
 
-	// Content area
+	title := titleStyle.Render(titleText)
+
+	// Content area height (subtract title height from box interior)
+	contentHeight := boxHeight - 3 // 1 for title, 2 for borders
+
+	// Create viewport content
+	var innerContent string
 	if v.loading {
-		if lineIdx < len(lines) {
-			lines[lineIdx] = v.spinner.View() + " Loading run details..."
-			lineIdx++
-		}
+		// Center loading message
+		loadingText := v.spinner.View() + " Loading run details..."
+		loadingStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("63")).
+			Bold(true).
+			Width(boxWidth-2).
+			Height(contentHeight).
+			Align(lipgloss.Center, lipgloss.Center)
+		innerContent = lipgloss.JoinVertical(lipgloss.Left, title, loadingStyle.Render(loadingText))
 	} else if v.error != nil {
-		if lineIdx < len(lines) {
-			lines[lineIdx] = styles.ErrorStyle.Render("Error: " + v.error.Error())
-			lineIdx++
-		}
+		// Show error
+		errorText := "Error: " + v.error.Error()
+		errorStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("196")).
+			Width(boxWidth-2).
+			Height(contentHeight).
+			Padding(1, 2)
+		innerContent = lipgloss.JoinVertical(lipgloss.Left, title, errorStyle.Render(errorText))
 	} else {
-		// Render content with visible cursor selection
+		// Render content with scrollable viewport
+		v.viewport.Width = boxWidth - 4 // Account for border and padding
+		v.viewport.Height = contentHeight
+
+		// Get content with highlighting
 		contentLines := v.renderContentWithCursor()
-		for _, line := range contentLines {
-			if lineIdx < len(lines)-1 { // Leave room for status bar
-				lines[lineIdx] = line
-				lineIdx++
-			}
-		}
+		content := strings.Join(contentLines, "\n")
+
+		// Apply padding to content
+		contentStyle := lipgloss.NewStyle().
+			Width(boxWidth-2).
+			Height(contentHeight).
+			Padding(0, 1)
+
+		innerContent = lipgloss.JoinVertical(lipgloss.Left, title, contentStyle.Render(content))
 	}
 
-	// Help has been moved to docs view
+	// Wrap in the box
+	boxedContent := boxStyle.Render(innerContent)
 
-	// Status bar always goes in the last line
-	if len(lines) > 0 {
-		lines[len(lines)-1] = v.renderStatusBar()
-	}
+	// Center the box on screen (leaving room for statusline)
+	centeredBox := lipgloss.Place(v.width, v.height-1, lipgloss.Center, lipgloss.Center, boxedContent)
 
-	// Join all lines with newlines
-	// This creates exactly height-1 newlines, which is correct
-	return strings.Join(lines, "\n")
+	// Create the statusline
+	statusLine := v.renderStatusBar()
+
+	// Join the centered box and statusline
+	return lipgloss.JoinVertical(lipgloss.Left, centeredBox, statusLine)
 }
 
 // renderContentWithCursor renders the content with a visible row selector
@@ -624,8 +679,19 @@ func (v *RunDetailsView) renderContentWithCursor() []string {
 
 	// Determine which lines are visible
 	visibleLines := []string{}
+	contentWidth := v.viewport.Width
+	if contentWidth <= 0 {
+		contentWidth = v.width - 6 // Account for box borders and padding
+	}
+
 	for i := viewportOffset; i < len(allLines) && i < viewportOffset+viewportHeight; i++ {
 		line := allLines[i]
+
+		// Truncate line if too long
+		lineRunes := []rune(line)
+		if len(lineRunes) > contentWidth {
+			line = string(lineRunes[:contentWidth-3]) + "..."
+		}
 
 		// Check if this line should be highlighted
 		shouldHighlight := false
@@ -637,28 +703,37 @@ func (v *RunDetailsView) renderContentWithCursor() []string {
 		}
 
 		if shouldHighlight {
-			// Apply highlight style
-			// Single blink: bright green briefly when yankBlink is true
+			// Apply highlight style similar to dashboard
 			var highlightedLine string
-			if v.yankBlink && !v.yankBlinkTime.IsZero() && time.Since(v.yankBlinkTime) < 2*time.Second {
-				// Bright green flash
+			if v.yankBlink && !v.yankBlinkTime.IsZero() && time.Since(v.yankBlinkTime) < 250*time.Millisecond {
+				// Bright green flash for copy feedback
 				highlightStyle := lipgloss.NewStyle().
 					Background(lipgloss.Color("82")). // Bright green
 					Foreground(lipgloss.Color("0")).  // Black text
 					Bold(true).
-					Width(v.width)
+					Width(contentWidth).
+					MaxWidth(contentWidth).
+					Inline(true)
 				highlightedLine = highlightStyle.Render(line)
 			} else {
-				// Normal focused highlight
+				// Normal focused highlight (matching dashboard style)
 				highlightStyle := lipgloss.NewStyle().
 					Background(lipgloss.Color("63")).
 					Foreground(lipgloss.Color("255")).
-					Width(v.width)
+					Width(contentWidth).
+					MaxWidth(contentWidth).
+					Inline(true)
 				highlightedLine = highlightStyle.Render(line)
 			}
 			visibleLines = append(visibleLines, highlightedLine)
 		} else {
-			visibleLines = append(visibleLines, line)
+			// Non-selected lines with width constraint
+			styledLine := lipgloss.NewStyle().
+				Width(contentWidth).
+				MaxWidth(contentWidth).
+				Inline(true).
+				Render(line)
+			visibleLines = append(visibleLines, styledLine)
 		}
 	}
 
@@ -719,18 +794,19 @@ func (v *RunDetailsView) hasCurrentSelectionURL() bool {
 }
 
 func (v *RunDetailsView) renderStatusBar() string {
-	options := "[q]back [l]ogs [j/k]navigate [y]copy field [Y]copy all [r]efresh [?]help [Q]uit"
+	// Shorter options to fit better
+	options := "q:back l:logs j/k:nav y:copy Y:all r:refresh ?:help Q:quit"
 
 	if v.showLogs {
-		options = "[q]back [l]details [j/k]navigate [y]copy field [Y]copy all [r]efresh [?]help [Q]uit"
+		options = "q:back l:details j/k:nav y:copy Y:all r:refresh ?:help Q:quit"
 	}
 
 	// Add URL opening hint if current selection has a URL
 	if v.hasCurrentSelectionURL() {
 		if v.showLogs {
-			options = "[o]open-url [q]back [l]details [j/k]navigate [y]copy field [Y]copy all [r]efresh [?]help [Q]uit"
+			options = "o:url q:back l:details j/k:nav y:copy Y:all r:refresh ?:help Q:quit"
 		} else {
-			options = "[o]open-url [q]back [l]ogs [j/k]navigate [y]copy field [Y]copy all [r]efresh [?]help [Q]uit"
+			options = "o:url q:back l:logs j/k:nav y:copy Y:all r:refresh ?:help Q:quit"
 		}
 	}
 

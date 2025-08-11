@@ -803,6 +803,28 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			createView.width = d.width
 			createView.height = d.height
 			return createView, nil
+		case key.Matches(msg, d.keys.Enter) && d.currentLayout == models.LayoutTripleColumn && d.focusedColumn == 2 && d.selectedRunData != nil:
+			// If we're in the details column (column 2) in the triple column layout, open the full details view
+			// Convert []*models.RunResponse to []models.RunResponse
+			runs := make([]models.RunResponse, len(d.allRuns))
+			for i, run := range d.allRuns {
+				if run != nil {
+					runs[i] = *run
+				}
+			}
+
+			// Open full details view for the selected run
+			detailsView := NewRunDetailsViewWithCacheAndDimensions(
+				d.client,
+				*d.selectedRunData,
+				runs,
+				true, // cached
+				d.lastDataRefresh,
+				nil, // No details cache for now
+				d.width,
+				d.height,
+			)
+			return detailsView, detailsView.Init()
 		case key.Matches(msg, d.keys.LayoutSwitch):
 			d.cycleLayout()
 			return d, nil

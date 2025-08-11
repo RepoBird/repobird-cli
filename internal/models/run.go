@@ -60,6 +60,7 @@ type APIRunRequest struct {
 	Title          string   `json:"title,omitempty"`
 	Context        string   `json:"context,omitempty"`
 	Files          []string `json:"files,omitempty"`
+	FileHash       string   `json:"fileHash,omitempty"`
 }
 
 // ToAPIRequest converts user-facing RunRequest to API-compatible structure

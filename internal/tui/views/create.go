@@ -1930,12 +1930,18 @@ func (v *CreateRunView) submitToAPI(task models.RunRequest) (models.RunResponse,
 	// Convert to API-compatible format
 	apiTask := task.ToAPIRequest()
 
+	// Add file hash if we have one (from loaded config file)
+	if v.currentFileHash != "" {
+		apiTask.FileHash = v.currentFileHash
+		debug.LogToFilef("DEBUG: Including file hash in API request: %s\n", v.currentFileHash)
+	}
+
 	// Debug: Log the final task object being sent to API
 	debug.LogToFilef(
 		"DEBUG: Final API task object - Title='%s', RepositoryName='%s', SourceBranch='%s', "+
-			"TargetBranch='%s', Prompt='%s', Context='%s', RunType='%s'\\n",
+			"TargetBranch='%s', Prompt='%s', Context='%s', RunType='%s', FileHash='%s'\\n",
 		apiTask.Title, apiTask.RepositoryName, apiTask.SourceBranch,
-		apiTask.TargetBranch, apiTask.Prompt, apiTask.Context, apiTask.RunType)
+		apiTask.TargetBranch, apiTask.Prompt, apiTask.Context, apiTask.RunType, apiTask.FileHash)
 
 	runPtr, err := v.client.CreateRunAPI(apiTask)
 
