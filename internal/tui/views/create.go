@@ -2157,21 +2157,13 @@ func (v *CreateRunView) loadConfigFromFile(filePath string) tea.Cmd {
 
 // validateForm checks if the form is valid and returns any validation errors
 func (v *CreateRunView) validateForm() (bool, string) {
-	// Check required fields
+	// Check required fields - only prompt and repository are required
 	if strings.TrimSpace(v.promptArea.Value()) == "" {
 		return false, "Prompt is required"
 	}
 	
 	if strings.TrimSpace(v.fields[0].Value()) == "" {
 		return false, "Repository is required"
-	}
-	
-	if strings.TrimSpace(v.fields[1].Value()) == "" {
-		return false, "Source branch is required"
-	}
-	
-	if strings.TrimSpace(v.fields[2].Value()) == "" {
-		return false, "Target branch is required"
 	}
 	
 	// Check for duplicate file hash if a config file was loaded
