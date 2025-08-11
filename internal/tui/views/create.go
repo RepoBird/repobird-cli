@@ -1176,15 +1176,14 @@ func (v *CreateRunView) renderCompactForm(width, height int) string {
 	// Add title header inside the form
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("63")).
-		MarginBottom(1)
+		Foreground(lipgloss.Color("63"))
 
 	b.WriteString(titleStyle.Render("Create New Run"))
-	b.WriteString("\n\n")
+	b.WriteString("\n")
 
 	labelStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("252")).
-		Width(20)
+		Width(24)
 
 	// Load from Config field (new, at index 0)
 	b.WriteString(labelStyle.Render("📄 Load Config:"))
@@ -1245,7 +1244,7 @@ func (v *CreateRunView) renderCompactForm(width, height int) string {
 	} else {
 		b.WriteString("   ")
 	}
-	v.fields[0].Width = min(width-18, 80)
+	v.fields[0].Width = min(width-22, 80)
 	b.WriteString(v.fields[0].View())
 	b.WriteString("\n")
 
@@ -1258,7 +1257,7 @@ func (v *CreateRunView) renderCompactForm(width, height int) string {
 	}
 
 	// Adjust prompt width
-	v.promptArea.SetWidth(min(width-18, 100))
+	v.promptArea.SetWidth(min(width-22, 100))
 
 	// Show collapsed or full prompt
 	if v.promptCollapsed && v.promptArea.Value() != "" {
@@ -1266,14 +1265,14 @@ func (v *CreateRunView) renderCompactForm(width, height int) string {
 		promptLines := strings.Split(v.promptArea.Value(), "\n")
 		if len(promptLines) > 0 {
 			truncated := promptLines[0]
-			if len(truncated) > width-20 {
-				truncated = truncated[:width-23] + "..."
+			if len(truncated) > width-24 {
+				truncated = truncated[:width-27] + "..."
 			}
 			collapsedStyle := lipgloss.NewStyle().
 				Foreground(lipgloss.Color("250")).
 				Italic(true)
 			b.WriteString(collapsedStyle.Render(truncated))
-			if len(promptLines) > 1 || len(promptLines[0]) > width-20 {
+			if len(promptLines) > 1 || len(promptLines[0]) > width-24 {
 				b.WriteString(" [+]")
 			}
 		}
@@ -1301,7 +1300,7 @@ func (v *CreateRunView) renderCompactForm(width, height int) string {
 		} else {
 			b.WriteString("   ")
 		}
-		v.fields[field.index].Width = min(width-18, 60)
+		v.fields[field.index].Width = min(width-22, 60)
 		b.WriteString(v.fields[field.index].View())
 		b.WriteString("\n")
 	}
@@ -1384,11 +1383,10 @@ func (v *CreateRunView) renderErrorLayout(availableHeight int) string {
 	// Add title header inside the error panel
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("63")).
-		MarginBottom(1)
+		Foreground(lipgloss.Color("63"))
 
 	b.WriteString(titleStyle.Render("Create New Run"))
-	b.WriteString("\n\n")
+	b.WriteString("\n")
 
 	// Error header
 	errorHeaderStyle := lipgloss.NewStyle().
