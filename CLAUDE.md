@@ -275,6 +275,7 @@ When working on this codebase:
 7. Ensure cross-platform compatibility (Linux, macOS, Windows)
 8. create final todo list item of run linting and formatting after all other todo changes: `make lint-fix fmt`
 9. Document any non-obvious design decisions in code comments in docs/ markdown files.
+10. When debugging TUI issues, use `debug.LogToFilef()` to write to `/tmp/repobird_debug.log` and check logs with `tail -f /tmp/repobird_debug.log`
 
 ## Quick Troubleshooting
 

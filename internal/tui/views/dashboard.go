@@ -86,6 +86,10 @@ type DashboardView struct {
 	statusInfoSelectedRow int      // Currently selected row in status info
 	statusInfoFields      []string // Field values that can be copied
 	statusInfoFieldLines  []int    // Line numbers for each field
+	statusInfoKeyOffset   int      // Horizontal scroll offset for keys
+	statusInfoValueOffset int      // Horizontal scroll offset for values
+	statusInfoFocusColumn int      // 0 = key column, 1 = value column
+	statusInfoKeys        []string // Full key text for each field
 
 	// URL selection for repositories
 	showURLSelectionPrompt bool                  // Show URL selection prompt in status line
@@ -99,6 +103,9 @@ type DashboardView struct {
 	// Documentation overlay state
 	docsCurrentPage int
 	docsSelectedRow int
+
+	// New scrollable help view
+	helpView *components.HelpView
 }
 
 type dashboardDataLoadedMsg struct {
@@ -140,6 +147,7 @@ func NewDashboardView(client *api.Client) *DashboardView {
 		fzfColumn:       -1, // No FZF mode initially
 		spinner:         s,
 		statusLine:      components.NewStatusLine(),
+		helpView:        components.NewHelpView(),
 	}
 
 	// Initialize cache system
@@ -496,6 +504,11 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		d.width = msg.Width
 		d.height = msg.Height
 
+		// Update help view size
+		if d.helpView != nil {
+			d.helpView.SetSize(msg.Width, msg.Height)
+		}
+
 		// Update child view dimensions
 		if d.runListView != nil {
 			_, childCmd := d.runListView.Update(msg)
@@ -667,12 +680,16 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			d.showStatusInfo = true
 			// Initialize status info navigation
 			d.initializeStatusInfoFields()
+			// Reset scroll offsets
+			d.statusInfoKeyOffset = 0
+			d.statusInfoValueOffset = 0
+			d.statusInfoFocusColumn = 1 // Default to value column
 			// Refresh user info when showing
 			cmds = append(cmds, d.loadUserInfo())
 			return d, tea.Batch(cmds...)
 		case d.showDocs:
-			// Handle navigation in docs overlay
-			return d.handleDocsNavigation(msg)
+			// Handle navigation in help overlay
+			return d.handleHelpNavigation(msg)
 		case d.showStatusInfo:
 			// Handle navigation in status info overlay
 			return d.handleStatusInfoNavigation(msg)
@@ -1229,9 +1246,9 @@ func (d *DashboardView) View() string {
 		return d.renderWithFZFOverlay(finalView)
 	}
 
-	// Overlay docs if requested
+	// Overlay help if requested
 	if d.showDocs {
-		return d.renderDocs()
+		return d.renderHelp()
 	}
 
 	// Overlay status info if requested
@@ -1849,6 +1866,7 @@ func (d *DashboardView) renderDetailsColumn(width, height int) string {
 func (d *DashboardView) initializeStatusInfoFields() {
 	d.statusInfoFields = []string{}
 	d.statusInfoFieldLines = []int{}
+	d.statusInfoKeys = []string{}
 	d.statusInfoSelectedRow = 0
 
 	lineNum := 0
@@ -1858,18 +1876,21 @@ func (d *DashboardView) initializeStatusInfoFields() {
 		lineNum++ // Section header
 
 		if d.userInfo.Name != "" {
+			d.statusInfoKeys = append(d.statusInfoKeys, "Name:")
 			d.statusInfoFields = append(d.statusInfoFields, d.userInfo.Name)
 			d.statusInfoFieldLines = append(d.statusInfoFieldLines, lineNum)
 			lineNum++
 		}
 
 		if d.userInfo.Email != "" {
+			d.statusInfoKeys = append(d.statusInfoKeys, "Email:")
 			d.statusInfoFields = append(d.statusInfoFields, d.userInfo.Email)
 			d.statusInfoFieldLines = append(d.statusInfoFieldLines, lineNum)
 			lineNum++
 		}
 
 		if d.userInfo.GithubUsername != "" {
+			d.statusInfoKeys = append(d.statusInfoKeys, "GitHub:")
 			d.statusInfoFields = append(d.statusInfoFields, d.userInfo.GithubUsername)
 			d.statusInfoFieldLines = append(d.statusInfoFieldLines, lineNum)
 			lineNum++
@@ -1882,6 +1903,7 @@ func (d *DashboardView) initializeStatusInfoFields() {
 		} else {
 			tierDisplay = strings.ToUpper(tierDisplay[:1]) + tierDisplay[1:]
 		}
+		d.statusInfoKeys = append(d.statusInfoKeys, "Account Tier:")
 		d.statusInfoFields = append(d.statusInfoFields, tierDisplay)
 		d.statusInfoFieldLines = append(d.statusInfoFieldLines, lineNum)
 		lineNum++
@@ -1897,6 +1919,7 @@ func (d *DashboardView) initializeStatusInfoFields() {
 				d.userInfo.RemainingRuns,
 				d.userInfo.TotalRuns)
 		}
+		d.statusInfoKeys = append(d.statusInfoKeys, "Runs Remaining:")
 		d.statusInfoFields = append(d.statusInfoFields, runsRemaining)
 		d.statusInfoFieldLines = append(d.statusInfoFieldLines, lineNum)
 		lineNum++
@@ -1905,10 +1928,12 @@ func (d *DashboardView) initializeStatusInfoFields() {
 		if d.userInfo.TotalRuns > 0 {
 			usedRuns := d.userInfo.TotalRuns - d.userInfo.RemainingRuns
 			percentage := float64(usedRuns) / float64(d.userInfo.TotalRuns) * 100
+			d.statusInfoKeys = append(d.statusInfoKeys, "Usage:")
 			d.statusInfoFields = append(d.statusInfoFields, fmt.Sprintf("%.1f%%", percentage))
 			d.statusInfoFieldLines = append(d.statusInfoFieldLines, lineNum)
 			lineNum++
 		} else {
+			d.statusInfoKeys = append(d.statusInfoKeys, "Usage:")
 			d.statusInfoFields = append(d.statusInfoFields, "Unlimited")
 			d.statusInfoFieldLines = append(d.statusInfoFieldLines, lineNum)
 			lineNum++
@@ -1918,10 +1943,12 @@ func (d *DashboardView) initializeStatusInfoFields() {
 	// System Stats fields
 	lineNum++ // Section header
 
+	d.statusInfoKeys = append(d.statusInfoKeys, "Repositories:")
 	d.statusInfoFields = append(d.statusInfoFields, fmt.Sprintf("%d", len(d.repositories)))
 	d.statusInfoFieldLines = append(d.statusInfoFieldLines, lineNum)
 	lineNum++
 
+	d.statusInfoKeys = append(d.statusInfoKeys, "Total Runs:")
 	d.statusInfoFields = append(d.statusInfoFields, fmt.Sprintf("%d", len(d.allRuns)))
 	d.statusInfoFieldLines = append(d.statusInfoFieldLines, lineNum)
 	lineNum++
@@ -1938,6 +1965,7 @@ func (d *DashboardView) initializeStatusInfoFields() {
 			failed++
 		}
 	}
+	d.statusInfoKeys = append(d.statusInfoKeys, "Run Status:")
 	d.statusInfoFields = append(d.statusInfoFields, fmt.Sprintf("🔄 %d  ✅ %d  ❌ %d", running, completed, failed))
 	d.statusInfoFieldLines = append(d.statusInfoFieldLines, lineNum)
 	lineNum++
@@ -1949,6 +1977,7 @@ func (d *DashboardView) initializeStatusInfoFields() {
 		if timeSince.Minutes() > 1 {
 			refreshText = fmt.Sprintf("%.1f minutes ago", timeSince.Minutes())
 		}
+		d.statusInfoKeys = append(d.statusInfoKeys, "Last Refresh:")
 		d.statusInfoFields = append(d.statusInfoFields, refreshText)
 		d.statusInfoFieldLines = append(d.statusInfoFieldLines, lineNum)
 		lineNum++
@@ -1957,10 +1986,12 @@ func (d *DashboardView) initializeStatusInfoFields() {
 	// Connection Info fields
 	lineNum++ // Section header
 
+	d.statusInfoKeys = append(d.statusInfoKeys, "API Endpoint:")
 	d.statusInfoFields = append(d.statusInfoFields, d.client.GetAPIEndpoint())
 	d.statusInfoFieldLines = append(d.statusInfoFieldLines, lineNum)
 	lineNum++
 
+	d.statusInfoKeys = append(d.statusInfoKeys, "Status:")
 	d.statusInfoFields = append(d.statusInfoFields, "Connected ✅")
 	d.statusInfoFieldLines = append(d.statusInfoFieldLines, lineNum)
 
@@ -1976,11 +2007,39 @@ func (d *DashboardView) handleStatusInfoNavigation(msg tea.KeyMsg) (tea.Model, t
 	case "j", "down":
 		if d.statusInfoSelectedRow < len(d.statusInfoFields)-1 {
 			d.statusInfoSelectedRow++
+			// Reset scroll offsets when changing rows
+			d.statusInfoKeyOffset = 0
+			d.statusInfoValueOffset = 0
+			// Keep focus on same column when changing rows
 		}
 		return d, nil
 	case "k", "up":
 		if d.statusInfoSelectedRow > 0 {
 			d.statusInfoSelectedRow--
+			// Reset scroll offsets when changing rows
+			d.statusInfoKeyOffset = 0
+			d.statusInfoValueOffset = 0
+			// Keep focus on same column when changing rows
+		}
+		return d, nil
+	case "h", "left":
+		if d.statusInfoFocusColumn == 1 {
+			// Move from value column to key column
+			d.statusInfoFocusColumn = 0
+		} else {
+			// Scroll key column left
+			if d.statusInfoKeyOffset > 0 {
+				d.statusInfoKeyOffset--
+			}
+		}
+		return d, nil
+	case "l", "right":
+		if d.statusInfoFocusColumn == 0 {
+			// Move from key column to value column
+			d.statusInfoFocusColumn = 1
+		} else {
+			// Scroll value column right
+			d.statusInfoValueOffset++
 		}
 		return d, nil
 	case "g":
@@ -1992,9 +2051,16 @@ func (d *DashboardView) handleStatusInfoNavigation(msg tea.KeyMsg) (tea.Model, t
 		}
 		return d, nil
 	case "y":
-		// Copy selected field value
+		// Copy selected field value (either key or value based on focus column)
 		if d.statusInfoSelectedRow >= 0 && d.statusInfoSelectedRow < len(d.statusInfoFields) {
-			textToCopy := d.statusInfoFields[d.statusInfoSelectedRow]
+			var textToCopy string
+			if d.statusInfoFocusColumn == 0 && d.statusInfoSelectedRow < len(d.statusInfoKeys) {
+				// Copy the key (without the colon)
+				textToCopy = strings.TrimSuffix(d.statusInfoKeys[d.statusInfoSelectedRow], ":")
+			} else {
+				// Copy the value
+				textToCopy = d.statusInfoFields[d.statusInfoSelectedRow]
+			}
 			if err := d.copyToClipboard(textToCopy); err == nil {
 				// Show what's actually copied, truncated for display
 				displayText := textToCopy
@@ -2027,91 +2093,23 @@ func (d *DashboardView) handleStatusInfoNavigation(msg tea.KeyMsg) (tea.Model, t
 	}
 }
 
-// handleDocsNavigation handles keyboard navigation in the docs overlay
-func (d *DashboardView) handleDocsNavigation(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	totalPages := 8 // Total number of documentation pages
-
+// handleHelpNavigation handles keyboard navigation in the help overlay
+func (d *DashboardView) handleHelpNavigation(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Handle special keys for closing help
 	switch msg.String() {
-	case "left", "h":
-		// Previous page
-		if d.docsCurrentPage > 0 {
-			d.docsCurrentPage--
-			d.docsSelectedRow = 0
-		}
-		return d, nil
-	case "right", "l":
-		// Next page
-		if d.docsCurrentPage < totalPages-1 {
-			d.docsCurrentPage++
-			d.docsSelectedRow = 0
-		}
-		return d, nil
-	case "up", "k":
-		// Move selection up
-		if d.docsSelectedRow > 0 {
-			d.docsSelectedRow--
-		}
-		return d, nil
-	case "down", "j":
-		// Move selection down (will be bounded by page content in render)
-		d.docsSelectedRow++
-		return d, nil
-	case "g":
-		// Jump to first row
-		d.docsSelectedRow = 0
-		return d, nil
-	case "G":
-		// Jump to last row (will be adjusted in render)
-		d.docsSelectedRow = 999
-		return d, nil
-	case "1", "2", "3", "4", "5", "6", "7", "8":
-		// Direct page navigation
-		pageNum := int(msg.String()[0] - '1')
-		if pageNum >= 0 && pageNum < totalPages {
-			d.docsCurrentPage = pageNum
-			d.docsSelectedRow = 0
-		}
-		return d, nil
-	case "y":
-		// Copy current row content
-		pages := d.getDocsPages()
-		currentPage := pages[d.docsCurrentPage]
-
-		// Ensure selected row is within bounds
-		if d.docsSelectedRow >= 0 && d.docsSelectedRow < len(currentPage) {
-			textToCopy := currentPage[d.docsSelectedRow]
-			if textToCopy != "" { // Don't copy empty lines
-				if err := d.copyToClipboard(textToCopy); err == nil {
-					// Show what's copied, truncated for display
-					displayText := textToCopy
-					maxLen := 30
-					if len(displayText) > maxLen {
-						displayText = displayText[:maxLen-3] + "..."
-					}
-					d.copiedMessage = fmt.Sprintf("📋 Copied \"%s\"", displayText)
-				} else {
-					d.copiedMessage = "✗ Failed to copy"
-				}
-				d.copiedMessageTime = time.Now()
-				d.yankBlink = true
-				return d, tea.Batch(
-					d.startYankBlinkAnimation(),
-					d.startClearStatusTimer(),
-				)
-			}
-		}
-		return d, nil
 	case "?", "q", "b", "escape":
-		// Close the docs overlay
+		// Close the help overlay
 		d.showDocs = false
 		return d, nil
 	case "Q":
 		// Force quit
 		return d, tea.Quit
-	default:
-		// Ignore other keys
-		return d, nil
 	}
+
+	// Pass other keys to the help view
+	updatedHelp, cmd := d.helpView.Update(msg)
+	d.helpView = updatedHelp
+	return d, cmd
 }
 
 // renderStatusInfo renders the status/user info overlay
@@ -2159,9 +2157,57 @@ func (d *DashboardView) renderStatusInfo() string {
 	lineNum := 0
 	fieldIdx := 0
 
+	// Helper to apply horizontal scrolling to text
+	applyHorizontalScroll := func(text string, offset int, maxWidth int) string {
+		if offset >= len(text) {
+			return ""
+		}
+		text = text[offset:]
+		if len(text) > maxWidth {
+			text = text[:maxWidth]
+		}
+		return text
+	}
+
 	// Helper to render a field line with highlight if selected
 	renderField := func(label, value string, isField bool) string {
-		renderedValue := value
+		// Apply horizontal scrolling to label and value
+		labelMaxWidth := 25
+		valueMaxWidth := boxWidth - labelMaxWidth - 6 // Account for border and padding
+
+		scrolledLabel := label
+		scrolledValue := value
+
+		// Check if this is the selected row
+		if isField && fieldIdx < len(d.statusInfoFieldLines) && lineNum == d.statusInfoFieldLines[fieldIdx] {
+			if fieldIdx == d.statusInfoSelectedRow {
+				// Apply horizontal scrolling only to selected row
+				if d.statusInfoFocusColumn == 0 {
+					// Scroll the label when focused
+					scrolledLabel = applyHorizontalScroll(label, d.statusInfoKeyOffset, labelMaxWidth)
+					// Add scroll indicators for label
+					if d.statusInfoKeyOffset > 0 && len(scrolledLabel) > 0 {
+						scrolledLabel = "◀" + scrolledLabel[1:]
+					}
+					if len(label) > d.statusInfoKeyOffset+labelMaxWidth && len(scrolledLabel) > 0 {
+						scrolledLabel = scrolledLabel[:len(scrolledLabel)-1] + "▶"
+					}
+				} else {
+					// Scroll the value when focused
+					scrolledValue = applyHorizontalScroll(value, d.statusInfoValueOffset, valueMaxWidth)
+					// Add scroll indicators for value
+					if d.statusInfoValueOffset > 0 && len(scrolledValue) > 0 {
+						scrolledValue = "◀" + scrolledValue[1:]
+					}
+					if len(value) > d.statusInfoValueOffset+valueMaxWidth && len(scrolledValue) > 0 {
+						scrolledValue = scrolledValue[:len(scrolledValue)-1] + "▶"
+					}
+				}
+			}
+		}
+
+		renderedLabel := labelStyle.Render(scrolledLabel)
+		renderedValue := scrolledValue
 
 		// Check if this field value should be highlighted
 		if isField && fieldIdx < len(d.statusInfoFieldLines) && lineNum == d.statusInfoFieldLines[fieldIdx] {
@@ -2174,34 +2220,56 @@ func (d *DashboardView) renderStatusInfo() string {
 							Background(lipgloss.Color("82")). // Bright green
 							Foreground(lipgloss.Color("0")).  // Black text
 							Bold(true)
-						renderedValue = highlightStyle.Render(value)
+
+						// Highlight both key and value based on focus
+						if d.statusInfoFocusColumn == 0 {
+							// Apply highlight while preserving width for label
+							highlightStyleWithWidth := highlightStyle.Copy().Width(25)
+							renderedLabel = highlightStyleWithWidth.Render(scrolledLabel)
+						} else {
+							renderedValue = highlightStyle.Render(scrolledValue)
+						}
 					} else {
 						// Normal highlight when "off"
 						highlightStyle := lipgloss.NewStyle().
 							Background(lipgloss.Color("63")).
 							Foreground(lipgloss.Color("255"))
-						renderedValue = highlightStyle.Render(value)
+
+						if d.statusInfoFocusColumn == 0 {
+							// Apply highlight while preserving width for label
+							highlightStyleWithWidth := highlightStyle.Copy().Width(25)
+							renderedLabel = highlightStyleWithWidth.Render(scrolledLabel)
+						} else {
+							renderedValue = highlightStyle.Render(scrolledValue)
+						}
 					}
 				} else {
 					// Normal focused highlight (no blinking)
 					highlightStyle := lipgloss.NewStyle().
 						Background(lipgloss.Color("63")).
 						Foreground(lipgloss.Color("255"))
-					renderedValue = highlightStyle.Render(value)
+
+					if d.statusInfoFocusColumn == 0 {
+						// Apply highlight while preserving width for label
+						highlightStyleWithWidth := highlightStyle.Copy().Width(25)
+						renderedLabel = highlightStyleWithWidth.Render(scrolledLabel)
+					} else {
+						renderedValue = highlightStyle.Render(scrolledValue)
+					}
 				}
 			} else {
 				// Apply normal value style
-				renderedValue = valueStyle.Render(value)
+				renderedValue = valueStyle.Render(scrolledValue)
 			}
 			fieldIdx++
 		} else if isField {
 			// Apply normal value style for non-selected fields
-			renderedValue = valueStyle.Render(value)
+			renderedValue = valueStyle.Render(scrolledValue)
 		}
 
 		lineNum++
 		// Return the label with the (potentially highlighted) value
-		return fmt.Sprintf("%s%s", labelStyle.Render(label), renderedValue)
+		return fmt.Sprintf("%s%s", renderedLabel, renderedValue)
 	}
 
 	// User Info Section
@@ -2432,7 +2500,7 @@ func (d *DashboardView) renderStatusInfo() string {
 
 	// Create the statusline using the dashboard statusline component
 	var statusLine string
-	shortHelp := "[j/k]navigate [y]copy [s/q/b/ESC]back [Q]uit"
+	shortHelp := "[j/k]navigate [h/l]column [y]copy [s/q/b/ESC]back [Q]uit"
 
 	// Use unified status line for status overlay
 	statusLine = d.statusLine.
@@ -2446,8 +2514,18 @@ func (d *DashboardView) renderStatusInfo() string {
 	return lipgloss.JoinVertical(lipgloss.Left, centeredBox, statusLine)
 }
 
-// renderDocs renders the documentation overlay
-func (d *DashboardView) renderDocs() string {
+// renderHelp renders the help overlay using the scrollable help view
+func (d *DashboardView) renderHelp() string {
+	// Set the size for the help view
+	d.helpView.SetSize(d.width, d.height)
+	// Return the rendered help view
+	return d.helpView.View()
+}
+
+// renderDocsOld renders the documentation overlay - DEPRECATED (kept for reference)
+//
+//nolint:unused
+func (d *DashboardView) renderDocsOld() string {
 	// Calculate box dimensions - leave room for statusline at bottom
 	boxWidth := d.width - 4   // Leave 2 chars margin on each side
 	boxHeight := d.height - 3 // Leave room for statusline at bottom
@@ -2602,7 +2680,9 @@ func (d *DashboardView) renderDocs() string {
 	return lipgloss.JoinVertical(lipgloss.Left, centeredBox, statusLine)
 }
 
-// getDocsPages returns the documentation content for each page
+// getDocsPages returns the documentation content for each page - DEPRECATED (kept for reference)
+//
+//nolint:unused
 func (d *DashboardView) getDocsPages() [][]string {
 	return [][]string{
 		// Page 1: Basic Navigation
@@ -2706,6 +2786,9 @@ func (d *DashboardView) getDocsPages() [][]string {
 }
 
 // truncateString truncates a string to the specified width, adding ellipsis if needed
+// truncateString truncates a string to the specified width - DEPRECATED (kept for reference)
+//
+//nolint:unused
 func (d *DashboardView) truncateString(s string, maxWidth int) string {
 	// Handle newlines by taking only the first line
 	lines := strings.Split(s, "\n")

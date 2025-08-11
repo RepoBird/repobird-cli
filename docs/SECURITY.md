@@ -107,12 +107,47 @@ rb config set api-key YOUR_KEY
 #### Machine-Specific Key Components
 The encryption key is derived from:
 - Hostname
-- Username
+- Username (`$USER` or `$USERNAME` environment variable)
 - Home directory path
-- Machine ID (Linux: `/etc/machine-id`)
-- Application salt
+- Machine ID (Linux: `/etc/machine-id` or `/var/lib/dbus/machine-id`)
+- Application salt: `"RepoBird-CLI-2024-Secure"`
 
 This ensures the encrypted file can only be decrypted on the same machine by the same user.
+
+#### How Encryption/Decryption Works
+
+##### Encryption Process (when setting API key):
+1. **Key Generation**: The system combines all machine-specific identifiers listed above
+2. **Hashing**: SHA-256 hash of the combined string produces a consistent 32-byte key
+3. **Encryption**: AES-256-GCM encrypts the API key with:
+   - The derived key
+   - A random 12-byte nonce (stored with ciphertext)
+   - Built-in authentication tag (prevents tampering)
+4. **Storage**: Base64-encoded ciphertext saved to `~/.repobird/.api_key.enc` with 0600 permissions
+
+##### Decryption Process (when TUI runs):
+1. **Key Regeneration**: The same machine identifiers are collected and hashed
+2. **File Read**: Encrypted data loaded from `~/.repobird/.api_key.enc`
+3. **Decryption**: AES-256-GCM decrypts using:
+   - The regenerated key (must match encryption key)
+   - The nonce extracted from ciphertext
+   - Authentication verification (fails if data was modified)
+4. **API Key Retrieved**: Decrypted key is used for API calls
+
+##### Security Properties:
+- **No Stored Salt/Key**: The decryption key is derived at runtime - nothing secret is stored
+- **Machine-Bound**: The encrypted file cannot be decrypted on a different machine since the derived key would differ
+- **User-Bound**: Different users on the same machine generate different keys
+- **Tamper-Proof**: GCM authentication tag detects any modifications to the encrypted file
+- **Forward Secrecy**: Each encryption uses a new random nonce
+
+##### Why This Design:
+- **No password required**: Users don't need to remember/enter a master password
+- **Automatic**: Works transparently without user intervention  
+- **Portable within machine**: Works across different RepoBird CLI sessions on the same machine
+- **Secure against copying**: Stolen encrypted files are useless on other machines
+
+The key insight: The machine itself becomes the "secret" - the combination of machine identifiers acts as a hardware-bound key that cannot be replicated elsewhere.
 
 ### Compliance
 
