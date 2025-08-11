@@ -655,7 +655,7 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Navigate to create new run view
 			// Check if we have existing form data to determine if this is a navigation back
 			existingFormData := cache.GetFormData()
-			
+
 			// Debug: Log what form data exists when navigating to create view
 			if existingFormData != nil {
 				debug.LogToFilef("DEBUG: Dashboard 'n' - Found existing form data: Repository=%s, Prompt=%d chars, Source=%s, Target=%s, Title=%s\n",
@@ -663,7 +663,7 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				debug.LogToFile("DEBUG: Dashboard 'n' - No existing form data found\n")
 			}
-			
+
 			config := CreateRunViewConfig{
 				Client: d.client,
 			}
@@ -1142,7 +1142,6 @@ func (d *DashboardView) View() string {
 
 // renderTripleColumnLayout renders the Miller Columns layout with real data
 func (d *DashboardView) renderTripleColumnLayout() string {
-
 	// Calculate available height for columns
 	// We have d.height total, minus:
 	// - 2 for title (1 line + spacing)
@@ -1171,14 +1170,12 @@ func (d *DashboardView) renderTripleColumnLayout() string {
 		rightWidth = 10
 	}
 
-
 	// Make columns with rounded borders - use full available height
 	// The Height() method in lipgloss includes borders in the total height
 	columnHeight := availableHeight
 	if columnHeight < 3 {
 		columnHeight = 3
 	}
-
 
 	// Create column content with titles
 	// Account for borders (2 chars for left/right, 2 for top/bottom)
@@ -1191,7 +1188,6 @@ func (d *DashboardView) renderTripleColumnLayout() string {
 	leftContent := d.renderRepositoriesColumn(contentWidth1, contentHeight)
 	centerContent := d.renderRunsColumn(contentWidth2, contentHeight)
 	rightContent := d.renderDetailsColumn(contentWidth3, contentHeight)
-
 
 	// Create styles for columns
 	// Width() and Height() in lipgloss include the border in the total dimensions
@@ -1217,7 +1213,6 @@ func (d *DashboardView) renderTripleColumnLayout() string {
 	leftBox := leftStyle.Render(leftContent)
 	centerBox := centerStyle.Render(centerContent)
 	rightBox := rightStyle.Render(rightContent)
-
 
 	// Join columns horizontally - they should already fit the width exactly
 	columns := lipgloss.JoinHorizontal(

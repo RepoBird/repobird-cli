@@ -270,24 +270,38 @@ func ClearCache() {
 
 // InitializeCacheForUser reinitializes the cache for a specific user
 func InitializeCacheForUser(userID *int) {
-	// Clear current cache first (but preserve user info if same user)
+	// Clear current cache first (but preserve user info if same user AND form data)
 	var savedUserInfo *models.UserInfo
 	var savedUserInfoTime time.Time
-	if globalCache != nil && globalCache.userInfo != nil && userID != nil && globalCache.userInfo.ID == *userID {
-		// Save user info if it's for the same user
-		savedUserInfo = globalCache.userInfo
-		savedUserInfoTime = globalCache.userInfoTime
+	var savedFormData *FormData
+	
+	if globalCache != nil {
+		// Always preserve form data
+		globalCache.mu.RLock()
+		savedFormData = globalCache.formData
+		globalCache.mu.RUnlock()
+		
+		if globalCache.userInfo != nil && userID != nil && globalCache.userInfo.ID == *userID {
+			// Save user info if it's for the same user
+			savedUserInfo = globalCache.userInfo
+			savedUserInfoTime = globalCache.userInfoTime
+		}
 	}
 
 	ClearCache()
 	// Initialize with user-specific cache
 	initializeCacheForUser(userID)
 
-	// Restore user info if same user
-	if savedUserInfo != nil {
+	// Restore user info and form data
+	if savedUserInfo != nil || savedFormData != nil {
 		globalCache.mu.Lock()
-		globalCache.userInfo = savedUserInfo
-		globalCache.userInfoTime = savedUserInfoTime
+		if savedUserInfo != nil {
+			globalCache.userInfo = savedUserInfo
+			globalCache.userInfoTime = savedUserInfoTime
+		}
+		if savedFormData != nil {
+			globalCache.formData = savedFormData
+		}
 		globalCache.mu.Unlock()
 	}
 }

@@ -104,7 +104,7 @@ type CreateRunViewConfig struct {
 // NewCreateRunViewWithConfig creates a new CreateRunView with the given configuration
 func NewCreateRunViewWithConfig(cfg CreateRunViewConfig) *CreateRunView {
 	debug.LogToFile("DEBUG: NewCreateRunViewWithConfig called\n")
-	
+
 	v := &CreateRunView{
 		client:             cfg.Client,
 		keys:               components.DefaultKeyMap,
@@ -121,7 +121,7 @@ func NewCreateRunViewWithConfig(cfg CreateRunViewConfig) *CreateRunView {
 	}
 
 	v.repoSelector = components.NewRepositorySelector()
-	
+
 	// Initialize fields BEFORE loading form data
 	debug.LogToFile("DEBUG: Calling initializeInputFields\n")
 	v.initializeInputFields()
@@ -129,7 +129,7 @@ func NewCreateRunViewWithConfig(cfg CreateRunViewConfig) *CreateRunView {
 	// Load saved form data first - this should populate the fields
 	debug.LogToFile("DEBUG: Calling loadFormData\n")
 	v.loadFormData()
-	
+
 	// Debug: Check what values are in fields after loading
 	if len(v.fields) >= 5 {
 		debug.LogToFilef("DEBUG: After loadFormData in NewCreateRunViewWithConfig - fields[0]=%s, fields[1]=%s, fields[2]=%s, fields[3]=%s, promptArea=%d chars\n",
@@ -245,7 +245,7 @@ func (v *CreateRunView) loadFormData() {
 		if savedData.RunType != "" {
 			v.runType = models.RunType(savedData.RunType)
 		}
-		
+
 		// Debug: Verify fields were actually set
 		debug.LogToFilef("DEBUG: loadFormData AFTER SET - fields[0]=%s, fields[1]=%s, fields[2]=%s, fields[3]=%s, promptArea=%d chars\n",
 			v.fields[0].Value(), v.fields[1].Value(), v.fields[2].Value(), v.fields[3].Value(), len(v.promptArea.Value()))
@@ -792,7 +792,7 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// IMPORTANT: Save the loaded config data to cache immediately
 		// so it persists when navigating away
 		v.saveFormData()
-		
+
 		// Debug: Verify what was saved
 		savedData := cache.GetFormData()
 		if savedData != nil {
@@ -1687,8 +1687,8 @@ func (v *CreateRunView) renderStatusBar() string {
 			Foreground(lipgloss.Color("0")).
 			Width(v.width).
 			Align(lipgloss.Center)
-		
-		statusContent := fmt.Sprintf("[RESET] ⚠️  RESET ALL FIELDS? [y] confirm [n] cancel")
+
+		statusContent := "[RESET] ⚠️  RESET ALL FIELDS? [y] confirm [n] cancel"
 		return resetStyle.Render(statusContent)
 	}
 
