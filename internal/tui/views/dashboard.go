@@ -273,8 +273,8 @@ func (d *DashboardView) loadDashboardData() tea.Cmd {
 		// Get runs to populate repository statistics
 		runs, cached, _, detailsCache, _ := cache.GetCachedList()
 		if !cached || len(runs) == 0 {
-			// Fetch runs from API
-			runsResp, err := d.client.ListRunsLegacy(100, 0)
+			// Fetch runs from API (increased limit for mock data)
+			runsResp, err := d.client.ListRunsLegacy(1000, 0)
 			if err != nil {
 				// Still return repos even if runs fail
 				_ = cache.SetRepositoryOverview(repositories)
@@ -339,8 +339,8 @@ func (d *DashboardView) loadDashboardData() tea.Cmd {
 func (d *DashboardView) loadFromRunsOnly() tea.Msg {
 	runs, cached, _, detailsCache, _ := cache.GetCachedList()
 	if !cached || len(runs) == 0 {
-		// Fetch from API
-		runsResp, err := d.client.ListRunsLegacy(100, 0)
+		// Fetch from API (increased limit for mock data)
+		runsResp, err := d.client.ListRunsLegacy(1000, 0)
 		if err != nil {
 			return dashboardDataLoadedMsg{error: err}
 		}
@@ -467,11 +467,43 @@ func (d *DashboardView) selectRepository(repo *models.Repository) tea.Cmd {
 		// Filter runs for this repository
 		var filteredRuns []*models.RunResponse
 
+		debug.LogToFilef("\n========== REPOSITORY SELECTION ==========\n")
+		debug.LogToFilef("[selectRepository] Selecting repo: '%s'\n", repo.Name)
+		debug.LogToFilef("[selectRepository] Total runs to filter: %d\n", len(d.allRuns))
+		
+		// Debug: Count all runs by repository to see distribution
+		runsByRepo := make(map[string]int)
+		for _, run := range d.allRuns {
+			repoName := run.GetRepositoryName()
+			runsByRepo[repoName]++
+		}
+		
+		debug.LogToFilef("[selectRepository] Run distribution across repos:\n")
+		for repoName, count := range runsByRepo {
+			if count > 0 {
+				debug.LogToFilef("  '%s': %d runs\n", repoName, count)
+			}
+		}
+		
+		// Debug: print first few runs to see their repo names
+		debug.LogToFilef("[selectRepository] Sample runs (first 10):\n")
+		for i, run := range d.allRuns {
+			if i < 10 {
+				debug.LogToFilef("  Run[%d]: Repository='%s', RepositoryName='%s', GetRepositoryName()='%s'\n", 
+					i, run.Repository, run.RepositoryName, run.GetRepositoryName())
+			}
+		}
+
 		// First try to match by repository name
+		matchCount := 0
 		for _, run := range d.allRuns {
 			runRepoName := run.GetRepositoryName()
 			if runRepoName == repo.Name {
 				filteredRuns = append(filteredRuns, run)
+				matchCount++
+				if matchCount <= 3 {
+					debug.LogToFilef("  MATCHED: Run '%s' (repo: '%s')\n", run.GetIDString(), runRepoName)
+				}
 				continue
 			}
 
@@ -484,10 +516,17 @@ func (d *DashboardView) selectRepository(repo *models.Repository) tea.Cmd {
 					}
 					if apiRepoName == repo.Name {
 						filteredRuns = append(filteredRuns, run)
+						matchCount++
+						if matchCount <= 3 {
+							debug.LogToFilef("  MATCHED by RepoID: Run '%s' (apiRepo: '%s')\n", run.GetIDString(), apiRepoName)
+						}
 					}
 				}
 			}
 		}
+
+		debug.LogToFilef("[selectRepository] RESULT: Found %d runs for repo '%s'\n", len(filteredRuns), repo.Name)
+		debug.LogToFilef("==========================================\n\n")
 
 		return dashboardRepositorySelectedMsg{
 			repository: repo,
@@ -534,6 +573,16 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.error != nil {
 			d.error = msg.error
 		} else {
+			debug.LogToFilef("\n[DASHBOARD DATA LOADED]\n")
+			debug.LogToFilef("  Repositories loaded: %d\n", len(msg.repositories))
+			debug.LogToFilef("  Total runs loaded: %d\n", len(msg.allRuns))
+			
+			// Debug: Show repository names
+			debug.LogToFilef("  Repository list:\n")
+			for i, repo := range msg.repositories {
+				debug.LogToFilef("    [%d] '%s'\n", i, repo.Name)
+			}
+			
 			d.repositories = msg.repositories
 			d.allRuns = msg.allRuns
 			d.lastDataRefresh = time.Now()
@@ -552,6 +601,17 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case dashboardRepositorySelectedMsg:
 		d.selectedRepo = msg.repository
 		d.filteredRuns = msg.runs
+		
+		debug.LogToFilef("\n[REPO SELECTED] Repository: '%s'\n", msg.repository.Name)
+		debug.LogToFilef("  Filtered runs count: %d\n", len(msg.runs))
+		if len(msg.runs) > 0 {
+			debug.LogToFilef("  First 3 runs:\n")
+			for i := 0; i < 3 && i < len(msg.runs); i++ {
+				debug.LogToFilef("    - %s (repo: %s)\n", msg.runs[i].GetIDString(), msg.runs[i].GetRepositoryName())
+			}
+		} else {
+			debug.LogToFilef("  NO RUNS FOUND for this repository!\n")
+		}
 		// Update viewport content when repository changes
 		d.updateViewportContent()
 
@@ -929,16 +989,25 @@ func (d *DashboardView) handleMillerColumnsNavigation(msg tea.KeyMsg) tea.Cmd {
 		case 0: // Repository column
 			if d.selectedRepoIdx > 0 {
 				d.selectedRepoIdx--
+			} else if len(d.repositories) > 0 {
+				// Wrap to last item
+				d.selectedRepoIdx = len(d.repositories) - 1
+			}
+			if len(d.repositories) > 0 {
 				d.selectedRepo = &d.repositories[d.selectedRepoIdx]
+				debug.LogToFilef("\n[NAV UP] Moving to repo[%d]: '%s'\n", d.selectedRepoIdx, d.selectedRepo.Name)
 				return d.selectRepository(d.selectedRepo)
 			}
 		case 1: // Runs column
 			if d.selectedRunIdx > 0 {
 				d.selectedRunIdx--
-				if len(d.filteredRuns) > d.selectedRunIdx {
-					d.selectedRunData = d.filteredRuns[d.selectedRunIdx]
-					d.updateDetailLines()
-				}
+			} else if len(d.filteredRuns) > 0 {
+				// Wrap to last item
+				d.selectedRunIdx = len(d.filteredRuns) - 1
+			}
+			if len(d.filteredRuns) > d.selectedRunIdx {
+				d.selectedRunData = d.filteredRuns[d.selectedRunIdx]
+				d.updateDetailLines()
 			}
 		case 2: // Details column
 			if d.selectedDetailLine > 0 {
@@ -950,6 +1019,9 @@ func (d *DashboardView) handleMillerColumnsNavigation(msg tea.KeyMsg) tea.Cmd {
 					// If no non-empty line found, just move up one
 					d.selectedDetailLine--
 				}
+			} else if len(d.detailLines) > 0 {
+				// Wrap to last item
+				d.selectedDetailLine = len(d.detailLines) - 1
 			}
 		}
 
@@ -958,16 +1030,25 @@ func (d *DashboardView) handleMillerColumnsNavigation(msg tea.KeyMsg) tea.Cmd {
 		case 0: // Repository column
 			if d.selectedRepoIdx < len(d.repositories)-1 {
 				d.selectedRepoIdx++
+			} else if len(d.repositories) > 0 {
+				// Wrap to first item
+				d.selectedRepoIdx = 0
+			}
+			if len(d.repositories) > 0 {
 				d.selectedRepo = &d.repositories[d.selectedRepoIdx]
+				debug.LogToFilef("\n[NAV DOWN] Moving to repo[%d]: '%s'\n", d.selectedRepoIdx, d.selectedRepo.Name)
 				return d.selectRepository(d.selectedRepo)
 			}
 		case 1: // Runs column
 			if d.selectedRunIdx < len(d.filteredRuns)-1 {
 				d.selectedRunIdx++
-				if len(d.filteredRuns) > d.selectedRunIdx {
-					d.selectedRunData = d.filteredRuns[d.selectedRunIdx]
-					d.updateDetailLines()
-				}
+			} else if len(d.filteredRuns) > 0 {
+				// Wrap to first item
+				d.selectedRunIdx = 0
+			}
+			if len(d.filteredRuns) > d.selectedRunIdx {
+				d.selectedRunData = d.filteredRuns[d.selectedRunIdx]
+				d.updateDetailLines()
 			}
 		case 2: // Details column
 			if d.selectedDetailLine < len(d.detailLines)-1 {
@@ -979,6 +1060,9 @@ func (d *DashboardView) handleMillerColumnsNavigation(msg tea.KeyMsg) tea.Cmd {
 					// If no non-empty line found, just move down one
 					d.selectedDetailLine++
 				}
+			} else if len(d.detailLines) > 0 {
+				// Wrap to first item
+				d.selectedDetailLine = 0
 			}
 		}
 
@@ -1704,6 +1788,10 @@ func (d *DashboardView) updateRepoViewportContent() {
 func (d *DashboardView) updateRunsViewportContent() {
 	debug.LogToFilef("updateRunsViewportContent: Width=%d, Height=%d\n", d.runsViewport.Width, d.runsViewport.Height)
 	
+	if d.selectedRepo != nil {
+		debug.LogToFilef("  Rendering runs for repo: '%s', count: %d\n", d.selectedRepo.Name, len(d.filteredRuns))
+	}
+	
 	var items []string
 	
 	if d.selectedRepo != nil {
@@ -1961,7 +2049,8 @@ func (d *DashboardView) renderRepositoriesColumn(width, height int) string {
 	} else {
 		titleStyle = titleStyle.Foreground(lipgloss.Color("240"))
 	}
-	title := titleStyle.Render("Repositories")
+	titleText := fmt.Sprintf("Repositories [%d]", len(d.repositories))
+	title := titleStyle.Render(titleText)
 
 	// Build items list
 	var items []string
@@ -2041,7 +2130,11 @@ func (d *DashboardView) renderRunsColumn(width, height int) string {
 	} else {
 		titleStyle = titleStyle.Foreground(lipgloss.Color("240"))
 	}
-	title := titleStyle.Render("Runs")
+	titleText := "Runs"
+	if d.selectedRepo != nil && len(d.filteredRuns) > 0 {
+		titleText = fmt.Sprintf("Runs [%d]", len(d.filteredRuns))
+	}
+	title := titleStyle.Render(titleText)
 
 	var items []string
 	if d.selectedRepo == nil {

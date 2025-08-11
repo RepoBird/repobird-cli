@@ -158,6 +158,8 @@ var (
 func GenerateMockRuns(numRepos, runsPerRepo int) []*models.RunResponse {
 	rand.Seed(time.Now().UnixNano())
 	runs := make([]*models.RunResponse, 0, numRepos*runsPerRepo)
+	
+	fmt.Printf("[MOCK DEBUG] Generating runs for %d repos (max available: %d)\n", numRepos, len(repositories))
 
 	// Generate runs for each repository
 	for i := 0; i < numRepos && i < len(repositories); i++ {
@@ -175,6 +177,8 @@ func GenerateMockRuns(numRepos, runsPerRepo int) []*models.RunResponse {
 			// All other repos get random number of runs between 1 and 60
 			actualRunsForRepo = rand.Intn(60) + 1
 		}
+		
+		fmt.Printf("[MOCK DEBUG] Repo[%d] %s: generating %d runs\n", i, repo, actualRunsForRepo)
 
 		for j := 0; j < actualRunsForRepo; j++ {
 			runID := fmt.Sprintf("run_%d_%d_%d", i+1, j+1, rand.Intn(10000))
@@ -226,6 +230,18 @@ func GenerateMockRuns(numRepos, runsPerRepo int) []*models.RunResponse {
 
 			runs = append(runs, run)
 		}
+	}
+	
+	fmt.Printf("[MOCK DEBUG] Total runs generated: %d\n", len(runs))
+	
+	// Debug: Count runs per repository
+	runCounts := make(map[string]int)
+	for _, run := range runs {
+		runCounts[run.Repository]++
+	}
+	fmt.Printf("[MOCK DEBUG] Runs per repository:\n")
+	for repo, count := range runCounts {
+		fmt.Printf("  %s: %d runs\n", repo, count)
 	}
 
 	return runs
