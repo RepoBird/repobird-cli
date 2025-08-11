@@ -699,7 +699,7 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		v.statusLine.SetTemporaryMessageWithType(
 			fmt.Sprintf("✅ Config loaded from %s", filepath.Base(msg.filePath)),
 			components.MessageSuccess,
-			3*time.Second,
+			500*time.Millisecond, // Show for only 500ms
 		)
 		return v, nil
 
@@ -1169,10 +1169,11 @@ func (v *CreateRunView) renderSinglePanelLayout(availableHeight int) string {
 	// Create the single panel content
 	panelContent := v.renderCompactForm(contentWidth, contentHeight)
 
-	// Style for single panel - Width and Height include the border
+	// Style for single panel - Width includes the border
+	// Don't set Height to allow content to determine it naturally
 	panelStyle := lipgloss.NewStyle().
 		Width(panelWidth).
-		Height(panelHeight).
+		MaxHeight(panelHeight). // Use MaxHeight instead of Height
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("63")).
 		Padding(1)
@@ -1914,6 +1915,9 @@ func (v *CreateRunView) populateFormFromConfig(config *models.RunRequest, filePa
 	// Store the loaded file path
 	v.lastLoadedFile = filepath.Base(filePath)
 
+	// Keep focus on Load Config field (index 0) - no need to update
+	// This prevents any layout shifts
+
 	// Populate form fields
 	if config.Repository != "" {
 		v.fields[0].SetValue(config.Repository) // Repository field
@@ -1921,11 +1925,8 @@ func (v *CreateRunView) populateFormFromConfig(config *models.RunRequest, filePa
 
 	if config.Prompt != "" {
 		v.promptArea.SetValue(config.Prompt)
-		// Expand prompt area if it was collapsed
-		if v.promptCollapsed {
-			v.promptCollapsed = false
-			v.promptArea.SetHeight(5)
-		}
+		// Don't change collapsed state when loading config
+		// This prevents layout shifts that hide the top rows
 	}
 
 	if config.Source != "" {
