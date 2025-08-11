@@ -2,7 +2,19 @@ openapi: 3.0.0
 info:
   title: RepoBird CLI API
   version: 1.0.0
-  description: API endpoints for RepoBird CLI integration
+  description: |
+    API endpoints for RepoBird CLI integration.
+    
+    ## Authentication
+    All endpoints require authentication using an API key passed as a Bearer token.
+    
+    ## Rate Limiting
+    API requests are rate-limited to 100 requests per minute per API key.
+    
+    ## File Hash Duplicate Detection
+    The API supports file hash-based duplicate detection to prevent re-running identical task files.
+    When submitting a run with a fileHash, the system checks for existing runs with the same hash.
+    Use the `force` parameter to override duplicate detection.
   contact:
     name: RepoBird Support
     email: support@repobird.ai
@@ -30,10 +42,12 @@ components:
       properties:
         error:
           type: string
-          description: Error code or message
+          description: Error code (e.g., DUPLICATE_RUN, REPO_NOT_FOUND)
+          example: DUPLICATE_RUN
         message:
           type: string
-          description: Human-readable error message (optional)
+          description: Human-readable error message
+          example: "Duplicate run detected: A run with this file hash already exists (ID: 123). Use --force to override."
       required:
         - error
 
@@ -42,12 +56,16 @@ components:
       properties:
         id:
           type: string
+          example: user_2abc123def456
         email:
           type: string
+          example: developer@example.com
         name:
           type: string
+          example: John Doe
         githubUsername:
           type: string
+          example: johndoe
         tier:
           $ref: '#/components/schemas/Tier'
 
@@ -57,39 +75,51 @@ components:
         name:
           type: string
           enum: [free, pro, enterprise]
+          example: pro
         remainingProRuns:
           type: integer
+          example: 45
         remainingPlanRuns:
           type: integer
+          example: 10
         lastPeriodResetDate:
           type: string
           format: date-time
+          example: 2024-01-01T00:00:00Z
 
     Run:
       type: object
       properties:
         id:
           type: integer
+          example: 12345
         repoId:
           type: integer
+          example: 789
         repositoryName:
           type: string
           nullable: true
           description: Repository name in owner/repo format
+          example: acme/webapp
         repositoryFullName:
           type: string
           nullable: true
           description: Full repository name
+          example: ACME Web Application
         status:
           type: string
           enum: [QUEUED, INITIALIZING, PROCESSING, DONE, FAILED]
+          example: PROCESSING
         runType:
           type: string
           enum: [pro, pro-plan]
+          example: pro
         title:
           type: string
+          example: Implement user authentication
         description:
           type: string
+          example: Add JWT-based authentication system with refresh tokens
         plan:
           type: string
           nullable: true
@@ -126,6 +156,7 @@ components:
           type: string
           nullable: true
           description: SHA-256 hash of the issue run task file
+          example: a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3
         filesModified:
           type: array
           nullable: true
@@ -182,27 +213,37 @@ components:
       properties:
         id:
           type: integer
+          example: 789
         name:
           type: string
+          example: ACME Web Application
         repoName:
           type: string
+          example: webapp
         repoOwner:
           type: string
+          example: acme
         repoUrl:
           type: string
+          example: https://github.com/acme/webapp
         defaultBranch:
           type: string
+          example: main
         isEnabled:
           type: boolean
+          example: true
         githubInstallationId:
           type: integer
           nullable: true
+          example: 12345678
         createdAt:
           type: string
           format: date-time
+          example: 2024-01-15T10:30:00Z
         updatedAt:
           type: string
           format: date-time
+          example: 2024-01-20T15:45:00Z
 
     CreateRunRequest:
       type: object
@@ -210,28 +251,50 @@ components:
         repoId:
           type: integer
           description: Repository ID (either repoId or repositoryName required)
+          example: 789
         repositoryName:
           type: string
           description: Repository name (owner/repo or just repo)
+          example: acme/webapp
         runType:
           type: string
           enum: [run, plan]
           default: run
           description: Type of run (run for execution, plan for planning)
+          example: run
         prompt:
           type: string
           description: The task description or prompt
+          example: "Implement JWT authentication with refresh tokens. Add login and logout endpoints."
         title:
           type: string
           description: Optional title for the run
+          example: "Add authentication system"
         sourceBranch:
           type: string
           description: Source branch (defaults to repo default)
+          example: feature/auth
         targetBranch:
           type: string
           description: Target branch (defaults to repo default)
+          example: main
+        fileHash:
+          type: string
+          description: SHA-256 hash of the task file for duplicate detection
+          example: a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3
+        force:
+          type: boolean
+          default: false
+          description: Force creation even if duplicate hash exists
+          example: false
       required:
         - prompt
+      example:
+        repositoryName: acme/webapp
+        runType: run
+        prompt: "Implement JWT authentication with refresh tokens"
+        title: "Add authentication system"
+        fileHash: "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3"
 
 paths:
   /api/v1/auth/verify:
@@ -358,6 +421,9 @@ paths:
   /api/v1/runs:
     post:
       summary: Create new run
+      description: |
+        Creates a new AI agent run for the specified repository.
+        Supports duplicate detection via file hash.
       tags:
         - Runs
       requestBody:
@@ -366,6 +432,27 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/CreateRunRequest'
+            examples:
+              basic:
+                summary: Basic run request
+                value:
+                  repositoryName: acme/webapp
+                  prompt: "Fix the login bug in auth.js"
+                  title: "Fix authentication issue"
+              withHash:
+                summary: Run with file hash for duplicate detection
+                value:
+                  repositoryName: acme/webapp
+                  prompt: "Implement JWT authentication"
+                  title: "Add auth system"
+                  fileHash: "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3"
+              forceDuplicate:
+                summary: Force run despite duplicate hash
+                value:
+                  repositoryName: acme/webapp
+                  prompt: "Implement JWT authentication"
+                  fileHash: "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3"
+                  force: true
       responses:
         '200':
           description: Run created successfully
@@ -379,10 +466,20 @@ paths:
                     properties:
                       id:
                         type: integer
+                        example: 12345
                       status:
                         type: string
+                        example: QUEUED
                       message:
                         type: string
+                        example: Run created successfully
+              examples:
+                success:
+                  value:
+                    data:
+                      id: 12345
+                      status: QUEUED
+                      message: Run created successfully
         '400':
           description: Invalid input
           content:
@@ -401,9 +498,23 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '409':
+          description: Conflict (duplicate file hash detected)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                duplicate:
+                  value:
+                    error: DUPLICATE_RUN
+                    message: "Duplicate run detected: A run with this file hash already exists (ID: 12345). Use --force to override."
 
     get:
       summary: List user's runs
+      description: |
+        Retrieves a paginated list of runs for the authenticated user.
+        Supports filtering by repository and sorting options.
       tags:
         - Runs
       parameters:
@@ -412,15 +523,23 @@ paths:
           schema:
             type: integer
             default: 1
+          description: Page number for pagination
+          example: 1
         - in: query
           name: limit
           schema:
             type: integer
             default: 10
+            minimum: 1
+            maximum: 100
+          description: Number of items per page
+          example: 10
         - in: query
           name: repoId
           schema:
             type: integer
+          description: Filter by repository ID
+          example: 789
         - in: query
           name: status
           schema:
@@ -432,12 +551,15 @@ paths:
           schema:
             type: string
             default: createdAt
+            enum: [createdAt, updatedAt, status]
+          description: Field to sort by
         - in: query
           name: sortOrder
           schema:
             type: string
             enum: [asc, desc]
             default: desc
+          description: Sort order
       responses:
         '200':
           description: List of runs
@@ -455,10 +577,40 @@ paths:
                     properties:
                       currentPage:
                         type: integer
+                        example: 1
                       total:
                         type: integer
+                        example: 42
                       totalPages:
                         type: integer
+                        example: 5
+              examples:
+                withRuns:
+                  summary: Response with multiple runs
+                  value:
+                    data:
+                      - id: 12345
+                        repoId: 789
+                        repositoryName: acme/webapp
+                        status: DONE
+                        runType: pro
+                        title: "Fix authentication bug"
+                        description: "Fixed the login timeout issue"
+                        fileHash: "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3"
+                        createdAt: "2024-01-20T10:00:00Z"
+                      - id: 12344
+                        repoId: 789
+                        repositoryName: acme/webapp
+                        status: PROCESSING
+                        runType: pro-plan
+                        title: "Add payment integration"
+                        description: "Planning payment system architecture"
+                        fileHash: null
+                        createdAt: "2024-01-20T09:30:00Z"
+                    metadata:
+                      currentPage: 1
+                      total: 2
+                      totalPages: 1
 
   /api/v1/runs/{id}:
     get:
@@ -527,6 +679,7 @@ paths:
   /api/v1/runs/{id}/logs:
     get:
       summary: Get run logs
+      description: Retrieves the execution logs for a specific run
       tags:
         - Runs
       parameters:
@@ -535,6 +688,8 @@ paths:
           required: true
           schema:
             type: integer
+          description: Run ID
+          example: 12345
       responses:
         '200':
           description: Run logs
@@ -549,13 +704,20 @@ paths:
                       commandLogUrl:
                         type: string
                         nullable: true
+                        description: URL to full command execution logs
+                        example: https://logs.repobird.ai/runs/12345
                       logs:
                         type: string
+                        description: Inline log content
+                        example: "[2024-01-20 10:00:00] Starting AI agent...\n[2024-01-20 10:00:05] Analyzing repository..."
 
   /api/v1/runs/hashes:
     get:
       summary: Get all file hashes for user's runs
-      description: Returns all non-empty fileHash values for the authenticated user's runs. Used by CLI to cache known file hashes.
+      description: |
+        Returns all non-empty fileHash values for the authenticated user's runs.
+        Used by CLI to cache known file hashes and detect duplicates before submission.
+        This endpoint helps prevent accidental re-runs of identical task files.
       tags:
         - Runs
       responses:
@@ -574,15 +736,40 @@ paths:
                         issueRunId:
                           type: integer
                           description: The ID of the issue run
+                          example: 12345
                         fileHash:
                           type: string
                           description: SHA-256 hash of the issue run task file
+                          example: a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3
+                      required:
+                        - issueRunId
+                        - fileHash
                   metadata:
                     type: object
                     properties:
                       total:
                         type: integer
                         description: Total number of hashes returned
+                        example: 42
+              examples:
+                withHashes:
+                  summary: Response with multiple file hashes
+                  value:
+                    data:
+                      - issueRunId: 12345
+                        fileHash: a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3
+                      - issueRunId: 12346
+                        fileHash: b123c45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae4
+                      - issueRunId: 12347
+                        fileHash: c789d45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae5
+                    metadata:
+                      total: 3
+                empty:
+                  summary: No hashes found
+                  value:
+                    data: []
+                    metadata:
+                      total: 0
         '401':
           description: Authentication failed
           content:
@@ -715,10 +902,18 @@ paths:
 
 tags:
   - name: Authentication
-    description: API key verification
+    description: |
+      API key verification and authentication endpoints.
+      All API requests require a valid Bearer token.
   - name: User
-    description: User information and usage
+    description: |
+      User profile and usage statistics.
+      Track remaining runs and subscription tier information.
   - name: Runs
-    description: Run management
+    description: |
+      AI agent run management including creation, listing, and monitoring.
+      Supports duplicate detection via file hashes.
   - name: Repositories
-    description: Repository management
+    description: |
+      Repository management and configuration.
+      View and search connected GitHub repositories.

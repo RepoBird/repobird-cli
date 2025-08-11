@@ -255,12 +255,15 @@ func (v *RunDetailsView) handleKeyInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch {
-	case key.Matches(msg, v.keys.Quit), key.Matches(msg, v.keys.Back):
+	case key.Matches(msg, v.keys.Quit), key.Matches(msg, v.keys.Back), msg.Type == tea.KeyEsc, msg.String() == "b":
 		v.stopPolling()
-		// Return to list view with cached data and current dimensions
-		return NewRunListViewWithCacheAndDimensions(
-			v.client, v.parentRuns, v.parentCached, v.parentCachedAt,
-			v.parentDetailsCache, -1, v.width, v.height), nil
+		// Return to dashboard view
+		dashboard := NewDashboardView(v.client)
+		// Set dimensions
+		dashboard.width = v.width
+		dashboard.height = v.height
+		// Initialize and let it load data
+		return dashboard, dashboard.Init()
 	case msg.String() == "Q":
 		// Capital Q to force quit from anywhere
 		v.stopPolling()
@@ -545,9 +548,9 @@ func (v *RunDetailsView) View() string {
 		return "Run ID: " + v.run.GetIDString()
 	}
 
-	// Calculate box dimensions - leave room for statusline at bottom
+	// Calculate box dimensions - leave room for statusline at bottom and ensure top border shows
 	boxWidth := v.width - 4   // Leave 2 chars margin on each side
-	boxHeight := v.height - 2 // Leave room for statusline at bottom
+	boxHeight := v.height - 3 // Leave room for statusline at bottom and top margin
 
 	if boxWidth < 10 {
 		boxWidth = 10
@@ -563,12 +566,11 @@ func (v *RunDetailsView) View() string {
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("63"))
 
-	// Title bar (inside the box)
+	// Title bar (inside the box) - no background to avoid conflict with cursor
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("255")).
-		Background(lipgloss.Color("63")).
-		Width(boxWidth-2). // Account for border
+		Foreground(lipgloss.Color("63")). // Use cyan color for text instead of background
+		Width(boxWidth-2).                // Account for border
 		Align(lipgloss.Center).
 		Padding(0, 1)
 
@@ -645,7 +647,8 @@ func (v *RunDetailsView) View() string {
 	// Wrap in the box
 	boxedContent := boxStyle.Render(innerContent)
 
-	// Center the box on screen (leaving room for statusline)
+	// Center the box on screen (leaving room for statusline and top margin)
+	// Add 1 line of top margin to ensure top border is visible
 	centeredBox := lipgloss.Place(v.width, v.height-1, lipgloss.Center, lipgloss.Center, boxedContent)
 
 	// Create the statusline
@@ -859,6 +862,17 @@ func (v *RunDetailsView) updateContent() {
 		// Display title only if it exists
 		if v.run.Title != "" {
 			addField("Title", v.run.Title)
+		}
+		// Display description if it exists (with truncation)
+		if v.run.Description != "" {
+			description := v.run.Description
+			// Truncate to single line with ellipsis if too long
+			if len(description) > 60 {
+				description = description[:57] + "..."
+			}
+			// Remove newlines to keep it single line
+			description = strings.ReplaceAll(description, "\n", " ")
+			addField("Description", description)
 		}
 		addField("Run ID", v.run.GetIDString())
 		addField("Repository", v.run.Repository)
