@@ -623,8 +623,18 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				} else {
 					d.statusLine.SetTemporaryMessageWithType(fmt.Sprintf("✗ Failed to open URL: %v", err), components.MessageError, 1*time.Second)
 				}
-				return d, d.startMessageClearTimer(1*time.Second)
+				return d, d.startMessageClearTimer(1 * time.Second)
 			}
+			return d, nil
+		case d.showURLSelectionPrompt:
+			// Block all other keys when URL prompt is active
+			// Enter key cancels the prompt
+			if key.Matches(msg, d.keys.Enter) {
+				d.showURLSelectionPrompt = false
+				d.pendingRepoForURL = nil
+				d.pendingAPIRepoForURL = nil
+			}
+			// Block all other keys by returning early
 			return d, nil
 		case msg.Type == tea.KeyEsc && d.showStatusInfo:
 			// Close status info overlay with ESC
@@ -962,7 +972,7 @@ func (d *DashboardView) handleMillerColumnsNavigation(msg tea.KeyMsg) tea.Cmd {
 			} else {
 				d.statusLine.SetTemporaryMessageWithType(fmt.Sprintf("✗ Failed to open URL: %v", err), components.MessageError, 1*time.Second)
 			}
-			return d.startMessageClearTimer(1*time.Second)
+			return d.startMessageClearTimer(1 * time.Second)
 		}
 
 	case key.Matches(msg, d.keys.Right) || (msg.Type == tea.KeyRunes && string(msg.Runes) == "l"):

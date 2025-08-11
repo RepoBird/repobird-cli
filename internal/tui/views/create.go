@@ -1000,9 +1000,9 @@ func (v *CreateRunView) View() string {
 		statusBar,
 	)
 
-	// If file selector is active, overlay it
+	// If file selector is active, show modal instead of overlay
 	if v.fileSelector != nil && v.fileSelector.IsActive() {
-		return v.renderWithFileSelectorOverlay(finalView)
+		return v.renderFileSelectionModal(title, statusBar)
 	}
 
 	// If FZF mode is active, overlay the dropdown
@@ -1013,18 +1013,60 @@ func (v *CreateRunView) View() string {
 	return finalView
 }
 
-// renderWithFileSelectorOverlay renders the view with file selector overlay
-func (v *CreateRunView) renderWithFileSelectorOverlay(baseView string) string {
+// renderFileSelectionModal renders a modal for file selection, replacing the entire view
+func (v *CreateRunView) renderFileSelectionModal(title, statusBar string) string {
 	if v.fileSelector == nil || !v.fileSelector.IsActive() {
-		return baseView
+		return ""
 	}
 
-	// Calculate position for file selector dropdown (Load Config field is at index 0)
-	// Title + border + load config field = about 3 lines
-	yOffset := 3
-	xOffset := 19 // After "Load Config:    " label and indicator
+	// Create modal content
+	modalTitle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("63")).
+		PaddingLeft(1).
+		Render("📄 Select JSON Config File")
 
-	return v.renderOverlayDropdown(baseView, v.fileSelector.View(), yOffset, xOffset)
+	// Get file selector view
+	fileSelectorView := v.fileSelector.View()
+
+	// Create help text
+	helpText := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("240")).
+		PaddingLeft(1).
+		Render("Type to search • ↑↓ to navigate • Enter to select • ESC to cancel")
+
+	// Calculate available height
+	availableHeight := v.height - 4 // title + help + statusbar + padding
+	if availableHeight < 10 {
+		availableHeight = 10
+	}
+
+	// Create content area
+	content := lipgloss.JoinVertical(
+		lipgloss.Left,
+		modalTitle,
+		"",
+		fileSelectorView,
+		"",
+		helpText,
+	)
+
+	// Center the content vertically
+	modalContent := lipgloss.Place(
+		v.width,
+		availableHeight,
+		lipgloss.Center,
+		lipgloss.Center,
+		content,
+	)
+
+	// Join with title and status bar
+	return lipgloss.JoinVertical(
+		lipgloss.Left,
+		title,
+		modalContent,
+		statusBar,
+	)
 }
 
 // renderWithFZFOverlay renders the view with FZF dropdown overlay
@@ -1140,7 +1182,9 @@ func (v *CreateRunView) renderCompactForm(width, height int) string {
 	}
 
 	loadConfigValue := "Press Enter or 'f' to select JSON file"
-	if v.lastLoadedFile != "" {
+	if v.fileSelectorLoading {
+		loadConfigValue = "⟳ Loading file selector..."
+	} else if v.lastLoadedFile != "" {
 		loadConfigValue = fmt.Sprintf("Loaded: %s", v.lastLoadedFile)
 	}
 
@@ -1811,17 +1855,22 @@ func (v *CreateRunView) activateFZFMode() {
 
 // activateConfigFileSelector activates the file selector for loading config files
 func (v *CreateRunView) activateConfigFileSelector() tea.Cmd {
+	// Show loading state immediately
+	v.fileSelectorLoading = true
+
 	return func() tea.Msg {
 		// Set file selector dimensions
 		v.fileSelector.SetDimensions(v.width, v.height)
 
 		// Activate JSON file selector
 		if err := v.fileSelector.ActivateJSONFileSelector(); err != nil {
+			v.fileSelectorLoading = false
 			debug.LogToFilef("DEBUG: Failed to activate file selector: %v\n", err)
 			return configLoadErrorMsg{err: fmt.Errorf("failed to show file selector: %w", err)}
 		}
 
 		v.configFileSelectorActive = true
+		v.fileSelectorLoading = false
 		debug.LogToFile("DEBUG: Config file selector activated\n")
 		return nil
 	}
