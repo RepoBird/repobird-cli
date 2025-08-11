@@ -91,6 +91,10 @@ type DashboardView struct {
 	showURLSelectionPrompt bool                  // Show URL selection prompt in status line
 	pendingRepoForURL      *models.Repository    // Repository pending URL selection
 	pendingAPIRepoForURL   *models.APIRepository // API repository data for URL generation
+
+	// Vim keybinding state for 'gg' command
+	lastGPressTime time.Time // Time when 'g' was last pressed
+	waitingForG    bool      // Whether we're waiting for second 'g' in 'gg' command
 }
 
 type dashboardDataLoadedMsg struct {
@@ -111,6 +115,7 @@ type dashboardUserInfoLoadedMsg struct {
 
 type yankBlinkMsg struct{}
 type messageClearMsg struct{}
+type gKeyTimeoutMsg struct{}
 
 // NewDashboardView creates a new dashboard view
 func NewDashboardView(client *api.Client) *DashboardView {
@@ -546,6 +551,10 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case messageClearMsg:
 		// Trigger UI refresh when message expires (no action needed - just refresh)
 
+	case gKeyTimeoutMsg:
+		// Cancel waiting for second 'g' after timeout
+		d.waitingForG = false
+
 	case clearStatusMsg:
 		// Clear the clipboard message after timeout
 		d.copiedMessage = ""
@@ -597,27 +606,36 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			d.pendingRepoForURL = nil
 			d.pendingAPIRepoForURL = nil
 			return d, nil
-		case d.showURLSelectionPrompt && (msg.Type == tea.KeyRunes && (string(msg.Runes) == "o" || string(msg.Runes) == "g")):
-			// Handle URL selection
-			var urlText string
-			var message string
+		case d.showURLSelectionPrompt && msg.Type == tea.KeyRunes && string(msg.Runes) == "o":
+			// Handle RepoBird URL selection
+			if d.pendingAPIRepoForURL != nil {
+				urlText := fmt.Sprintf("https://repobird.ai/repos/%d", d.pendingAPIRepoForURL.ID)
+				message := "🌐 Opened RepoBird URL in browser"
 
-			if string(msg.Runes) == "o" && d.pendingAPIRepoForURL != nil {
-				// Open RepoBird URL
-				urlText = fmt.Sprintf("https://repobird.ai/repos/%d", d.pendingAPIRepoForURL.ID)
-				message = "🌐 Opened RepoBird URL in browser"
-			} else if string(msg.Runes) == "g" && d.pendingAPIRepoForURL != nil {
-				// Open GitHub URL
-				urlText = d.pendingAPIRepoForURL.RepoURL
-				message = "🌐 Opened GitHub URL in browser"
+				// Clear the prompt
+				d.showURLSelectionPrompt = false
+				d.pendingRepoForURL = nil
+				d.pendingAPIRepoForURL = nil
+
+				if err := utils.OpenURL(urlText); err == nil {
+					d.statusLine.SetTemporaryMessageWithType(message, components.MessageSuccess, 1*time.Second)
+				} else {
+					d.statusLine.SetTemporaryMessageWithType(fmt.Sprintf("✗ Failed to open URL: %v", err), components.MessageError, 1*time.Second)
+				}
+				return d, d.startMessageClearTimer(1 * time.Second)
 			}
+			return d, nil
+		case d.showURLSelectionPrompt && msg.Type == tea.KeyRunes && string(msg.Runes) == "g":
+			// Handle GitHub URL selection
+			if d.pendingAPIRepoForURL != nil {
+				urlText := d.pendingAPIRepoForURL.RepoURL
+				message := "🌐 Opened GitHub URL in browser"
 
-			// Clear the prompt
-			d.showURLSelectionPrompt = false
-			d.pendingRepoForURL = nil
-			d.pendingAPIRepoForURL = nil
+				// Clear the prompt
+				d.showURLSelectionPrompt = false
+				d.pendingRepoForURL = nil
+				d.pendingAPIRepoForURL = nil
 
-			if urlText != "" {
 				if err := utils.OpenURL(urlText); err == nil {
 					d.statusLine.SetTemporaryMessageWithType(message, components.MessageSuccess, 1*time.Second)
 				} else {
@@ -722,6 +740,66 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			d.statusLine.SetTemporaryMessageWithType(fmt.Sprintf("✗ Failed to open file viewer: %v", err), components.MessageError, 2*time.Second)
 			return d, nil
+		case msg.Type == tea.KeyRunes && string(msg.Runes) == "G":
+			// Vim: Go to bottom of current column
+			d.waitingForG = false // Cancel any pending 'gg' command
+			switch d.focusedColumn {
+			case 0: // Repository column
+				if len(d.repositories) > 0 {
+					d.selectedRepoIdx = len(d.repositories) - 1
+					d.selectedRepo = &d.repositories[d.selectedRepoIdx]
+					return d, d.selectRepository(d.selectedRepo)
+				}
+			case 1: // Runs column
+				if len(d.filteredRuns) > 0 {
+					d.selectedRunIdx = len(d.filteredRuns) - 1
+					d.selectedRunData = d.filteredRuns[d.selectedRunIdx]
+					d.updateDetailLines()
+				}
+			case 2: // Details column
+				if len(d.detailLines) > 0 {
+					d.selectedDetailLine = len(d.detailLines) - 1
+				}
+			}
+			return d, nil
+		case msg.Type == tea.KeyRunes && string(msg.Runes) == "g":
+			// Check for URL selection prompt first
+			if d.showURLSelectionPrompt {
+				// This 'g' is for GitHub URL selection, handled above
+				return d, nil
+			}
+
+			if d.waitingForG {
+				// This is the second 'g' in 'gg' - go to top
+				d.waitingForG = false
+				switch d.focusedColumn {
+				case 0: // Repository column
+					if len(d.repositories) > 0 {
+						d.selectedRepoIdx = 0
+						d.selectedRepo = &d.repositories[0]
+						return d, d.selectRepository(d.selectedRepo)
+					}
+				case 1: // Runs column
+					if len(d.filteredRuns) > 0 {
+						d.selectedRunIdx = 0
+						d.selectedRunData = d.filteredRuns[0]
+						d.updateDetailLines()
+					}
+				case 2: // Details column
+					if len(d.detailLines) > 0 {
+						d.selectedDetailLine = 0
+					}
+				}
+			} else {
+				// First 'g' pressed - wait for second 'g'
+				d.waitingForG = true
+				d.lastGPressTime = time.Now()
+				// Start a timer to cancel the 'gg' command after 1 second
+				return d, tea.Tick(1*time.Second, func(t time.Time) tea.Msg {
+					return gKeyTimeoutMsg{}
+				})
+			}
+			return d, nil
 		default:
 			// Handle navigation in Miller Columns layout
 			switch d.currentLayout {
@@ -793,6 +871,15 @@ func (d *DashboardView) findNextNonEmptyLine(startIdx int, direction int) int {
 
 // handleMillerColumnsNavigation handles navigation in the Miller Columns layout
 func (d *DashboardView) handleMillerColumnsNavigation(msg tea.KeyMsg) tea.Cmd {
+	// Cancel any pending 'gg' command if another key is pressed
+	if d.waitingForG {
+		// Cancel if it's not the second 'g' or if it's any non-rune key
+		if msg.Type != tea.KeyRunes || string(msg.Runes) != "g" {
+			d.waitingForG = false
+		}
+		// Continue processing the current key normally
+	}
+
 	switch {
 	case key.Matches(msg, d.keys.Up) || (msg.Type == tea.KeyRunes && string(msg.Runes) == "k"):
 		switch d.focusedColumn {

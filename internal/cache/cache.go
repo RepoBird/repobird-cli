@@ -274,13 +274,13 @@ func InitializeCacheForUser(userID *int) {
 	var savedUserInfo *models.UserInfo
 	var savedUserInfoTime time.Time
 	var savedFormData *FormData
-	
+
 	if globalCache != nil {
 		// Always preserve form data
 		globalCache.mu.RLock()
 		savedFormData = globalCache.formData
 		globalCache.mu.RUnlock()
-		
+
 		if globalCache.userInfo != nil && userID != nil && globalCache.userInfo.ID == *userID {
 			// Save user info if it's for the same user
 			savedUserInfo = globalCache.userInfo

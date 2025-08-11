@@ -85,6 +85,9 @@ type CreateRunView struct {
 	fileSelectorLoading      bool
 	// Reset confirmation state
 	resetConfirmMode bool
+	// Vim keybinding state for 'gg' command
+	lastGPressTime time.Time // Time when 'g' was last pressed
+	waitingForG    bool      // Whether we're waiting for second 'g' in 'gg' command
 }
 
 func NewCreateRunView(client *api.Client) *CreateRunView {
@@ -563,7 +566,43 @@ func (v *CreateRunView) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		v.resetConfirmMode = true
 		debug.LogToFile("DEBUG: Entering reset confirmation mode\n")
 		return v, nil
+	case msg.String() == "G":
+		// Vim: Go to bottom (last field or submit button)
+		v.waitingForG = false // Cancel any pending 'gg' command
+		// Calculate total fields: 1 (load config) + 1 (run type) + 1 (repo) + 1 (prompt) + 4 (other fields) + context (if shown)
+		totalFields := len(v.fields) + 3 // +1 for load config, +1 for run type, +1 for prompt
+		if v.showContext {
+			totalFields++ // +1 for context
+		}
+		// Go to submit button (which is after all fields)
+		v.focusIndex = totalFields
+		v.submitButtonFocused = true
+		v.backButtonFocused = false
+		v.updateFocus()
+		return v, nil
+	case msg.String() == "g":
+		if v.waitingForG {
+			// This is the second 'g' in 'gg' - go to top (first field)
+			v.waitingForG = false
+			v.focusIndex = 0 // Go to load config field
+			v.submitButtonFocused = false
+			v.backButtonFocused = false
+			v.updateFocus()
+		} else {
+			// First 'g' pressed - wait for second 'g'
+			v.waitingForG = true
+			v.lastGPressTime = time.Now()
+			// Start a timer to cancel the 'gg' command after 1 second
+			return v, tea.Tick(1*time.Second, func(t time.Time) tea.Msg {
+				return gKeyTimeoutMsg{}
+			})
+		}
+		return v, nil
 	default:
+		// Cancel any pending 'gg' command if another key is pressed
+		if v.waitingForG {
+			v.waitingForG = false
+		}
 		// Block vim navigation keys from doing anything else
 	}
 
@@ -758,6 +797,11 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if v.yankBlink {
 			v.yankBlink = false // Turn off after being on - completes the single blink
 		}
+		return v, nil
+
+	case gKeyTimeoutMsg:
+		// Cancel waiting for second 'g' after timeout
+		v.waitingForG = false
 		return v, nil
 
 	case clipboardResultMsg:
