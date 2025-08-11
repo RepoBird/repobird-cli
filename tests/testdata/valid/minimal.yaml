@@ -1,0 +1,5 @@
+# Minimal YAML config with only required fields
+prompt: Fix the login timeout issue
+repository: myorg/webapp
+target: fix/login-timeout
+title: Fix login timeout bug

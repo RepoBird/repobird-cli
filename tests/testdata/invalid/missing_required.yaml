@@ -1,0 +1,4 @@
+# Invalid YAML - missing required fields
+repository: myorg/webapp
+source: main
+# Missing: prompt, target, title

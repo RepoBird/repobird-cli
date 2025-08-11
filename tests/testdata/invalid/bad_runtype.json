@@ -1,0 +1,7 @@
+{
+  "prompt": "Test invalid run type",
+  "repository": "org/repo",
+  "target": "feature/test",
+  "title": "Test",
+  "runType": "invalid_type"
+}

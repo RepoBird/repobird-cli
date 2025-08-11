@@ -267,21 +267,32 @@ func (cfs *ConfigFileSelector) View() string {
 		Foreground(lipgloss.Color("86")).
 		Bold(true)
 
-	// Use full height minus status bar (like other views)
-	availableHeight := cfs.height - 1 // Reserve 1 line for status bar
+	// Use full terminal dimensions
+	// Status bar takes 1 line at bottom
+	availableHeight := cfs.height - 1
 	if availableHeight < 10 {
 		availableHeight = 10
 	}
 	
-	// Use more of the available width
-	totalWidth := cfs.width - 4
-	halfWidth := totalWidth / 2
-	listWidth := min(halfWidth-2, 50) // Cap at 50 for readability
-	previewWidth := totalWidth - listWidth - 3
+	// Calculate box dimensions - boxes should fill available height
+	boxHeight := availableHeight
 	
-	// Content area height (account for borders and padding)
-	boxHeight := availableHeight - 2 // Leave space for help text
-	contentHeight := boxHeight - 4 // Account for borders and headers
+	// Use most of the available width, with some margin
+	marginX := 2
+	totalWidth := cfs.width - (marginX * 2)
+	
+	// Split width between list and preview (40/60 split favoring preview)
+	listWidth := int(float64(totalWidth) * 0.4)
+	if listWidth < 30 {
+		listWidth = 30
+	}
+	if listWidth > 50 {
+		listWidth = 50
+	}
+	previewWidth := totalWidth - listWidth - 1 // -1 for gap between panes
+	
+	// Content height inside boxes (account for borders and headers)
+	contentHeight := boxHeight - 4 // -2 for borders, -2 for header and spacing
 	listContentHeight := contentHeight - 1 // Extra line for filter
 	previewContentHeight := contentHeight
 
@@ -404,47 +415,58 @@ func (cfs *ConfigFileSelector) View() string {
 		previewContent = append(previewContent, "")
 	}
 
-	// Create file list box with fixed dimensions
+	// Create file list box
 	fileListBox := borderStyle.
 		Width(listWidth).
-		Height(maxHeight).
-		MaxWidth(listWidth).
-		MaxHeight(maxHeight).
+		Height(boxHeight).
 		Render(lipgloss.JoinVertical(lipgloss.Left,
 			headerStyle.Render("📁 Config Files"),
 			strings.Join(fileListContent, "\n"),
 		))
 
-	// Create preview box with fixed dimensions
+	// Create preview box
 	previewBox := borderStyle.
 		Width(previewWidth).
-		Height(maxHeight).
-		MaxWidth(previewWidth).
-		MaxHeight(maxHeight).
+		Height(boxHeight).
 		Render(lipgloss.JoinVertical(lipgloss.Left,
 			headerStyle.Render("👁️ Preview"),
 			strings.Join(previewContent, "\n"),
 		))
 
-	// Combine both panes horizontally
+	// Combine both panes horizontally with margin
 	splitView := lipgloss.JoinHorizontal(lipgloss.Top, fileListBox, " ", previewBox)
-
-	// Add help text at the bottom
-	helpStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("241")).
-		Italic(true).
-		MaxWidth(totalWidth)
 	
-	helpText := helpStyle.Render("↑↓/jk: navigate • Enter: select • ESC: cancel • Type to filter • Ctrl+u/d: scroll")
+	// Add left margin to align properly
+	contentWithMargin := lipgloss.NewStyle().
+		MarginLeft(2).
+		Render(splitView)
 
-	// Use Place to center everything
-	return lipgloss.Place(
-		cfs.width,
-		cfs.height,
-		lipgloss.Center,
-		lipgloss.Center,
-		lipgloss.JoinVertical(lipgloss.Left, splitView, helpText),
+	// Status bar at the bottom (full width, like other views)
+	statusBarStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("240")).
+		Background(lipgloss.Color("235")).
+		Width(cfs.width).
+		Padding(0, 1).
+		Height(1)
+	
+	// Add selected file info to status
+	selectedInfo := ""
+	if len(cfs.filteredFiles) > 0 && cfs.selectedIndex < len(cfs.filteredFiles) {
+		selectedFile := cfs.filteredFiles[cfs.selectedIndex]
+		selectedInfo = fmt.Sprintf(" | Selected: %s", filepath.Base(selectedFile))
+	}
+	
+	statusText := fmt.Sprintf("↑↓/jk: nav • Enter: select • ESC: cancel • Type: filter%s", selectedInfo)
+	statusBar := statusBarStyle.Render(statusText)
+
+	// Join content and status bar vertically
+	fullView := lipgloss.JoinVertical(
+		lipgloss.Left,
+		contentWithMargin,
+		statusBar,
 	)
+
+	return fullView
 }
 
 // stripANSI removes ANSI escape codes from a string

@@ -1,0 +1,49 @@
+# YAML with multiline strings for better readability
+prompt: |
+  Implement a comprehensive authentication system with the following requirements:
+  
+  1. User Registration:
+     - Email verification
+     - Password strength validation
+     - Username uniqueness check
+  
+  2. Login System:
+     - JWT token generation
+     - Refresh token rotation
+     - Rate limiting on failed attempts
+  
+  3. Password Recovery:
+     - Secure reset token generation
+     - Email notification
+     - Token expiration (24 hours)
+  
+  4. Security Features:
+     - CSRF protection
+     - XSS prevention
+     - SQL injection protection
+  
+  Please follow OWASP best practices and add comprehensive error handling.
+
+repository: security/webapp
+source: develop
+target: feature/complete-auth
+runType: approval
+title: Complete Authentication System
+context: |
+  Current Stack:
+  - Backend: Node.js with Express
+  - Database: PostgreSQL with Prisma ORM
+  - Frontend: React with TypeScript
+  - Email Service: SendGrid
+  
+  Existing Issues:
+  - No authentication system in place
+  - User data stored in plain text
+  - No session management
+  
+files:
+  - src/auth/
+  - src/middleware/
+  - src/models/user.ts
+  - src/routes/auth.ts
+  - tests/auth/

@@ -1,0 +1,5 @@
+# Invalid YAML syntax
+prompt: "This has unclosed quote
+repository: myorg/webapp
+  target: fix/bug
+title: Invalid syntax example
