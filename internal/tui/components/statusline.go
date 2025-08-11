@@ -186,9 +186,11 @@ func (s *StatusLine) Render() string {
 			}
 			helpLen := lipgloss.Width(helpContent)
 			middlePadding := strings.Repeat(" ", availableForHelp-helpLen)
+			// Build the content without applying help style inline
+			// This prevents style inheritance issues
 			statusContent = fmt.Sprintf("%s  %s%s  %s",
 				leftContent,
-				s.helpStyle.Render(helpContent),
+				helpContent,
 				middlePadding,
 				rightContent)
 		} else {
@@ -214,17 +216,26 @@ func (s *StatusLine) Render() string {
 			rightContent)
 	}
 
-	// Final safety check - ensure it fits exactly
-	if lipgloss.Width(statusContent) > s.width {
+	// Ensure content is exactly the right width by padding with spaces if needed
+	contentWidth := lipgloss.Width(statusContent)
+	if contentWidth < s.width {
+		// Pad with spaces to fill the entire width
+		statusContent += strings.Repeat(" ", s.width-contentWidth)
+	} else if contentWidth > s.width {
+		// Truncate if too long
 		statusContent = truncateWithEllipsis(statusContent, s.width)
 	}
 
-	// Use MaxWidth and MaxHeight to ensure no wrapping
-	return s.style.
+	// Apply style without padding since we're handling width manually
+	// This ensures the background color fills the entire line properly
+	finalStyle := lipgloss.NewStyle().
+		Background(lipgloss.Color("235")).
+		Foreground(lipgloss.Color("252")).
 		Width(s.width).
 		MaxWidth(s.width).
-		MaxHeight(1).
-		Render(statusContent)
+		MaxHeight(1)
+	
+	return finalStyle.Render(statusContent)
 }
 
 // truncateWithEllipsis truncates a string to fit within maxWidth with ellipsis

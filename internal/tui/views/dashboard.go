@@ -1924,8 +1924,47 @@ func (d *DashboardView) initializeStatusInfoFields() {
 		d.statusInfoFieldLines = append(d.statusInfoFieldLines, lineNum)
 		lineNum++
 
-		// Usage - skip the bar, just include percentage
-		if d.userInfo.TotalRuns > 0 {
+		// Usage - simplified display without bars in stored field
+		if d.userInfo.TierDetails != nil {
+			// Calculate usage for Pro runs
+			var totalProRuns, totalPlanRuns int
+			tierLower := strings.ToLower(d.userInfo.Tier)
+			if strings.Contains(tierLower, "free") || tierLower == "" {
+				totalProRuns = 3
+				totalPlanRuns = 5
+			} else if strings.Contains(tierLower, "pro") {
+				totalProRuns = 30
+				totalPlanRuns = 35
+			} else {
+				totalProRuns = 30
+				totalPlanRuns = 35
+			}
+			
+			proUsed := totalProRuns - d.userInfo.TierDetails.RemainingProRuns
+			if d.userInfo.TierDetails.RemainingProRuns > totalProRuns {
+				proUsed = 0
+			}
+			proPercentage := 0.0
+			if totalProRuns > 0 {
+				proPercentage = float64(proUsed) / float64(totalProRuns) * 100
+			}
+			
+			planUsed := totalPlanRuns - d.userInfo.TierDetails.RemainingPlanRuns
+			if d.userInfo.TierDetails.RemainingPlanRuns > totalPlanRuns {
+				planUsed = 0
+			}
+			planPercentage := 0.0
+			if totalPlanRuns > 0 {
+				planPercentage = float64(planUsed) / float64(totalPlanRuns) * 100
+			}
+			
+			// Store simplified version without bars for scrolling
+			usageValue := fmt.Sprintf("Pro: %.0f%% | Plan: %.0f%%", proPercentage, planPercentage)
+			d.statusInfoKeys = append(d.statusInfoKeys, "Usage:")
+			d.statusInfoFields = append(d.statusInfoFields, usageValue)
+			d.statusInfoFieldLines = append(d.statusInfoFieldLines, lineNum)
+			lineNum++
+		} else if d.userInfo.TotalRuns > 0 {
 			usedRuns := d.userInfo.TotalRuns - d.userInfo.RemainingRuns
 			percentage := float64(usedRuns) / float64(d.userInfo.TotalRuns) * 100
 			d.statusInfoKeys = append(d.statusInfoKeys, "Usage:")
@@ -2044,10 +2083,10 @@ func (d *DashboardView) handleStatusInfoNavigation(msg tea.KeyMsg) (tea.Model, t
 				// Calculate max width for value display
 				boxWidth := d.width - 4
 				valueMaxWidth := boxWidth - 25 - 6 // 25 for label, 6 for border/padding
-				
-				debug.LogToFilef("DEBUG: StatusInfo scroll check - Row %d, Value len=%d, MaxWidth=%d, Offset=%d\n", 
+
+				debug.LogToFilef("DEBUG: StatusInfo scroll check - Row %d, Value len=%d, MaxWidth=%d, Offset=%d\n",
 					d.statusInfoSelectedRow, len(value), valueMaxWidth, d.statusInfoValueOffset)
-				
+
 				// Only allow scrolling if value is longer than display width
 				if len(value) > d.statusInfoValueOffset+valueMaxWidth {
 					d.statusInfoValueOffset++
@@ -2201,11 +2240,11 @@ func (d *DashboardView) renderStatusInfo() string {
 					if len(label) > labelMaxWidth {
 						// Scroll the label when focused
 						scrolledLabel = applyHorizontalScroll(label, d.statusInfoKeyOffset, labelMaxWidth)
-						// Add scroll indicators for label
-						if d.statusInfoKeyOffset > 0 && len(scrolledLabel) > 0 {
+						// Add scroll indicators for label, ensuring we maintain the correct length
+						if d.statusInfoKeyOffset > 0 && len(scrolledLabel) > 1 {
 							scrolledLabel = "◀" + scrolledLabel[1:]
 						}
-						if len(label) > d.statusInfoKeyOffset+labelMaxWidth && len(scrolledLabel) > 0 {
+						if len(label) > d.statusInfoKeyOffset+labelMaxWidth && len(scrolledLabel) > 1 {
 							scrolledLabel = scrolledLabel[:len(scrolledLabel)-1] + "▶"
 						}
 					}
@@ -2215,11 +2254,11 @@ func (d *DashboardView) renderStatusInfo() string {
 					if len(value) > valueMaxWidth {
 						// Scroll the value when focused
 						scrolledValue = applyHorizontalScroll(value, d.statusInfoValueOffset, valueMaxWidth)
-						// Add scroll indicators for value
-						if d.statusInfoValueOffset > 0 && len(scrolledValue) > 0 {
+						// Add scroll indicators for value, ensuring we maintain the correct length
+						if d.statusInfoValueOffset > 0 && len(scrolledValue) > 1 {
 							scrolledValue = "◀" + scrolledValue[1:]
 						}
-						if len(value) > d.statusInfoValueOffset+valueMaxWidth && len(scrolledValue) > 0 {
+						if len(value) > d.statusInfoValueOffset+valueMaxWidth && len(scrolledValue) > 1 {
 							scrolledValue = scrolledValue[:len(scrolledValue)-1] + "▶"
 						}
 					}
@@ -2249,6 +2288,7 @@ func (d *DashboardView) renderStatusInfo() string {
 							highlightStyleWithWidth := highlightStyle.Copy().Width(25)
 							renderedLabel = highlightStyleWithWidth.Render(scrolledLabel)
 						} else {
+							// Apply highlight while preserving available width for value
 							renderedValue = highlightStyle.Render(scrolledValue)
 						}
 					} else {
@@ -2262,6 +2302,7 @@ func (d *DashboardView) renderStatusInfo() string {
 							highlightStyleWithWidth := highlightStyle.Copy().Width(25)
 							renderedLabel = highlightStyleWithWidth.Render(scrolledLabel)
 						} else {
+							// Apply highlight while preserving available width for value
 							renderedValue = highlightStyle.Render(scrolledValue)
 						}
 					}

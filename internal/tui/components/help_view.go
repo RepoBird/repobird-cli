@@ -390,13 +390,13 @@ func (h *HelpView) View() string {
 	if !h.viewport.AtTop() || !h.viewport.AtBottom() {
 		// The main box height is h.height - 3 (accounting for title and status)
 		boxHeight := h.height - 3
-		
+
 		// Build scrollbar lines to match the box height
 		scrollbarLines := h.buildScrollbarLines(boxHeight)
-		
+
 		// Join all lines into a single string
 		scrollbarContent := strings.Join(scrollbarLines, "\n")
-		
+
 		// Use NormalBorder for proper connection between border and vertical lines
 		// NormalBorder uses straight lines that connect properly to vertical bars
 		scrollbarStyle := lipgloss.NewStyle().
@@ -444,21 +444,21 @@ func (h *HelpView) View() string {
 func (h *HelpView) buildScrollbarLines(totalHeight int) []string {
 	// Don't subtract - we need to fill the exact height for proper alignment
 	innerHeight := totalHeight
-	
+
 	if innerHeight <= 0 {
 		return []string{}
 	}
-	
+
 	// Calculate scrollbar metrics
 	totalLines := len(h.contentLines)
 	visibleLines := h.viewport.Height
-	
+
 	// Calculate thumb size and position
 	thumbSize := max(1, (visibleLines*innerHeight)/totalLines)
 	if thumbSize > innerHeight {
 		thumbSize = innerHeight
 	}
-	
+
 	percentScrolled := h.viewport.ScrollPercent()
 	maxThumbPos := innerHeight - thumbSize
 	thumbPos := int(float64(maxThumbPos) * percentScrolled)
@@ -468,7 +468,7 @@ func (h *HelpView) buildScrollbarLines(totalHeight int) []string {
 	if thumbPos > maxThumbPos {
 		thumbPos = maxThumbPos
 	}
-	
+
 	// Build exactly innerHeight lines
 	var lines []string
 	for i := 0; i < innerHeight; i++ {
@@ -484,7 +484,7 @@ func (h *HelpView) buildScrollbarLines(totalHeight int) []string {
 				Render("│"))
 		}
 	}
-	
+
 	return lines
 }
 
