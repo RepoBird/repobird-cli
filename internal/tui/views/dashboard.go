@@ -2027,6 +2027,93 @@ func (d *DashboardView) handleStatusInfoNavigation(msg tea.KeyMsg) (tea.Model, t
 	}
 }
 
+// handleDocsNavigation handles keyboard navigation in the docs overlay
+func (d *DashboardView) handleDocsNavigation(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	totalPages := 8 // Total number of documentation pages
+
+	switch msg.String() {
+	case "left", "h":
+		// Previous page
+		if d.docsCurrentPage > 0 {
+			d.docsCurrentPage--
+			d.docsSelectedRow = 0
+		}
+		return d, nil
+	case "right", "l":
+		// Next page
+		if d.docsCurrentPage < totalPages-1 {
+			d.docsCurrentPage++
+			d.docsSelectedRow = 0
+		}
+		return d, nil
+	case "up", "k":
+		// Move selection up
+		if d.docsSelectedRow > 0 {
+			d.docsSelectedRow--
+		}
+		return d, nil
+	case "down", "j":
+		// Move selection down (will be bounded by page content in render)
+		d.docsSelectedRow++
+		return d, nil
+	case "g":
+		// Jump to first row
+		d.docsSelectedRow = 0
+		return d, nil
+	case "G":
+		// Jump to last row (will be adjusted in render)
+		d.docsSelectedRow = 999
+		return d, nil
+	case "1", "2", "3", "4", "5", "6", "7", "8":
+		// Direct page navigation
+		pageNum := int(msg.String()[0] - '1')
+		if pageNum >= 0 && pageNum < totalPages {
+			d.docsCurrentPage = pageNum
+			d.docsSelectedRow = 0
+		}
+		return d, nil
+	case "y":
+		// Copy current row content
+		pages := d.getDocsPages()
+		currentPage := pages[d.docsCurrentPage]
+		
+		// Ensure selected row is within bounds
+		if d.docsSelectedRow >= 0 && d.docsSelectedRow < len(currentPage) {
+			textToCopy := currentPage[d.docsSelectedRow]
+			if textToCopy != "" { // Don't copy empty lines
+				if err := d.copyToClipboard(textToCopy); err == nil {
+					// Show what's copied, truncated for display
+					displayText := textToCopy
+					maxLen := 30
+					if len(displayText) > maxLen {
+						displayText = displayText[:maxLen-3] + "..."
+					}
+					d.copiedMessage = fmt.Sprintf("📋 Copied \"%s\"", displayText)
+				} else {
+					d.copiedMessage = "✗ Failed to copy"
+				}
+				d.copiedMessageTime = time.Now()
+				d.yankBlink = true
+				return d, tea.Batch(
+					d.startYankBlinkAnimation(),
+					d.startClearStatusTimer(),
+				)
+			}
+		}
+		return d, nil
+	case "?", "q", "b", "escape":
+		// Close the docs overlay
+		d.showDocs = false
+		return d, nil
+	case "Q":
+		// Force quit
+		return d, tea.Quit
+	default:
+		// Ignore other keys
+		return d, nil
+	}
+}
+
 // renderStatusInfo renders the status/user info overlay
 func (d *DashboardView) renderStatusInfo() string {
 	// Calculate box dimensions - leave room for statusline at bottom
@@ -2357,6 +2444,283 @@ func (d *DashboardView) renderStatusInfo() string {
 
 	// Join the centered box and statusline
 	return lipgloss.JoinVertical(lipgloss.Left, centeredBox, statusLine)
+}
+
+// renderDocs renders the documentation overlay
+func (d *DashboardView) renderDocs() string {
+	// Calculate box dimensions - leave room for statusline at bottom
+	boxWidth := d.width - 4   // Leave 2 chars margin on each side
+	boxHeight := d.height - 3 // Leave room for statusline at bottom
+
+	// Ensure minimum dimensions
+	if boxWidth < 60 {
+		boxWidth = 60
+	}
+
+	// Box style with rounded border
+	boxStyle := lipgloss.NewStyle().
+		Width(boxWidth).
+		Height(boxHeight).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("63"))
+
+	// Title bar (inside the box)
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("255")).
+		Background(lipgloss.Color("63")).
+		Width(boxWidth-2). // Account for border
+		Align(lipgloss.Center).
+		Padding(0, 1)
+
+	// Get current page title
+	pageTitles := []string{
+		"Basic Navigation",
+		"Fuzzy Search (FZF)",
+		"View Controls",
+		"Clipboard Operations",
+		"Create Run Form",
+		"Dashboard Layout",
+		"Tips & Tricks",
+		"Quick Reference",
+	}
+
+	title := titleStyle.Render(fmt.Sprintf("Documentation - %s", pageTitles[d.docsCurrentPage]))
+
+	// Content styles
+	contentStyle := lipgloss.NewStyle().
+		Width(boxWidth-2). // Account for border
+		Padding(1, 2)
+
+	// Define documentation pages with proper truncation
+	pages := d.getDocsPages()
+	currentPage := pages[d.docsCurrentPage]
+
+	// Ensure selected row is within bounds
+	if d.docsSelectedRow >= len(currentPage) {
+		d.docsSelectedRow = len(currentPage) - 1
+	}
+	if d.docsSelectedRow < 0 {
+		d.docsSelectedRow = 0
+	}
+
+	// Render content lines with selection highlighting
+	var contentLines []string
+	maxContentWidth := boxWidth - 6 // Account for border (2) + padding (4)
+
+	for i, row := range currentPage {
+		// Truncate long lines to prevent layout issues
+		truncatedRow := d.truncateString(row, maxContentWidth)
+
+		if i == d.docsSelectedRow {
+			// Highlight selected row
+			highlightStyle := lipgloss.NewStyle().
+				Background(lipgloss.Color("63")).
+				Foreground(lipgloss.Color("255")).
+				Width(maxContentWidth)
+			contentLines = append(contentLines, highlightStyle.Render(truncatedRow))
+		} else {
+			// Normal row
+			normalStyle := lipgloss.NewStyle().
+				Foreground(lipgloss.Color("252")).
+				Width(maxContentWidth)
+			contentLines = append(contentLines, normalStyle.Render(truncatedRow))
+		}
+	}
+
+	// Join content lines
+	content := contentStyle.Render(strings.Join(contentLines, "\n"))
+
+	// Page indicator at bottom
+	indicatorStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("240")).
+		Width(boxWidth - 2).
+		Align(lipgloss.Center).
+		MarginTop(1)
+
+	// Page dots
+	var dots []string
+	for i := 0; i < len(pageTitles); i++ {
+		if i == d.docsCurrentPage {
+			dots = append(dots, "●")
+		} else {
+			dots = append(dots, "○")
+		}
+	}
+
+	pageIndicator := indicatorStyle.Render(
+		fmt.Sprintf("Page %d/%d  %s  (1-8: jump)",
+			d.docsCurrentPage+1,
+			len(pageTitles),
+			strings.Join(dots, " ")))
+
+	// Calculate remaining height for spacing
+	innerHeight := boxHeight - 2 // Account for border
+	titleHeight := lipgloss.Height(title)
+	contentHeight := lipgloss.Height(content)
+	indicatorHeight := lipgloss.Height(pageIndicator)
+	usedHeight := titleHeight + contentHeight + indicatorHeight
+	remainingHeight := innerHeight - usedHeight
+
+	spacing := ""
+	if remainingHeight > 0 {
+		spacing = strings.Repeat("\n", remainingHeight)
+	}
+
+	// Join everything inside the box
+	innerContent := lipgloss.JoinVertical(
+		lipgloss.Left,
+		title,
+		content,
+		spacing,
+		pageIndicator,
+	)
+
+	// Wrap in the box
+	boxedContent := boxStyle.Render(innerContent)
+
+	// Center the box on screen (leaving room for statusline)
+	centeredBox := lipgloss.Place(d.width, d.height-1, lipgloss.Center, lipgloss.Center, boxedContent)
+
+	// Create the statusline
+	shortHelp := "[h/l]pages [j/k]navigate [1-8]jump [?/q/b/ESC]back [Q]uit"
+
+	statusLine := d.statusLine.
+		SetWidth(d.width).
+		SetLeft("[DOCS]").
+		SetRight(fmt.Sprintf("Page %d/%d", d.docsCurrentPage+1, len(pageTitles))).
+		SetHelp(shortHelp).
+		Render()
+
+	// Join the centered box and statusline
+	return lipgloss.JoinVertical(lipgloss.Left, centeredBox, statusLine)
+}
+
+// getDocsPages returns the documentation content for each page
+func (d *DashboardView) getDocsPages() [][]string {
+	return [][]string{
+		// Page 1: Basic Navigation
+		{
+			"↑/↓, j/k     Move up/down in current column",
+			"←/→, h/l     Move between columns",
+			"Tab          Cycle through columns",
+			"Enter        Select item and move to next column",
+			"Backspace    Move to previous column",
+			"g            Jump to first item",
+			"G            Jump to last item",
+			"gg           Jump to top (vim-style double tap)",
+			"Ctrl+u       Page up",
+			"Ctrl+d       Page down",
+		},
+		// Page 2: Fuzzy Search (FZF)
+		{
+			"f            Activate FZF mode on current column",
+			"Type         Filter items in real-time",
+			"↑/↓          Navigate filtered items",
+			"Ctrl+j/k     Alternative navigation in FZF",
+			"Enter        Select item and proceed",
+			"ESC          Cancel FZF mode",
+			"",
+			"In Create View:",
+			"Ctrl+F       FZF for repository (insert mode)",
+			"f            FZF for repository (normal mode)",
+		},
+		// Page 3: View Controls
+		{
+			"n            Create new run",
+			"s            Show status/user info overlay",
+			"r            Refresh data",
+			"o            Open URL (when available)",
+			"?            Toggle help/documentation",
+			"q            Go back/quit (context-aware)",
+			"Q            Force quit from anywhere",
+			"ESC, b       Alternative back navigation",
+		},
+		// Page 4: Clipboard Operations
+		{
+			"y            Copy current selection to clipboard",
+			"Y            Copy all content (details view)",
+			"",
+			"Visual Feedback:",
+			"Green flash  Successful copy animation",
+			"Status msg   Shows what was copied",
+			"",
+			"Tip: All selectable fields support copying",
+		},
+		// Page 5: Create Run Form
+		{
+			"Normal Mode:",
+			"i, Enter     Enter insert mode",
+			"j/k          Navigate fields",
+			"ESC (2x)     Return to dashboard",
+			"",
+			"Insert Mode:",
+			"Tab/Shift+Tab Navigate between fields",
+			"ESC          Switch to normal mode",
+			"Ctrl+S       Submit run",
+			"Ctrl+L       Clear all fields",
+			"Ctrl+X       Clear current field",
+			"Ctrl+F       Repository fuzzy search",
+		},
+		// Page 6: Dashboard Layout
+		{
+			"Left Column  Repositories with active runs",
+			"Middle       Runs for selected repository",
+			"Right        Details for selected run",
+			"",
+			"Status Icons:",
+			"🟢           Success",
+			"🔵           Running",
+			"🟡           Pending",
+			"🔴           Failed",
+			"⚪           Unknown",
+		},
+		// Page 7: Tips & Tricks
+		{
+			"Quick Find   Use 'f' instead of scrolling",
+			"Fast Nav     Enter drills down, Backspace goes up",
+			"Context      'q' behavior changes by view",
+			"Memory       Recently used repos saved",
+			"Smart Icons  📁 current, 🔄 history, ✏️ edited",
+			"",
+			"Pro Tip: Chain 'f' + Enter for quick access",
+		},
+		// Page 8: Quick Reference
+		{
+			"Navigation   j/k h/l Tab Enter Backspace",
+			"Search       f (fuzzy) / (search)",
+			"Actions      n (new) r (refresh) s (status)",
+			"Clipboard    y (copy) Y (copy all)",
+			"View Control ? (help) q (back) Q (quit)",
+			"",
+			"Vim Commands gg G Ctrl+u Ctrl+d",
+			"Form Submit  Ctrl+S",
+		},
+	}
+}
+
+// truncateString truncates a string to the specified width, adding ellipsis if needed
+func (d *DashboardView) truncateString(s string, maxWidth int) string {
+	// Handle newlines by taking only the first line
+	lines := strings.Split(s, "\n")
+	if len(lines) > 0 {
+		s = lines[0]
+	}
+
+	// Convert tabs to spaces for consistent display
+	s = strings.ReplaceAll(s, "\t", "    ")
+
+	// Use rune counting for proper unicode handling
+	runes := []rune(s)
+	if len(runes) <= maxWidth {
+		return s
+	}
+
+	// Leave room for ellipsis
+	if maxWidth > 3 {
+		return string(runes[:maxWidth-3]) + "..."
+	}
+	return "..."
 }
 
 // renderRepositoriesTable renders a table of repositories with real data

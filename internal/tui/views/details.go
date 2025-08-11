@@ -267,9 +267,9 @@ func (v *RunDetailsView) handleKeyInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		v.stopPolling()
 		return v, tea.Quit
 	case key.Matches(msg, v.keys.Help):
-		// Navigate to docs view
-		docsView := NewDocsView(v)
-		return docsView, docsView.Init()
+		// For now, just ignore help in details view
+		// Could return to dashboard with docs shown if needed
+		return v, nil
 	case key.Matches(msg, v.keys.Refresh):
 		v.loading = true
 		v.error = nil

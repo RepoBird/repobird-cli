@@ -282,9 +282,10 @@ func (v *RunListView) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		dashboard := NewDashboardView(v.client)
 		return dashboard, dashboard.Init()
 	case key.Matches(msg, v.keys.Help):
-		// Navigate to docs view
-		docsView := NewDocsView(v)
-		return docsView, docsView.Init()
+		// Return to dashboard and show docs
+		dashboard := NewDashboardView(v.client)
+		dashboard.showDocs = true
+		return dashboard, dashboard.Init()
 	case key.Matches(msg, v.keys.Refresh):
 		cmds = append(cmds, v.loadRuns())
 	case key.Matches(msg, v.keys.Search):

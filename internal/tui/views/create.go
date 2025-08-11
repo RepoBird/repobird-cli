@@ -472,9 +472,13 @@ func (v *CreateRunView) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return dashboard, dashboard.Init()
 		}
 	case key.Matches(msg, v.keys.Help):
-		// Navigate to docs view
-		docsView := NewDocsView(v)
-		return docsView, docsView.Init()
+		// Return to dashboard and show docs
+		dashboard := NewDashboardView(v.client)
+		dashboard.width = v.width
+		dashboard.height = v.height
+		dashboard.showDocs = true
+		dashboard.docsCurrentPage = 4 // Show Create Run Form page
+		return dashboard, dashboard.Init()
 	case msg.String() == "i":
 		// 'i' enters insert mode
 		v.inputMode = components.InsertMode
