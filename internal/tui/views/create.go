@@ -417,7 +417,11 @@ func (v *CreateRunView) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		} else if v.focusIndex == 0 {
 			// Enter on load config field (index 0) activates file selector
-			return v, v.activateConfigFileSelector()
+			// Don't process if already loading or active
+			if !v.fileSelectorLoading && !v.configFileSelectorActive {
+				v.fileSelectorLoading = true
+				return v, v.activateConfigFileSelector()
+			}
 		} else if v.focusIndex == 1 {
 			// Enter on run type field (index 1) toggles it
 			if v.runType == models.RunTypeRun {
@@ -453,7 +457,11 @@ func (v *CreateRunView) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// In normal mode, 'f' activates FZF
 		if v.focusIndex == 0 {
 			// Load config field - activate file selector
-			return v, v.activateConfigFileSelector()
+			// Don't process if already loading or active
+			if !v.fileSelectorLoading && !v.configFileSelectorActive {
+				v.fileSelectorLoading = true
+				return v, v.activateConfigFileSelector()
+			}
 		} else if v.focusIndex == 2 && !v.fzfActive {
 			// Repository field - activate FZF for repository selection
 			v.activateFZFMode()
@@ -697,9 +705,16 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case configLoadErrorMsg:
 		// Handle config loading error
+		v.fileSelectorLoading = false
 		v.error = msg.err
 		v.initErrorFocus()
 		debug.LogToFilef("DEBUG: Config loading failed: %v\n", msg.err)
+		return v, nil
+
+	case fileSelectorActivatedMsg:
+		// File selector is now active, clear loading state
+		v.fileSelectorLoading = false
+		v.configFileSelectorActive = true
 		return v, nil
 	}
 
@@ -1780,6 +1795,8 @@ type configLoadErrorMsg struct {
 	err error
 }
 
+type fileSelectorActivatedMsg struct{}
+
 // startYankBlinkAnimation starts the blink animation for clipboard feedback
 func (v *CreateRunView) startYankBlinkAnimation() tea.Cmd {
 	return func() tea.Msg {
@@ -1855,24 +1872,18 @@ func (v *CreateRunView) activateFZFMode() {
 
 // activateConfigFileSelector activates the file selector for loading config files
 func (v *CreateRunView) activateConfigFileSelector() tea.Cmd {
-	// Show loading state immediately
-	v.fileSelectorLoading = true
-
 	return func() tea.Msg {
 		// Set file selector dimensions
 		v.fileSelector.SetDimensions(v.width, v.height)
 
 		// Activate JSON file selector
 		if err := v.fileSelector.ActivateJSONFileSelector(); err != nil {
-			v.fileSelectorLoading = false
 			debug.LogToFilef("DEBUG: Failed to activate file selector: %v\n", err)
 			return configLoadErrorMsg{err: fmt.Errorf("failed to show file selector: %w", err)}
 		}
 
-		v.configFileSelectorActive = true
-		v.fileSelectorLoading = false
 		debug.LogToFile("DEBUG: Config file selector activated\n")
-		return nil
+		return fileSelectorActivatedMsg{}
 	}
 }
 
