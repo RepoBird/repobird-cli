@@ -33,7 +33,6 @@ type RunListView struct {
 	spinner      spinner.Model
 	pollTicker   *time.Ticker
 	pollStop     chan bool
-	showHelp     bool
 	searchMode   bool
 	searchQuery  string
 	filteredRuns []models.RunResponse
@@ -223,9 +222,7 @@ func (v *RunListView) handleWindowSizeMsg(msg tea.WindowSizeMsg) {
 		nonTableHeight++ // Search/filter line
 	}
 
-	if v.showHelp {
-		nonTableHeight += 4 // Help text
-	}
+	// Help has been moved to docs view
 
 	// Give the rest to the table
 	tableHeight := msg.Height - nonTableHeight
@@ -285,7 +282,9 @@ func (v *RunListView) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		dashboard := NewDashboardView(v.client)
 		return dashboard, dashboard.Init()
 	case key.Matches(msg, v.keys.Help):
-		v.showHelp = !v.showHelp
+		// Navigate to docs view
+		docsView := NewDocsView(v)
+		return docsView, docsView.Init()
 	case key.Matches(msg, v.keys.Refresh):
 		cmds = append(cmds, v.loadRuns())
 	case key.Matches(msg, v.keys.Search):
@@ -560,23 +559,7 @@ func (v *RunListView) View() string {
 		}
 	}
 
-	// Help content (if shown) - place just before status bar
-	if v.showHelp {
-		helpContent := v.help.View(v.keys)
-		if helpContent != "" {
-			helpLines := strings.Split(strings.TrimRight(helpContent, "\n"), "\n")
-			// Place help starting from height-1-len(helpLines)
-			helpStart := v.height - 1 - len(helpLines)
-			if helpStart < lineIdx {
-				helpStart = lineIdx
-			}
-			for i, line := range helpLines {
-				if helpStart+i < v.height-1 {
-					lines[helpStart+i] = line
-				}
-			}
-		}
-	}
+	// Help has been moved to docs view
 
 	// Status bar always goes in the last line
 	lines[v.height-1] = v.renderStatusBar()

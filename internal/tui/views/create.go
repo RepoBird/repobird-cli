@@ -39,7 +39,6 @@ type CreateRunView struct {
 	error         error
 	success       bool
 	createdRun    *models.RunResponse
-	showHelp      bool
 	useFileInput  bool
 	filePathInput textinput.Model
 	// Input mode tracking
@@ -473,7 +472,9 @@ func (v *CreateRunView) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return dashboard, dashboard.Init()
 		}
 	case key.Matches(msg, v.keys.Help):
-		v.showHelp = !v.showHelp
+		// Navigate to docs view
+		docsView := NewDocsView(v)
+		return docsView, docsView.Init()
 	case msg.String() == "i":
 		// 'i' enters insert mode
 		v.inputMode = components.InsertMode

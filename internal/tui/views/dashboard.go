@@ -27,8 +27,8 @@ type DashboardView struct {
 
 	// Dashboard state
 	currentLayout      models.LayoutType
-	showHelp           bool
 	showStatusInfo     bool // Show status/user info overlay
+	showDocs           bool // Show documentation overlay
 	selectedRepo       *models.Repository
 	selectedRepoIdx    int
 	selectedRunIdx     int
@@ -95,6 +95,10 @@ type DashboardView struct {
 	// Vim keybinding state for 'gg' command
 	lastGPressTime time.Time // Time when 'g' was last pressed
 	waitingForG    bool      // Whether we're waiting for second 'g' in 'gg' command
+
+	// Documentation overlay state
+	docsCurrentPage int
+	docsSelectedRow int
 }
 
 type dashboardDataLoadedMsg struct {
@@ -666,6 +670,9 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Refresh user info when showing
 			cmds = append(cmds, d.loadUserInfo())
 			return d, tea.Batch(cmds...)
+		case d.showDocs:
+			// Handle navigation in docs overlay
+			return d.handleDocsNavigation(msg)
 		case d.showStatusInfo:
 			// Handle navigation in status info overlay
 			return d.handleStatusInfoNavigation(msg)
@@ -716,7 +723,10 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			d.currentLayout = models.LayoutRepositoriesOnly
 			return d, nil
 		case key.Matches(msg, d.keys.Help):
-			d.showHelp = !d.showHelp
+			// Toggle docs overlay
+			d.showDocs = true
+			d.docsCurrentPage = 0
+			d.docsSelectedRow = 0
 			return d, nil
 		case key.Matches(msg, d.keys.Quit):
 			return d, tea.Quit
@@ -1217,6 +1227,11 @@ func (d *DashboardView) View() string {
 	// Overlay FZF selector if active
 	if d.fzfMode != nil && d.fzfMode.IsActive() {
 		return d.renderWithFZFOverlay(finalView)
+	}
+
+	// Overlay docs if requested
+	if d.showDocs {
+		return d.renderDocs()
 	}
 
 	// Overlay status info if requested
@@ -2602,10 +2617,7 @@ func (d *DashboardView) renderStatusLine(layoutName string) string {
 	}
 
 	// Compact help text
-	shortHelp := "n:new f:fuzzy s:status y:copy ?:help r:refresh q:quit"
-	if d.showHelp {
-		shortHelp = "n:new f:fuzzy s:status y:copy j/k:↑↓ h/l:←→ Enter:→ BS:← ?:help q:quit"
-	}
+	shortHelp := "n:new f:fuzzy s:status y:copy ?:docs r:refresh q:quit"
 
 	// Add URL opening hint if current selection has a URL
 	if d.hasCurrentSelectionURL() {
