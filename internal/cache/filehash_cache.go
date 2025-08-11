@@ -274,3 +274,17 @@ func CalculateConfigHash(config *models.RunConfig) (string, error) {
 	hash := sha256.Sum256(data)
 	return hex.EncodeToString(hash[:]), nil
 }
+
+// CalculateStringHash calculates the SHA-256 hash of a string
+func CalculateStringHash(content string) string {
+	hash := sha256.Sum256([]byte(content))
+	return hex.EncodeToString(hash[:])
+}
+
+// Set stores a hash in the cache (for tracking generated hashes)
+func (c *FileHashCache) Set(key string, hash string) {
+	if hash == "" {
+		return
+	}
+	c.AddHash(hash)
+}

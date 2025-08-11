@@ -92,12 +92,12 @@ type CreateRunView struct {
 	currentFileHash string
 	isDuplicateRun  bool
 	// Submission state tracking
-	isSubmitting bool
+	isSubmitting    bool
 	submitStartTime time.Time
 	// Duplicate run confirmation state
 	isDuplicateConfirm bool
-	duplicateRunID string
-	pendingTask models.RunRequest
+	duplicateRunID     string
+	pendingTask        models.RunRequest
 }
 
 func NewCreateRunView(client APIClient) *CreateRunView {
@@ -655,7 +655,7 @@ func (v *CreateRunView) handleRunCreated(msg runCreatedMsg) (tea.Model, tea.Cmd)
 				return v, nil
 			}
 		}
-		
+
 		// Regular error handling for non-duplicate errors
 		v.error = msg.err
 		v.initErrorFocus()
@@ -1885,8 +1885,8 @@ func (v *CreateRunView) renderStatusBar() string {
 	if v.isDuplicateConfirm {
 		// Create yellow status line similar to reset confirmation
 		duplicateStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("0")).   // Black text
-			Background(lipgloss.Color("11")).  // Yellow background
+			Foreground(lipgloss.Color("0")).  // Black text
+			Background(lipgloss.Color("11")). // Yellow background
 			Bold(true).
 			Width(v.width).
 			Align(lipgloss.Center)

@@ -24,6 +24,9 @@ const (
 
 	// EndpointRunsHashes is the endpoint for getting all file hashes
 	EndpointRunsHashes = "/api/v1/runs/hashes"
+
+	// EndpointBulkRuns is the endpoint for bulk run operations
+	EndpointBulkRuns = "/api/v1/runs/bulk"
 )
 
 // RunDetailsURL builds the URL for getting a specific run by ID

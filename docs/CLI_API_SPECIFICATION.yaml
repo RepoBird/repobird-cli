@@ -4,13 +4,13 @@ info:
   version: 1.0.0
   description: |
     API endpoints for RepoBird CLI integration.
-    
+
     ## Authentication
     All endpoints require authentication using an API key passed as a Bearer token.
-    
+
     ## Rate Limiting
     API requests are rate-limited to 100 requests per minute per API key.
-    
+
     ## File Hash Duplicate Detection
     The API supports file hash-based duplicate detection to prevent re-running identical task files.
     When submitting a run with a fileHash, the system checks for existing runs with the same hash.
@@ -47,7 +47,7 @@ components:
         message:
           type: string
           description: Human-readable error message
-          example: "Duplicate run detected: A run with this file hash already exists (ID: 123). Use --force to override."
+          example: 'Duplicate run detected: A run with this file hash already exists (ID: 123). Use --force to override.'
       required:
         - error
 
@@ -265,11 +265,11 @@ components:
         prompt:
           type: string
           description: The task description or prompt
-          example: "Implement JWT authentication with refresh tokens. Add login and logout endpoints."
+          example: Implement JWT authentication with refresh tokens. Add login and logout endpoints.
         title:
           type: string
           description: Optional title for the run
-          example: "Add authentication system"
+          example: Add authentication system
         sourceBranch:
           type: string
           description: Source branch (defaults to repo default)
@@ -292,9 +292,226 @@ components:
       example:
         repositoryName: acme/webapp
         runType: run
-        prompt: "Implement JWT authentication with refresh tokens"
-        title: "Add authentication system"
-        fileHash: "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3"
+        prompt: Implement JWT authentication with refresh tokens
+        title: Add authentication system
+        fileHash: a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3
+
+    BulkRunRequest:
+      type: object
+      properties:
+        repoId:
+          type: integer
+          description: Repository ID (either repoId or repositoryName required)
+          example: 789
+        repositoryName:
+          type: string
+          description: Repository name (owner/repo format)
+          example: acme/webapp
+        batchTitle:
+          type: string
+          description: Optional title for the entire batch
+          example: Q1 2024 Bug Fixes
+        runType:
+          type: string
+          enum: [run, plan]
+          default: run
+          description: Type of run for all runs in batch
+        sourceBranch:
+          type: string
+          description: Source branch for all runs (defaults to repo default)
+          example: main
+        targetBranch:
+          type: string
+          description: Base target branch (individual runs can override)
+          example: feature/bulk
+        force:
+          type: boolean
+          default: false
+          description: Override duplicate detection for all runs
+        runs:
+          type: array
+          minItems: 1
+          maxItems: 10
+          items:
+            type: object
+            properties:
+              prompt:
+                type: string
+                description: The task description or prompt
+                example: Fix authentication bug
+              title:
+                type: string
+                description: Optional title (generated from prompt if not provided)
+                example: Fix auth issue
+              context:
+                type: string
+                description: Additional context for this run
+                example: Users can't login with Google OAuth
+              target:
+                type: string
+                description: Target branch for this specific run
+                example: fix/auth-bug-1
+              fileHash:
+                type: string
+                description: SHA-256 hash for duplicate detection
+                example: abc123def456
+            required:
+              - prompt
+      required:
+        - runs
+      example:
+        repositoryName: acme/webapp
+        batchTitle: Authentication module refactoring
+        runs:
+          - prompt: Fix authentication bug
+            title: Fix auth issue
+            fileHash: hash1
+          - prompt: Add password reset
+            title: Password reset feature
+            fileHash: hash2
+
+    BulkRunResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            batchId:
+              type: string
+              description: Unique batch identifier
+              example: batch_20240120_abc123
+            batchTitle:
+              type: string
+              nullable: true
+              description: Batch title if provided
+              example: Authentication module refactoring
+            successful:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    example: 12345
+                  status:
+                    type: string
+                    example: QUEUED
+                  repositoryName:
+                    type: string
+                    example: acme/webapp
+                  title:
+                    type: string
+                    example: Fix auth issue
+                  requestIndex:
+                    type: integer
+                    description: Position in original request
+                    example: 0
+            failed:
+              type: array
+              items:
+                type: object
+                properties:
+                  requestIndex:
+                    type: integer
+                    example: 1
+                  prompt:
+                    type: string
+                    example: Add password reset
+                  error:
+                    type: string
+                    example: DUPLICATE_RUN
+                  message:
+                    type: string
+                    example: Duplicate detected (ID 12300). Use force true to override.
+                  existingRunId:
+                    type: integer
+                    description: ID of existing run if duplicate
+                    example: 12300
+            metadata:
+              type: object
+              properties:
+                totalRequested:
+                  type: integer
+                  example: 3
+                totalSuccessful:
+                  type: integer
+                  example: 2
+                totalFailed:
+                  type: integer
+                  example: 1
+
+    BatchStatusResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            batchId:
+              type: string
+              example: batch_20240120_abc123
+            batchTitle:
+              type: string
+              nullable: true
+              example: Authentication module refactoring
+            status:
+              type: string
+              enum: [QUEUED, PROCESSING, COMPLETED, PARTIALLY_FAILED, FAILED]
+              description: Aggregate status of all runs
+              example: PROCESSING
+            runs:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    example: 12345
+                  status:
+                    type: string
+                    example: DONE
+                  title:
+                    type: string
+                    example: Fix auth issue
+                  completedAt:
+                    type: string
+                    format: date-time
+                    description: Completion time for DONE runs
+                    example: 2024-01-20T10:30:00Z
+                  prUrl:
+                    type: string
+                    description: Pull request URL if created
+                    example: https://github.com/acme/webapp/pull/123
+                  progress:
+                    type: integer
+                    description: Progress percentage for PROCESSING runs
+                    example: 45
+            metadata:
+              type: object
+              properties:
+                totalRuns:
+                  type: integer
+                  example: 3
+                completed:
+                  type: integer
+                  example: 1
+                processing:
+                  type: integer
+                  example: 1
+                failed:
+                  type: integer
+                  example: 0
+                queued:
+                  type: integer
+                  example: 1
+                startedAt:
+                  type: string
+                  format: date-time
+                  example: 2024-01-20T10:00:00Z
+                estimatedCompletionTime:
+                  type: string
+                  format: date-time
+                  nullable: true
+                  example: 2024-01-20T10:45:00Z
 
 paths:
   /api/v1/auth/verify:
@@ -437,21 +654,21 @@ paths:
                 summary: Basic run request
                 value:
                   repositoryName: acme/webapp
-                  prompt: "Fix the login bug in auth.js"
-                  title: "Fix authentication issue"
+                  prompt: Fix the login bug in auth.js
+                  title: Fix authentication issue
               withHash:
                 summary: Run with file hash for duplicate detection
                 value:
                   repositoryName: acme/webapp
-                  prompt: "Implement JWT authentication"
-                  title: "Add auth system"
-                  fileHash: "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3"
+                  prompt: Implement JWT authentication
+                  title: Add auth system
+                  fileHash: a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3
               forceDuplicate:
                 summary: Force run despite duplicate hash
                 value:
                   repositoryName: acme/webapp
-                  prompt: "Implement JWT authentication"
-                  fileHash: "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3"
+                  prompt: Implement JWT authentication
+                  fileHash: a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3
                   force: true
       responses:
         '200':
@@ -508,7 +725,7 @@ paths:
                 duplicate:
                   value:
                     error: DUPLICATE_RUN
-                    message: "Duplicate run detected: A run with this file hash already exists (ID: 12345). Use --force to override."
+                    message: 'Duplicate run detected: A run with this file hash already exists (ID: 12345). Use --force to override.'
 
     get:
       summary: List user's runs
@@ -594,19 +811,19 @@ paths:
                         repositoryName: acme/webapp
                         status: DONE
                         runType: pro
-                        title: "Fix authentication bug"
-                        description: "Fixed the login timeout issue"
-                        fileHash: "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3"
-                        createdAt: "2024-01-20T10:00:00Z"
+                        title: Fix authentication bug
+                        description: Fixed the login timeout issue
+                        fileHash: a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3
+                        createdAt: '2024-01-20T10:00:00Z'
                       - id: 12344
                         repoId: 789
                         repositoryName: acme/webapp
                         status: PROCESSING
                         runType: pro-plan
-                        title: "Add payment integration"
-                        description: "Planning payment system architecture"
+                        title: Add payment integration
+                        description: Planning payment system architecture
                         fileHash: null
-                        createdAt: "2024-01-20T09:30:00Z"
+                        createdAt: '2024-01-20T09:30:00Z'
                     metadata:
                       currentPage: 1
                       total: 2
@@ -803,6 +1020,260 @@ paths:
                         type: string
                         nullable: true
 
+  /api/v1/runs/bulk:
+    post:
+      summary: Create bulk runs
+      description: |
+        Creates multiple AI agent runs in a single batch for the specified repository.
+        Maximum of 10 runs per batch. Supports partial success with 207 Multi-Status.
+        Each run can have its own configuration while sharing common settings.
+      tags:
+        - Runs
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkRunRequest'
+            examples:
+              basic:
+                summary: Basic bulk run request
+                value:
+                  repositoryName: acme/webapp
+                  runs:
+                    - prompt: Fix the login bug
+                    - prompt: Add password reset functionality
+                    - prompt: Update user profile page
+              withOptions:
+                summary: Bulk run with options
+                value:
+                  repositoryName: acme/webapp
+                  batchTitle: Q1 2024 Bug Fixes
+                  force: true
+                  runs:
+                    - prompt: Fix bug #123
+                      title: Critical auth fix
+                      fileHash: abc123
+                    - prompt: Fix bug #124
+                      context: Users report timeout issues
+                      fileHash: def456
+      responses:
+        '200':
+          description: All runs created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkRunResponse'
+              examples:
+                allSuccess:
+                  value:
+                    data:
+                      batchId: batch_20240120_abc123
+                      batchTitle: Authentication module refactoring
+                      successful:
+                        - id: 12345
+                          status: QUEUED
+                          repositoryName: acme/webapp
+                          title: Fix auth issue
+                          requestIndex: 0
+                        - id: 12346
+                          status: QUEUED
+                          repositoryName: acme/webapp
+                          title: Password reset feature
+                          requestIndex: 1
+                      failed: []
+                      metadata:
+                        totalRequested: 2
+                        totalSuccessful: 2
+                        totalFailed: 0
+        '207':
+          description: Partial success (some runs created, some failed)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkRunResponse'
+              examples:
+                partialSuccess:
+                  value:
+                    data:
+                      batchId: batch_20240120_xyz789
+                      batchTitle: null
+                      successful:
+                        - id: 12345
+                          status: QUEUED
+                          title: Fix auth issue
+                          requestIndex: 0
+                      failed:
+                        - requestIndex: 1
+                          prompt: Add password reset
+                          error: DUPLICATE_RUN
+                          message: Duplicate detected (ID 12300). Use force true to override.
+                          existingRunId: 12300
+                      metadata:
+                        totalRequested: 2
+                        totalSuccessful: 1
+                        totalFailed: 1
+        '400':
+          description: Invalid bulk request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: INVALID_BULK_REQUEST
+                  message:
+                    type: string
+                    example: Bulk request validation failed
+                  batchId:
+                    type: null
+                  details:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        field:
+                          type: string
+                        error:
+                          type: string
+        '403':
+          description: Forbidden (quota exceeded or repo disabled)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkRunResponse'
+
+  /api/v1/runs/bulk/{batchId}:
+    get:
+      summary: Get bulk run status
+      description: |
+        Retrieves the status and details of all runs in a batch.
+        Provides aggregate status and individual run progress.
+      tags:
+        - Runs
+      parameters:
+        - in: path
+          name: batchId
+          required: true
+          schema:
+            type: string
+          description: Batch identifier
+          example: batch_20240120_abc123
+      responses:
+        '200':
+          description: Batch status and run details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchStatusResponse'
+              examples:
+                processing:
+                  value:
+                    data:
+                      batchId: batch_20240120_abc123
+                      batchTitle: Refactoring authentication module
+                      status: PROCESSING
+                      runs:
+                        - id: 12345
+                          status: DONE
+                          title: Fix auth issue
+                          completedAt: '2024-01-20T10:30:00Z'
+                          prUrl: https://github.com/acme/webapp/pull/123
+                        - id: 12346
+                          status: PROCESSING
+                          title: Password reset feature
+                          progress: 45
+                      metadata:
+                        totalRuns: 2
+                        completed: 1
+                        processing: 1
+                        failed: 0
+                        queued: 0
+                        startedAt: '2024-01-20T10:00:00Z'
+                        estimatedCompletionTime: '2024-01-20T10:45:00Z'
+        '404':
+          description: Batch not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: Cancel bulk runs
+      description: |
+        Cancels all QUEUED runs in a batch.
+        Only QUEUED runs can be cancelled. PROCESSING/RUNNING runs will continue.
+        Returns information about which runs were cancelled, completed, or unable to cancel.
+      tags:
+        - Runs
+      parameters:
+        - in: path
+          name: batchId
+          required: true
+          schema:
+            type: string
+          description: Batch identifier
+          example: batch_20240120_abc123
+      responses:
+        '200':
+          description: Cancellation result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      batchId:
+                        type: string
+                        example: batch_20240120_abc123
+                      cancelled:
+                        type: array
+                        items:
+                          type: integer
+                        description: IDs of cancelled runs
+                        example: [12346, 12347]
+                      completed:
+                        type: array
+                        items:
+                          type: integer
+                        description: IDs of already completed runs
+                        example: [12345]
+                      cannotCancel:
+                        type: array
+                        items:
+                          type: integer
+                        description: IDs of runs that cannot be cancelled (processing)
+                        example: [12348]
+                      message:
+                        type: string
+                        example: Cancelled 2 of 4 runs (1 already completed, 1 in progress)
+              examples:
+                partial:
+                  value:
+                    data:
+                      batchId: batch_20240120_abc123
+                      cancelled: [12346, 12347]
+                      completed: [12345]
+                      cannotCancel: [12348]
+                      message: Cancelled 2 of 4 runs (1 already completed, 1 in progress)
+                allCompleted:
+                  value:
+                    data:
+                      batchId: batch_20240120_abc123
+                      cancelled: []
+                      completed: [12345, 12346]
+                      cannotCancel: []
+                      message: All 2 runs were already completed
+        '404':
+          description: Batch not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /api/v1/repositories:
     get:
       summary: List user's repositories
@@ -913,6 +1384,7 @@ tags:
     description: |
       AI agent run management including creation, listing, and monitoring.
       Supports duplicate detection via file hashes.
+      Bulk operations allow creating up to 10 runs in a single request.
   - name: Repositories
     description: |
       Repository management and configuration.

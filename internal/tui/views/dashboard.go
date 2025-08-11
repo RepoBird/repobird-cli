@@ -12,6 +12,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/repobird/repobird-cli/internal/api"
 	"github.com/repobird/repobird-cli/internal/cache"
 	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/repobird/repobird-cli/internal/tui/components"
@@ -478,8 +479,6 @@ func (d *DashboardView) selectRepository(repo *models.Repository) tea.Cmd {
 		// Filter runs for this repository
 		var filteredRuns []*models.RunResponse
 
-
-
 		// First try to match by repository name
 		matchCount := 0
 		for _, run := range d.allRuns {
@@ -504,7 +503,6 @@ func (d *DashboardView) selectRepository(repo *models.Repository) tea.Cmd {
 				}
 			}
 		}
-
 
 		return dashboardRepositorySelectedMsg{
 			repository: repo,
@@ -798,6 +796,16 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			createView.width = d.width
 			createView.height = d.height
 			return createView, nil
+		case msg.Type == tea.KeyRunes && string(msg.Runes) == "b":
+			// Navigate to bulk runs view
+			// Type assert the APIClient interface to *api.Client
+			if apiClient, ok := d.client.(*api.Client); ok {
+				bulkView := NewBulkView(apiClient)
+				return bulkView, bulkView.Init()
+			} else {
+				// Fallback: if not a real API client, ignore
+				return d, nil
+			}
 		case key.Matches(msg, d.keys.Enter) && d.currentLayout == models.LayoutTripleColumn && d.focusedColumn == 2 && d.selectedRunData != nil:
 			// If we're in the details column (column 2) in the triple column layout, open the full details view
 			// Convert []*models.RunResponse to []models.RunResponse
@@ -1729,7 +1737,6 @@ func (d *DashboardView) updateViewportContent() {
 
 // updateRepoViewportContent updates the repository column viewport content
 func (d *DashboardView) updateRepoViewportContent() {
-
 	var items []string
 	for i, repo := range d.repositories {
 		statusIcon := d.getRepositoryStatusIcon(&repo)
@@ -1810,7 +1817,6 @@ func (d *DashboardView) updateRepoViewportContent() {
 
 // updateRunsViewportContent updates the runs column viewport content
 func (d *DashboardView) updateRunsViewportContent() {
-
 	var items []string
 
 	if d.selectedRepo != nil {
@@ -1919,7 +1925,6 @@ func (d *DashboardView) updateRunsViewportContent() {
 
 // updateDetailsViewportContent updates the details column viewport content
 func (d *DashboardView) updateDetailsViewportContent() {
-
 	var displayLines []string
 
 	if d.selectedRunData == nil {
@@ -3284,6 +3289,7 @@ func (d *DashboardView) getDocsPages() [][]string {
 		// Page 3: View Controls
 		{
 			"n            Create new run",
+			"b            Bulk runs (multiple at once)",
 			"s            Show status/user info overlay",
 			"r            Refresh data",
 			"o            Open URL (when available)",

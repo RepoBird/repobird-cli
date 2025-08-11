@@ -11,6 +11,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/repobird/repobird-cli/internal/api/dto"
 	"github.com/repobird/repobird-cli/internal/errors"
 	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/repobird/repobird-cli/internal/retry"
@@ -570,4 +571,113 @@ func (c *Client) GetFileHashes(ctx context.Context) ([]models.FileHashEntry, err
 	}
 
 	return hashesResp.Data, nil
+}
+
+// CreateBulkRuns creates multiple runs in a batch
+func (c *Client) CreateBulkRuns(ctx context.Context, req *dto.BulkRunRequest) (*dto.BulkRunResponse, error) {
+	resp, err := c.doRequestWithRetry(ctx, "POST", EndpointBulkRuns, req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if err := ValidateResponseOKOrCreated(resp); err != nil {
+		return nil, err
+	}
+
+	var bulkResp dto.BulkRunResponse
+	if err := json.NewDecoder(resp.Body).Decode(&bulkResp); err != nil {
+		return nil, fmt.Errorf("failed to decode bulk runs response: %w", err)
+	}
+
+	return &bulkResp, nil
+}
+
+// GetBulkStatus retrieves the status of a bulk run batch
+func (c *Client) GetBulkStatus(ctx context.Context, batchID string) (*dto.BulkStatusResponse, error) {
+	if batchID == "" {
+		return nil, fmt.Errorf("batch ID cannot be empty")
+	}
+
+	path := fmt.Sprintf("%s/%s", EndpointBulkRuns, batchID)
+	resp, err := c.doRequestWithRetry(ctx, "GET", path, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if err := ValidateResponseOK(resp); err != nil {
+		return nil, err
+	}
+
+	var statusResp dto.BulkStatusResponse
+	if err := json.NewDecoder(resp.Body).Decode(&statusResp); err != nil {
+		return nil, fmt.Errorf("failed to decode bulk status response: %w", err)
+	}
+
+	return &statusResp, nil
+}
+
+// CancelBulkRuns cancels all runs in a batch
+func (c *Client) CancelBulkRuns(ctx context.Context, batchID string) error {
+	if batchID == "" {
+		return fmt.Errorf("batch ID cannot be empty")
+	}
+
+	path := fmt.Sprintf("%s/%s", EndpointBulkRuns, batchID)
+	resp, err := c.doRequestWithRetry(ctx, "DELETE", path, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if err := ValidateResponseOK(resp); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// PollBulkStatus polls for bulk status updates at the specified interval
+func (c *Client) PollBulkStatus(ctx context.Context, batchID string, interval time.Duration) (<-chan dto.BulkStatusResponse, error) {
+	if batchID == "" {
+		return nil, fmt.Errorf("batch ID cannot be empty")
+	}
+
+	statusChan := make(chan dto.BulkStatusResponse, 1)
+
+	go func() {
+		defer close(statusChan)
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				status, err := c.GetBulkStatus(ctx, batchID)
+				if err != nil {
+					if c.debug {
+						logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
+						logger.Debug("Failed to get bulk status", "error", err)
+					}
+					continue
+				}
+
+				select {
+				case statusChan <- *status:
+				case <-ctx.Done():
+					return
+				}
+
+				// Check if batch is complete
+				if status.Status == "completed" || status.Status == "failed" || status.Status == "cancelled" {
+					return
+				}
+			}
+		}
+	}()
+
+	return statusChan, nil
 }
