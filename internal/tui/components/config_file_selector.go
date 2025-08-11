@@ -275,13 +275,15 @@ func (cfs *ConfigFileSelector) View() string {
 	}
 	
 	// Calculate box dimensions - boxes should fill available height
-	boxHeight := availableHeight
+	// Subtract 2 for the border characters that will be added
+	boxHeight := availableHeight - 2
 	
-	// Use most of the available width, with some margin
-	marginX := 2
-	totalWidth := cfs.width - (marginX * 2)
+	// Account for border expansion: each box renders 2 chars wider than set width
+	// So we need to subtract 4 total (2 per box) from terminal width
+	totalWidth := cfs.width - 4
 	
 	// Split width between list and preview (40/60 split favoring preview)
+	// No gap between panes to maximize space usage
 	listWidth := int(float64(totalWidth) * 0.4)
 	if listWidth < 30 {
 		listWidth = 30
@@ -289,12 +291,14 @@ func (cfs *ConfigFileSelector) View() string {
 	if listWidth > 50 {
 		listWidth = 50
 	}
-	previewWidth := totalWidth - listWidth - 1 // -1 for gap between panes
+	previewWidth := totalWidth - listWidth
 	
 	// Content height inside boxes (account for borders and headers)
-	contentHeight := boxHeight - 4 // -2 for borders, -2 for header and spacing
-	listContentHeight := contentHeight - 1 // Extra line for filter
-	previewContentHeight := contentHeight
+	// The box content area is boxHeight - 2 (for top/bottom borders)
+	contentHeight := boxHeight - 2
+	// Reserve space for header and spacing
+	listContentHeight := contentHeight - 2 // Header + filter line
+	previewContentHeight := contentHeight - 1 // Just header
 
 	// Build file list content
 	var fileListContent []string
@@ -433,13 +437,8 @@ func (cfs *ConfigFileSelector) View() string {
 			strings.Join(previewContent, "\n"),
 		))
 
-	// Combine both panes horizontally with margin
-	splitView := lipgloss.JoinHorizontal(lipgloss.Top, fileListBox, " ", previewBox)
-	
-	// Add left margin to align properly
-	contentWithMargin := lipgloss.NewStyle().
-		MarginLeft(2).
-		Render(splitView)
+	// Combine both panes horizontally - no gap between them
+	splitView := lipgloss.JoinHorizontal(lipgloss.Top, fileListBox, previewBox)
 
 	// Status bar at the bottom (full width, like other views)
 	statusBarStyle := lipgloss.NewStyle().
@@ -459,10 +458,10 @@ func (cfs *ConfigFileSelector) View() string {
 	statusText := fmt.Sprintf("↑↓/jk: nav • Enter: select • ESC: cancel • Type: filter%s", selectedInfo)
 	statusBar := statusBarStyle.Render(statusText)
 
-	// Join content and status bar vertically
+	// Join content and status bar vertically - content aligned to top
 	fullView := lipgloss.JoinVertical(
 		lipgloss.Left,
-		contentWithMargin,
+		splitView,
 		statusBar,
 	)
 

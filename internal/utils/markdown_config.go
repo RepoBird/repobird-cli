@@ -139,8 +139,8 @@ func ValidateRunConfig(config *models.RunConfig) error {
 
 	if config.RunType == "" {
 		config.RunType = "run" // Default to "run" if not specified
-	} else if config.RunType != "run" && config.RunType != "approval" {
-		errors = append(errors, fmt.Sprintf("invalid runType '%s', must be 'run' or 'approval'", config.RunType))
+	} else if config.RunType != "run" && config.RunType != "approval" && config.RunType != "plan" {
+		errors = append(errors, fmt.Sprintf("invalid runType '%s', must be 'run', 'plan', or 'approval'", config.RunType))
 	}
 
 	if config.Title == "" {

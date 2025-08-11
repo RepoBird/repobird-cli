@@ -1,0 +1,31 @@
+# Example YAML configuration for RepoBird CLI
+# This demonstrates the clean YAML syntax with multiline support
+
+prompt: |
+  Fix the authentication issue where users are getting logged out randomly.
+  The issue seems to be related to JWT token expiration handling.
+  
+  Please investigate and fix:
+  - Token refresh logic
+  - Session persistence
+  - Cookie handling
+  
+repository: mycompany/webapp
+target: fix/auth-logout-issue
+title: Fix random logout issue
+
+# Optional fields with defaults
+source: main        # defaults to 'main' if omitted
+runType: run        # defaults to 'run' if omitted
+
+# Optional context for additional information
+context: |
+  Users report being logged out after 5-10 minutes of activity.
+  This started happening after the last deployment on Friday.
+  No changes were made to the auth module directly.
+
+# Optional file list to help the AI focus
+files:
+  - src/auth/jwt.js
+  - src/middleware/session.js
+  - src/utils/cookies.js
