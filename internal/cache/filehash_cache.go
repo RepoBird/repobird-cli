@@ -234,26 +234,15 @@ func (c *FileHashCache) IsLoaded() bool {
 }
 
 // CalculateFileHash calculates the SHA-256 hash of a file's contents
+// Works with any file type by hashing the raw file contents
 func CalculateFileHash(filepath string) (string, error) {
 	data, err := os.ReadFile(filepath)
 	if err != nil {
 		return "", fmt.Errorf("failed to read file: %w", err)
 	}
 
-	// Parse as JSON to normalize the content
-	var jsonData interface{}
-	if err := json.Unmarshal(data, &jsonData); err != nil {
-		return "", fmt.Errorf("failed to parse JSON: %w", err)
-	}
-
-	// Marshal back to get normalized JSON
-	normalizedData, err := json.Marshal(jsonData)
-	if err != nil {
-		return "", fmt.Errorf("failed to normalize JSON: %w", err)
-	}
-
-	// Calculate SHA-256 hash
-	hash := sha256.Sum256(normalizedData)
+	// Calculate SHA-256 hash of raw file contents
+	hash := sha256.Sum256(data)
 	return hex.EncodeToString(hash[:]), nil
 }
 

@@ -478,32 +478,7 @@ func (d *DashboardView) selectRepository(repo *models.Repository) tea.Cmd {
 		// Filter runs for this repository
 		var filteredRuns []*models.RunResponse
 
-		debug.LogToFilef("\n========== REPOSITORY SELECTION ==========\n")
-		debug.LogToFilef("[selectRepository] Selecting repo: '%s'\n", repo.Name)
-		debug.LogToFilef("[selectRepository] Total runs to filter: %d\n", len(d.allRuns))
 
-		// Debug: Count all runs by repository to see distribution
-		runsByRepo := make(map[string]int)
-		for _, run := range d.allRuns {
-			repoName := run.GetRepositoryName()
-			runsByRepo[repoName]++
-		}
-
-		debug.LogToFilef("[selectRepository] Run distribution across repos:\n")
-		for repoName, count := range runsByRepo {
-			if count > 0 {
-				debug.LogToFilef("  '%s': %d runs\n", repoName, count)
-			}
-		}
-
-		// Debug: print first few runs to see their repo names
-		debug.LogToFilef("[selectRepository] Sample runs (first 10):\n")
-		for i, run := range d.allRuns {
-			if i < 10 {
-				debug.LogToFilef("  Run[%d]: Repository='%s', RepositoryName='%s', GetRepositoryName()='%s'\n",
-					i, run.Repository, run.RepositoryName, run.GetRepositoryName())
-			}
-		}
 
 		// First try to match by repository name
 		matchCount := 0
@@ -512,9 +487,6 @@ func (d *DashboardView) selectRepository(repo *models.Repository) tea.Cmd {
 			if runRepoName == repo.Name {
 				filteredRuns = append(filteredRuns, run)
 				matchCount++
-				if matchCount <= 3 {
-					debug.LogToFilef("  MATCHED: Run '%s' (repo: '%s')\n", run.GetIDString(), runRepoName)
-				}
 				continue
 			}
 
@@ -528,16 +500,11 @@ func (d *DashboardView) selectRepository(repo *models.Repository) tea.Cmd {
 					if apiRepoName == repo.Name {
 						filteredRuns = append(filteredRuns, run)
 						matchCount++
-						if matchCount <= 3 {
-							debug.LogToFilef("  MATCHED by RepoID: Run '%s' (apiRepo: '%s')\n", run.GetIDString(), apiRepoName)
-						}
 					}
 				}
 			}
 		}
 
-		debug.LogToFilef("[selectRepository] RESULT: Found %d runs for repo '%s'\n", len(filteredRuns), repo.Name)
-		debug.LogToFilef("==========================================\n\n")
 
 		return dashboardRepositorySelectedMsg{
 			repository: repo,
@@ -620,16 +587,6 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		d.selectedRepo = msg.repository
 		d.filteredRuns = msg.runs
 
-		debug.LogToFilef("\n[REPO SELECTED] Repository: '%s'\n", msg.repository.Name)
-		debug.LogToFilef("  Filtered runs count: %d\n", len(msg.runs))
-		if len(msg.runs) > 0 {
-			debug.LogToFilef("  First 3 runs:\n")
-			for i := 0; i < 3 && i < len(msg.runs); i++ {
-				debug.LogToFilef("    - %s (repo: %s)\n", msg.runs[i].GetIDString(), msg.runs[i].GetRepositoryName())
-			}
-		} else {
-			debug.LogToFilef("  NO RUNS FOUND for this repository!\n")
-		}
 		// Update viewport content when repository changes
 		d.updateViewportContent()
 
@@ -645,9 +602,18 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				d.selectedRunIdx = 0
 			}
 			d.updateDetailLines()
-			// Restore detail line selection if available
-			if d.selectedDetailLine >= 0 {
-				// selectedDetailLine will be restored after updateDetailLines()
+			// Restore detail line selection if available after detail lines are updated
+			if d.selectedDetailLine >= 0 && d.selectedDetailLine < len(d.detailLines) {
+				// Keep the saved selection if it's within bounds
+			} else if len(d.detailLines) > 0 {
+				// Default to first non-empty line if saved selection is out of bounds
+				d.selectedDetailLine = 0
+				if d.isEmptyLine(d.detailLines[0]) {
+					newIdx := d.findNextNonEmptyLine(-1, 1)
+					if newIdx >= 0 && newIdx < len(d.detailLines) {
+						d.selectedDetailLine = newIdx
+					}
+				}
 			}
 		}
 
@@ -1786,7 +1752,6 @@ func (d *DashboardView) updateRepoViewportContent() {
 			}
 		}
 
-
 		// Highlight selected repository
 		if i == d.selectedRepoIdx {
 			if d.focusedColumn == 0 {
@@ -1898,7 +1863,6 @@ func (d *DashboardView) updateRunsViewportContent() {
 				debug.LogToFilef("Run[%d]: Final safety truncation triggered\n", i)
 			}
 
-
 			// Highlight selected run
 			if i == d.selectedRunIdx {
 				if d.focusedColumn == 1 {
@@ -1955,7 +1919,6 @@ func (d *DashboardView) updateRunsViewportContent() {
 
 // updateDetailsViewportContent updates the details column viewport content
 func (d *DashboardView) updateDetailsViewportContent() {
-	debug.LogToFilef("updateDetailsViewportContent: Width=%d, Height=%d\n", d.detailsViewport.Width, d.detailsViewport.Height)
 
 	var displayLines []string
 
@@ -2039,8 +2002,6 @@ func (d *DashboardView) updateDetailsViewportContent() {
 					Inline(true).
 					Render(displayLine)
 			}
-
-			debug.LogToFilef("Detail[%d]: len=%d runes, width=%d\n", i, len(displayRunes), contentWidth)
 
 			displayLines = append(displayLines, styledLine)
 		}
