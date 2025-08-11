@@ -164,10 +164,16 @@ func GenerateMockRuns(numRepos, runsPerRepo int) []*models.RunResponse {
 		repo := repositories[i]
 		
 		// Vary the number of runs per repo for more realistic data
-		actualRunsForRepo := runsPerRepo
-		if i > 10 {
-			// Some repos have fewer runs
-			actualRunsForRepo = rand.Intn(runsPerRepo) + 5
+		var actualRunsForRepo int
+		if i == 0 {
+			// First repo gets 30 runs
+			actualRunsForRepo = 30
+		} else if i == 1 {
+			// Second repo gets only 5 runs
+			actualRunsForRepo = 5
+		} else {
+			// All other repos get random number of runs between 1 and 60
+			actualRunsForRepo = rand.Intn(60) + 1
 		}
 
 		for j := 0; j < actualRunsForRepo; j++ {
