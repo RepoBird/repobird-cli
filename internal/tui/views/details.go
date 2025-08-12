@@ -67,192 +67,7 @@ type RunDetailsView struct {
 	cache *cache.SimpleCache
 }
 
-func NewRunDetailsView(client APIClient, run models.RunResponse) *RunDetailsView {
-	// Create new cache instance
-	cache := cache.NewSimpleCache()
-	_ = cache.LoadFromDisk()
-
-	// Get cached data
-	runs, cached, detailsCache := cache.GetCachedList()
-	var cachedAt time.Time
-	if cached {
-		cachedAt = time.Now()
-	}
-	return NewRunDetailsViewWithCache(client, run, runs, cached, cachedAt, detailsCache, cache)
-}
-
-// RunDetailsViewConfig holds configuration for creating a new RunDetailsView
-type RunDetailsViewConfig struct {
-	Client             APIClient
-	Run                models.RunResponse
-	ParentRuns         []models.RunResponse
-	ParentCached       bool
-	ParentCachedAt     time.Time
-	ParentDetailsCache map[string]*models.RunResponse
-	Cache              *cache.SimpleCache // Optional embedded cache
-	// Dashboard state for restoration
-	DashboardSelectedRepoIdx    int
-	DashboardSelectedRunIdx     int
-	DashboardSelectedDetailLine int
-	DashboardFocusedColumn      int
-}
-
-// NewRunDetailsViewWithConfig creates a new RunDetailsView with the given configuration
-func NewRunDetailsViewWithConfig(config RunDetailsViewConfig) *RunDetailsView {
-	// Use provided cache or create new one
-	embeddedCache := config.Cache
-	if embeddedCache == nil {
-		embeddedCache = cache.NewSimpleCache()
-		_ = embeddedCache.LoadFromDisk()
-	}
-
-	s := spinner.New()
-	s.Spinner = spinner.Dot
-	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("63"))
-
-	vp := viewport.New(80, 20)
-
-	// Check if we have preloaded data for this run
-	needsLoading := true
-	run := config.Run
-	runID := run.GetIDString()
-
-	// Check cache for preloaded data
-	if config.ParentDetailsCache != nil {
-		if cachedRun, exists := config.ParentDetailsCache[runID]; exists && cachedRun != nil {
-			debug.LogToFilef("DEBUG: Cache HIT for runID='%s'\n", runID)
-			run = *cachedRun
-			needsLoading = false
-		} else {
-			debug.LogToFilef("DEBUG: Cache MISS for runID='%s'\n", runID)
-		}
-	}
-
-	v := &RunDetailsView{
-		client:                      config.Client,
-		run:                         run,
-		keys:                        components.DefaultKeyMap,
-		help:                        help.New(),
-		viewport:                    vp,
-		spinner:                     s,
-		loading:                     needsLoading,
-		showLogs:                    false,
-		parentRuns:                  config.ParentRuns,
-		parentCached:                config.ParentCached,
-		parentCachedAt:              config.ParentCachedAt,
-		parentDetailsCache:          config.ParentDetailsCache,
-		statusHistory:               make([]string, 0),
-		cacheRetryCount:             0,
-		maxCacheRetries:             3,
-		statusLine:                  components.NewStatusLine(),
-		dashboardSelectedRepoIdx:    config.DashboardSelectedRepoIdx,
-		dashboardSelectedRunIdx:     config.DashboardSelectedRunIdx,
-		dashboardSelectedDetailLine: config.DashboardSelectedDetailLine,
-		dashboardFocusedColumn:      config.DashboardFocusedColumn,
-		cache:                       embeddedCache,
-	}
-
-	// Initialize status history with current status if we have cached data
-	if !needsLoading {
-		v.updateStatusHistory(string(run.Status), false)
-		v.updateContent()
-	}
-
-	// Start in navigation mode
-	v.navigationMode = true
-
-	return v
-}
-
-// NewRunDetailsViewWithDashboardState creates a new details view with dashboard state for restoration
-func NewRunDetailsViewWithDashboardState(
-	client APIClient,
-	run models.RunResponse,
-	parentRuns []models.RunResponse,
-	parentCached bool,
-	parentCachedAt time.Time,
-	parentDetailsCache map[string]*models.RunResponse,
-	width int,
-	height int,
-	selectedRepoIdx int,
-	selectedRunIdx int,
-	selectedDetailLine int,
-	focusedColumn int,
-) *RunDetailsView {
-	config := RunDetailsViewConfig{
-		Client:                      client,
-		Run:                         run,
-		ParentRuns:                  parentRuns,
-		ParentCached:                parentCached,
-		ParentCachedAt:              parentCachedAt,
-		ParentDetailsCache:          parentDetailsCache,
-		DashboardSelectedRepoIdx:    selectedRepoIdx,
-		DashboardSelectedRunIdx:     selectedRunIdx,
-		DashboardSelectedDetailLine: selectedDetailLine,
-		DashboardFocusedColumn:      focusedColumn,
-	}
-
-	v := NewRunDetailsViewWithConfig(config)
-
-	// Set dimensions immediately if provided
-	if width > 0 && height > 0 {
-		v.width = width
-		v.height = height
-		// Apply dimensions to viewport immediately
-		v.handleWindowSizeMsg(tea.WindowSizeMsg{Width: width, Height: height})
-	}
-
-	return v
-}
-
-// NewRunDetailsViewWithCacheAndDimensions creates a new details view with cache and dimensions
-func NewRunDetailsViewWithCacheAndDimensions(
-	client APIClient,
-	run models.RunResponse,
-	parentRuns []models.RunResponse,
-	parentCached bool,
-	parentCachedAt time.Time,
-	parentDetailsCache map[string]*models.RunResponse,
-	width int,
-	height int,
-) *RunDetailsView {
-	// Create cache for this view
-	cache := cache.NewSimpleCache()
-	v := NewRunDetailsViewWithCache(client, run, parentRuns, parentCached, parentCachedAt, parentDetailsCache, cache)
-
-	// Set dimensions immediately if provided
-	if width > 0 && height > 0 {
-		v.width = width
-		v.height = height
-		// Apply dimensions to viewport immediately
-		v.handleWindowSizeMsg(tea.WindowSizeMsg{Width: width, Height: height})
-	}
-
-	return v
-}
-
-// NewRunDetailsViewWithCache maintains backward compatibility
-func NewRunDetailsViewWithCache(
-	client APIClient,
-	run models.RunResponse,
-	parentRuns []models.RunResponse,
-	parentCached bool,
-	parentCachedAt time.Time,
-	parentDetailsCache map[string]*models.RunResponse,
-	embeddedCache *cache.SimpleCache,
-) *RunDetailsView {
-	config := RunDetailsViewConfig{
-		Client:             client,
-		Run:                run,
-		ParentRuns:         parentRuns,
-		ParentCached:       parentCached,
-		ParentCachedAt:     parentCachedAt,
-		ParentDetailsCache: parentDetailsCache,
-		Cache:              embeddedCache,
-	}
-
-	return NewRunDetailsViewWithConfig(config)
-}
+// Constructors are defined in details_constructors.go
 
 func (v *RunDetailsView) Init() tea.Cmd {
 	// Initialize clipboard (will detect CGO availability)
@@ -396,72 +211,7 @@ func (v *RunDetailsView) handleKeyInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return v, tea.Batch(cmds...)
 }
 
-// handleRowNavigation handles navigation between selectable rows/fields
-func (v *RunDetailsView) handleClipboardOperations(key string) tea.Cmd {
-	switch key {
-	case "y":
-		// Copy selected field value to clipboard
-		var textToCopy string
-		if v.navigationMode && v.selectedRow >= 0 && v.selectedRow < len(v.fieldValues) {
-			textToCopy = v.fieldValues[v.selectedRow]
-			if err := utils.WriteToClipboard(textToCopy); err == nil {
-				// Show what's actually copied, truncated for display
-				displayText := textToCopy
-				maxLen := 30
-				if len(displayText) > maxLen {
-					displayText = displayText[:maxLen-3] + "..."
-				}
-				v.statusLine.SetTemporaryMessageWithType(fmt.Sprintf("📋 Copied \"%s\"", displayText), components.MessageSuccess, 100*time.Millisecond)
-			} else {
-				v.statusLine.SetTemporaryMessageWithType("✗ Failed to copy", components.MessageError, 100*time.Millisecond)
-			}
-		} else {
-			// Copy current line to clipboard (old behavior)
-			currentLine := v.getCurrentLine()
-			if currentLine != "" {
-				if err := utils.WriteToClipboard(currentLine); err == nil {
-					// Show what's actually copied, truncated for display
-					displayText := currentLine
-					maxLen := 30
-					if len(displayText) > maxLen {
-						displayText = displayText[:maxLen-3] + "..."
-					}
-					v.statusLine.SetTemporaryMessageWithType(fmt.Sprintf("📋 Copied \"%s\"", displayText), components.MessageSuccess, 100*time.Millisecond)
-				} else {
-					v.statusLine.SetTemporaryMessageWithType("✗ Failed to copy", components.MessageError, 100*time.Millisecond)
-				}
-			} else {
-				v.statusLine.SetTemporaryMessageWithType("✗ No line to copy", components.MessageError, 100*time.Millisecond)
-			}
-		}
-		v.yankBlink = true
-		v.yankBlinkTime = time.Now()
-		return v.startYankBlinkAnimation()
-	case "Y":
-		// Copy all content to clipboard
-		if err := v.copyAllContent(); err == nil {
-			v.statusLine.SetTemporaryMessageWithType("📋 Copied all content", components.MessageSuccess, 100*time.Millisecond)
-		} else {
-			v.statusLine.SetTemporaryMessageWithType("✗ Failed to copy", components.MessageError, 100*time.Millisecond)
-		}
-		v.yankBlink = true
-		v.yankBlinkTime = time.Now()
-		return v.startYankBlinkAnimation()
-	case "o":
-		// Open URL in browser if current selection contains a URL
-		var urlText string
-		if v.navigationMode && v.selectedRow >= 0 && v.selectedRow < len(v.fieldValues) {
-			// Check if the selected field contains a URL
-			fieldValue := v.fieldValues[v.selectedRow]
-			if utils.IsURL(fieldValue) {
-				urlText = utils.ExtractURL(fieldValue)
-			}
-		}
-		// TODO: handle URL opening
-		_ = urlText
-	}
-	return nil
-}
+// Clipboard operations are defined in details_clipboard.go
 
 // Update handles incoming events
 func (v *RunDetailsView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -550,6 +300,65 @@ func (v *RunDetailsView) View() string {
 	titleText := fmt.Sprintf("Run #%s", idStr)
 	if v.run.Title != "" {
 		maxTitleLen := boxWidth - 20 // Leave room for status and padding
+		if maxTitleLen > 0 && len(v.run.Title) > maxTitleLen {
+			titleText += " - " + v.run.Title[:maxTitleLen] + "..."
+		} else {
+			titleText += " - " + v.run.Title
+		}
+	}
+	titleText = fmt.Sprintf("%s %s %s", statusIcon, titleText, string(v.run.Status))
+
+	// Add polling indicator if active
+	if models.IsActiveStatus(string(v.run.Status)) {
+		if v.pollingStatus {
+			titleText += " [Fetching... " + v.spinner.View() + "]"
+		} else {
+			titleText += " [Monitoring ⟳]"
+		}
+	}
+
+	title := titleStyle.Render(titleText)
+
+	// Content area height (subtract title height from box interior)
+	contentHeight := boxHeight - 3 // 1 for title, 2 for borders
+
+	// Create viewport content
+	var innerContent string
+	if v.loading {
+		// Center loading message
+		loadingText := v.spinner.View() + " Loading run details..."
+		loadingStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("63")).
+			Bold(true).
+			Width(boxWidth-2).
+			Height(contentHeight).
+			Align(lipgloss.Center, lipgloss.Center)
+		innerContent = lipgloss.JoinVertical(lipgloss.Left, title, loadingStyle.Render(loadingText))
+	} else if v.error != nil {
+		// Show error
+		errorText := "Error: " + v.error.Error()
+		errorStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("196")).
+			Width(boxWidth-2).
+			Height(contentHeight).
+			Padding(1, 2)
+		innerContent = lipgloss.JoinVertical(lipgloss.Left, title, errorStyle.Render(errorText))
+	} else {
+		// Render content with scrollable viewport
+		v.viewport.Width = boxWidth - 4 // Account for border and padding
+		v.viewport.Height = contentHeight
+
+		// Get content with highlighting
+		contentLines := v.renderContentWithCursor()
+		content := strings.Join(contentLines, "\n")
+
+		// Apply padding to content
+		contentStyle := lipgloss.NewStyle().
+			Width(boxWidth-2).
+			Height(contentHeight).
+			Padding(0, 1)
+
+		innerContent = lipgloss.JoinVertical(lipgloss.Left, title, contentStyle.Render(content))
 	}
 
 	// Wrap in the box
@@ -567,168 +376,9 @@ func (v *RunDetailsView) View() string {
 }
 
 // renderContentWithCursor renders the content with a visible row selector
-func (v *RunDetailsView) renderContentWithCursor() []string {
-	if v.showLogs {
-		// For logs view, just return the viewport content as-is
-		return strings.Split(v.viewport.View(), "\n")
-	}
+// Rendering methods are defined in details_rendering.go
 
-	// Get all content lines
-	allLines := strings.Split(v.fullContent, "\n")
-	if len(allLines) == 0 {
-		return []string{}
-	}
-
-	// Calculate viewport bounds
-	viewportHeight := v.viewport.Height
-	if viewportHeight <= 0 {
-		viewportHeight = v.height - 6 // Fallback calculation
-	}
-
-	// Get the current viewport offset
-	viewportOffset := v.viewport.YOffset
-
-	// Determine which lines are visible
-	visibleLines := []string{}
-	contentWidth := v.viewport.Width
-	if contentWidth <= 0 {
-		contentWidth = v.width - 6 // Account for box borders and padding
-	}
-
-	for i := viewportOffset; i < len(allLines) && i < viewportOffset+viewportHeight; i++ {
-		line := allLines[i]
-
-		// Truncate line if too long
-		lineRunes := []rune(line)
-		if len(lineRunes) > contentWidth {
-			line = string(lineRunes[:contentWidth-3]) + "..."
-		}
-
-		// Check if this line should be highlighted
-		shouldHighlight := false
-		if v.navigationMode && v.selectedRow >= 0 && v.selectedRow < len(v.fieldRanges) {
-			fieldRange := v.fieldRanges[v.selectedRow]
-			if i >= fieldRange[0] && i <= fieldRange[1] {
-				shouldHighlight = true
-			}
-		}
-
-		if shouldHighlight {
-			// Apply highlight style similar to dashboard
-			var highlightedLine string
-			if v.yankBlink && !v.yankBlinkTime.IsZero() && time.Since(v.yankBlinkTime) < 250*time.Millisecond {
-				// Bright green flash for copy feedback
-				highlightStyle := lipgloss.NewStyle().
-					Background(lipgloss.Color("82")). // Bright green
-					Foreground(lipgloss.Color("0")).  // Black text
-					Bold(true).
-					Width(contentWidth).
-					MaxWidth(contentWidth).
-					Inline(true)
-				highlightedLine = highlightStyle.Render(line)
-			} else {
-				// Normal focused highlight (matching dashboard style)
-				highlightStyle := lipgloss.NewStyle().
-					Background(lipgloss.Color("63")).
-					Foreground(lipgloss.Color("255")).
-					Width(contentWidth).
-					MaxWidth(contentWidth).
-					Inline(true)
-				highlightedLine = highlightStyle.Render(line)
-			}
-			visibleLines = append(visibleLines, highlightedLine)
-		} else {
-			// Non-selected lines with width constraint
-			styledLine := lipgloss.NewStyle().
-				Width(contentWidth).
-				MaxWidth(contentWidth).
-				Inline(true).
-				Render(line)
-			visibleLines = append(visibleLines, styledLine)
-		}
-	}
-
-	return visibleLines
-}
-
-func (v *RunDetailsView) renderHeader() string {
-	statusIcon := styles.GetStatusIcon(string(v.run.Status))
-	statusStyle := styles.GetStatusStyle(string(v.run.Status))
-	status := statusStyle.Render(fmt.Sprintf("%s %s", statusIcon, v.run.Status))
-
-	idStr := v.run.GetIDString()
-	if len(idStr) > 8 {
-		idStr = idStr[:8]
-	}
-	title := fmt.Sprintf("Run #%s", idStr)
-	if v.run.Title != "" {
-		title += " - " + v.run.Title
-	}
-
-	// Truncate title if too long for terminal width
-	if v.width > 25 && len(title) > v.width-20 {
-		maxLen := v.width - 23
-		if maxLen > 0 && maxLen < len(title) {
-			title = title[:maxLen] + "..."
-		}
-	}
-
-	header := styles.TitleStyle.MaxWidth(v.width).Render(title)
-
-	if models.IsActiveStatus(string(v.run.Status)) {
-		if v.pollingStatus {
-			// Show active polling indicator
-			pollingIndicator := styles.ProcessingStyle.Render(" [Fetching... " + v.spinner.View() + "]")
-			header += pollingIndicator
-		} else {
-			// Show passive polling indicator
-			pollingIndicator := styles.ProcessingStyle.Render(" [Monitoring ⟳]")
-			header += pollingIndicator
-		}
-	}
-
-	rightAlign := lipgloss.NewStyle().Align(lipgloss.Right).Width(v.width - lipgloss.Width(header))
-	header += rightAlign.Render("Status: " + status)
-
-	return header
-}
-
-// hasCurrentSelectionURL checks if the current selection contains a URL
-func (v *RunDetailsView) hasCurrentSelectionURL() bool {
-	if v.navigationMode && v.selectedRow >= 0 && v.selectedRow < len(v.fieldValues) {
-		fieldValue := v.fieldValues[v.selectedRow]
-		return utils.IsURL(fieldValue)
-	}
-	// Fallback to current line
-	currentLine := v.getCurrentLine()
-	return utils.IsURL(currentLine)
-}
-
-func (v *RunDetailsView) renderStatusBar() string {
-	// Shorter options to fit better (removed logs functionality)
-	options := "q:back j/k:nav y:copy Y:all r:refresh ?:help Q:quit"
-
-	// Add URL opening hint if current selection has a URL
-	if v.hasCurrentSelectionURL() {
-		options = "o:url q:back j/k:nav y:copy Y:all r:refresh ?:help Q:quit"
-	}
-
-	// Determine if we're loading
-	isLoadingData := v.loading
-
-	// Set right content based on loading state
-	rightContent := ""
-	// Don't show any text when loading, just the spinner
-
-	// Use unified status line system
-	return v.statusLine.
-		SetWidth(v.width).
-		SetLeft("[DETAILS]").
-		SetRight(rightContent).
-		SetHelp(options).
-		SetLoading(isLoadingData).
-		Render()
-}
+// Rendering helper methods are defined in details_rendering.go
 
 func (v *RunDetailsView) updateContent() {
 	var content strings.Builder
@@ -811,7 +461,7 @@ func (v *RunDetailsView) updateContent() {
 
 		if v.run.UpdatedAt.After(v.run.CreatedAt) && (v.run.Status == models.StatusDone || v.run.Status == models.StatusFailed) {
 			duration := v.run.UpdatedAt.Sub(v.run.CreatedAt)
-			addField("Duration", formatDuration(duration))
+			addField("Duration", formatDurationDetails(duration))
 		}
 
 		addSeparator("\n═══ Status History ═══")
@@ -892,65 +542,7 @@ func (v *RunDetailsView) updateContent() {
 }
 
 // createHighlightedContent creates content with the selected field highlighted
-func (v *RunDetailsView) createHighlightedContent(lines []string) string {
-	if v.selectedRow < 0 || v.selectedRow >= len(v.fieldRanges) {
-		return v.fullContent
-	}
-
-	// Get the range of lines for the selected field
-	fieldRange := v.fieldRanges[v.selectedRow]
-	startLine := fieldRange[0]
-	endLine := fieldRange[1]
-
-	var result strings.Builder
-	highlightStyle := lipgloss.NewStyle().
-		Background(lipgloss.Color("238")).
-		Foreground(lipgloss.Color("15"))
-
-	for i, line := range lines {
-		if i >= startLine && i <= endLine {
-			// Highlight all lines in the field range
-			result.WriteString(highlightStyle.Render(line))
-		} else {
-			result.WriteString(line)
-		}
-		if i < len(lines)-1 {
-			result.WriteString("\n")
-		}
-	}
-
-	return result.String()
-}
-
-func (v *RunDetailsView) updateStatusHistory(status string, isPolling bool) {
-	timestamp := time.Now().Format("15:04:05")
-	var entry string
-
-	if isPolling {
-		// Show polling indicator
-		entry = fmt.Sprintf("[%s] 🔄 %s", timestamp, status)
-	} else {
-		// Regular status update - only add if different from last non-polling status
-		if len(v.statusHistory) > 0 {
-			// Find last non-polling status
-			for i := len(v.statusHistory) - 1; i >= 0; i-- {
-				if !strings.Contains(v.statusHistory[i], "🔄") && strings.Contains(v.statusHistory[i], status) {
-					// Same status as before, don't add duplicate
-					return
-				}
-			}
-		}
-		statusIcon := styles.GetStatusIcon(status)
-		entry = fmt.Sprintf("[%s] %s %s", timestamp, statusIcon, status)
-	}
-
-	v.statusHistory = append(v.statusHistory, entry)
-
-	// Keep history size reasonable
-	if len(v.statusHistory) > 50 {
-		v.statusHistory = v.statusHistory[len(v.statusHistory)-50:]
-	}
-}
+// Status history and highlighting methods are defined in details_rendering.go
 
 func (v *RunDetailsView) loadRunDetails() tea.Cmd {
 	// Capture the current run ID to ensure it doesn't get lost
@@ -1034,3 +626,43 @@ func (v *RunDetailsView) stopPolling() {
 	}
 }
 
+// handleRunDetailsLoaded handles the runDetailsLoadedMsg message
+func (v *RunDetailsView) handleRunDetailsLoaded(msg runDetailsLoadedMsg) {
+	v.loading = false
+	v.pollingStatus = false // Clear polling status
+	v.run = msg.run
+	v.error = msg.err
+	if msg.err == nil {
+		v.updateStatusHistory(string(msg.run.Status), false)
+		// Cache the loaded details for future use
+		v.cache.SetRun(msg.run)
+		debug.LogToFilef("DEBUG: Cached run details for ID '%s' (status: %s)\n", msg.run.GetIDString(), msg.run.Status)
+	}
+	v.updateContent()
+
+	// Debug logging for successful load
+	debug.LogToFilef("DEBUG: Successfully loaded run details for '%s'\n", msg.run.GetIDString())
+}
+
+// handlePolling handles the pollTickMsg message
+func (v *RunDetailsView) handlePolling(msg pollTickMsg) []tea.Cmd {
+	var cmds []tea.Cmd
+	if models.IsActiveStatus(string(v.run.Status)) {
+		// Mark that we're fetching status
+		v.pollingStatus = true
+		v.updateStatusHistory("Fetching status...", true)
+		v.updateContent()
+		cmds = append(cmds, v.loadRunDetails())
+		// Keep the polling going
+		cmds = append(cmds, v.startPolling())
+	} else {
+		v.stopPolling()
+	}
+	return cmds
+}
+
+// Message types for details view
+type runDetailsLoadedMsg struct {
+	run models.RunResponse
+	err error
+}

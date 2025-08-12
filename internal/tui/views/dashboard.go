@@ -1468,46 +1468,7 @@ func (d *DashboardView) updateRepoViewportContent() {
 		}
 
 		// Highlight selected repository
-		if i == d.selectedRepoIdx {
-			if d.focusedColumn == 0 {
-				// Single blink: bright green briefly when yankBlink is true
-				if d.yankBlink && time.Since(d.yankBlinkTime) < 250*time.Millisecond {
-					// Bright green flash
-					item = lipgloss.NewStyle().
-						Width(maxWidth). // Use Width to ensure exact width
-						MaxWidth(maxWidth).
-						Inline(true).
-						Background(lipgloss.Color("82")). // Bright green
-						Foreground(lipgloss.Color("0")).  // Black text
-						Bold(true).
-						Render(item)
-				} else {
-					// Normal focused highlight
-					item = lipgloss.NewStyle().
-						Width(maxWidth). // Use Width to ensure exact width
-						MaxWidth(maxWidth).
-						Inline(true).
-						Background(lipgloss.Color("63")).
-						Foreground(lipgloss.Color("255")).
-						Render(item)
-				}
-			} else {
-				item = lipgloss.NewStyle().
-					Width(maxWidth). // Use Width to ensure exact width
-					MaxWidth(maxWidth).
-					Inline(true).
-					Background(lipgloss.Color("240")).
-					Foreground(lipgloss.Color("255")).
-					Render(item)
-			}
-		} else {
-			// Non-selected items also need width constraint
-			item = lipgloss.NewStyle().
-				Width(maxWidth). // Use Width to ensure exact width
-				MaxWidth(maxWidth).
-				Inline(true).
-				Render(item)
-		}
+		item = d.applyItemHighlight(item, i == d.selectedRepoIdx, d.focusedColumn == 0, maxWidth)
 
 		items = append(items, item)
 	}
@@ -1641,43 +1602,7 @@ func (d *DashboardView) updateRunsViewportContent() {
 			}
 
 			// Highlight selected run
-			if i == d.selectedRunIdx {
-				if d.focusedColumn == 1 {
-					if d.yankBlink && time.Since(d.yankBlinkTime) < 250*time.Millisecond {
-						item = lipgloss.NewStyle().
-							Width(maxWidth). // Use Width to ensure exact width
-							MaxWidth(maxWidth).
-							Inline(true).
-							Background(lipgloss.Color("82")).
-							Foreground(lipgloss.Color("0")).
-							Bold(true).
-							Render(item)
-					} else {
-						item = lipgloss.NewStyle().
-							Width(maxWidth). // Use Width to ensure exact width
-							MaxWidth(maxWidth).
-							Inline(true).
-							Background(lipgloss.Color("63")).
-							Foreground(lipgloss.Color("255")).
-							Render(item)
-					}
-				} else {
-					item = lipgloss.NewStyle().
-						Width(maxWidth). // Use Width to ensure exact width
-						MaxWidth(maxWidth).
-						Inline(true).
-						Background(lipgloss.Color("240")).
-						Foreground(lipgloss.Color("255")).
-						Render(item)
-				}
-			} else {
-				// Non-selected items also need width constraint
-				item = lipgloss.NewStyle().
-					Width(maxWidth). // Use Width to ensure exact width
-					MaxWidth(maxWidth).
-					Inline(true).
-					Render(item)
-			}
+			item = d.applyItemHighlight(item, i == d.selectedRunIdx, d.focusedColumn == 1, maxWidth)
 
 			items = append(items, item)
 		}
@@ -3197,7 +3122,7 @@ func (d *DashboardView) getDocsPages() [][]string {
 // truncateString truncates a string to the specified width - DEPRECATED (kept for reference)
 // Use utils.TruncateMultiline instead if this functionality is needed
 //
-//nolint:unused
+
 func (d *DashboardView) renderNotificationLine() string {
 	// If we're showing a status message in the status line, don't show notification
 	if d.statusLine.HasActiveMessage() {

@@ -737,7 +737,7 @@ func (v *RunListView) loadRuns() tea.Cmd {
 		// Create context with 10-second timeout for list view
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		
+
 		// Use the context-aware ListRuns method
 		listResp, err := v.client.ListRuns(ctx, 1, 1000) // page 1, limit 1000
 		if err != nil {
@@ -754,7 +754,7 @@ func (v *RunListView) loadRuns() tea.Cmd {
 				}
 			}
 		}
-		
+
 		return runsLoadedMsg{runs: runs, err: nil}
 	}
 }

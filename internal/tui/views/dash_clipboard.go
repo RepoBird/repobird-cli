@@ -7,7 +7,6 @@ import (
 	"github.com/repobird/repobird-cli/internal/utils"
 )
 
-
 // copyToClipboard copies the given text to clipboard
 func (d *DashboardView) copyToClipboard(text string) error {
 	return utils.WriteToClipboard(text)
@@ -30,3 +29,10 @@ func (d *DashboardView) startMessageClearTimer(duration time.Duration) tea.Cmd {
 	}
 }
 
+// startClearStatusTimer starts a timer to clear the status message
+func (d *DashboardView) startClearStatusTimer() tea.Cmd {
+	return func() tea.Msg {
+		time.Sleep(250 * time.Millisecond)
+		return clearStatusMsg{}
+	}
+}

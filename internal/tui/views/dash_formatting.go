@@ -175,3 +175,48 @@ func (d *DashboardView) renderRepositoriesTable() string {
 
 	return strings.Join(rows, "\n")
 }
+
+// applyItemHighlight applies the appropriate highlighting style to an item based on selection and focus state
+func (d *DashboardView) applyItemHighlight(item string, isSelected bool, isFocused bool, maxWidth int) string {
+	if isSelected {
+		if isFocused {
+			// Single blink: bright green briefly when yankBlink is true
+			if d.yankBlink && time.Since(d.yankBlinkTime) < 250*time.Millisecond {
+				// Bright green flash
+				return lipgloss.NewStyle().
+					Width(maxWidth). // Use Width to ensure exact width
+					MaxWidth(maxWidth).
+					Inline(true).
+					Background(lipgloss.Color("82")). // Bright green
+					Foreground(lipgloss.Color("0")).  // Black text
+					Bold(true).
+					Render(item)
+			} else {
+				// Normal focused highlight
+				return lipgloss.NewStyle().
+					Width(maxWidth). // Use Width to ensure exact width
+					MaxWidth(maxWidth).
+					Inline(true).
+					Background(lipgloss.Color("63")).
+					Foreground(lipgloss.Color("255")).
+					Render(item)
+			}
+		} else {
+			// Selected but not focused
+			return lipgloss.NewStyle().
+				Width(maxWidth). // Use Width to ensure exact width
+				MaxWidth(maxWidth).
+				Inline(true).
+				Background(lipgloss.Color("240")).
+				Foreground(lipgloss.Color("255")).
+				Render(item)
+		}
+	} else {
+		// Non-selected items also need width constraint
+		return lipgloss.NewStyle().
+			Width(maxWidth). // Use Width to ensure exact width
+			MaxWidth(maxWidth).
+			Inline(true).
+			Render(item)
+	}
+}

@@ -35,3 +35,6 @@ type gKeyTimeoutMsg struct{}
 
 // syncFileHashesMsg is sent when file hash sync is completed
 type syncFileHashesMsg struct{}
+
+// clearStatusMsg is sent to clear status message
+type clearStatusMsg struct{}

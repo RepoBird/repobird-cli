@@ -141,11 +141,11 @@ func (d *DashboardView) loadDashboardData() tea.Cmd {
 		if !cached || len(runs) == 0 {
 			// Fetch runs from API using context-aware method with timeout
 			debug.LogToFilef("  Calling ListRuns API with context...\n")
-			
+
 			// Create context with 5-second timeout
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			
+
 			// Use the context-aware ListRuns method
 			listResp, err := d.client.ListRuns(ctx, 1, 1000) // page 1, limit 1000
 			if err != nil {
@@ -159,7 +159,7 @@ func (d *DashboardView) loadDashboardData() tea.Cmd {
 					error:        nil,
 				}
 			}
-			
+
 			var runsResp []*models.RunResponse
 			if listResp != nil && listResp.Data != nil {
 				runsResp = listResp.Data
@@ -228,7 +228,7 @@ func (d *DashboardView) loadFromRunsOnly() tea.Msg {
 		// Fetch from API using context-aware method
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		
+
 		listResp, err := d.client.ListRuns(ctx, 1, 1000) // page 1, limit 1000
 		if err != nil {
 			return dashboardDataLoadedMsg{
@@ -236,7 +236,7 @@ func (d *DashboardView) loadFromRunsOnly() tea.Msg {
 				error:        err,
 			}
 		}
-		
+
 		var runsResp []*models.RunResponse
 		if listResp != nil && listResp.Data != nil {
 			runsResp = listResp.Data

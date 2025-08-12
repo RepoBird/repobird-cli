@@ -132,13 +132,13 @@ func (v *RunDetailsView) copyAllContent() error {
 // startYankBlinkAnimation starts the clipboard visual feedback animation
 func (v *RunDetailsView) startYankBlinkAnimation() tea.Cmd {
 	return tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
-		return yankBlinkMsg(t)
+		return yankBlinkMsg{}
 	})
 }
 
 // startMessageClearTimer starts a timer to clear temporary messages
 func (v *RunDetailsView) startMessageClearTimer(duration time.Duration) tea.Cmd {
 	return tea.Tick(duration, func(t time.Time) tea.Msg {
-		return messageClearMsg(t)
+		return messageClearMsg{}
 	})
 }
