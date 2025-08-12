@@ -226,15 +226,15 @@ func parseJSONWithUnknownFieldsAndPrompts(file *os.File) (*RunConfig, *prompts.V
 
 	// Create validation prompt handler
 	promptHandler := prompts.NewValidationPromptHandler()
-	
+
 	// Check for unsupported fields and create prompts
 	unsupportedFields, suggestions := findUnsupportedJSONFieldsWithSuggestions(genericMap)
-	
+
 	// Add field suggestion prompts
 	for field, suggestion := range suggestions {
 		promptHandler.AddFieldSuggestionPrompt(field, suggestion)
 	}
-	
+
 	// Add general unknown field warning if there are fields without suggestions
 	var fieldsWithoutSuggestions []string
 	for _, field := range unsupportedFields {
@@ -298,7 +298,7 @@ func findUnsupportedJSONFieldsWithSuggestions(data map[string]interface{}) ([]st
 
 	var unsupported []string
 	suggestions := make(map[string]string)
-	
+
 	for field := range data {
 		if !supportedFields[field] {
 			unsupported = append(unsupported, field)

@@ -9,12 +9,12 @@ import (
 
 // ValidationPrompt represents a single validation prompt
 type ValidationPrompt struct {
-	Type        string // "field_suggestion", "unknown_field", "validation_error", "confirmation"
-	Message     string // The prompt message to show user
-	Field       string // Field name (for field-related prompts)
-	Suggestion  string // Suggested field name (for similarity prompts)
-	Required    bool   // Whether user must respond (true) or can skip (false)
-	DefaultNo   bool   // Whether default response is No (for safety)
+	Type       string // "field_suggestion", "unknown_field", "validation_error", "confirmation"
+	Message    string // The prompt message to show user
+	Field      string // Field name (for field-related prompts)
+	Suggestion string // Suggested field name (for similarity prompts)
+	Required   bool   // Whether user must respond (true) or can skip (false)
+	DefaultNo  bool   // Whether default response is No (for safety)
 }
 
 // ValidationPromptHandler manages multiple validation prompts in sequence
@@ -88,30 +88,30 @@ func (h *ValidationPromptHandler) ProcessPrompts() (bool, error) {
 	}
 
 	reader := bufio.NewReader(os.Stdin)
-	
+
 	for i, prompt := range h.prompts {
 		// Show prompt number if multiple prompts
 		if len(h.prompts) > 1 {
 			fmt.Printf("\n[%d/%d] ", i+1, len(h.prompts))
 		}
-		
+
 		response, err := h.showPrompt(prompt, reader)
 		if err != nil {
 			return false, err
 		}
-		
+
 		// Store response
 		if prompt.Field != "" {
 			h.results[prompt.Field] = response
 		}
-		
+
 		// Handle responses that should stop the process
 		if prompt.Required && (response == "n" || response == "no") {
 			fmt.Println("Operation cancelled.")
 			return false, nil
 		}
 	}
-	
+
 	return true, nil
 }
 
@@ -119,7 +119,7 @@ func (h *ValidationPromptHandler) ProcessPrompts() (bool, error) {
 func (h *ValidationPromptHandler) showPrompt(prompt ValidationPrompt, reader *bufio.Reader) (string, error) {
 	var defaultResponse string
 	var promptSuffix string
-	
+
 	switch prompt.Type {
 	case "field_suggestion":
 		if prompt.DefaultNo {
@@ -157,19 +157,19 @@ func (h *ValidationPromptHandler) showPrompt(prompt ValidationPrompt, reader *bu
 		promptSuffix = " [Y/n]: "
 		defaultResponse = "y"
 	}
-	
+
 	fmt.Printf("%s%s", prompt.Message, promptSuffix)
-	
+
 	input, err := reader.ReadString('\n')
 	if err != nil {
 		return "", err
 	}
-	
+
 	input = strings.TrimSpace(strings.ToLower(input))
 	if input == "" {
 		input = defaultResponse
 	}
-	
+
 	return input, nil
 }
 
@@ -191,5 +191,33 @@ func (h *ValidationPromptHandler) ShouldContinue() bool {
 			}
 		}
 	}
+	return true
+}
+
+// GetPrompts returns the list of prompts for TUI rendering
+func (h *ValidationPromptHandler) GetPrompts() []ValidationPrompt {
+	return h.prompts
+}
+
+// ProcessResponses processes TUI responses instead of reading from stdin
+func (h *ValidationPromptHandler) ProcessResponses(responses []string) bool {
+	if len(responses) != len(h.prompts) {
+		return false
+	}
+
+	for i, prompt := range h.prompts {
+		response := responses[i]
+
+		// Store response
+		if prompt.Field != "" {
+			h.results[prompt.Field] = response
+		}
+
+		// Check if we should stop
+		if prompt.Required && (response == "n" || response == "no") {
+			return false
+		}
+	}
+
 	return true
 }

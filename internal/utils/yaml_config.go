@@ -83,15 +83,15 @@ func parseYAMLWithUnknownFieldsAndPrompts(data []byte) (*models.RunConfig, *prom
 
 	// Create validation prompt handler
 	promptHandler := prompts.NewValidationPromptHandler()
-	
+
 	// Check for unsupported fields and create prompts
 	unsupportedFields, suggestions := findUnsupportedYAMLFieldsWithSuggestions(genericMap)
-	
+
 	// Add field suggestion prompts
 	for field, suggestion := range suggestions {
 		promptHandler.AddFieldSuggestionPrompt(field, suggestion)
 	}
-	
+
 	// Add general unknown field warning if there are fields without suggestions
 	var fieldsWithoutSuggestions []string
 	for _, field := range unsupportedFields {
@@ -152,7 +152,7 @@ func findUnsupportedYAMLFieldsWithSuggestions(data map[string]interface{}) ([]st
 
 	var unsupported []string
 	suggestions := make(map[string]string)
-	
+
 	for field := range data {
 		if !supportedFields[field] {
 			unsupported = append(unsupported, field)
@@ -202,7 +202,7 @@ func validateYAMLConfigForPrompts(config *YAMLConfig) error {
 
 	// Check for validation errors and return them (but don't fail)
 	validationErr := ValidateRunConfig(runConfig)
-	
+
 	// Apply any additional defaults that were set during validation
 	config.Source = runConfig.Source
 	config.RunType = runConfig.RunType
@@ -216,7 +216,7 @@ func LoadConfigFromFile(filepath string) (*models.RunConfig, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
-	
+
 	// Process any validation prompts before proceeding
 	if promptHandler != nil && promptHandler.HasPrompts() {
 		shouldContinue, err := promptHandler.ProcessPrompts()
@@ -227,7 +227,7 @@ func LoadConfigFromFile(filepath string) (*models.RunConfig, string, error) {
 			return nil, "", fmt.Errorf("operation cancelled by user")
 		}
 	}
-	
+
 	return config, additionalContext, nil
 }
 
@@ -330,7 +330,7 @@ func ParseJSONFromStdin() (*models.RunConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Process any validation prompts before proceeding
 	if promptHandler != nil && promptHandler.HasPrompts() {
 		shouldContinue, err := promptHandler.ProcessPrompts()
@@ -341,7 +341,7 @@ func ParseJSONFromStdin() (*models.RunConfig, error) {
 			return nil, fmt.Errorf("operation cancelled by user")
 		}
 	}
-	
+
 	return config, nil
 }
 
@@ -361,15 +361,15 @@ func ParseJSONFromStdinWithPrompts() (*models.RunConfig, *prompts.ValidationProm
 
 	// Create validation prompt handler
 	promptHandler := prompts.NewValidationPromptHandler()
-	
+
 	// Check for unsupported fields and create prompts
 	unsupportedFields, suggestions := findUnsupportedJSONFieldsForStdinWithSuggestions(genericMap)
-	
+
 	// Add field suggestion prompts
 	for field, suggestion := range suggestions {
 		promptHandler.AddFieldSuggestionPrompt(field, suggestion)
 	}
-	
+
 	// Add general unknown field warning if there are fields without suggestions
 	var fieldsWithoutSuggestions []string
 	for _, field := range unsupportedFields {
@@ -428,7 +428,7 @@ func findUnsupportedJSONFieldsForStdinWithSuggestions(data map[string]interface{
 
 	var unsupported []string
 	suggestions := make(map[string]string)
-	
+
 	for field := range data {
 		if !supportedFields[field] {
 			unsupported = append(unsupported, field)
