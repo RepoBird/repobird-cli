@@ -636,17 +636,14 @@ func (b *BulkFileSelector) View(statusLine *StatusLine) string {
 
 	// Setup statusline with better text visibility
 	if statusLine != nil {
-		// Build status text parts
-		leftStatus := fmt.Sprintf("[FZF] %d/%d files", len(b.filteredFiles), len(b.files))
-		if selectedCount < 2 {
-			leftStatus += fmt.Sprintf(" • ⚠️ %d selected (need 2+)", selectedCount)
-		} else {
-			leftStatus += fmt.Sprintf(" • ✓ %d selected", selectedCount)
-		}
+		// Build status text parts - remove warning, keep it simple
+		leftStatus := fmt.Sprintf("[FZF] %d selected", selectedCount)
 
+		// Use SetHelp to put commands right after the label instead of far right
 		statusLine.SetWidth(b.width).
 			SetLeft(leftStatus).
-			SetRight("Space:toggle | Ctrl+A:all | Ctrl+D:none | Enter:submit | Esc:cancel")
+			SetRight("").
+			SetHelp("Space:toggle | Ctrl+A:all | Ctrl+D:none | Enter:submit | Esc:cancel")
 
 		// Join content and status bar
 		return lipgloss.JoinVertical(
