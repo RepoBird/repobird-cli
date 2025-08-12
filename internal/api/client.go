@@ -578,9 +578,9 @@ func (c *Client) GetFileHashes(ctx context.Context) ([]models.FileHashEntry, err
 // processes each run sequentially. The server will return 207 Multi-Status if
 // some runs are still being processed.
 func (c *Client) CreateBulkRuns(ctx context.Context, req *dto.BulkRunRequest) (*dto.BulkRunResponse, error) {
-	// For bulk operations, we use a longer timeout as the server may need
-	// several minutes to process all runs
-	bulkCtx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	// For bulk operations, we use a 5-minute timeout
+	// The server should return 207 if it needs more time
+	bulkCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 
 	resp, err := c.doRequestWithRetry(bulkCtx, "POST", EndpointBulkRuns, req)

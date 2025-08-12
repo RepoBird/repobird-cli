@@ -2,6 +2,7 @@ package commands
 
 import (
 	"context"
+	stderrors "errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -135,23 +136,28 @@ func runBulk(cmd *cobra.Command, args []string) error {
 	}
 	client := api.NewClient(cfg.APIKey, apiURL, debug)
 
-	// Generate file hashes for duplicate detection
-	fileHashCache := cache.NewFileHashCache()
+	// Generate file hashes for duplicate detection (only if not forcing)
 	var runHashes []string
-	for i, run := range bulkConfig.Runs {
-		// Create a temporary hash based on the run content
-		hashContent := fmt.Sprintf("%s-%s-%s-%s-%d",
-			bulkConfig.Repository,
-			run.Prompt,
-			run.Target,
-			run.Context,
-			i,
-		)
-		hash := cache.CalculateStringHash(hashContent)
-		runHashes = append(runHashes, hash)
+	if !bulkConfig.Force {
+		fileHashCache := cache.NewFileHashCache()
+		for i, run := range bulkConfig.Runs {
+			// Create a hash based on the run content for duplicate detection
+			// Note: Including timestamp would prevent duplicate detection, so we don't
+			hashContent := fmt.Sprintf("%s-%s-%s-%s",
+				bulkConfig.Repository,
+				run.Prompt,
+				run.Target,
+				run.Context,
+			)
+			hash := cache.CalculateStringHash(hashContent)
+			runHashes = append(runHashes, hash)
 
-		// Cache the hash
-		fileHashCache.Set(fmt.Sprintf("bulk-run-%d", i), hash)
+			// Cache the hash
+			fileHashCache.Set(fmt.Sprintf("bulk-run-%d", i), hash)
+		}
+	} else {
+		// When forcing, don't send file hashes to skip duplicate detection
+		runHashes = make([]string, len(bulkConfig.Runs))
 	}
 
 	// Convert to API request format
@@ -169,13 +175,17 @@ func runBulk(cmd *cobra.Command, args []string) error {
 	}
 
 	for i, run := range bulkConfig.Runs {
-		bulkRequest.Runs[i] = dto.RunItem{
-			Prompt:   run.Prompt,
-			Title:    run.Title,
-			Target:   run.Target,
-			Context:  run.Context,
-			FileHash: runHashes[i],
+		item := dto.RunItem{
+			Prompt:  run.Prompt,
+			Title:   run.Title,
+			Target:  run.Target,
+			Context: run.Context,
 		}
+		// Only include file hash if we're not forcing (to enable duplicate detection)
+		if !bulkConfig.Force && i < len(runHashes) {
+			item.FileHash = runHashes[i]
+		}
+		bulkRequest.Runs[i] = item
 	}
 
 	// Submit bulk runs
@@ -185,12 +195,13 @@ func runBulk(cmd *cobra.Command, args []string) error {
 	fmt.Println(lipgloss.NewStyle().Bold(true).Render("Submitting bulk runs..."))
 	fmt.Printf("Repository: %s\n", bulkConfig.Repository)
 	fmt.Printf("Total runs: %d\n", len(bulkConfig.Runs))
-	fmt.Println("\nThis may take a few minutes for large batches. Please wait...")
+	fmt.Println("\nThis may take up to 5 minutes. Please wait...")
 
-	// Show a simple spinner while waiting
+	// Show a progress indicator with elapsed time
+	startTime := time.Now()
 	spinner := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 	spinnerIdx := 0
-	done := make(chan bool)
+	done := make(chan bool, 1) // Buffered to prevent goroutine leak
 
 	// Start spinner in background
 	go func() {
@@ -202,7 +213,9 @@ func runBulk(cmd *cobra.Command, args []string) error {
 				fmt.Print("\r\033[K") // Clear the spinner line
 				return
 			case <-ticker.C:
-				fmt.Printf("\r%s Processing...", spinner[spinnerIdx])
+				elapsed := time.Since(startTime)
+				fmt.Printf("\r%s Processing... (%.0fs)", spinner[spinnerIdx], elapsed.Seconds())
+				os.Stdout.Sync() // Force flush to ensure animation
 				spinnerIdx = (spinnerIdx + 1) % len(spinner)
 			}
 		}
@@ -210,8 +223,21 @@ func runBulk(cmd *cobra.Command, args []string) error {
 
 	bulkResp, err := client.CreateBulkRuns(ctx, bulkRequest)
 	done <- true // Stop spinner
+	close(done)  // Clean up channel
 
 	if err != nil {
+		// Check for timeout error
+		if ctx.Err() == context.DeadlineExceeded || stderrors.Is(err, context.DeadlineExceeded) {
+			return fmt.Errorf("bulk submission timed out after 5 minutes. The server may still be processing your runs.\nTry checking the status later with 'repobird status'")
+		}
+
+		// Check if this is a 403 error which might indicate duplicate runs
+		var authErr *errors.AuthError
+		if stderrors.As(err, &authErr) && !bulkConfig.Force {
+			// Suggest using --force flag for duplicate issues
+			errMsg := errors.FormatUserError(err)
+			return fmt.Errorf("%s\n\nIf you're seeing duplicate run errors, try using the --force flag to bypass duplicate detection", errMsg)
+		}
 		return fmt.Errorf("%s", errors.FormatUserError(err))
 	}
 
@@ -236,8 +262,18 @@ func runBulk(cmd *cobra.Command, args []string) error {
 		fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render("\n⚠ Partial success:"))
 		fmt.Printf("Created: %d/%d runs\n", bulkResp.Data.Metadata.TotalSuccessful, bulkResp.Data.Metadata.TotalRequested)
 
+		// Check if failures are due to duplicates
+		hasDuplicates := false
 		for _, runErr := range bulkResp.Data.Failed {
 			fmt.Printf("  ✗ Run %d: %s\n", runErr.RequestIndex+1, runErr.Message)
+			if strings.Contains(strings.ToUpper(runErr.Error), "DUPLICATE") {
+				hasDuplicates = true
+			}
+		}
+
+		// Suggest using --force if duplicates detected and not already forcing
+		if hasDuplicates && !bulkConfig.Force {
+			fmt.Println("\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("14")).Render("💡 Tip: Use --force to bypass duplicate detection and re-run these tasks"))
 		}
 	} else {
 		// All runs created successfully

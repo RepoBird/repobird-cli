@@ -10,14 +10,3 @@ prompt: |
   Focus on achieving at least 80% code coverage.
 
 repository: support-rb/test-ruby
-source: main
-target: feature/improve-test-coverage
-runType: run
-wallaby: run
-title: Add comprehensive test coverage
-context: |
-  This is a Ruby application that needs better test coverage.
-  The goal is to improve code quality and reliability through comprehensive testing.
-  
-  Please follow Ruby and RSpec/Minitest conventions and best practices.
-  Ensure all tests are properly isolated and don't depend on external services.
