@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/repobird/repobird-cli/internal/models"
+	"github.com/repobird/repobird-cli/internal/prompts"
 	"gopkg.in/yaml.v3"
 )
 
@@ -32,7 +33,7 @@ func ParseYAMLConfig(filepath string) (*models.RunConfig, error) {
 }
 
 // ParseYAMLConfigWithPrompts reads and parses a YAML configuration file with validation prompts
-func ParseYAMLConfigWithPrompts(filepath string) (*models.RunConfig, *ValidationPromptHandler, error) {
+func ParseYAMLConfigWithPrompts(filepath string) (*models.RunConfig, *prompts.ValidationPromptHandler, error) {
 	file, err := os.Open(filepath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to open YAML file: %w", err)
@@ -49,7 +50,7 @@ func ParseYAMLConfigFromReader(r io.Reader) (*models.RunConfig, error) {
 }
 
 // ParseYAMLConfigFromReaderWithPrompts parses YAML config from an io.Reader with validation prompts
-func ParseYAMLConfigFromReaderWithPrompts(r io.Reader) (*models.RunConfig, *ValidationPromptHandler, error) {
+func ParseYAMLConfigFromReaderWithPrompts(r io.Reader) (*models.RunConfig, *prompts.ValidationPromptHandler, error) {
 	data, err := io.ReadAll(r)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to read YAML content: %w", err)
@@ -60,10 +61,16 @@ func ParseYAMLConfigFromReaderWithPrompts(r io.Reader) (*models.RunConfig, *Vali
 
 // parseYAMLWithUnknownFields parses YAML allowing unknown fields and warns about them
 func parseYAMLWithUnknownFields(data []byte) (*models.RunConfig, error) {
+	config, _, err := parseYAMLWithUnknownFieldsAndPrompts(data)
+	return config, err
+}
+
+// parseYAMLWithUnknownFieldsAndPrompts parses YAML allowing unknown fields and creates validation prompts
+func parseYAMLWithUnknownFieldsAndPrompts(data []byte) (*models.RunConfig, *prompts.ValidationPromptHandler, error) {
 	// First, parse into a generic map to detect unknown fields
 	var genericMap map[string]interface{}
 	if err := yaml.Unmarshal(data, &genericMap); err != nil {
-		return nil, fmt.Errorf("failed to parse YAML: %w", err)
+		return nil, nil, fmt.Errorf("failed to parse YAML: %w", err)
 	}
 
 	// Parse into our known structure without strict field checking
@@ -71,19 +78,35 @@ func parseYAMLWithUnknownFields(data []byte) (*models.RunConfig, error) {
 	decoder := yaml.NewDecoder(strings.NewReader(string(data)))
 	// Remove the KnownFields(true) restriction to allow unknown fields
 	if err := decoder.Decode(&config); err != nil {
-		return nil, fmt.Errorf("failed to parse YAML: %w", err)
+		return nil, nil, fmt.Errorf("failed to parse YAML: %w", err)
 	}
 
-	// Check for unsupported fields and warn
-	unsupportedFields := findUnsupportedYAMLFields(genericMap)
-	if len(unsupportedFields) > 0 {
-		fmt.Fprintf(os.Stderr, "Warning: Task file has unsupported fields: %s\n",
-			strings.Join(unsupportedFields, ", "))
+	// Create validation prompt handler
+	promptHandler := prompts.NewValidationPromptHandler()
+	
+	// Check for unsupported fields and create prompts
+	unsupportedFields, suggestions := findUnsupportedYAMLFieldsWithSuggestions(genericMap)
+	
+	// Add field suggestion prompts
+	for field, suggestion := range suggestions {
+		promptHandler.AddFieldSuggestionPrompt(field, suggestion)
+	}
+	
+	// Add general unknown field warning if there are fields without suggestions
+	var fieldsWithoutSuggestions []string
+	for _, field := range unsupportedFields {
+		if suggestions[field] == "" {
+			fieldsWithoutSuggestions = append(fieldsWithoutSuggestions, field)
+		}
+	}
+	if len(fieldsWithoutSuggestions) > 0 {
+		promptHandler.AddUnknownFieldWarning(fieldsWithoutSuggestions)
 	}
 
-	// Validate required fields
-	if err := validateYAMLConfig(&config); err != nil {
-		return nil, err
+	// Validate required fields and add to prompt handler if there are errors
+	validationErr := validateYAMLConfigForPrompts(&config)
+	if validationErr != nil {
+		promptHandler.AddValidationError(validationErr.Error())
 	}
 
 	// Convert to RunConfig (only supported fields are included)
@@ -98,11 +121,17 @@ func parseYAMLWithUnknownFields(data []byte) (*models.RunConfig, error) {
 		Files:      config.Files,
 	}
 
-	return runConfig, nil
+	return runConfig, promptHandler, nil
 }
 
 // findUnsupportedYAMLFields identifies fields not in the supported YAMLConfig struct
 func findUnsupportedYAMLFields(data map[string]interface{}) []string {
+	unsupportedFields, _ := findUnsupportedYAMLFieldsWithSuggestions(data)
+	return unsupportedFields
+}
+
+// findUnsupportedYAMLFieldsWithSuggestions identifies fields and returns suggestions
+func findUnsupportedYAMLFieldsWithSuggestions(data map[string]interface{}) ([]string, map[string]string) {
 	supportedFields := map[string]bool{
 		"prompt":      true,
 		"repository":  true,
@@ -122,22 +151,33 @@ func findUnsupportedYAMLFields(data map[string]interface{}) []string {
 	}
 
 	var unsupported []string
+	suggestions := make(map[string]string)
+	
 	for field := range data {
 		if !supportedFields[field] {
 			unsupported = append(unsupported, field)
 
-			// Check for similar field names and suggest
+			// Check for similar field names and store suggestion
 			if suggestion := SuggestFieldName(field, supportedFieldsList); suggestion != "" {
-				fmt.Fprintf(os.Stderr, "Warning: Unknown field '%s' - did you mean '%s'?\n", field, suggestion)
+				suggestions[field] = suggestion
 			}
 		}
 	}
 
-	return unsupported
+	return unsupported, suggestions
 }
 
 // validateYAMLConfig validates required fields in the YAML configuration
 func validateYAMLConfig(config *YAMLConfig) error {
+	validationErr := validateYAMLConfigForPrompts(config)
+	if validationErr != nil {
+		return validationErr
+	}
+	return nil
+}
+
+// validateYAMLConfigForPrompts validates and applies defaults without failing on validation errors
+func validateYAMLConfigForPrompts(config *YAMLConfig) error {
 	// Convert to RunConfig for validation
 	runConfig := &models.RunConfig{
 		Prompt:     config.Prompt,
@@ -150,16 +190,24 @@ func validateYAMLConfig(config *YAMLConfig) error {
 		Files:      config.Files,
 	}
 
-	// Use shared validation
-	if err := ValidateRunConfig(runConfig); err != nil {
-		return err
+	// Apply defaults first
+	if runConfig.Source == "" {
+		runConfig.Source = "main"
+		config.Source = "main"
+	}
+	if runConfig.RunType == "" {
+		runConfig.RunType = "run"
+		config.RunType = "run"
 	}
 
-	// Apply defaults back to the YAML config
+	// Check for validation errors and return them (but don't fail)
+	validationErr := ValidateRunConfig(runConfig)
+	
+	// Apply any additional defaults that were set during validation
 	config.Source = runConfig.Source
 	config.RunType = runConfig.RunType
 
-	return nil
+	return validationErr
 }
 
 // LoadConfigFromFile loads configuration from JSON, YAML, or Markdown files
@@ -184,7 +232,7 @@ func LoadConfigFromFile(filepath string) (*models.RunConfig, string, error) {
 }
 
 // LoadConfigFromFileWithPrompts loads configuration and returns validation prompts for processing
-func LoadConfigFromFileWithPrompts(filepath string) (*models.RunConfig, string, *ValidationPromptHandler, error) {
+func LoadConfigFromFileWithPrompts(filepath string) (*models.RunConfig, string, *prompts.ValidationPromptHandler, error) {
 	lowercasePath := strings.ToLower(filepath)
 
 	// Check file extension
@@ -213,9 +261,15 @@ func LoadConfigFromFileWithPrompts(filepath string) (*models.RunConfig, string, 
 
 // detectAndParseConfig attempts to detect the file format and parse accordingly
 func detectAndParseConfig(filepath string) (*models.RunConfig, string, error) {
+	config, additionalContext, _, err := detectAndParseConfigWithPrompts(filepath)
+	return config, additionalContext, err
+}
+
+// detectAndParseConfigWithPrompts attempts to detect the file format and parse accordingly with validation prompts
+func detectAndParseConfigWithPrompts(filepath string) (*models.RunConfig, string, *prompts.ValidationPromptHandler, error) {
 	file, err := os.Open(filepath)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to open file: %w", err)
+		return nil, "", nil, fmt.Errorf("failed to open file: %w", err)
 	}
 	defer func() { _ = file.Close() }()
 
@@ -223,12 +277,12 @@ func detectAndParseConfig(filepath string) (*models.RunConfig, string, error) {
 	buf := make([]byte, 512)
 	n, err := file.Read(buf)
 	if err != nil && err != io.EOF {
-		return nil, "", fmt.Errorf("failed to read file: %w", err)
+		return nil, "", nil, fmt.Errorf("failed to read file: %w", err)
 	}
 
 	// Reset file position
 	if _, err := file.Seek(0, 0); err != nil {
-		return nil, "", fmt.Errorf("failed to reset file position: %w", err)
+		return nil, "", nil, fmt.Errorf("failed to reset file position: %w", err)
 	}
 
 	content := string(buf[:n])
@@ -238,66 +292,103 @@ func detectAndParseConfig(filepath string) (*models.RunConfig, string, error) {
 	switch {
 	case strings.HasPrefix(trimmed, "{"):
 		// Likely JSON
-		config, err := models.LoadRunConfigFromFile(filepath)
-		return config, "", err
+		config, promptHandler, err := models.LoadRunConfigFromFileWithPrompts(filepath)
+		return config, "", promptHandler, err
 
 	case strings.HasPrefix(trimmed, "---"):
 		// Could be YAML frontmatter or pure YAML
 		if strings.Contains(content, "\n---\n") || strings.Contains(content, "\r\n---\r\n") {
-			// Likely markdown with frontmatter
-			return ParseMarkdownConfig(filepath)
+			// Likely markdown with frontmatter - no prompts currently
+			config, additionalContext, err := ParseMarkdownConfig(filepath)
+			return config, additionalContext, nil, err
 		}
 		// Pure YAML
-		config, err := ParseYAMLConfig(filepath)
-		return config, "", err
+		config, promptHandler, err := ParseYAMLConfigWithPrompts(filepath)
+		return config, "", promptHandler, err
 
 	default:
 		// Try YAML first (most flexible)
-		config, yamlErr := ParseYAMLConfig(filepath)
+		config, promptHandler, yamlErr := ParseYAMLConfigWithPrompts(filepath)
 		if yamlErr == nil {
-			return config, "", nil
+			return config, "", promptHandler, nil
 		}
 
 		// Try JSON
-		config, jsonErr := models.LoadRunConfigFromFile(filepath)
+		config, promptHandler2, jsonErr := models.LoadRunConfigFromFileWithPrompts(filepath)
 		if jsonErr == nil {
-			return config, "", nil
+			return config, "", promptHandler2, nil
 		}
 
 		// Return the YAML error as it's more likely
-		return nil, "", fmt.Errorf("unable to parse file as YAML or JSON: %w", yamlErr)
+		return nil, "", nil, fmt.Errorf("unable to parse file as YAML or JSON: %w", yamlErr)
 	}
 }
 
 // ParseJSONFromStdin parses JSON from stdin with unknown field support and warnings
 func ParseJSONFromStdin() (*models.RunConfig, error) {
+	config, promptHandler, err := ParseJSONFromStdinWithPrompts()
+	if err != nil {
+		return nil, err
+	}
+	
+	// Process any validation prompts before proceeding
+	if promptHandler != nil && promptHandler.HasPrompts() {
+		shouldContinue, err := promptHandler.ProcessPrompts()
+		if err != nil {
+			return nil, err
+		}
+		if !shouldContinue {
+			return nil, fmt.Errorf("operation cancelled by user")
+		}
+	}
+	
+	return config, nil
+}
+
+// ParseJSONFromStdinWithPrompts parses JSON from stdin with validation prompts
+func ParseJSONFromStdinWithPrompts() (*models.RunConfig, *prompts.ValidationPromptHandler, error) {
 	// First, read all stdin data
 	data, err := io.ReadAll(os.Stdin)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read from stdin: %w", err)
+		return nil, nil, fmt.Errorf("failed to read from stdin: %w", err)
 	}
 
 	// Parse into a generic map to detect unknown fields
 	var genericMap map[string]interface{}
 	if err := json.Unmarshal(data, &genericMap); err != nil {
-		return nil, fmt.Errorf("failed to parse JSON: %w", err)
+		return nil, nil, fmt.Errorf("failed to parse JSON: %w", err)
 	}
 
-	// Check for unsupported fields and warn
-	unsupportedFields := findUnsupportedJSONFieldsForStdin(genericMap)
-	if len(unsupportedFields) > 0 {
-		fmt.Fprintf(os.Stderr, "Warning: Task JSON has unsupported fields: %s\n",
-			strings.Join(unsupportedFields, ", "))
+	// Create validation prompt handler
+	promptHandler := prompts.NewValidationPromptHandler()
+	
+	// Check for unsupported fields and create prompts
+	unsupportedFields, suggestions := findUnsupportedJSONFieldsForStdinWithSuggestions(genericMap)
+	
+	// Add field suggestion prompts
+	for field, suggestion := range suggestions {
+		promptHandler.AddFieldSuggestionPrompt(field, suggestion)
+	}
+	
+	// Add general unknown field warning if there are fields without suggestions
+	var fieldsWithoutSuggestions []string
+	for _, field := range unsupportedFields {
+		if suggestions[field] == "" {
+			fieldsWithoutSuggestions = append(fieldsWithoutSuggestions, field)
+		}
+	}
+	if len(fieldsWithoutSuggestions) > 0 {
+		promptHandler.AddUnknownFieldWarning(fieldsWithoutSuggestions)
 	}
 
 	// Parse into our known structure (unknown fields will be ignored)
 	var runReq models.RunRequest
 	if err := json.Unmarshal(data, &runReq); err != nil {
-		return nil, fmt.Errorf("failed to parse JSON: %w", err)
+		return nil, nil, fmt.Errorf("failed to parse JSON: %w", err)
 	}
 
 	// Convert RunRequest to RunConfig (only supported fields are included)
-	return &models.RunConfig{
+	runConfig := &models.RunConfig{
 		Prompt:     runReq.Prompt,
 		Repository: runReq.Repository,
 		Source:     runReq.Source,
@@ -306,11 +397,19 @@ func ParseJSONFromStdin() (*models.RunConfig, error) {
 		Title:      runReq.Title,
 		Context:    runReq.Context,
 		Files:      runReq.Files,
-	}, nil
+	}
+
+	return runConfig, promptHandler, nil
 }
 
 // findUnsupportedJSONFieldsForStdin identifies fields not supported for stdin JSON
 func findUnsupportedJSONFieldsForStdin(data map[string]interface{}) []string {
+	unsupportedFields, _ := findUnsupportedJSONFieldsForStdinWithSuggestions(data)
+	return unsupportedFields
+}
+
+// findUnsupportedJSONFieldsForStdinWithSuggestions identifies fields and returns suggestions
+func findUnsupportedJSONFieldsForStdinWithSuggestions(data map[string]interface{}) ([]string, map[string]string) {
 	supportedFields := map[string]bool{
 		"prompt":     true,
 		"repository": true,
@@ -328,16 +427,18 @@ func findUnsupportedJSONFieldsForStdin(data map[string]interface{}) []string {
 	}
 
 	var unsupported []string
+	suggestions := make(map[string]string)
+	
 	for field := range data {
 		if !supportedFields[field] {
 			unsupported = append(unsupported, field)
 
-			// Check for similar field names and suggest
+			// Check for similar field names and store suggestion
 			if suggestion := SuggestFieldName(field, supportedFieldsList); suggestion != "" {
-				fmt.Fprintf(os.Stderr, "Warning: Unknown field '%s' - did you mean '%s'?\n", field, suggestion)
+				suggestions[field] = suggestion
 			}
 		}
 	}
 
-	return unsupported
+	return unsupported, suggestions
 }

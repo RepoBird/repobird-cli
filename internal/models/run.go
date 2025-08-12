@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/repobird/repobird-cli/internal/prompts"
 )
 
 type RunType string
@@ -188,48 +190,75 @@ type FileHashesResponse struct {
 
 // LoadRunConfigFromFile loads a RunConfig from a JSON file
 func LoadRunConfigFromFile(filepath string) (*RunConfig, error) {
+	config, _, err := LoadRunConfigFromFileWithPrompts(filepath)
+	return config, err
+}
+
+// LoadRunConfigFromFileWithPrompts loads a RunConfig from a JSON file with validation prompts
+func LoadRunConfigFromFileWithPrompts(filepath string) (*RunConfig, *prompts.ValidationPromptHandler, error) {
 	file, err := os.Open(filepath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open file: %w", err)
+		return nil, nil, fmt.Errorf("failed to open file: %w", err)
 	}
 	defer file.Close()
 
-	return parseJSONWithUnknownFields(file)
+	return parseJSONWithUnknownFieldsAndPrompts(file)
 }
 
 // parseJSONWithUnknownFields parses JSON allowing unknown fields and warns about them
 func parseJSONWithUnknownFields(file *os.File) (*RunConfig, error) {
+	config, _, err := parseJSONWithUnknownFieldsAndPrompts(file)
+	return config, err
+}
+
+// parseJSONWithUnknownFieldsAndPrompts parses JSON allowing unknown fields and creates validation prompts
+func parseJSONWithUnknownFieldsAndPrompts(file *os.File) (*RunConfig, *prompts.ValidationPromptHandler, error) {
 	// Reset file position for multiple reads
 	if _, err := file.Seek(0, 0); err != nil {
-		return nil, fmt.Errorf("failed to reset file position: %w", err)
+		return nil, nil, fmt.Errorf("failed to reset file position: %w", err)
 	}
 
 	// First, parse into a generic map to detect unknown fields
 	var genericMap map[string]interface{}
 	if err := json.NewDecoder(file).Decode(&genericMap); err != nil {
-		return nil, fmt.Errorf("failed to parse JSON: %w", err)
+		return nil, nil, fmt.Errorf("failed to parse JSON: %w", err)
 	}
 
-	// Check for unsupported fields and warn
-	unsupportedFields := findUnsupportedJSONFields(genericMap)
-	if len(unsupportedFields) > 0 {
-		fmt.Fprintf(os.Stderr, "Warning: Task file has unsupported fields: %s\n",
-			strings.Join(unsupportedFields, ", "))
+	// Create validation prompt handler
+	promptHandler := prompts.NewValidationPromptHandler()
+	
+	// Check for unsupported fields and create prompts
+	unsupportedFields, suggestions := findUnsupportedJSONFieldsWithSuggestions(genericMap)
+	
+	// Add field suggestion prompts
+	for field, suggestion := range suggestions {
+		promptHandler.AddFieldSuggestionPrompt(field, suggestion)
+	}
+	
+	// Add general unknown field warning if there are fields without suggestions
+	var fieldsWithoutSuggestions []string
+	for _, field := range unsupportedFields {
+		if suggestions[field] == "" {
+			fieldsWithoutSuggestions = append(fieldsWithoutSuggestions, field)
+		}
+	}
+	if len(fieldsWithoutSuggestions) > 0 {
+		promptHandler.AddUnknownFieldWarning(fieldsWithoutSuggestions)
 	}
 
 	// Reset file position for actual parsing
 	if _, err := file.Seek(0, 0); err != nil {
-		return nil, fmt.Errorf("failed to reset file position: %w", err)
+		return nil, nil, fmt.Errorf("failed to reset file position: %w", err)
 	}
 
 	// Parse into our known structure (unknown fields will be ignored)
 	var runReq RunRequest
 	if err := json.NewDecoder(file).Decode(&runReq); err != nil {
-		return nil, fmt.Errorf("failed to parse JSON: %w", err)
+		return nil, nil, fmt.Errorf("failed to parse JSON: %w", err)
 	}
 
 	// Convert RunRequest to RunConfig (only supported fields are included)
-	return &RunConfig{
+	runConfig := &RunConfig{
 		Prompt:     runReq.Prompt,
 		Repository: runReq.Repository,
 		Source:     runReq.Source,
@@ -238,11 +267,19 @@ func parseJSONWithUnknownFields(file *os.File) (*RunConfig, error) {
 		Title:      runReq.Title,
 		Context:    runReq.Context,
 		Files:      runReq.Files,
-	}, nil
+	}
+
+	return runConfig, promptHandler, nil
 }
 
 // findUnsupportedJSONFields identifies fields not in the supported RunRequest struct
 func findUnsupportedJSONFields(data map[string]interface{}) []string {
+	unsupportedFields, _ := findUnsupportedJSONFieldsWithSuggestions(data)
+	return unsupportedFields
+}
+
+// findUnsupportedJSONFieldsWithSuggestions identifies fields and returns suggestions
+func findUnsupportedJSONFieldsWithSuggestions(data map[string]interface{}) ([]string, map[string]string) {
 	supportedFields := map[string]bool{
 		"prompt":     true,
 		"repository": true,
@@ -260,18 +297,20 @@ func findUnsupportedJSONFields(data map[string]interface{}) []string {
 	}
 
 	var unsupported []string
+	suggestions := make(map[string]string)
+	
 	for field := range data {
 		if !supportedFields[field] {
 			unsupported = append(unsupported, field)
 
-			// Check for similar field names and suggest
+			// Check for similar field names and store suggestion
 			if suggestion := suggestJSONFieldName(field, supportedFieldsList); suggestion != "" {
-				fmt.Fprintf(os.Stderr, "Warning: Unknown field '%s' - did you mean '%s'?\n", field, suggestion)
+				suggestions[field] = suggestion
 			}
 		}
 	}
 
-	return unsupported
+	return unsupported, suggestions
 }
 
 // suggestJSONFieldName suggests similar field names for JSON parsing

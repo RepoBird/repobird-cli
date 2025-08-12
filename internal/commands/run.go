@@ -64,10 +64,7 @@ func runCommand(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Validate the configuration
-	if err := utils.ValidateRunConfig(runConfig); err != nil {
-		return fmt.Errorf("validation failed: %w", err)
-	}
+	// Validation is now handled during parsing with prompts
 
 	// Convert to domain request
 	createReq := domain.CreateRunRequest{
