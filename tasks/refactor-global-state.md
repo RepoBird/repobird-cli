@@ -1,7 +1,16 @@
-# Task: Refactor Global State Anti-Pattern
+# Task: Refactor Global State Anti-Pattern (Bubble Tea Native Approach)
 
 ## Issue Summary
-The RepoBird CLI codebase currently uses global variables and package-level initialization, violating Go best practices and creating significant technical debt. This refactoring will implement proper dependency injection to eliminate global state.
+The RepoBird CLI codebase currently uses global variables and package-level initialization, violating Go best practices and creating significant technical debt. This refactoring will implement Bubble Tea's native state management pattern for the TUI, eliminating global state while keeping the solution simple and framework-aligned.
+
+## 🎯 TL;DR - The Simple Solution
+
+Instead of complex dependency injection:
+1. **Use Bubble Tea's Model** as the state container (it's designed for this!)
+2. **Add ttlcache library** for automatic TTL and cleanup
+3. **Embed cache in TUI views** - no globals, no DI
+4. **Keep CLI commands as-is** - they don't need changes
+5. **One week of work** instead of four!
 
 ## Current Problems
 
@@ -49,652 +58,576 @@ Found 18 instances of global command definitions:
 - Thread-safety concerns in concurrent operations
 - Memory leaks possible from unbounded cache growth
 
-## Proposed Solution
+## Why NOT Complex Dependency Injection?
 
-### Phase 1: Create Dependency Container Infrastructure
+After researching Bubble Tea best practices and examining the codebase:
 
-#### 1.1 Define Core Interfaces
-```go
-// internal/container/interfaces.go
-package container
+1. **Bubble Tea has its own state management pattern** - The Model IS the state container
+2. **CLI commands barely use cache** - Only bulk.go uses file hash caching
+3. **TUI is the primary cache consumer** - All cache usage is in TUI views
+4. **DI adds unnecessary complexity** - For a single-user CLI tool, it's overkill
+5. **Testing is simpler with models** - Create a model with test data, no mocks needed
 
-import (
-    "context"
-    "time"
-    "github.com/repobird/repobird-cli/internal/models"
-)
+## Proposed Solution: Bubble Tea Native Approach
 
-// CacheService defines the cache operations
-type CacheService interface {
-    // Run operations
-    GetRuns(ctx context.Context, userID int) ([]models.RunResponse, error)
-    SetRuns(ctx context.Context, userID int, runs []models.RunResponse, ttl time.Duration) error
-    InvalidateRuns(ctx context.Context, userID int) error
-    
-    // Run details operations
-    GetRunDetails(ctx context.Context, runID string) (*models.RunResponse, error)
-    SetRunDetails(ctx context.Context, runID string, details *models.RunResponse, ttl time.Duration) error
-    
-    // User info operations
-    GetUserInfo(ctx context.Context) (*models.UserInfo, error)
-    SetUserInfo(ctx context.Context, info *models.UserInfo, ttl time.Duration) error
-    
-    // Form data operations
-    GetFormData(ctx context.Context) (*FormData, error)
-    SetFormData(ctx context.Context, data *FormData) error
-}
+### Core Principle
+Use Bubble Tea's Model as the single source of truth for application state, including cache. This follows the framework's intended patterns and keeps the code simple.
 
-// ConfigService defines configuration operations
-type ConfigService interface {
-    GetAPIKey() string
-    GetAPIURL() string
-    GetEnvironment() string
-    SetAPIKey(key string) error
-    SetAPIURL(url string) error
-    Validate() error
-}
+### Phase 1: Add TTL Cache Library
 
-// APIClient defines the API operations
-type APIClient interface {
-    CreateRun(ctx context.Context, req *models.CreateRunRequest) (*models.RunResponse, error)
-    GetRun(ctx context.Context, runID string) (*models.RunResponse, error)
-    ListRuns(ctx context.Context, params *models.ListParams) ([]models.RunResponse, error)
-    VerifyAuth(ctx context.Context) (*models.UserInfo, error)
-}
+#### 1.1 Install ttlcache
+```bash
+go get github.com/jellydator/ttlcache/v3
+go get github.com/adrg/xdg  # For cross-platform directories
 ```
 
-#### 1.2 Create Container Structure
+#### 1.2 Why ttlcache?
+- **Simple API** - Get/Set/Delete with automatic TTL expiration
+- **Thread-safe** - Built-in mutex protection
+- **Performant** - Optimized for <10,000 items
+- **Well-maintained** - Active development, widely used
+- **No configuration hell** - Works out of the box
+
 ```go
-// internal/container/container.go
-package container
-
-import (
-    "sync"
-    "github.com/repobird/repobird-cli/internal/api"
-)
-
-// Container holds all application dependencies
-type Container struct {
-    mu        sync.RWMutex
-    cache     CacheService
-    config    ConfigService
-    apiClient APIClient
-    
-    // Lazy initialization flags
-    cacheInit     sync.Once
-    configInit    sync.Once
-    apiClientInit sync.Once
-}
-
-// New creates a new dependency container
-func New() *Container {
-    return &Container{}
-}
-
-// Cache returns the cache service, initializing if needed
-func (c *Container) Cache() CacheService {
-    c.cacheInit.Do(func() {
-        if c.cache == nil {
-            c.cache = NewDefaultCache()
-        }
-    })
-    return c.cache
-}
-
-// Config returns the config service, initializing if needed
-func (c *Container) Config() ConfigService {
-    c.configInit.Do(func() {
-        if c.config == nil {
-            c.config = NewDefaultConfig()
-        }
-    })
-    return c.config
-}
-
-// APIClient returns the API client, initializing if needed
-func (c *Container) APIClient() APIClient {
-    c.apiClientInit.Do(func() {
-        if c.apiClient == nil {
-            c.apiClient = api.NewClient(c.Config())
-        }
-    })
-    return c.apiClient
-}
-
-// WithCache sets a custom cache implementation
-func (c *Container) WithCache(cache CacheService) *Container {
-    c.mu.Lock()
-    defer c.mu.Unlock()
-    c.cache = cache
-    return c
-}
-
-// WithConfig sets a custom config implementation
-func (c *Container) WithConfig(config ConfigService) *Container {
-    c.mu.Lock()
-    defer c.mu.Unlock()
-    c.config = config
-    return c
-}
-
-// WithAPIClient sets a custom API client implementation
-func (c *Container) WithAPIClient(client APIClient) *Container {
-    c.mu.Lock()
-    defer c.mu.Unlock()
-    c.apiClient = client
-    return c
-}
-```
-
-### Phase 2: Refactor Cache Implementation
-
-#### 2.1 Convert GlobalCache to Service
-```go
-// internal/cache/service.go
+// internal/tui/cache/simple.go
 package cache
 
 import (
-    "context"
-    "sync"
     "time"
+    "github.com/jellydator/ttlcache/v3"
     "github.com/repobird/repobird-cli/internal/models"
 )
 
-// Service implements the CacheService interface
-type Service struct {
-    mu              sync.RWMutex
-    runs            []models.RunResponse
-    runsCachedAt    time.Time
-    runsTTL         time.Duration
-    details         map[string]*models.RunResponse
-    detailsAt       map[string]time.Time
-    terminalDetails map[string]*models.RunResponse
-    userInfo        *models.UserInfo
-    userInfoTime    time.Time
-    formData        *FormData
-    persistentCache *PersistentCache
-    fileHashCache   *FileHashCache
+// SimpleCache wraps ttlcache for RepoBird's needs
+type SimpleCache struct {
+    cache *ttlcache.Cache[string, any]
 }
 
-// NewService creates a new cache service
-func NewService(userID *int) (*Service, error) {
-    pc, err := NewPersistentCacheForUser(userID)
-    if err != nil {
-        // Log error but continue with memory-only cache
-        pc = nil
-    }
+// NewSimpleCache creates a cache with sensible defaults
+func NewSimpleCache() *SimpleCache {
+    cache := ttlcache.New[string, any](
+        ttlcache.WithTTL[string, any](5 * time.Minute),
+        ttlcache.WithCapacity[string, any](10000),
+    )
     
-    s := &Service{
-        details:         make(map[string]*models.RunResponse),
-        detailsAt:       make(map[string]time.Time),
-        terminalDetails: make(map[string]*models.RunResponse),
-        persistentCache: pc,
-        fileHashCache:   NewFileHashCacheForUser(userID),
-        runsTTL:         5 * time.Minute, // Default TTL
-    }
+    // Start automatic cleanup
+    go cache.Start()
     
-    // Load persisted terminal runs
-    if pc != nil {
-        if terminalRuns, err := pc.LoadAllTerminalRuns(); err == nil {
-            s.terminalDetails = terminalRuns
+    return &SimpleCache{cache: cache}
+}
+
+// GetRuns retrieves cached runs
+func (c *SimpleCache) GetRuns() []models.RunResponse {
+    if item := c.cache.Get("runs"); item != nil {
+        if runs, ok := item.Value().([]models.RunResponse); ok {
+            return runs
         }
     }
-    
-    return s, nil
-}
-
-// GetRuns implements CacheService
-func (s *Service) GetRuns(ctx context.Context, userID int) ([]models.RunResponse, error) {
-    s.mu.RLock()
-    defer s.mu.RUnlock()
-    
-    // Check if cache is still valid
-    if time.Since(s.runsCachedAt) > s.runsTTL {
-        return nil, ErrCacheExpired
-    }
-    
-    return s.runs, nil
-}
-
-// SetRuns implements CacheService
-func (s *Service) SetRuns(ctx context.Context, userID int, runs []models.RunResponse, ttl time.Duration) error {
-    s.mu.Lock()
-    defer s.mu.Unlock()
-    
-    s.runs = runs
-    s.runsCachedAt = time.Now()
-    if ttl > 0 {
-        s.runsTTL = ttl
-    }
-    
     return nil
 }
 
-// Additional methods implementation...
-```
+// SetRuns caches runs with TTL
+func (c *SimpleCache) SetRuns(runs []models.RunResponse) {
+    c.cache.Set("runs", runs, ttlcache.DefaultTTL)
+}
 
-#### 2.2 Create Migration Helper
-```go
-// internal/cache/migration.go
-package cache
-
-import (
-    "github.com/repobird/repobird-cli/internal/container"
-)
-
-// GetGlobalCache returns the global cache wrapped in the service interface
-// DEPRECATED: This is a migration helper and will be removed
-func GetGlobalCache() container.CacheService {
-    if globalCache == nil {
-        initializeCache()
+// GetUserInfo retrieves cached user info
+func (c *SimpleCache) GetUserInfo() *models.UserInfo {
+    if item := c.cache.Get("userInfo"); item != nil {
+        if info, ok := item.Value().(*models.UserInfo); ok {
+            return info
+        }
     }
-    return &legacyWrapper{cache: globalCache}
+    return nil
 }
 
-// legacyWrapper wraps the old GlobalCache to implement CacheService
-type legacyWrapper struct {
-    cache *GlobalCache
+// SetUserInfo caches user info
+func (c *SimpleCache) SetUserInfo(info *models.UserInfo) {
+    c.cache.Set("userInfo", info, 10*time.Minute)
 }
 
-// Implement CacheService methods wrapping GlobalCache methods
-func (w *legacyWrapper) GetRuns(ctx context.Context, userID int) ([]models.RunResponse, error) {
-    return w.cache.GetRuns()
-}
-
-// Continue implementing wrapper methods...
-```
-
-### Phase 3: Refactor Commands
-
-#### 3.1 Convert Commands to Functions
-```go
-// internal/commands/root.go
-package commands
-
-import (
-    "github.com/spf13/cobra"
-    "github.com/repobird/repobird-cli/internal/container"
-)
-
-// NewRootCommand creates the root command with dependencies
-func NewRootCommand(c *container.Container) *cobra.Command {
-    cmd := &cobra.Command{
-        Use:   "repobird",
-        Short: "RepoBird CLI - AI-powered code generation",
-        Long:  `RepoBird CLI allows you to submit and track AI-powered code generation tasks.`,
-        PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-            // Initialize configuration
-            return c.Config().Validate()
-        },
-    }
-    
-    // Add subcommands with dependencies
-    cmd.AddCommand(
-        NewRunCommand(c),
-        NewStatusCommand(c),
-        NewAuthCommand(c),
-        NewConfigCommand(c),
-        NewTUICommand(c),
-        NewVersionCommand(),
-        NewCompletionCommand(),
-        NewDocsCommand(),
-    )
-    
-    // Add global flags
-    cmd.PersistentFlags().Bool("debug", false, "Enable debug output")
-    cmd.PersistentFlags().String("api-url", "", "Override API URL")
-    
-    return cmd
-}
-
-// NewRunCommand creates the run command with dependencies
-func NewRunCommand(c *container.Container) *cobra.Command {
-    var follow bool
-    var skipConfirmation bool
-    
-    cmd := &cobra.Command{
-        Use:   "run [task-file]",
-        Short: "Submit a new run from a task JSON file",
-        Args:  cobra.ExactArgs(1),
-        RunE: func(cmd *cobra.Command, args []string) error {
-            // Use injected dependencies
-            client := c.APIClient()
-            cache := c.Cache()
-            config := c.Config()
-            
-            // Implementation using dependencies...
-            return runTask(cmd.Context(), client, cache, config, args[0], follow, skipConfirmation)
-        },
-    }
-    
-    cmd.Flags().BoolVarP(&follow, "follow", "f", false, "Follow run status until completion")
-    cmd.Flags().BoolVar(&skipConfirmation, "yes", false, "Skip confirmation prompt")
-    
-    return cmd
-}
-
-// Continue converting other commands...
-```
-
-#### 3.2 Update Main Entry Point
-```go
-// cmd/repobird/main.go
-package main
-
-import (
-    "fmt"
-    "os"
-    
-    "github.com/repobird/repobird-cli/internal/commands"
-    "github.com/repobird/repobird-cli/internal/container"
-)
-
-func main() {
-    // Create dependency container
-    c := container.New()
-    
-    // Create root command with dependencies
-    rootCmd := commands.NewRootCommand(c)
-    
-    // Execute command
-    if err := rootCmd.Execute(); err != nil {
-        fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-        os.Exit(1)
-    }
+// Clear removes all cached items
+func (c *SimpleCache) Clear() {
+    c.cache.DeleteAll()
 }
 ```
 
-### Phase 4: Update TUI Views
+### Phase 2: Update TUI Model to Include Cache
 
-#### 4.1 Refactor View Constructors
+#### 2.1 Embed Cache in Bubble Tea Model
 ```go
 // internal/tui/views/dashboard.go
 package views
 
 import (
-    "github.com/repobird/repobird-cli/internal/container"
+    tea "github.com/charmbracelet/bubbletea"
+    "github.com/repobird/repobird-cli/internal/tui/cache"
 )
 
-// DashboardView represents the dashboard view
+// DashboardView holds all state for the dashboard
 type DashboardView struct {
-    container *container.Container
-    // other fields...
+    // This IS our state container - no globals!
+    cache     *cache.SimpleCache
+    apiClient APIClient
+    
+    // View-specific state
+    width     int
+    height    int
+    runs      []models.RunResponse
+    loading   bool
+    err       error
 }
 
-// NewDashboardView creates a new dashboard view with dependencies
-func NewDashboardView(c *container.Container) *DashboardView {
+// NewDashboardView creates a dashboard with embedded cache
+func NewDashboardView(client APIClient) *DashboardView {
     return &DashboardView{
-        container: c,
-        // initialize other fields...
+        cache:     cache.NewSimpleCache(),  // Cache is part of the model!
+        apiClient: client,
     }
 }
 
-// Methods use injected dependencies
-func (v *DashboardView) loadData() error {
-    cache := v.container.Cache()
-    client := v.container.APIClient()
+// Update handles all state changes through messages
+func (v *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+    switch msg := msg.(type) {
+    case runsLoadedMsg:
+        v.runs = msg.runs
+        v.cache.SetRuns(msg.runs)  // Cache through the model
+        v.loading = false
+        
+    case tea.WindowSizeMsg:
+        v.width = msg.Width
+        v.height = msg.Height
+    }
     
-    // Use cache and client...
-    return nil
+    return v, nil
 }
 ```
 
-### Phase 5: Testing Infrastructure
-
-#### 5.1 Create Mock Implementations
+#### 2.2 Use Commands for Async Operations (Bubble Tea Way)
 ```go
-// internal/container/mocks/cache_mock.go
-package mocks
+// internal/tui/views/commands.go
+package views
 
 import (
-    "context"
-    "sync"
-    "time"
-    "github.com/repobird/repobird-cli/internal/models"
+    tea "github.com/charmbracelet/bubbletea"
+    "github.com/repobird/repobird-cli/internal/api"
 )
 
-// MockCache is a mock implementation of CacheService for testing
-type MockCache struct {
-    mu          sync.RWMutex
-    runs        []models.RunResponse
-    runDetails  map[string]*models.RunResponse
-    userInfo    *models.UserInfo
-    
-    // Track method calls for assertions
-    getCalls    int
-    setCalls    int
-    invalidated bool
+// Messages for state updates
+type runsLoadedMsg struct {
+    runs []models.RunResponse
+    err  error
 }
 
-// NewMockCache creates a new mock cache
-func NewMockCache() *MockCache {
-    return &MockCache{
-        runDetails: make(map[string]*models.RunResponse),
+type userInfoLoadedMsg struct {
+    info *models.UserInfo
+    err  error
+}
+
+// Commands for async operations
+func fetchRunsCmd(client APIClient) tea.Cmd {
+    return func() tea.Msg {
+        runs, err := client.ListRuns(nil)
+        return runsLoadedMsg{runs, err}
     }
 }
 
-// GetRuns implements CacheService
-func (m *MockCache) GetRuns(ctx context.Context, userID int) ([]models.RunResponse, error) {
-    m.mu.RLock()
-    defer m.mu.RUnlock()
-    m.getCalls++
-    return m.runs, nil
+func fetchUserInfoCmd(client APIClient) tea.Cmd {
+    return func() tea.Msg {
+        info, err := client.VerifyAuth()
+        return userInfoLoadedMsg{info, err}
+    }
 }
 
-// SetRuns implements CacheService
-func (m *MockCache) SetRuns(ctx context.Context, userID int, runs []models.RunResponse, ttl time.Duration) error {
-    m.mu.Lock()
-    defer m.mu.Unlock()
-    m.setCalls++
-    m.runs = runs
-    return nil
-}
-
-// Helper methods for test assertions
-func (m *MockCache) GetCallCount() int {
-    m.mu.RLock()
-    defer m.mu.RUnlock()
-    return m.getCalls
-}
-
-func (m *MockCache) WasInvalidated() bool {
-    m.mu.RLock()
-    defer m.mu.RUnlock()
-    return m.invalidated
+// Load from cache or fetch
+func loadRunsCmd(cache *cache.SimpleCache, client APIClient) tea.Cmd {
+    return func() tea.Msg {
+        // Try cache first
+        if runs := cache.GetRuns(); runs != nil {
+            return runsLoadedMsg{runs, nil}
+        }
+        
+        // Cache miss, fetch from API
+        runs, err := client.ListRuns(nil)
+        if err == nil {
+            cache.SetRuns(runs)
+        }
+        return runsLoadedMsg{runs, err}
+    }
 }
 ```
 
-#### 5.2 Update Tests
+### Phase 3: Handle CLI Commands Minimally
+
+#### 3.1 Keep CLI Commands Simple (No Major Changes Needed!)
 ```go
-// internal/commands/run_test.go
+// internal/commands/bulk.go - The ONLY CLI command that uses cache
 package commands
+
+import (
+    "github.com/repobird/repobird-cli/internal/cache"
+)
+
+// No changes needed for most commands!
+// They already don't use global cache
+
+var bulkCmd = &cobra.Command{
+    Use: "bulk",
+    RunE: func(cmd *cobra.Command, args []string) error {
+        // For bulk command, just create a local cache instance
+        fileHashCache := cache.NewFileHashCache()
+        // Use it for duplicate detection
+        // ...
+    },
+}
+
+// That's it! Other commands stay as-is with their var definitions
+// No complex refactoring needed for CLI commands
+```
+
+#### 3.2 Update TUI Entry Point Only
+```go
+// internal/commands/tui.go
+package commands
+
+import (
+    "github.com/spf13/cobra"
+    "github.com/repobird/repobird-cli/internal/tui"
+)
+
+var tuiCmd = &cobra.Command{  // Keep as var - it's fine!
+    Use:   "tui",
+    Short: "Launch terminal user interface",
+    RunE: func(cmd *cobra.Command, args []string) error {
+        // TUI gets its own cache instance in the model
+        app := tui.NewApp(apiClient)
+        return app.Run()
+    },
+}
+
+// main.go stays almost the same!
+// No dependency injection framework needed
+```
+
+### Phase 4: Add Optional Persistence
+
+#### 4.1 Cross-Platform Cache Persistence
+```go
+// internal/tui/cache/persistence.go
+package cache
+
+import (
+    "encoding/json"
+    "os"
+    "path/filepath"
+    "github.com/adrg/xdg"  // Cross-platform directories
+)
+
+type CacheData struct {
+    Runs     []models.RunResponse `json:"runs"`
+    UserInfo *models.UserInfo     `json:"userInfo"`
+    SavedAt  time.Time            `json:"savedAt"`
+}
+
+// SaveToDisk persists cache to disk (called on quit)
+func (c *SimpleCache) SaveToDisk() error {
+    configDir, _ := xdg.ConfigHome()  // ~/.config on Linux, AppData on Windows
+    cacheFile := filepath.Join(configDir, "repobird", "cache.json")
+    
+    // Create directory if needed
+    os.MkdirAll(filepath.Dir(cacheFile), 0700)
+    
+    data := CacheData{
+        Runs:     c.GetRuns(),
+        UserInfo: c.GetUserInfo(),
+        SavedAt:  time.Now(),
+    }
+    
+    jsonData, _ := json.Marshal(data)
+    return os.WriteFile(cacheFile, jsonData, 0600)
+}
+
+// LoadFromDisk restores cache from disk (called on start)
+func (c *SimpleCache) LoadFromDisk() error {
+    configDir, _ := xdg.ConfigHome()
+    cacheFile := filepath.Join(configDir, "repobird", "cache.json")
+    
+    data, err := os.ReadFile(cacheFile)
+    if err != nil {
+        return err  // File doesn't exist, that's OK
+    }
+    
+    var cacheData CacheData
+    if err := json.Unmarshal(data, &cacheData); err != nil {
+        return err
+    }
+    
+    // Only restore if cache is less than 1 hour old
+    if time.Since(cacheData.SavedAt) < time.Hour {
+        if cacheData.Runs != nil {
+            c.SetRuns(cacheData.Runs)
+        }
+        if cacheData.UserInfo != nil {
+            c.SetUserInfo(cacheData.UserInfo)
+        }
+    }
+    
+    return nil
+}
+```
+
+### Phase 5: Simple Testing (No Mocks Needed!)
+
+#### 5.1 Test with Real Cache
+```go
+// internal/tui/views/dashboard_test.go
+package views
+
+import (
+    "testing"
+    tea "github.com/charmbracelet/bubbletea"
+    "github.com/stretchr/testify/assert"
+    "github.com/repobird/repobird-cli/internal/tui/cache"
+)
+
+func TestDashboardView(t *testing.T) {
+    // Create a real cache - no mocks!
+    view := &DashboardView{
+        cache:     cache.NewSimpleCache(),
+        apiClient: &testClient{},  // Simple test client
+    }
+    
+    // Test cache operations
+    testRuns := []models.RunResponse{{ID: "test-1"}}
+    view.cache.SetRuns(testRuns)
+    
+    // Verify cache works
+    cached := view.cache.GetRuns()
+    assert.Equal(t, testRuns, cached)
+    
+    // Test Bubble Tea update
+    model, cmd := view.Update(runsLoadedMsg{runs: testRuns})
+    updatedView := model.(*DashboardView)
+    assert.Equal(t, testRuns, updatedView.runs)
+    assert.Nil(t, cmd)
+}
+
+// Simple test client - not a complex mock!
+type testClient struct{}
+
+func (t *testClient) ListRuns(params *models.ListParams) ([]models.RunResponse, error) {
+    return []models.RunResponse{{ID: "test-1"}}, nil
+}
+```
+
+#### 5.2 Test Commands with Messages
+```go
+// internal/tui/views/commands_test.go
+package views
 
 import (
     "testing"
     "github.com/stretchr/testify/assert"
-    "github.com/repobird/repobird-cli/internal/container"
-    "github.com/repobird/repobird-cli/internal/container/mocks"
 )
 
-func TestRunCommand(t *testing.T) {
-    // Create container with mocks
-    c := container.New()
-    mockCache := mocks.NewMockCache()
-    mockConfig := mocks.NewMockConfig()
-    mockClient := mocks.NewMockAPIClient()
+func TestLoadRunsCommand(t *testing.T) {
+    cache := cache.NewSimpleCache()
+    client := &testClient{}
     
-    c.WithCache(mockCache).
-      WithConfig(mockConfig).
-      WithAPIClient(mockClient)
+    // Test cache hit
+    cache.SetRuns([]models.RunResponse{{ID: "cached"}})
+    cmd := loadRunsCmd(cache, client)
+    msg := cmd()  // Execute command
     
-    // Create command with mocked dependencies
-    cmd := NewRunCommand(c)
+    loadedMsg := msg.(runsLoadedMsg)
+    assert.NoError(t, loadedMsg.err)
+    assert.Equal(t, "cached", loadedMsg.runs[0].ID)
     
-    // Test command execution
-    err := cmd.Execute()
-    assert.NoError(t, err)
+    // Test cache miss
+    cache.Clear()
+    cmd = loadRunsCmd(cache, client)
+    msg = cmd()
     
-    // Verify interactions
-    assert.Equal(t, 1, mockCache.GetCallCount())
-    assert.True(t, mockClient.CreateRunCalled())
+    loadedMsg = msg.(runsLoadedMsg)
+    assert.NoError(t, loadedMsg.err)
+    assert.Equal(t, "test-1", loadedMsg.runs[0].ID)
 }
 ```
 
-## Implementation Plan
+## Implementation Plan (Much Simpler!)
 
-### Week 1: Foundation
-- [ ] Day 1-2: Create container package with interfaces
-- [ ] Day 3-4: Implement basic container with lazy initialization
-- [ ] Day 5: Create mock implementations for testing
+### Day 1-2: Add Cache Library
+- [ ] Add ttlcache and xdg dependencies
+- [ ] Create SimpleCache wrapper in internal/tui/cache
+- [ ] Write basic tests for cache operations
+- [ ] Add persistence methods (save/load from disk)
 
-### Week 2: Cache Refactoring
-- [ ] Day 1-2: Convert GlobalCache to Service implementation
-- [ ] Day 3: Create legacy wrapper for backward compatibility
-- [ ] Day 4: Update cache tests with mocks
-- [ ] Day 5: Verify all cache operations work correctly
+### Day 3-4: Update TUI Views
+- [ ] Add cache field to DashboardView model
+- [ ] Add cache field to other view models (List, Details, Create)
+- [ ] Replace cache.GetGlobalCache() calls with model.cache
+- [ ] Convert blocking operations to Bubble Tea commands
 
-### Week 3: Command Refactoring
-- [ ] Day 1: Convert root and version commands
-- [ ] Day 2: Convert run and status commands
-- [ ] Day 3: Convert auth and config commands
-- [ ] Day 4: Convert remaining commands
-- [ ] Day 5: Update main.go and integration tests
+### Day 5: Migration & Cleanup
+- [ ] Update bulk command to use local cache instance
+- [ ] Remove global cache variables
+- [ ] Remove init() functions from cache package
+- [ ] Test full TUI flow with embedded cache
 
-### Week 4: TUI and Cleanup
-- [ ] Day 1-2: Update TUI views to use container
-- [ ] Day 3: Remove global variables
-- [ ] Day 4: Remove legacy wrappers
-- [ ] Day 5: Final testing and documentation
+### Day 6-7: Testing & Polish
+- [ ] Write integration tests for TUI with cache
+- [ ] Test persistence across restarts
+- [ ] Performance testing (should be faster!)
+- [ ] Update documentation
 
-## Testing Strategy
+That's it! One week instead of four!
+
+## Testing Strategy (Simplified!)
 
 ### Unit Tests
-1. Test each service implementation in isolation
-2. Use mocks for all dependencies
-3. Verify thread-safety with concurrent tests
-4. Test error conditions and edge cases
+1. Test cache operations with real ttlcache (no mocks!)
+2. Test Bubble Tea models with messages
+3. Test commands return correct messages
+4. Test persistence save/load
 
 ### Integration Tests
-1. Test command execution with real services
-2. Verify cache persistence works correctly
-3. Test configuration loading and validation
-4. Ensure backward compatibility during migration
+1. Test full TUI flow with embedded cache
+2. Test cache persistence across restarts
+3. Verify CLI commands still work unchanged
 
 ### Performance Tests
-1. Benchmark cache operations before/after refactoring
-2. Test memory usage with large datasets
-3. Verify no performance regression
+1. ttlcache is already benchmarked and optimized
+2. Should be faster than current global cache with locks
+3. Memory usage should be lower (better GC with ttlcache)
 
 ## Rollback Plan
 
-If issues arise during deployment:
-1. Legacy wrappers allow gradual migration
-2. Feature flags can toggle between old/new implementation
-3. Each phase can be deployed independently
-4. Git tags at each phase for easy rollback
+This approach is so simple, rollback is trivial:
+1. Changes are isolated to TUI views
+2. CLI commands remain unchanged
+3. Can revert to global cache temporarily if needed
+4. Each view can be migrated independently
 
 ## Success Metrics
 
 ### Code Quality
-- [ ] Zero global variables (except in main.go)
-- [ ] All dependencies injected explicitly
-- [ ] 100% of commands use dependency injection
-- [ ] All cache operations go through interfaces
+- [ ] Zero global cache variables
+- [ ] Cache embedded in Bubble Tea models
+- [ ] All TUI state flows through Update()
+- [ ] CLI commands unchanged (except bulk)
 
 ### Testing
-- [ ] Test coverage increases to 80%+
-- [ ] All tests can run in parallel
-- [ ] Mock implementations for all services
-- [ ] No test pollution between runs
+- [ ] Tests use real cache, not mocks
+- [ ] Tests can run in parallel
+- [ ] Model-based testing for TUI
+- [ ] No test pollution
 
 ### Performance
-- [ ] No performance regression
-- [ ] Memory usage remains stable
-- [ ] Cache operations maintain O(1) complexity
-- [ ] Startup time unchanged
+- [ ] Faster than global cache (no lock contention)
+- [ ] Lower memory usage (ttlcache GC-friendly)
+- [ ] O(1) cache operations
+- [ ] Instant startup (lazy loading)
 
 ### Maintainability
-- [ ] Clear separation of concerns
-- [ ] Easy to add new dependencies
-- [ ] Simple to test new features
-- [ ] Reduced coupling between components
+- [ ] Follows Bubble Tea patterns
+- [ ] Simple, readable code
+- [ ] Easy to understand state flow
+- [ ] Less code overall
 
 ## Migration Checklist
 
 ### Pre-Migration
-- [ ] Create feature branch: `refactor/global-state`
-- [ ] Document current behavior
-- [ ] Create comprehensive test suite
-- [ ] Set up performance benchmarks
+- [ ] Create feature branch: `refactor/tui-native-cache`
+- [ ] Run existing tests as baseline
+- [ ] Document which views use cache
 
-### During Migration
-- [ ] Implement in small, reviewable PRs
-- [ ] Maintain backward compatibility
-- [ ] Run tests after each change
-- [ ] Update documentation as needed
+### During Migration (1 Week!)
+- [ ] Day 1-2: Add ttlcache dependency
+- [ ] Day 3-4: Update TUI views
+- [ ] Day 5: Clean up globals
+- [ ] Day 6-7: Test and document
 
 ### Post-Migration
-- [ ] Remove all legacy code
-- [ ] Update developer documentation
-- [ ] Train team on new patterns
-- [ ] Monitor for issues in production
+- [ ] Remove old cache package
+- [ ] Update CLAUDE.md with new pattern
+- [ ] Celebrate simpler code! 🎉
 
 ## Risk Assessment
 
-### High Risk
-- Breaking existing CLI commands
-- Data loss from cache changes
-- Performance degradation
+### Minimal Risk!
+- CLI commands unchanged (except bulk)
+- TUI changes are isolated
+- Cache library is battle-tested
+- Simple rollback if needed
 
-### Mitigation
-- Extensive testing at each phase
-- Legacy wrappers for compatibility
-- Gradual rollout with monitoring
-- Easy rollback capability
+### Why This is Safer
+- Following framework patterns (not fighting them)
+- Using proven libraries (ttlcache)
+- Smaller change surface area
+- Easy to understand and debug
 
 ## Dependencies
 
-### Required Before Starting
-- Approval from team lead
-- Complete test coverage of current behavior
-- Performance benchmarks established
+### New Libraries (Minimal!)
+```bash
+go get github.com/jellydator/ttlcache/v3  # TTL cache
+go get github.com/adrg/xdg               # Cross-platform dirs
+```
 
-### External Dependencies
-- No new external libraries required
-- Uses standard Go patterns
-- Compatible with existing tooling
+### Why These Libraries?
+- **ttlcache**: Simple, fast, well-maintained
+- **xdg**: Handles Windows/Mac/Linux paths correctly
+- Both have minimal dependencies
+- Both are widely used and trusted
 
-## Notes
+## Key Insights
 
-1. This refactoring follows Go best practices and industry standards
-2. The container pattern is widely used in Go applications
-3. Dependency injection improves testability significantly
-4. This change enables future improvements like:
-   - Multiple cache backends
-   - Configuration hot-reloading
-   - Plugin architecture
-   - Better monitoring/observability
+### Why Bubble Tea Native is Better
+
+1. **Works WITH the framework**: Bubble Tea expects state in the Model
+2. **Simpler testing**: Just create models with test data
+3. **Less code**: No interfaces, mocks, or DI containers
+4. **Easier to understand**: State flows through Update()
+5. **Better performance**: No lock contention between views
+
+### What We Learned
+
+- **Don't over-engineer**: This is a single-user CLI, not a web service
+- **Use the right tool**: ttlcache solves our problem perfectly
+- **Follow framework patterns**: Bubble Tea has opinions - follow them!
+- **Isolate changes**: TUI refactoring doesn't need to touch CLI
+
+### Future Benefits
+
+- Easy to add Redis cache later (just swap SimpleCache)
+- Can add cache metrics in one place
+- Testing is straightforward
+- New developers understand it immediately
 
 ## References
 
-- [Go Best Practices - Dependency Injection](https://github.com/golang/go/wiki/CodeReviewComments)
-- [Uber's Dig - Dependency Injection Framework](https://github.com/uber-go/dig)
-- [Google's Wire - Compile-time DI](https://github.com/google/wire)
-- [Clean Architecture in Go](https://github.com/bxcodec/go-clean-arch)
+- [Bubble Tea Documentation](https://github.com/charmbracelet/bubbletea)
+- [Bubble Tea Best Practices](https://leg100.github.io/en/posts/building-bubbletea-programs/)
+- [ttlcache Documentation](https://github.com/jellydator/ttlcache)
+- [XDG Base Directory](https://github.com/adrg/xdg)
+- [The Elm Architecture](https://guide.elm-lang.org/architecture/) (Bubble Tea's inspiration)
 
-## Questions to Address
+## FAQ
 
-1. Should we use a DI framework (Dig/Wire) or manual injection?
-   - Recommendation: Start with manual injection for simplicity
-   
-2. How to handle configuration changes at runtime?
-   - Recommendation: Immutable config, restart for changes
-   
-3. Should cache be persistent across restarts?
-   - Recommendation: Yes, maintain current persistent cache behavior
+### Q: Why not use dependency injection?
+**A**: Bubble Tea already has a pattern for state management - the Model. DI adds complexity without benefits for a TUI app.
 
-4. How to handle backward compatibility?
-   - Recommendation: Legacy wrappers during migration period
+### Q: What about the CLI commands?
+**A**: They barely use cache (only bulk command). No need to refactor them.
+
+### Q: Is ttlcache production-ready?
+**A**: Yes! It's used by many production Go applications and is actively maintained.
+
+### Q: What about testing?
+**A**: Testing is actually easier! Create a model with a cache, send messages, assert on state. No mocks needed.
+
+### Q: Will this break existing functionality?
+**A**: No! CLI commands stay the same, TUI gets better. It's a win-win.
 
 ## Approval
 
