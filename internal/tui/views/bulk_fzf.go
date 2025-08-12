@@ -213,6 +213,40 @@ func (v *BulkFZFView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		// If canceled, stay in file select mode
 
+	case bulkFZFErrMsg:
+		// Handle error loading config files
+		debug.LogToFileWithTimestampf("BULK_DEBUG: Error loading config: %v\n", msg.err)
+		v.error = msg.err
+
+		// Format error message for display
+		errorMsg := msg.err.Error()
+		// Simplify common error messages
+		if strings.Contains(errorMsg, "failed to parse") {
+			if strings.Contains(errorMsg, "validation failed") {
+				// Extract the validation error details
+				parts := strings.Split(errorMsg, "validation failed: ")
+				if len(parts) > 1 {
+					errorMsg = "Validation failed: " + parts[1]
+				}
+			} else if strings.Contains(errorMsg, "not valid JSON or YAML") {
+				errorMsg = "Invalid file format - must be JSON, YAML, JSONL, or Markdown"
+			} else {
+				errorMsg = "Failed to parse config file - check file format and syntax"
+			}
+		} else if strings.Contains(errorMsg, "required") {
+			errorMsg = "Missing required fields in config"
+		}
+
+		// Show error in status line
+		v.statusLine.SetTemporaryMessageWithType(
+			fmt.Sprintf("❌ %s", errorMsg),
+			components.MessageError,
+			7*time.Second,
+		)
+		// Stay in file select mode so user can try again
+		v.mode = BulkModeFileSelect
+		return v, nil
+
 	case bulkFZFConfigLoadedMsg:
 		v.bulkConfig = msg.config
 		v.runs = msg.runs
