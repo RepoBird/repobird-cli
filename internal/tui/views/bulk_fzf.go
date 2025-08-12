@@ -117,7 +117,11 @@ func NewBulkFZFView(client *api.Client) *BulkFZFView {
 
 func (v *BulkFZFView) Init() tea.Cmd {
 	// Don't activate file selector immediately - wait for user to press 'f'
-	return v.spinner.Tick
+	// Return both spinner tick and window size commands
+	return tea.Batch(
+		v.spinner.Tick,
+		tea.WindowSize(), // Request window size
+	)
 }
 
 func (v *BulkFZFView) tickCmd() tea.Cmd {
@@ -140,10 +144,8 @@ func (v *BulkFZFView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if v.fileSelector != nil && v.fileSelector.IsActive() {
 			newSelector, cmd := v.fileSelector.Update(msg)
 			v.fileSelector = newSelector
-			cmds = append(cmds, cmd)
-			// Only continue ticking if still active
-			if v.fileSelector.IsActive() {
-				cmds = append(cmds, v.tickCmd())
+			if cmd != nil {
+				cmds = append(cmds, cmd)
 			}
 		}
 
@@ -205,11 +207,12 @@ func (v *BulkFZFView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (v *BulkFZFView) View() string {
-	if v.width <= 0 || v.height <= 0 {
-		return lipgloss.NewStyle().
-			Foreground(lipgloss.Color("63")).
-			Bold(true).
-			Render("⟳ Initializing...")
+	// Set default dimensions if not set
+	if v.width <= 0 {
+		v.width = 80
+	}
+	if v.height <= 0 {
+		v.height = 24
 	}
 
 	// If file selector is active, show it
@@ -516,15 +519,20 @@ func (v *BulkFZFView) handleFileSelectKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	}
 
 	// Main file select mode keys
-	switch {
-	case key.Matches(msg, v.keys.Quit):
+	switch msg.String() {
+	case "q":
+		// Go back to dashboard
+		return NewDashboardView(v.client), nil
+	
+	case "Q":
+		// Quit entire program (capital Q)
 		return v, tea.Quit
 
-	case msg.String() == "f":
-		// Activate file selector  
+	case "f":
+		// Activate file selector
 		cmd := v.fileSelector.Activate()
-		// Combine the activation command with tick command
-		return v, tea.Batch(cmd, v.tickCmd())
+		// Just return the activation command, it handles its own ticking
+		return v, cmd
 
 	case msg.String() == "c":
 		// Clear selection
@@ -542,18 +550,22 @@ func (v *BulkFZFView) handleFileSelectKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 }
 
 func (v *BulkFZFView) handleRunListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch {
-	case key.Matches(msg, v.keys.Quit):
+	switch msg.String() {
+	case "q":
 		// Go back to file selection
 		v.mode = BulkModeFileSelect
 		return v, nil
+	
+	case "Q":
+		// Quit entire program
+		return v, tea.Quit
 
-	case key.Matches(msg, v.keys.Up):
+	case "up", "k":
 		if v.selectedRunIdx > 0 {
 			v.selectedRunIdx--
 		}
 
-	case key.Matches(msg, v.keys.Down):
+	case "down", "j":
 		if v.selectedRunIdx < len(v.runs)-1 {
 			v.selectedRunIdx++
 		}

@@ -515,6 +515,9 @@ func TestClient_RequestHeaders(t *testing.T) {
 	client := NewClient("test-key", server.URL, false)
 
 	// Test with POST request (should have Content-Type)
-	_, err := client.doRequest("POST", "/test", map[string]bool{"test": true})
+	resp, err := client.doRequest("POST", "/test", map[string]bool{"test": true})
+	if resp != nil && resp.Body != nil {
+		defer resp.Body.Close()
+	}
 	assert.NoError(t, err)
 }

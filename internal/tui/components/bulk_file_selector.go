@@ -19,23 +19,24 @@ type BulkFileSelector struct {
 	files         []FileItem
 	filteredFiles []FileItem
 	selectedFiles map[string]bool // Map of file paths to selected state
-	
+
 	// UI state
-	cursor          int
-	filterInput     string
-	active          bool
-	cursorVisible   bool
-	loading         bool
-	
+	cursor         int
+	filterInput    string
+	active         bool
+	loading        bool
+	previewContent string
+	previewOffset  int
+
 	// Dimensions
-	width           int
-	height          int
-	
+	width  int
+	height int
+
 	// Git root for relative paths
-	gitRoot         string
-	
+	gitRoot string
+
 	// Error state
-	loadError       error
+	loadError error
 }
 
 // FileItem represents a file in the selector
@@ -88,13 +89,12 @@ func getGitRoot() string {
 // NewBulkFileSelector creates a new bulk file selector
 func NewBulkFileSelector(width, height int) *BulkFileSelector {
 	gitRoot := getGitRoot()
-	
+
 	return &BulkFileSelector{
 		width:         width,
 		height:        height,
 		selectedFiles: make(map[string]bool),
 		gitRoot:       gitRoot,
-		cursorVisible: true,
 		files:         []FileItem{},
 		filteredFiles: []FileItem{},
 	}
@@ -103,9 +103,6 @@ func NewBulkFileSelector(width, height int) *BulkFileSelector {
 // SetActive sets the active state
 func (b *BulkFileSelector) SetActive(active bool) {
 	b.active = active
-	if active {
-		b.cursorVisible = true
-	}
 }
 
 // IsActive returns whether the selector is active
@@ -122,7 +119,6 @@ func (b *BulkFileSelector) SetDimensions(width, height int) {
 // Activate activates the selector and starts loading files
 func (b *BulkFileSelector) Activate() tea.Cmd {
 	b.active = true
-	b.cursorVisible = true
 	b.loading = true
 	b.loadError = nil
 	// Return command to load files progressively
@@ -155,7 +151,7 @@ func (b *BulkFileSelector) LoadFilesProgressiveCmd() tea.Cmd {
 		}
 
 		files, _ := utils.FindFiles(currentDir, opts)
-		
+
 		// Convert to FileItems
 		items := make([]FileItem, 0, len(files))
 		for _, file := range files {
@@ -183,7 +179,7 @@ func (b *BulkFileSelector) findConfigFiles() ([]FileItem, error) {
 
 	// Use utils.FindFiles with proper options for config files
 	opts := utils.FileDiscoveryOptions{
-		MaxDepth:       3, // Limit depth to 3 levels as requested
+		MaxDepth:       3,                           // Limit depth to 3 levels as requested
 		IgnorePatterns: utils.DefaultIgnorePatterns, // Use the default ignore patterns
 		FileExtensions: []string{".json", ".yaml", ".yml", ".jsonl", ".md", ".markdown"},
 		SortByModTime:  true,
@@ -258,11 +254,13 @@ func (b *BulkFileSelector) Update(msg tea.Msg) (*BulkFileSelector, tea.Cmd) {
 		if b.cursor >= len(b.filteredFiles) {
 			b.cursor = 0
 		}
+		// Update preview for the first file
+		b.updatePreview()
 		return b, nil
 
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "esc":
+		case "esc", "ctrl+c", "ctrl+[":
 			b.active = false
 			return b, func() tea.Msg {
 				return BulkFileSelectedMsg{Canceled: true}
@@ -277,12 +275,8 @@ func (b *BulkFileSelector) Update(msg tea.Msg) (*BulkFileSelector, tea.Cmd) {
 				}
 			}
 
-			// If none selected, select the current item
-			if len(selected) == 0 && b.cursor < len(b.filteredFiles) {
-				selected = []string{b.filteredFiles[b.cursor].Path}
-			}
-
-			if len(selected) > 0 {
+			// Require at least 2 files for bulk run
+			if len(selected) >= 2 {
 				b.active = false
 				return b, func() tea.Msg {
 					return BulkFileSelectedMsg{
@@ -346,11 +340,13 @@ func (b *BulkFileSelector) Update(msg tea.Msg) (*BulkFileSelector, tea.Cmd) {
 		case "up", "k", "ctrl+p":
 			if b.cursor > 0 {
 				b.cursor--
+				b.updatePreview()
 			}
 
 		case "down", "j", "ctrl+n":
 			if b.cursor < len(b.filteredFiles)-1 {
 				b.cursor++
+				b.updatePreview()
 			}
 
 		case "pgup":
@@ -382,8 +378,8 @@ func (b *BulkFileSelector) Update(msg tea.Msg) (*BulkFileSelector, tea.Cmd) {
 		b.height = msg.Height
 
 	case TickMsg:
-		b.cursorVisible = !b.cursorVisible
-		return b, tick()
+		// Ignore tick messages to prevent lag
+		return b, nil
 	}
 
 	return b, nil
@@ -393,7 +389,11 @@ func (b *BulkFileSelector) Update(msg tea.Msg) (*BulkFileSelector, tea.Cmd) {
 func (b *BulkFileSelector) applyFilter() {
 	if b.filterInput == "" {
 		b.filteredFiles = b.files
-		b.cursor = 0
+		// Don't reset cursor to prevent jumping
+		if b.cursor >= len(b.filteredFiles) {
+			b.cursor = max(0, len(b.filteredFiles)-1)
+		}
+		b.updatePreview()
 		return
 	}
 
@@ -410,8 +410,35 @@ func (b *BulkFileSelector) applyFilter() {
 		b.filteredFiles[i] = b.files[match.Index]
 	}
 
-	// Reset cursor
-	b.cursor = 0
+	// Keep cursor in bounds but don't reset to 0
+	if b.cursor >= len(b.filteredFiles) {
+		b.cursor = max(0, len(b.filteredFiles)-1)
+	}
+	b.updatePreview()
+}
+
+// updatePreview updates the preview content for the currently selected file
+func (b *BulkFileSelector) updatePreview() {
+	if len(b.filteredFiles) == 0 || b.cursor >= len(b.filteredFiles) {
+		b.previewContent = "No file selected"
+		return
+	}
+
+	filePath := b.filteredFiles[b.cursor].Path
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		b.previewContent = fmt.Sprintf("Error reading file: %v", err)
+		return
+	}
+
+	// Limit preview size
+	maxPreviewSize := 5000
+	if len(content) > maxPreviewSize {
+		content = content[:maxPreviewSize]
+	}
+
+	b.previewContent = string(content)
+	b.previewOffset = 0
 }
 
 // View renders the file selector
@@ -440,26 +467,26 @@ func (b *BulkFileSelector) View(statusLine *StatusLine) string {
 	checkboxStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("42"))
 
-	// Calculate dimensions
+	// Calculate dimensions - split screen between file list and preview
 	availableHeight := b.height - 3 // Reserve for statusline
 	if availableHeight < 10 {
 		availableHeight = 10
 	}
+	
+	// Split width between file list (60%) and preview (40%)
+	fileListWidth := int(float64(b.width) * 0.6)
+	previewWidth := b.width - fileListWidth - 1 // -1 for gap
 
 	boxHeight := availableHeight
-	contentHeight := boxHeight - 2      // Account for borders
+	contentHeight := boxHeight - 2         // Account for borders
 	listContentHeight := contentHeight - 3 // Header + filter + spacing
+	previewContentHeight := contentHeight - 2 // Header + spacing
 
 	// Build content
 	var content []string
 
-	// Add filter line with cursor
-	cursor := ""
-	if b.cursorVisible {
-		cursor = "█"
-	} else {
-		cursor = " "
-	}
+	// Add filter line with cursor (always visible)
+	cursor := "█"
 	filterLine := fmt.Sprintf("Filter: %s%s", b.filterInput, cursor)
 	content = append(content, filterStyle.Render(filterLine))
 	content = append(content, "") // Empty line
@@ -544,31 +571,82 @@ func (b *BulkFileSelector) View(statusLine *StatusLine) string {
 		}
 	}
 
-	// Pad to fixed height
+	// Pad file list to fixed height
 	for len(content) < listContentHeight {
 		content = append(content, "")
 	}
 
-	// Create the box
+	// Create file list box
 	fileListBox := borderStyle.
-		Width(b.width - 4).
+		Width(fileListWidth - 2).
 		Height(boxHeight).
 		Render(lipgloss.JoinVertical(lipgloss.Left,
 			headerStyle.Render(fmt.Sprintf("📁 Bulk Config Files (%d selected)", selectedCount)),
 			strings.Join(content, "\n"),
 		))
 
+	// Build preview pane
+	var previewContent []string
+	if len(b.filteredFiles) > 0 && b.cursor < len(b.filteredFiles) {
+		lines := strings.Split(b.previewContent, "\n")
+		previewStart := b.previewOffset
+		if previewStart < 0 {
+			previewStart = 0
+		}
+		if previewStart >= len(lines) {
+			previewStart = max(0, len(lines)-1)
+		}
+
+		for i := 0; i < previewContentHeight && previewStart+i < len(lines); i++ {
+			line := lines[previewStart+i]
+			// Truncate long lines for preview
+			maxLineLen := previewWidth - 6
+			if len(line) > maxLineLen {
+				line = line[:maxLineLen] + "..."
+			}
+			previewContent = append(previewContent, line)
+		}
+	} else {
+		previewContent = append(previewContent, lipgloss.NewStyle().
+			Foreground(lipgloss.Color("241")).
+			Render("Select a file to preview"))
+	}
+
+	// Pad preview to fixed height
+	for len(previewContent) < previewContentHeight {
+		previewContent = append(previewContent, "")
+	}
+
+	// Create preview box
+	previewBox := borderStyle.
+		Width(previewWidth - 2).
+		Height(boxHeight).
+		Render(lipgloss.JoinVertical(lipgloss.Left,
+			headerStyle.Render("👁️ Preview"),
+			strings.Join(previewContent, "\n"),
+		))
+
+	// Combine both panes horizontally
+	combinedPanes := lipgloss.JoinHorizontal(lipgloss.Top, fileListBox, previewBox)
+
 	// Add top margin for visibility
 	contentWithMargin := lipgloss.NewStyle().
 		MarginTop(2).
-		Render(fileListBox)
+		Render(combinedPanes)
 
-	// Setup statusline
+	// Setup statusline with better text visibility
 	if statusLine != nil {
+		// Build status text parts
+		leftStatus := fmt.Sprintf("[FZF] %d/%d files", len(b.filteredFiles), len(b.files))
+		if selectedCount < 2 {
+			leftStatus += fmt.Sprintf(" • ⚠️ %d selected (need 2+)", selectedCount)
+		} else {
+			leftStatus += fmt.Sprintf(" • ✓ %d selected", selectedCount)
+		}
+		
 		statusLine.SetWidth(b.width).
-			SetLeft(fmt.Sprintf("[FZF] %d/%d files • %d selected",
-				len(b.filteredFiles), len(b.files), selectedCount)).
-			SetRight("Space: toggle • a: all • n: none • Enter: load • Esc: cancel")
+			SetLeft(leftStatus).
+			SetRight("Space: toggle | a: all | n: none | Enter: submit (2+ files) | Esc: cancel")
 
 		// Join content and status bar
 		return lipgloss.JoinVertical(
