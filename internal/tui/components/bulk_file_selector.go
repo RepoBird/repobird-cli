@@ -642,8 +642,8 @@ func (b *BulkFileSelector) View(statusLine *StatusLine) string {
 
 	// Setup statusline with better text visibility
 	if statusLine != nil {
-		// Build status text parts - remove warning, keep it simple
-		leftStatus := fmt.Sprintf("[FZF] %d selected", selectedCount)
+		// Build status text parts - selection count already shown in file list header
+		leftStatus := "[FZF]"
 
 		// Use SetHelp to put commands right after the label instead of far right
 		statusLine.SetWidth(b.width).

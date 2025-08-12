@@ -116,7 +116,7 @@ func GetCachedList() (
 
 	// Always build details cache from terminal and active runs
 	detailsCopy := make(map[string]*models.RunResponse)
-	
+
 	// First add terminal runs (these never expire)
 	for k, v := range globalCache.terminalDetails {
 		if v != nil {
@@ -140,13 +140,13 @@ func GetCachedList() (
 		runsCopy := make([]models.RunResponse, len(globalCache.runs))
 		copy(runsCopy, globalCache.runs)
 
-		debug.LogToFilef("DEBUG: GetCachedList returning %d runs, %d cached details (%d terminal + %d active)\n", 
+		debug.LogToFilef("DEBUG: GetCachedList returning %d runs, %d cached details (%d terminal + %d active)\n",
 			len(runsCopy), len(detailsCopy), len(globalCache.terminalDetails), len(globalCache.details))
 		return runsCopy, true, globalCache.cachedAt, detailsCopy, globalCache.selectedIndex
 	}
 
 	// No cached runs, but still return available details cache
-	debug.LogToFilef("DEBUG: GetCachedList - no cached runs but returning %d details (cached=%t, runs=%d, terminalDetails=%d)\n", 
+	debug.LogToFilef("DEBUG: GetCachedList - no cached runs but returning %d details (cached=%t, runs=%d, terminalDetails=%d)\n",
 		len(detailsCopy), globalCache.cached, len(globalCache.runs), len(globalCache.terminalDetails))
 	return nil, false, time.Time{}, detailsCopy, 0
 }
@@ -292,7 +292,7 @@ func InitializeCacheForUser(userID *int) {
 		globalCache.mu.RLock()
 		// Always preserve form data
 		savedFormData = globalCache.formData
-		
+
 		if globalCache.userInfo != nil && userID != nil && globalCache.userInfo.ID == *userID {
 			// Save user info and terminal details if it's the same user
 			savedUserInfo = globalCache.userInfo

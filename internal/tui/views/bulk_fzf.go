@@ -372,11 +372,8 @@ func (v *BulkFZFView) renderFileSelectView() string {
 	panel := panelStyle.Render(content.String())
 	panelWithMargin := lipgloss.NewStyle().MarginTop(2).Render(panel)
 
-	// Setup statusline with shorter text
+	// Setup statusline without redundant file count (shown in file selector itself)
 	statusText := "[BULK]"
-	if len(v.selectedFiles) > 0 {
-		statusText = fmt.Sprintf("[BULK] %d file(s)", len(v.selectedFiles))
-	}
 
 	// Use SetHelp to put commands right after the label instead of far right
 	statusLine := v.statusLine.SetWidth(v.width).
@@ -500,9 +497,8 @@ func (v *BulkFZFView) renderRunListView() string {
 		statusContent := fmt.Sprintf("[CONFIRM] ⚠️  Submit %d selected runs? [y] yes [n] no", selectedCount)
 		statusLine = confirmStyle.Render(statusContent)
 	} else {
-		// Regular status line
-		selectedCount := countSelected(v.runs)
-		statusText := fmt.Sprintf("[RUNS] %d selected", selectedCount)
+		// Regular status line without redundant selection count (shown in FZF header)
+		statusText := "[RUNS]"
 
 		// Use SetHelp to put commands right after the label instead of far right
 		statusLine = v.statusLine.SetWidth(v.width).

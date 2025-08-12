@@ -693,6 +693,173 @@ repobird auth logout
 repobird auth login
 ```
 
+## Cache Issues
+
+### Problem: TUI Making Unnecessary API Calls for DONE Runs
+**Symptoms:**
+- Details view always makes API calls for completed runs
+- Slow navigation between run details
+- Network requests visible in API logs for cached runs
+
+**Debug Steps:**
+1. Enable debug logging to see cache behavior:
+```bash
+# Clear existing debug log
+rm -f /tmp/repobird_debug.log
+
+# Run with debug logging
+REPOBIRD_DEBUG=true repobird tui
+
+# Check debug log in another terminal
+tail -f /tmp/repobird_debug.log
+```
+
+2. Look for cache behavior indicators:
+```bash
+# Good signs (cache working):
+DEBUG: Cache HIT for runID='123'
+DEBUG: Using cached data for run '123'
+Details cache loaded: 8
+
+# Bad signs (cache not working):
+DEBUG: Cache MISS for runID='123'  
+DEBUG: Making API call for runID='123'
+Details cache loaded: 0
+```
+
+**Solutions:**
+
+1. **Check cache directory structure:**
+```bash
+ls -la ~/.cache/repobird/users/
+# Should show: user-{userID}/ directories
+# Each should contain runs/ with *.json files
+```
+
+2. **Verify user-specific cache:**
+```bash
+# Look for terminal run files
+find ~/.cache/repobird/users -name "*.json" -type f | head -10
+# Should show files like: user-123/runs/456.json
+```
+
+3. **Clear and rebuild cache if corrupted:**
+```bash
+# Clear all cache (will rebuild automatically)
+rm -rf ~/.cache/repobird/
+
+# Or clear specific user cache:
+rm -rf ~/.cache/repobird/users/user-{YOUR_USER_ID}/
+```
+
+4. **Remove legacy cache files:**
+```bash
+# Delete old cache structure that conflicts with new system
+rm -rf ~/.cache/repobird/runs/
+rm -rf ~/.cache/repobird/shared/runs/
+```
+
+### Problem: Cache Not Loading Across Sessions
+**Symptoms:**
+- Cache seems to work within session but resets on restart
+- Debug shows "Loaded 0 terminal runs from persistent cache"
+- Have to refetch all run details every restart
+
+**Solutions:**
+
+1. **Check persistent cache loading:**
+```bash
+# Enable debug mode and look for these lines on startup:
+DEBUG: Using user-specific cache directory: /home/user/.cache/repobird/users/user-123/runs
+DEBUG: Loaded 5 terminal runs from persistent cache
+```
+
+2. **Verify file permissions:**
+```bash
+# Check cache directory is writable
+ls -la ~/.cache/repobird/users/user-*/
+# Ensure runs/ directory and *.json files exist and are readable
+```
+
+3. **Test cache persistence manually:**
+```bash
+# Navigate to a DONE run in TUI, then quit
+# Restart TUI and navigate to same run
+# Should show "Cache HIT" instead of making API call
+```
+
+### Problem: Cache Growing Too Large
+**Symptoms:**
+- Slow TUI performance
+- Large cache directory size
+- Memory usage increasing over time
+
+**Solutions:**
+
+1. **Check cache size:**
+```bash
+du -sh ~/.cache/repobird/
+# Should be reasonable (< 50MB for typical usage)
+```
+
+2. **Clean old cache files:**
+```bash
+# RepoBird automatically cleans files older than 30 days
+# Manual cleanup if needed:
+find ~/.cache/repobird -name "*.json" -mtime +30 -delete
+```
+
+3. **Reset cache if extremely large:**
+```bash
+rm -rf ~/.cache/repobird/
+# Cache will rebuild automatically with current runs
+```
+
+### Problem: Multiple Users on Same Machine
+**Symptoms:**
+- Users see each other's data
+- Cache conflicts between users
+- Wrong run details showing
+
+**Solutions:**
+
+1. **Verify user-specific caches:**
+```bash
+# Each user should have their own directory:
+ls ~/.cache/repobird/users/
+# Should show: user-456/, user-789/, etc.
+```
+
+2. **Check authentication:**
+```bash
+repobird auth info
+# Verify correct user is authenticated
+```
+
+3. **Clear specific user cache:**
+```bash
+# If user data is mixed up:
+rm -rf ~/.cache/repobird/users/user-{INCORRECT_USER_ID}/
+# Re-authenticate and cache will rebuild correctly
+```
+
+### Debug Commands for Cache Issues
+
+```bash
+# Complete cache information
+REPOBIRD_DEBUG=true repobird diagnose 2>&1 | grep -i cache
+
+# Monitor cache behavior during navigation
+tail -f /tmp/repobird_debug.log | grep -E "(Cache|DEBUG:|Details cache)"
+
+# Check cache contents
+find ~/.cache/repobird -name "*.json" | wc -l  # Count cached files
+ls -la ~/.cache/repobird/users/user-*/runs/   # List cached runs
+
+# Test specific run cache
+REPOBIRD_DEBUG=true repobird status RUN_ID   # Should show cache hit/miss
+```
+
 ## Preventive Measures
 
 ### Regular Maintenance

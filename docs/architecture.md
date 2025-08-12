@@ -82,25 +82,61 @@ Contains business logic and domain models, isolated from external concerns.
 Multi-level caching for performance and offline support with user isolation.
 
 ```
-Memory Cache (30s TTL)
-    ↓
-Persistent Cache (Terminal runs never expire)
-    ↓
-Global Cache (Cross-view state)
+┌─────────────────────────────────────────────────────────────┐
+│                    Cache Architecture                       │
+├─────────────────────────────────────────────────────────────┤
+│ In-Memory Cache (Global)                                    │
+│ ├── Active Details (30s TTL)                               │
+│ ├── Terminal Details (Never expires)                       │
+│ ├── Run List (Refresh-based)                              │
+│ └── Form Data & User Info                                  │
+├─────────────────────────────────────────────────────────────┤
+│ Persistent Cache (Disk)                                    │
+│ ├── Terminal Runs (.json files)                           │
+│ ├── Repository History                                     │
+│ └── Dashboard Data                                         │
+├─────────────────────────────────────────────────────────────┤
+│ User-Specific Storage                                       │
+│ ~/.cache/repobird/users/user-{id}/                        │
+└─────────────────────────────────────────────────────────────┘
 ```
 
+**Cache Types & Behavior:**
+
+1. **Terminal Details Cache** (`terminalDetails`):
+   - Stores DONE/FAILED runs permanently
+   - Never expires (persistent across sessions)
+   - Automatically saved to disk on cache
+   - Loaded from disk on application start
+
+2. **Active Details Cache** (`details`):
+   - Stores RUNNING/PENDING runs temporarily
+   - 30-second TTL for freshness
+   - Cleared when status changes to terminal
+
+3. **Run List Cache** (`runs`):
+   - Cached until explicit refresh
+   - Triggers details cache population
+   - Used for dashboard display
+
 **User-Based Cache Separation:**
-The cache system now supports user-specific storage to prevent data mixing when multiple users share the same machine:
+The cache system supports user-specific storage to prevent data mixing:
 
 ```
 ~/.cache/repobird/
 ├── users/
-│   ├── user-123/
+│   ├── user-7671023745138904594/
 │   │   ├── runs/
-│   │   │   ├── run-456.json
+│   │   │   ├── 961.json          # Terminal run details
+│   │   │   ├── 962.json          # Terminal run details  
+│   │   │   ├── 964.json          # Terminal run details
 │   │   │   └── ...
+│   │   ├── dashboard/
+│   │   │   ├── repos.json        # Repository overview
+│   │   │   └── repo_*.json       # Per-repo data
+│   │   ├── file_hashes.json      # File duplicate detection
 │   │   └── repository_history.json
-│   └── user-789/
+│   └── user-123/
 │       ├── runs/
 │       └── repository_history.json
 └── shared/ (fallback for unknown users)
@@ -108,11 +144,51 @@ The cache system now supports user-specific storage to prevent data mixing when 
     └── repository_history.json
 ```
 
-**User Service (`/internal/services/user_service.go`):**
+**Cache Operations:**
+
+```go
+// Adding details to cache
+cache.AddCachedDetail(runID, runDetails)
+// -> If terminal status: stored in terminalDetails + persisted to disk
+// -> If active status: stored in details with TTL
+
+// Retrieving cached data
+runs, cached, cachedAt, details, _ := cache.GetCachedList()
+// -> Always returns terminal details even if runs not cached
+// -> Merges terminal + active details
+// -> Used by dashboard and details views
+```
+
+**Cache Performance Optimizations:**
+
+1. **Immediate Cache Population**: Run details are cached immediately after API load
+2. **Cross-View Persistence**: Cache survives view navigation and user switches  
+3. **Smart Loading**: Terminal runs always available, active runs refresh automatically
+4. **User Isolation**: Each user gets separate cache directory and data
+5. **Graceful Degradation**: Falls back to API if cache unavailable
+
+**Cache Initialization Flow:**
+
+```go
+// On application start
+1. Initialize with no user ID (shared cache)
+2. Load user info from API
+3. Re-initialize with user-specific cache  
+4. Preserve terminal details from previous session
+5. Load persistent terminal runs from disk
+
+// Key functions:
+cache.InitializeCacheForUser(userID)     // Switch to user cache
+cache.AddCachedDetail(id, run)           // Add single run detail
+cache.GetCachedList()                    // Get all cached data
+```
+
+**User Service Integration:**
 - Manages current authenticated user context
 - Automatically initializes user-specific cache on authentication
 - Provides user ID extraction from API responses
 - Handles cache switching when users login/logout
+- Preserves terminal cache when switching between same user sessions
 
 ### 6. Configuration Management (`/internal/config/`)
 Secure, flexible configuration with multiple storage backends.
