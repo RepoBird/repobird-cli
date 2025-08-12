@@ -1,0 +1,9 @@
+{
+  "repository": "support-rb/test-ruby",
+  "source": "main",
+  "target": "feature/improve-documentation",
+  "runType": "run",
+  "title": "Create info.txt file",
+  "prompt": "Create a simple text file called 'info.txt' in the root directory. The file should contain: 'This is a test repository for RepoBird CLI.'",
+  "context": "Simple file creation that always works."
+}

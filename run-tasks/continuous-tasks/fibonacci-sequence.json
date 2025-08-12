@@ -1,0 +1,9 @@
+{
+  "repository": "support-rb/test-ruby",
+  "source": "main",
+  "target": "feature/fibonacci-sequence",
+  "runType": "run",
+  "title": "Add next Fibonacci number",
+  "prompt": "Create or update a file called `fibonacci.txt` in the root directory. If the file doesn't exist, create it with the first two Fibonacci numbers: '0\\n1'. If it exists, calculate the next number in the Fibonacci sequence by adding the last two numbers in the file, then append this new number on a new line. Each line should contain exactly one number. The file should grow with each run, continuing the Fibonacci sequence infinitely.",
+  "context": "This task generates an ever-growing Fibonacci sequence. Since Fibonacci numbers continue indefinitely, there will always be a next number to calculate and add, ensuring continuous changes."
+}

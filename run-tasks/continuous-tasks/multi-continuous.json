@@ -1,0 +1,26 @@
+{
+  "repository": "support-rb/test-ruby",
+  "source": "main",
+  "runType": "run",
+  "batchTitle": "Multiple Continuous Tasks",
+  "runs": [
+    {
+      "prompt": "Create or update a file called `alphabet.txt` in the root directory. If the file doesn't exist, create it with just the letter 'A'. If it exists, read the last letter in the file and add the next letter in the alphabet on a new line. If the last letter is 'Z', start over with 'A'. Each run should add exactly one letter to continue the alphabetical sequence. The file should have one letter per line.",
+      "title": "Alphabet cycle - add next letter",
+      "target": "feature/alphabet-cycle",
+      "context": "This task creates a continuously changing file that cycles through the alphabet."
+    },
+    {
+      "prompt": "Create or update a file called `counter.txt` in the root directory. If the file doesn't exist, create it with the number '1'. If it exists, read the current number and increment it by 1, then write the new number to the file. The file should contain only a single number on one line. Additionally, create or update a `counter_log.txt` file that logs each increment with a timestamp.",
+      "title": "Increment counter value",
+      "target": "feature/counter-increment",
+      "context": "This task creates a continuously incrementing counter that will always change on each run."
+    },
+    {
+      "prompt": "Create or update a file called `fibonacci.txt` in the root directory. If the file doesn't exist, create it with the first two Fibonacci numbers: '0\\n1'. If it exists, calculate the next number in the Fibonacci sequence by adding the last two numbers in the file, then append this new number on a new line. Each line should contain exactly one number.",
+      "title": "Add next Fibonacci number",
+      "target": "feature/fibonacci-sequence",
+      "context": "This task generates an ever-growing Fibonacci sequence with infinite numbers to calculate."
+    }
+  ]
+}

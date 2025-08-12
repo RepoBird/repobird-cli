@@ -1,0 +1,9 @@
+{
+  "repository": "support-rb/test-ruby",
+  "source": "main",
+  "target": "feature/improve-test-coverage",
+  "runType": "run",
+  "title": "Create repobird.txt file",
+  "prompt": "Create a simple text file called 'repobird.txt' in the root directory of the repository. The file should contain just one line: 'RepoBird was here!' - that's it, nothing more complex.",
+  "context": "Simple file creation task that will always work and always make a change."
+}

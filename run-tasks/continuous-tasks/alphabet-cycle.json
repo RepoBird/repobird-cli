@@ -1,0 +1,9 @@
+{
+  "repository": "support-rb/test-ruby",
+  "source": "main",
+  "target": "feature/alphabet-cycle",
+  "runType": "run",
+  "title": "Alphabet cycle - add next letter",
+  "prompt": "Create or update a file called `alphabet.txt` in the root directory. If the file doesn't exist, create it with just the letter 'A'. If it exists, read the last letter in the file and add the next letter in the alphabet on a new line. If the last letter is 'Z', start over with 'A'. Each run should add exactly one letter to continue the alphabetical sequence. The file should have one letter per line.",
+  "context": "This task creates a continuously changing file that cycles through the alphabet. Each run will always have something to change - either creating the file with 'A' or adding the next letter in sequence. This ensures the AI will always have work to do."
+}

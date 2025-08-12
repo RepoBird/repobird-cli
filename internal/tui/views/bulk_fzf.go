@@ -263,19 +263,38 @@ func (v *BulkFZFView) View() string {
 }
 
 func (v *BulkFZFView) renderFileSelectView() string {
-	// This is shown when file selector is not active
+	// Calculate available height following create view pattern
+	availableHeight := v.height - 3 // Status bar + margins
+	if availableHeight < 5 {
+		availableHeight = 5
+	}
+
+	// Calculate panel dimensions with proper border accounting
+	panelWidth := v.width - 2
+	if panelWidth < 60 {
+		panelWidth = 60
+	}
+	panelHeight := availableHeight
+	if panelHeight < 8 {
+		panelHeight = 8
+	}
+
+	// Build panel content
+	var content strings.Builder
+
+	// Title inside the panel
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("205")).
-		MarginBottom(1)
-
-	title := titleStyle.Render("Bulk Run Configuration")
+		Foreground(lipgloss.Color("205"))
+	content.WriteString(titleStyle.Render("Bulk Run Configuration"))
+	content.WriteString("\n\n")
 
 	// Instructions
-	instructions := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("241")).
-		MarginTop(1).
-		Render(strings.Join([]string{
+	instructionsStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("241"))
+
+	if len(v.selectedFiles) == 0 {
+		content.WriteString(instructionsStyle.Render(strings.Join([]string{
 			"Select configuration files for bulk run creation:",
 			"",
 			"• Press 'f' to open file selector with FZF filtering",
@@ -284,75 +303,59 @@ func (v *BulkFZFView) renderFileSelectView() string {
 			"• Maximum 10 runs per batch",
 			"",
 			"Press 'f' to begin file selection or 'q' to quit",
-		}, "\n"))
+		}, "\n")))
+	} else {
+		// Show selected files
+		selectedStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("42")).
+			Bold(true)
+		content.WriteString(selectedStyle.Render(fmt.Sprintf("Selected Files (%d):", len(v.selectedFiles))))
+		content.WriteString("\n\n")
 
-	// Show previously selected files if any
-	var selectedList string
-	if len(v.selectedFiles) > 0 {
-		fileListStyle := lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("62")).
-			Padding(1).
-			MarginTop(1).
-			MarginBottom(1)
-
-		var files []string
 		for i, file := range v.selectedFiles {
-			files = append(files, fmt.Sprintf("%d. %s", i+1, file))
+			content.WriteString(fmt.Sprintf("  %d. %s\n", i+1, file))
 		}
+		content.WriteString("\n")
 
-		selectedList = fileListStyle.Render(
-			lipgloss.NewStyle().Bold(true).Render("Selected Files:\n\n") +
-				strings.Join(files, "\n"),
-		)
-
-		// Update instructions
-		instructions = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("241")).
-			MarginTop(1).
-			Render(strings.Join([]string{
-				"Actions:",
-				"  Enter - Load selected files and proceed",
-				"  f     - Add more files",
-				"  c     - Clear selection",
-				"  q     - Cancel and quit",
-			}, "\n"))
+		// Actions
+		content.WriteString(instructionsStyle.Render(strings.Join([]string{
+			"Actions:",
+			"  Enter - Load selected files and proceed",
+			"  f     - Add more files",
+			"  c     - Clear selection",
+			"  q     - Cancel and quit",
+		}, "\n")))
 	}
 
-	// Calculate available height
-	availableHeight := v.height - 3 // Reserve for statusline
+	// Create bordered panel following create.go pattern
+	panelStyle := lipgloss.NewStyle().
+		Width(panelWidth).
+		Height(panelHeight).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("63")).
+		Padding(1)
 
-	// Combine all elements
-	content := lipgloss.JoinVertical(
-		lipgloss.Left,
-		title,
-		instructions,
-		selectedList,
-	)
+	// Render panel with top margin to prevent border cutoff
+	panel := panelStyle.Render(content.String())
+	panelWithMargin := lipgloss.NewStyle().MarginTop(2).Render(panel)
 
-	// Center the content
-	centeredContent := lipgloss.Place(
-		v.width,
-		availableHeight,
-		lipgloss.Center,
-		lipgloss.Center,
-		content,
-	)
-
-	// Setup statusline
+	// Setup statusline with shorter text
 	statusText := "[BULK]"
 	if len(v.selectedFiles) > 0 {
-		statusText = fmt.Sprintf("[BULK] %d file(s) selected", len(v.selectedFiles))
+		statusText = fmt.Sprintf("[BULK] %d file(s)", len(v.selectedFiles))
 	}
 
-	v.statusLine.SetWidth(v.width).
+	// Shorter status commands to prevent overflow
+	statusLine := v.statusLine.SetWidth(v.width).
 		SetLeft(statusText).
-		SetRight("f: select files | Enter: load | ?: help | q: back")
+		SetRight("f:files | Enter:load | ?:help | q:back").
+		Render()
 
+	// Join content and status bar
 	return lipgloss.JoinVertical(
 		lipgloss.Left,
-		centeredContent,
-		v.statusLine.Render(),
+		panelWithMargin,
+		statusLine,
 	)
 }
 
@@ -361,33 +364,54 @@ func (v *BulkFZFView) renderRunListView() string {
 		return "No configuration loaded"
 	}
 
+	// Calculate available height following create view pattern
+	availableHeight := v.height - 3 // Status bar + margins
+	if availableHeight < 5 {
+		availableHeight = 5
+	}
+
+	// Calculate panel dimensions with proper border accounting
+	panelWidth := v.width - 2
+	if panelWidth < 60 {
+		panelWidth = 60
+	}
+	panelHeight := availableHeight
+	if panelHeight < 8 {
+		panelHeight = 8
+	}
+
+	// Build panel content
+	var content strings.Builder
+
+	// Title inside the panel
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("205"))
-
-	title := titleStyle.Render(fmt.Sprintf("Bulk Runs - %d tasks", len(v.runs)))
+	content.WriteString(titleStyle.Render(fmt.Sprintf("Bulk Runs - %d tasks", len(v.runs))))
+	content.WriteString("\n\n")
 
 	// Repository info
 	infoStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("241")).
-		MarginBottom(1)
-
+		Foreground(lipgloss.Color("241"))
 	info := fmt.Sprintf("Repository: %s | Source: %s | Type: %s",
 		v.bulkConfig.Repository,
 		v.bulkConfig.Source,
 		v.bulkConfig.RunType,
 	)
+	content.WriteString(infoStyle.Render(info))
+	content.WriteString("\n\n")
 
 	// Build run list
-	listStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("62")).
-		Padding(1).
-		Width(v.width - 4).
-		Height(v.height - 10)
+	contentHeight := panelHeight - 6 // Account for title, info, padding, borders
+	visibleRuns := contentHeight - 2
+	startIdx := 0
+	if v.selectedRunIdx >= visibleRuns {
+		startIdx = v.selectedRunIdx - visibleRuns + 1
+	}
+	endIdx := min(len(v.runs), startIdx+visibleRuns)
 
-	var runLines []string
-	for i, run := range v.runs {
+	for i := startIdx; i < endIdx; i++ {
+		run := v.runs[i]
 		prefix := "  "
 		if i == v.selectedRunIdx {
 			prefix = "> "
@@ -411,67 +435,128 @@ func (v *BulkFZFView) renderRunListView() string {
 				Render(line)
 		}
 
-		runLines = append(runLines, line)
+		content.WriteString(line)
+		if i < endIdx-1 {
+			content.WriteString("\n")
+		}
 	}
 
-	runList := listStyle.Render(strings.Join(runLines, "\n"))
+	// Create bordered panel following create.go pattern
+	panelStyle := lipgloss.NewStyle().
+		Width(panelWidth).
+		Height(panelHeight).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("63")).
+		Padding(1)
 
-	// Status line
-	v.statusLine.SetWidth(v.width).
-		SetLeft(fmt.Sprintf("[RUNS] %d selected", countSelected(v.runs))).
-		SetRight("Space: toggle | a: all | n: none | Enter: submit | ?: help | q: back")
+	// Render panel with top margin to prevent border cutoff
+	panel := panelStyle.Render(content.String())
+	panelWithMargin := lipgloss.NewStyle().MarginTop(2).Render(panel)
 
+	// Setup statusline with shorter text
+	selectedCount := countSelected(v.runs)
+	statusText := fmt.Sprintf("[RUNS] %d selected", selectedCount)
+
+	// Shorter status commands to prevent overflow
+	statusLine := v.statusLine.SetWidth(v.width).
+		SetLeft(statusText).
+		SetRight("Space:toggle | a:all | n:none | Enter:submit | ?:help | q:back").
+		Render()
+
+	// Join content and status bar
 	return lipgloss.JoinVertical(
 		lipgloss.Left,
-		title,
-		infoStyle.Render(info),
-		runList,
-		v.statusLine.Render(),
+		panelWithMargin,
+		statusLine,
 	)
 }
 
 func (v *BulkFZFView) renderSubmittingView() string {
-	content := lipgloss.JoinVertical(
-		lipgloss.Center,
-		v.spinner.View(),
-		"",
-		"Submitting bulk runs...",
-		fmt.Sprintf("Processing %d tasks", len(v.runs)),
-	)
+	// Calculate available height following create view pattern
+	availableHeight := v.height - 3 // Status bar + margins
+	if availableHeight < 5 {
+		availableHeight = 5
+	}
 
-	centeredContent := lipgloss.Place(
-		v.width,
-		v.height-1,
-		lipgloss.Center,
-		lipgloss.Center,
-		content,
-	)
+	// Calculate panel dimensions with proper border accounting
+	panelWidth := v.width - 2
+	if panelWidth < 60 {
+		panelWidth = 60
+	}
+	panelHeight := availableHeight
+	if panelHeight < 8 {
+		panelHeight = 8
+	}
 
-	v.statusLine.SetWidth(v.width).
+	// Build panel content
+	var content strings.Builder
+
+	// Center the spinner and text in the panel
+	content.WriteString("\n\n")
+	content.WriteString(lipgloss.NewStyle().Width(panelWidth - 4).Align(lipgloss.Center).Render(v.spinner.View()))
+	content.WriteString("\n\n")
+	content.WriteString(lipgloss.NewStyle().Width(panelWidth - 4).Align(lipgloss.Center).Render("Submitting bulk runs..."))
+	content.WriteString("\n")
+	content.WriteString(lipgloss.NewStyle().Width(panelWidth - 4).Align(lipgloss.Center).Render(fmt.Sprintf("Processing %d tasks", len(v.runs))))
+
+	// Create bordered panel following create.go pattern
+	panelStyle := lipgloss.NewStyle().
+		Width(panelWidth).
+		Height(panelHeight).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("63")).
+		Padding(1)
+
+	// Render panel with top margin to prevent border cutoff
+	panel := panelStyle.Render(content.String())
+	panelWithMargin := lipgloss.NewStyle().MarginTop(2).Render(panel)
+
+	// Setup statusline
+	statusLine := v.statusLine.SetWidth(v.width).
 		SetLeft("[BULK]").
-		SetRight("Submitting...")
+		SetRight("Submitting...").
+		Render()
 
+	// Join content and status bar
 	return lipgloss.JoinVertical(
 		lipgloss.Left,
-		centeredContent,
-		v.statusLine.Render(),
+		panelWithMargin,
+		statusLine,
 	)
 }
 
 func (v *BulkFZFView) renderResultsView() string {
+	// Calculate available height following create view pattern
+	availableHeight := v.height - 3 // Status bar + margins
+	if availableHeight < 5 {
+		availableHeight = 5
+	}
+
+	// Calculate panel dimensions with proper border accounting
+	panelWidth := v.width - 2
+	if panelWidth < 60 {
+		panelWidth = 60
+	}
+	panelHeight := availableHeight
+	if panelHeight < 8 {
+		panelHeight = 8
+	}
+
+	// Build panel content
+	var content strings.Builder
+
+	// Title inside the panel
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("205"))
-
-	title := titleStyle.Render("Bulk Run Results")
-
-	var content strings.Builder
+	content.WriteString(titleStyle.Render("Bulk Run Results"))
+	content.WriteString("\n\n")
 
 	if v.error != nil {
 		errorStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("9")).
-			MarginBottom(1)
+			Foreground(lipgloss.Color("9"))
 		content.WriteString(errorStyle.Render(fmt.Sprintf("Error: %v", v.error)))
+		content.WriteString("\n\n")
 	}
 
 	if len(v.results) > 0 {
@@ -486,17 +571,17 @@ func (v *BulkFZFView) renderResultsView() string {
 			}
 		}
 
+		// Summary
 		summaryStyle := lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("62")).
-			Padding(1).
-			MarginBottom(1)
-
-		summary := fmt.Sprintf("✓ Success: %d\n✗ Failed: %d\nTotal: %d",
+			Foreground(lipgloss.Color("241"))
+		summary := fmt.Sprintf("✓ Success: %d  ✗ Failed: %d  Total: %d",
 			successCount, failCount, len(v.results))
-
 		content.WriteString(summaryStyle.Render(summary))
-		content.WriteString("\n\nDetails:\n")
+		content.WriteString("\n\n")
+
+		// Details
+		content.WriteString(lipgloss.NewStyle().Bold(true).Render("Details:"))
+		content.WriteString("\n")
 
 		for _, result := range v.results {
 			icon := "✓"
@@ -510,7 +595,8 @@ func (v *BulkFZFView) renderResultsView() string {
 				Foreground(color).
 				Render(fmt.Sprintf("%s %s (ID: %d)", icon, result.Title, result.ID))
 
-			content.WriteString(resultLine + "\n")
+			content.WriteString(resultLine)
+			content.WriteString("\n")
 
 			if result.Error != "" {
 				content.WriteString(fmt.Sprintf("  Error: %s\n", result.Error))
@@ -518,21 +604,29 @@ func (v *BulkFZFView) renderResultsView() string {
 		}
 	}
 
-	v.statusLine.SetWidth(v.width).
+	// Create bordered panel following create.go pattern
+	panelStyle := lipgloss.NewStyle().
+		Width(panelWidth).
+		Height(panelHeight).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("63")).
+		Padding(1)
+
+	// Render panel with top margin to prevent border cutoff
+	panel := panelStyle.Render(content.String())
+	panelWithMargin := lipgloss.NewStyle().MarginTop(2).Render(panel)
+
+	// Setup statusline with shorter text
+	statusLine := v.statusLine.SetWidth(v.width).
 		SetLeft("[RESULTS]").
-		SetRight("Enter: new batch | ?: help | q: back")
+		SetRight("Enter:new | ?:help | q:back").
+		Render()
 
-	resultBox := lipgloss.NewStyle().
-		Width(v.width - 4).
-		Height(v.height - 6).
-		Padding(1).
-		Render(content.String())
-
+	// Join content and status bar
 	return lipgloss.JoinVertical(
 		lipgloss.Left,
-		title,
-		resultBox,
-		v.statusLine.Render(),
+		panelWithMargin,
+		statusLine,
 	)
 }
 
@@ -557,7 +651,10 @@ func (v *BulkFZFView) handleFileSelectKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 
 	case "q":
 		// Go back to dashboard
-		return NewDashboardView(v.client), nil
+		dashboard := NewDashboardView(v.client)
+		dashboard.width = v.width
+		dashboard.height = v.height
+		return dashboard, dashboard.Init()
 
 	case "Q":
 		// Quit entire program (capital Q)
@@ -635,7 +732,10 @@ func (v *BulkFZFView) handleResultsKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q":
 		// Go back to dashboard
-		return NewDashboardView(v.client), nil
+		dashboard := NewDashboardView(v.client)
+		dashboard.width = v.width
+		dashboard.height = v.height
+		return dashboard, dashboard.Init()
 
 	case "Q":
 		// Quit entire program

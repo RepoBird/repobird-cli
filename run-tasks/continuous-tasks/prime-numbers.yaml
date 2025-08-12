@@ -1,0 +1,21 @@
+repository: support-rb/test-ruby
+source: main
+target: feature/prime-numbers
+runType: run
+title: Add next prime number
+prompt: |
+  Create or update a file called `primes.txt` in the root directory.
+  
+  If the file doesn't exist, create it with the first prime number: '2'.
+  If it exists, find the next prime number after the last number in the file and append it on a new line.
+  
+  Each line should contain exactly one prime number.
+  The file should grow with each run, continuing the prime number sequence.
+  
+  Also maintain a count in a comment at the top of the file:
+  # Prime count: [number of primes in file]
+  
+  Update this count each time you add a new prime.
+context: |
+  This task generates an infinite sequence of prime numbers. Since there are infinitely many primes,
+  there will always be a next prime to find and add, ensuring continuous work for every run.

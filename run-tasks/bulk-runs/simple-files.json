@@ -1,0 +1,23 @@
+{
+  "repository": "support-rb/test-ruby",
+  "source": "main",
+  "runType": "run",
+  "batchTitle": "Create Simple Files",
+  "runs": [
+    {
+      "prompt": "Create a simple text file called 'repobird.txt' in the root directory. The file should contain: 'RepoBird was here!'",
+      "title": "Create repobird.txt",
+      "target": "feature/repobird-file"
+    },
+    {
+      "prompt": "Create a simple text file called 'hello.txt' in the root directory. The file should contain: 'Hello from RepoBird!'",
+      "title": "Create hello.txt", 
+      "target": "feature/hello-file"
+    },
+    {
+      "prompt": "Create a simple text file called 'welcome.txt' in the root directory. The file should contain: 'Welcome to the test repository!'",
+      "title": "Create welcome.txt",
+      "target": "feature/welcome-file"
+    }
+  ]
+}

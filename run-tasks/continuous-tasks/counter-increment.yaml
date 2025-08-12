@@ -1,0 +1,20 @@
+repository: support-rb/test-ruby
+source: main
+target: feature/counter-increment
+runType: run
+title: Increment counter value
+prompt: |
+  Create or update a file called `counter.txt` in the root directory. 
+  
+  If the file doesn't exist, create it with the number '1'.
+  If it exists, read the current number and increment it by 1, then write the new number to the file.
+  
+  The file should contain only a single number on one line.
+  
+  Additionally, create or update a `counter_log.txt` file that logs each increment with a timestamp in the format:
+  "Count [number] at [timestamp]"
+  
+  Each run should increment the counter and add a new log entry.
+context: |
+  This task creates a continuously incrementing counter that will always change on each run.
+  The counter will never reach a state where no changes are needed, ensuring continuous work.

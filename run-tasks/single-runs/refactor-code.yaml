@@ -1,0 +1,10 @@
+repository: support-rb/test-ruby
+source: main
+target: feature/refactor-code
+runType: run
+title: Create hello.txt file
+prompt: |
+  Create a simple text file called 'hello.txt' in the root directory. 
+  The file should contain: 'Hello from RepoBird!'
+context: |
+  Simple file creation task that always works.

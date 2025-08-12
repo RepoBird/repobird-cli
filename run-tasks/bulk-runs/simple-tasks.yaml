@@ -1,0 +1,22 @@
+repository: support-rb/test-ruby
+source: main
+runType: run
+batchTitle: Simple File Creation Tasks
+runs:
+  - prompt: |
+      Create a text file called 'status.txt' in the root directory.
+      The file should contain: 'Status: Active'
+    title: Create status file
+    target: feature/status-file
+  
+  - prompt: |
+      Create a text file called 'version.txt' in the root directory.
+      The file should contain: 'Version: 1.0.0'
+    title: Create version file
+    target: feature/version-file
+  
+  - prompt: |
+      Create a text file called 'notes.txt' in the root directory.
+      The file should contain: 'Test notes for RepoBird'
+    title: Create notes file
+    target: feature/notes-file
