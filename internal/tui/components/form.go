@@ -36,13 +36,13 @@ type FormField struct {
 
 // FormComponent is a reusable form component
 type FormComponent struct {
-	fields      []FormField
-	focusIndex  int
-	insertMode  bool
-	keymaps     FormKeyMap
-	width       int
-	height      int
-	errors      map[string]string
+	fields     []FormField
+	focusIndex int
+	insertMode bool
+	keymaps    FormKeyMap
+	width      int
+	height     int
+	errors     map[string]string
 
 	// Styling
 	labelStyle    lipgloss.Style
@@ -53,12 +53,12 @@ type FormComponent struct {
 
 // FormKeyMap contains key bindings specific to forms
 type FormKeyMap struct {
-	KeyMap        // Embed standard keymaps
-	NextField     string
-	PrevField     string
-	InsertMode    string
-	NormalMode    string
-	Submit        string
+	KeyMap     // Embed standard keymaps
+	NextField  string
+	PrevField  string
+	InsertMode string
+	NormalMode string
+	Submit     string
 }
 
 // DefaultFormKeyMap returns the default form key bindings
@@ -319,7 +319,7 @@ func (f *FormComponent) renderField(field FormField, focused bool) string {
 
 	// Add error message if present
 	if errMsg, ok := f.errors[field.Name]; ok {
-		input += "\n" + f.errorStyle.Render("  ↳ " + errMsg)
+		input += "\n" + f.errorStyle.Render("  ↳ "+errMsg)
 	}
 
 	return label + "\n" + input

@@ -85,22 +85,22 @@ func (p *PermanentCache) SetRun(run models.RunResponse) error {
 	runDir := filepath.Join(p.baseDir, "runs")
 	tempPath := filepath.Join(runDir, run.ID+".tmp")
 	finalPath := filepath.Join(runDir, run.ID+".json")
-	
+
 	data, err := json.MarshalIndent(run, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal run: %w", err)
 	}
-	
+
 	// Ensure directory exists (idempotent operation)
 	if err := os.MkdirAll(runDir, 0700); err != nil {
 		return fmt.Errorf("failed to create runs directory: %w", err)
 	}
-	
+
 	// Write to temp file (no lock needed)
 	if err := os.WriteFile(tempPath, data, 0600); err != nil {
 		return fmt.Errorf("failed to write temp file: %w", err)
 	}
-	
+
 	// Atomic rename (no lock needed)
 	return os.Rename(tempPath, finalPath)
 }
@@ -180,17 +180,17 @@ func (p *PermanentCache) SetUserInfo(info *models.UserInfo) error {
 	// Prepare data without lock
 	tempPath := filepath.Join(p.baseDir, "user-info.tmp")
 	finalPath := filepath.Join(p.baseDir, "user-info.json")
-	
+
 	data, err := json.MarshalIndent(info, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal user info: %w", err)
 	}
-	
+
 	// Write to temp file
 	if err := os.WriteFile(tempPath, data, 0600); err != nil {
 		return err
 	}
-	
+
 	// Atomic rename
 	return os.Rename(tempPath, finalPath)
 }
@@ -218,22 +218,22 @@ func (p *PermanentCache) SetRepositoryList(repos []string) error {
 	repoDir := filepath.Join(p.baseDir, "repositories")
 	tempPath := filepath.Join(repoDir, "list.tmp")
 	finalPath := filepath.Join(repoDir, "list.json")
-	
+
 	data, err := json.MarshalIndent(repos, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal repository list: %w", err)
 	}
-	
+
 	// Ensure directory exists
 	if err := os.MkdirAll(repoDir, 0700); err != nil {
 		return fmt.Errorf("failed to create repositories directory: %w", err)
 	}
-	
+
 	// Write to temp file
 	if err := os.WriteFile(tempPath, data, 0600); err != nil {
 		return err
 	}
-	
+
 	// Atomic rename
 	return os.Rename(tempPath, finalPath)
 }
@@ -252,7 +252,7 @@ func (p *PermanentCache) SetFileHash(filePath string, hash string) error {
 	// This is the only place where we need synchronization
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	
+
 	hashes := p.loadFileHashes()
 	hashes[filePath] = hash
 
@@ -285,17 +285,17 @@ func (p *PermanentCache) loadFileHashes() map[string]string {
 func (p *PermanentCache) saveFileHashesAtomic(hashes map[string]string) error {
 	tempPath := filepath.Join(p.baseDir, "file-hashes.tmp")
 	finalPath := filepath.Join(p.baseDir, "file-hashes.json")
-	
+
 	data, err := json.MarshalIndent(hashes, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal file hashes: %w", err)
 	}
-	
+
 	// Write to temp file
 	if err := os.WriteFile(tempPath, data, 0600); err != nil {
 		return err
 	}
-	
+
 	// Atomic rename
 	return os.Rename(tempPath, finalPath)
 }

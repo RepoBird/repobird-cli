@@ -379,22 +379,22 @@ func (d *DashboardView) batchCacheRepositoryData(repositories []models.Repositor
 		runs    []*models.RunResponse
 		details map[string]*models.RunResponse
 	}
-	
+
 	// Create job queue
 	jobs := make(chan cacheJob, len(repositories))
-	
+
 	// Queue all jobs
 	for _, repo := range repositories {
 		repoRuns := d.filterRunsByRepository(allRuns, repo.Name)
 		repoDetails := make(map[string]*models.RunResponse)
-		
+
 		// Add any cached details
 		for _, run := range repoRuns {
 			if detail, exists := detailsCache[run.GetIDString()]; exists {
 				repoDetails[run.GetIDString()] = detail
 			}
 		}
-		
+
 		jobs <- cacheJob{
 			repo:    repo,
 			runs:    repoRuns,
@@ -402,7 +402,7 @@ func (d *DashboardView) batchCacheRepositoryData(repositories []models.Repositor
 		}
 	}
 	close(jobs)
-	
+
 	// Process with limited concurrency (max 3 concurrent cache writes)
 	var wg sync.WaitGroup
 	for i := 0; i < 3; i++ {
@@ -414,7 +414,7 @@ func (d *DashboardView) batchCacheRepositoryData(repositories []models.Repositor
 			}
 		}()
 	}
-	
+
 	wg.Wait()
 }
 

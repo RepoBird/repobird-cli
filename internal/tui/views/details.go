@@ -15,6 +15,7 @@ import (
 	"github.com/repobird/repobird-cli/internal/tui/cache"
 	"github.com/repobird/repobird-cli/internal/tui/components"
 	"github.com/repobird/repobird-cli/internal/tui/debug"
+	"github.com/repobird/repobird-cli/internal/tui/messages"
 	"github.com/repobird/repobird-cli/internal/tui/styles"
 	"github.com/repobird/repobird-cli/internal/utils"
 )
@@ -156,27 +157,26 @@ func (v *RunDetailsView) handleKeyInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case msg.String() == "q", key.Matches(msg, v.keys.Back), msg.Type == tea.KeyEsc, msg.String() == "b", msg.Type == tea.KeyBackspace:
 		v.stopPolling()
-		// Return to dashboard view with restored state
-		dashboard := NewDashboardViewWithState(
-			v.client,
-			v.dashboardSelectedRepoIdx,
-			v.dashboardSelectedRunIdx,
-			v.dashboardSelectedDetailLine,
-			v.dashboardFocusedColumn,
-		)
-		// Set dimensions
-		dashboard.width = v.width
-		dashboard.height = v.height
-		// Initialize and let it load data
-		return dashboard, dashboard.Init()
+		// Navigate back or to dashboard
+		return v, func() tea.Msg {
+			return messages.NavigateBackMsg{}
+		}
 	case msg.String() == "Q":
 		// Capital Q to force quit from anywhere
 		v.stopPolling()
 		return v, tea.Quit
+	case msg.String() == "d":
+		// d key to go to dashboard
+		v.stopPolling()
+		return v, func() tea.Msg {
+			return messages.NavigateToDashboardMsg{}
+		}
 	case key.Matches(msg, v.keys.Help):
-		// For now, just ignore help in details view
-		// Could return to dashboard with docs shown if needed
-		return v, nil
+		// Navigate to dashboard with docs
+		v.stopPolling()
+		return v, func() tea.Msg {
+			return messages.NavigateToDashboardMsg{}
+		}
 	case key.Matches(msg, v.keys.Refresh):
 		v.loading = true
 		v.error = nil

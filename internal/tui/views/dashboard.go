@@ -11,7 +11,6 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/repobird/repobird-cli/internal/api"
 	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/repobird/repobird-cli/internal/tui/cache"
 	"github.com/repobird/repobird-cli/internal/tui/components"
@@ -506,7 +505,7 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Return navigation message to create view
 			return d, func() tea.Msg {
 				return messages.NavigateToCreateMsg{
-					SelectedRepository: repo,
+					SelectedRepository: config.SelectedRepository,
 				}
 			}
 		case msg.Type == tea.KeyRunes && string(msg.Runes) == "b":

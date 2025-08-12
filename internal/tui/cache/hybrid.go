@@ -77,11 +77,11 @@ func (h *HybridCache) SetRun(run models.RunResponse) error {
 func (h *HybridCache) GetRuns() ([]models.RunResponse, bool) {
 	// No mutex needed - child caches handle their own locking
 	runMap := make(map[string]models.RunResponse)
-	
+
 	// Get from caches in parallel to avoid sequential blocking
 	var wg sync.WaitGroup
 	var mapMu sync.Mutex
-	
+
 	// Permanent cache goroutine
 	if h.permanent != nil {
 		wg.Add(1)
@@ -96,8 +96,8 @@ func (h *HybridCache) GetRuns() ([]models.RunResponse, bool) {
 			}
 		}()
 	}
-	
-	// Session cache goroutine  
+
+	// Session cache goroutine
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -110,9 +110,9 @@ func (h *HybridCache) GetRuns() ([]models.RunResponse, bool) {
 			mapMu.Unlock()
 		}
 	}()
-	
+
 	wg.Wait()
-	
+
 	// Convert map to slice and sort by creation time (newest first)
 	runs := make([]models.RunResponse, 0, len(runMap))
 	for _, run := range runMap {

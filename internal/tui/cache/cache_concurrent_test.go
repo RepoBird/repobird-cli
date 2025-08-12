@@ -18,13 +18,13 @@ func TestNoCacheDeadlock(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "cache-test-*")
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
-	
+
 	os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Unsetenv("XDG_CONFIG_HOME")
-	
+
 	cache := NewSimpleCache()
 	defer cache.Stop()
-	
+
 	// Simulate dashboard loading pattern
 	var wg sync.WaitGroup
 	for i := 0; i < 100; i++ {
@@ -37,18 +37,18 @@ func TestNoCacheDeadlock(t *testing.T) {
 			for j := range runs {
 				details[runs[j].ID] = &runs[j]
 			}
-			
+
 			// This previously caused deadlock
 			cache.SetRepositoryData(repo, convertToPointers(runs), details)
 		}(i)
 	}
-	
+
 	done := make(chan bool)
 	go func() {
 		wg.Wait()
 		done <- true
 	}()
-	
+
 	select {
 	case <-done:
 		// Success - no deadlock
@@ -62,15 +62,15 @@ func TestConcurrentGetSetRuns(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "cache-test-*")
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
-	
+
 	os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Unsetenv("XDG_CONFIG_HOME")
-	
+
 	cache := NewSimpleCache()
 	defer cache.Stop()
-	
+
 	var wg sync.WaitGroup
-	
+
 	// Multiple writers
 	for i := 0; i < 50; i++ {
 		wg.Add(1)
@@ -80,7 +80,7 @@ func TestConcurrentGetSetRuns(t *testing.T) {
 			cache.SetRuns(runs)
 		}(i)
 	}
-	
+
 	// Multiple readers
 	for i := 0; i < 50; i++ {
 		wg.Add(1)
@@ -89,13 +89,13 @@ func TestConcurrentGetSetRuns(t *testing.T) {
 			_ = cache.GetRuns()
 		}()
 	}
-	
+
 	done := make(chan bool)
 	go func() {
 		wg.Wait()
 		done <- true
 	}()
-	
+
 	select {
 	case <-done:
 		// Success - no race conditions
@@ -109,15 +109,15 @@ func TestParallelCacheOperations(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "cache-test-*")
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
-	
+
 	os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Unsetenv("XDG_CONFIG_HOME")
-	
+
 	cache := NewSimpleCache()
 	defer cache.Stop()
-	
+
 	var wg sync.WaitGroup
-	
+
 	// Test all cache operations concurrently
 	operations := []func(){
 		// SetRun operations
@@ -162,7 +162,7 @@ func TestParallelCacheOperations(t *testing.T) {
 			_, _ = cache.GetDashboardCache()
 		},
 	}
-	
+
 	// Run each operation 100 times concurrently
 	for _, op := range operations {
 		for i := 0; i < 100; i++ {
@@ -174,13 +174,13 @@ func TestParallelCacheOperations(t *testing.T) {
 			}()
 		}
 	}
-	
+
 	done := make(chan bool)
 	go func() {
 		wg.Wait()
 		done <- true
 	}()
-	
+
 	select {
 	case <-done:
 		// Success - all operations completed without deadlock
@@ -194,28 +194,28 @@ func TestHybridCacheParallelFetch(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "cache-test-*")
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
-	
+
 	os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Unsetenv("XDG_CONFIG_HOME")
-	
+
 	hybrid, err := NewHybridCache("test-user")
 	require.NoError(t, err)
 	defer hybrid.Close()
-	
+
 	// Add some terminal runs to permanent cache
 	for i := 0; i < 10; i++ {
 		run := generateTestRun(fmt.Sprintf("perm-%d", i), models.StatusDone)
 		err := hybrid.SetRun(run)
 		assert.NoError(t, err)
 	}
-	
+
 	// Add some active runs to session cache
 	for i := 0; i < 10; i++ {
 		run := generateTestRun(fmt.Sprintf("sess-%d", i), models.StatusProcessing)
 		err := hybrid.SetRun(run)
 		assert.NoError(t, err)
 	}
-	
+
 	// Concurrent reads should not deadlock
 	var wg sync.WaitGroup
 	for i := 0; i < 100; i++ {
@@ -227,13 +227,13 @@ func TestHybridCacheParallelFetch(t *testing.T) {
 			assert.NotEmpty(t, runs)
 		}()
 	}
-	
+
 	done := make(chan bool)
 	go func() {
 		wg.Wait()
 		done <- true
 	}()
-	
+
 	select {
 	case <-done:
 		// Success - parallel fetch completed
@@ -247,16 +247,16 @@ func TestAtomicFileWrites(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "cache-test-*")
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
-	
+
 	os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Unsetenv("XDG_CONFIG_HOME")
-	
+
 	perm, err := NewPermanentCache("test-user")
 	require.NoError(t, err)
 	defer perm.Close()
-	
+
 	var wg sync.WaitGroup
-	
+
 	// Concurrent writes to different files
 	for i := 0; i < 50; i++ {
 		wg.Add(1)
@@ -267,7 +267,7 @@ func TestAtomicFileWrites(t *testing.T) {
 			assert.NoError(t, err)
 		}(i)
 	}
-	
+
 	// Concurrent reads while writing
 	for i := 0; i < 50; i++ {
 		wg.Add(1)
@@ -276,9 +276,9 @@ func TestAtomicFileWrites(t *testing.T) {
 			_, _ = perm.GetRun(fmt.Sprintf("run-%d", idx))
 		}(i)
 	}
-	
+
 	wg.Wait()
-	
+
 	// Verify all runs were written correctly
 	allRuns, found := perm.GetAllRuns()
 	assert.True(t, found)
@@ -301,9 +301,10 @@ func generateTestRuns(count int) []models.RunResponse {
 	runs := make([]models.RunResponse, count)
 	for i := 0; i < count; i++ {
 		status := models.StatusProcessing
-		if i%3 == 0 {
+		switch i % 3 {
+		case 0:
 			status = models.StatusDone
-		} else if i%3 == 1 {
+		case 1:
 			status = models.StatusFailed
 		}
 		runs[i] = generateTestRun(fmt.Sprintf("run-%d", i), status)

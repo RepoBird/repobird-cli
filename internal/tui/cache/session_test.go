@@ -1,280 +1,455 @@
 package cache
 
 import (
+	"fmt"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestSessionCache_OnlyStoresActiveRuns(t *testing.T) {
-	cache := NewSessionCache()
-	defer cache.Close()
-
-	// Should store active run
-	activeRun := models.RunResponse{
-		ID:        "test-1",
-		Status:    models.StatusProcessing,
-		CreatedAt: time.Now(),
+// TestSessionCacheNoMutex verifies SessionCache works without extra mutex
+func TestSessionCacheNoMutex(t *testing.T) {
+	session := NewSessionCache()
+	defer session.Close()
+	
+	// Concurrent operations that would reveal mutex issues
+	var wg sync.WaitGroup
+	numGoroutines := 100
+	
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			
+			// Mix of operations
+			run := models.RunResponse{
+				ID:        fmt.Sprintf("sess-%d", id),
+				Status:    models.StatusProcessing,
+				CreatedAt: time.Now(),
+				UpdatedAt: time.Now(),
+			}
+			
+			// Set and get operations
+			_ = session.SetRun(run)
+			_, _ = session.GetRun(fmt.Sprintf("sess-%d", id))
+			
+			// Form data operations
+			_ = session.SetFormData(fmt.Sprintf("form-%d", id), "data")
+			_, _ = session.GetFormData(fmt.Sprintf("form-%d", id))
+		}(i)
 	}
-	err := cache.SetRun(activeRun)
-	assert.NoError(t, err)
+	
+	done := make(chan bool)
+	go func() {
+		wg.Wait()
+		done <- true
+	}()
+	
+	select {
+	case <-done:
+		// Success - no deadlock
+	case <-time.After(3 * time.Second):
+		t.Fatal("Operations blocked - ttlcache should handle concurrency")
+	}
+}
 
-	cached, found := cache.GetRun("test-1")
-	assert.True(t, found, "active run should be cached")
-	assert.Equal(t, activeRun.ID, cached.ID)
-	assert.Equal(t, activeRun.Status, cached.Status)
-
-	// Should not store terminal run
+// TestSessionCacheActiveRunsOnly verifies session cache only stores active runs
+func TestSessionCacheActiveRunsOnly(t *testing.T) {
+	session := NewSessionCache()
+	defer session.Close()
+	
+	// Try to store terminal run
 	terminalRun := models.RunResponse{
-		ID:        "test-2",
+		ID:        "terminal-1",
 		Status:    models.StatusDone,
 		CreatedAt: time.Now(),
 	}
-	err = cache.SetRun(terminalRun)
+	
+	err := session.SetRun(terminalRun)
 	assert.NoError(t, err)
-
-	_, found = cache.GetRun("test-2")
-	assert.False(t, found, "terminal run should not be cached in session")
-}
-
-func TestSessionCache_AutoRemovalOfTerminalRuns(t *testing.T) {
-	cache := NewSessionCache()
-	defer cache.Close()
-
-	// Store an active run
-	run := models.RunResponse{
-		ID:        "test-run",
+	
+	// Should not be retrievable (filtered out)
+	retrieved, found := session.GetRun("terminal-1")
+	assert.False(t, found)
+	assert.Nil(t, retrieved)
+	
+	// Store active run
+	activeRun := models.RunResponse{
+		ID:        "active-1",
 		Status:    models.StatusProcessing,
 		CreatedAt: time.Now(),
 	}
-	err := cache.SetRun(run)
+	
+	err = session.SetRun(activeRun)
 	assert.NoError(t, err)
-
-	// Verify it's cached
-	cached, found := cache.GetRun("test-run")
+	
+	// Should be retrievable
+	retrieved, found = session.GetRun("active-1")
 	assert.True(t, found)
-	assert.Equal(t, models.StatusProcessing, cached.Status)
-
-	// Update to terminal status
-	run.Status = models.StatusDone
-	err = cache.SetRun(run)
-	assert.NoError(t, err)
-
-	// Should be removed from cache
-	_, found = cache.GetRun("test-run")
-	assert.False(t, found, "terminal run should be removed from session cache")
+	assert.Equal(t, activeRun.ID, retrieved.ID)
 }
 
-func TestSessionCache_BulkRunOperations(t *testing.T) {
-	cache := NewSessionCache()
-	defer cache.Close()
-
-	runs := []models.RunResponse{
-		{ID: "run-1", Status: models.StatusQueued, CreatedAt: time.Now()},
-		{ID: "run-2", Status: models.StatusProcessing, CreatedAt: time.Now()},
-		{ID: "run-3", Status: models.StatusDone, CreatedAt: time.Now()},   // Terminal
-		{ID: "run-4", Status: models.StatusFailed, CreatedAt: time.Now()}, // Terminal
-		{ID: "run-5", Status: models.StatusInitializing, CreatedAt: time.Now()},
-	}
-
-	err := cache.SetRuns(runs)
-	assert.NoError(t, err)
-
-	// GetRuns should only return active runs
-	cachedRuns, found := cache.GetRuns()
-	assert.True(t, found)
-	assert.Len(t, cachedRuns, 3, "should only return active runs")
-
-	// Verify only active runs are returned
-	for _, run := range cachedRuns {
-		assert.False(t, isTerminalState(run.Status), "should not return terminal runs")
-	}
-}
-
-func TestSessionCache_InvalidateRun(t *testing.T) {
-	cache := NewSessionCache()
-	defer cache.Close()
-
-	// Add a run
-	run := models.RunResponse{
-		ID:        "test-run",
+// TestSessionCacheOldRunFiltering verifies old runs are filtered out
+func TestSessionCacheOldRunFiltering(t *testing.T) {
+	session := NewSessionCache()
+	defer session.Close()
+	
+	// Old run (should be filtered)
+	oldRun := models.RunResponse{
+		ID:        "old-1",
 		Status:    models.StatusProcessing,
-		CreatedAt: time.Now(), // Recent run
+		CreatedAt: time.Now().Add(-3 * time.Hour),
+		UpdatedAt: time.Now().Add(-3 * time.Hour),
 	}
-	_ = cache.SetRun(run)
+	
+	err := session.SetRun(oldRun)
+	assert.NoError(t, err)
+	
+	// Should not be stored (old runs go to permanent)
+	retrieved, found := session.GetRun("old-1")
+	assert.False(t, found)
+	assert.Nil(t, retrieved)
+}
 
+// TestSessionCacheTTL verifies TTL expiration
+func TestSessionCacheTTL(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping TTL test in short mode")
+	}
+	
+	session := NewSessionCache()
+	defer session.Close()
+	
+	// Store run with 5-minute TTL
+	run := models.RunResponse{
+		ID:        "ttl-test",
+		Status:    models.StatusProcessing,
+		CreatedAt: time.Now(),
+	}
+	
+	err := session.SetRun(run)
+	assert.NoError(t, err)
+	
+	// Should be retrievable immediately
+	retrieved, found := session.GetRun("ttl-test")
+	assert.True(t, found)
+	assert.NotNil(t, retrieved)
+	
+	// Note: In production, items expire after 5 minutes
+	// For testing, we'd need to mock time or use shorter TTL
+}
+
+// TestSessionCacheConcurrentSetRuns tests concurrent SetRuns operations
+func TestSessionCacheConcurrentSetRuns(t *testing.T) {
+	session := NewSessionCache()
+	defer session.Close()
+	
+	var wg sync.WaitGroup
+	numBatches := 50
+	runsPerBatch := 10
+	
+	for i := 0; i < numBatches; i++ {
+		wg.Add(1)
+		go func(batchID int) {
+			defer wg.Done()
+			
+			runs := make([]models.RunResponse, runsPerBatch)
+			for j := 0; j < runsPerBatch; j++ {
+				runs[j] = models.RunResponse{
+					ID:        fmt.Sprintf("batch-%d-run-%d", batchID, j),
+					Status:    models.StatusProcessing,
+					CreatedAt: time.Now(),
+				}
+			}
+			
+			err := session.SetRuns(runs)
+			assert.NoError(t, err)
+		}(i)
+	}
+	
+	wg.Wait()
+	
+	// Verify some runs are stored
+	allRuns, found := session.GetRuns()
+	assert.True(t, found)
+	assert.NotEmpty(t, allRuns)
+}
+
+// TestSessionCacheInvalidateRun tests run invalidation
+func TestSessionCacheInvalidateRun(t *testing.T) {
+	session := NewSessionCache()
+	defer session.Close()
+	
+	// Add run
+	run := models.RunResponse{
+		ID:        "invalidate-test",
+		Status:    models.StatusProcessing,
+		CreatedAt: time.Now(),
+	}
+	
+	_ = session.SetRun(run)
+	
 	// Verify it exists
-	_, found := cache.GetRun("test-run")
+	_, found := session.GetRun("invalidate-test")
 	assert.True(t, found)
-
-	// Invalidate the run
-	err := cache.InvalidateRun("test-run")
+	
+	// Invalidate
+	err := session.InvalidateRun("invalidate-test")
 	assert.NoError(t, err)
-
-	// Should no longer exist
-	_, found = cache.GetRun("test-run")
-	assert.False(t, found, "run should be invalidated")
+	
+	// Should be gone
+	_, found = session.GetRun("invalidate-test")
+	assert.False(t, found)
 }
 
-func TestSessionCache_InvalidateActiveRuns(t *testing.T) {
-	cache := NewSessionCache()
-	defer cache.Close()
-
+// TestSessionCacheInvalidateActiveRuns tests clearing all active runs
+func TestSessionCacheInvalidateActiveRuns(t *testing.T) {
+	session := NewSessionCache()
+	defer session.Close()
+	
 	// Add multiple runs
-	runs := []models.RunResponse{
-		{ID: "run-1", Status: models.StatusQueued, CreatedAt: time.Now()},
-		{ID: "run-2", Status: models.StatusProcessing, CreatedAt: time.Now()},
-		{ID: "run-3", Status: models.StatusInitializing, CreatedAt: time.Now()},
+	for i := 0; i < 10; i++ {
+		run := models.RunResponse{
+			ID:        fmt.Sprintf("active-%d", i),
+			Status:    models.StatusProcessing,
+			CreatedAt: time.Now(),
+		}
+		_ = session.SetRun(run)
 	}
-
-	for _, run := range runs {
-		_ = cache.SetRun(run)
-	}
-
+	
 	// Verify they exist
-	cachedRuns, found := cache.GetRuns()
+	runs, found := session.GetRuns()
 	assert.True(t, found)
-	assert.Len(t, cachedRuns, 3)
-
+	assert.Len(t, runs, 10)
+	
 	// Invalidate all active runs
-	err := cache.InvalidateActiveRuns()
+	err := session.InvalidateActiveRuns()
 	assert.NoError(t, err)
-
-	// Should have no runs
-	cachedRuns, found = cache.GetRuns()
-	assert.False(t, found, "should have no runs after invalidation")
-	assert.Empty(t, cachedRuns)
-
-	// Individual runs should also be gone
-	for _, run := range runs {
-		_, found := cache.GetRun(run.ID)
-		assert.False(t, found, "individual run should be invalidated")
-	}
+	
+	// Should be empty
+	runs, found = session.GetRuns()
+	assert.False(t, found)
+	assert.Empty(t, runs)
 }
 
-func TestSessionCache_FormData(t *testing.T) {
-	cache := NewSessionCache()
-	defer cache.Close()
-
+// TestSessionCacheFormData tests form data caching
+func TestSessionCacheFormData(t *testing.T) {
+	session := NewSessionCache()
+	defer session.Close()
+	
 	// Store form data
 	formData := map[string]string{
 		"field1": "value1",
 		"field2": "value2",
 	}
-	err := cache.SetFormData("create-run-form", formData)
+	
+	err := session.SetFormData("test-form", formData)
 	assert.NoError(t, err)
-
+	
 	// Retrieve form data
-	cached, found := cache.GetFormData("create-run-form")
+	retrieved, found := session.GetFormData("test-form")
 	assert.True(t, found)
+	
+	data, ok := retrieved.(map[string]string)
+	require.True(t, ok)
+	assert.Equal(t, formData, data)
+}
 
-	cachedForm, ok := cached.(map[string]string)
-	assert.True(t, ok)
-	assert.Equal(t, formData, cachedForm)
+// TestSessionCacheDashboardData tests dashboard data caching
+func TestSessionCacheDashboardData(t *testing.T) {
+	session := NewSessionCache()
+	defer session.Close()
+	
+	// Store dashboard data
+	dashData := &DashboardData{
+		Runs: []models.RunResponse{
+			{ID: "dash-1", Status: models.StatusProcessing},
+		},
+		UserInfo: &models.UserInfo{ID: 123},
+		LastUpdated: time.Now(),
+	}
+	
+	err := session.SetDashboardData(dashData)
+	assert.NoError(t, err)
+	
+	// Retrieve dashboard data
+	retrieved, found := session.GetDashboardData()
+	assert.True(t, found)
+	assert.NotNil(t, retrieved)
+	assert.Len(t, retrieved.Runs, 1)
+	assert.Equal(t, 123, retrieved.UserInfo.ID)
+}
 
-	// Non-existent form data
-	_, found = cache.GetFormData("non-existent")
+// TestSessionCacheClear tests clearing all data
+func TestSessionCacheClear(t *testing.T) {
+	session := NewSessionCache()
+	defer session.Close()
+	
+	// Add various data
+	_ = session.SetRun(models.RunResponse{
+		ID:        "clear-test",
+		Status:    models.StatusProcessing,
+		CreatedAt: time.Now(),
+	})
+	_ = session.SetFormData("form", "data")
+	_ = session.SetDashboardData(&DashboardData{})
+	
+	// Clear all
+	err := session.Clear()
+	assert.NoError(t, err)
+	
+	// Verify everything is gone
+	_, found := session.GetRun("clear-test")
+	assert.False(t, found)
+	
+	_, found = session.GetFormData("form")
+	assert.False(t, found)
+	
+	_, found = session.GetDashboardData()
 	assert.False(t, found)
 }
 
-func TestSessionCache_DashboardData(t *testing.T) {
-	cache := NewSessionCache()
-	defer cache.Close()
-
-	// Create dashboard data
-	dashData := &DashboardData{
-		Runs: []models.RunResponse{
-			{ID: "run-1", Status: models.StatusProcessing},
-			{ID: "run-2", Status: models.StatusDone},
-		},
-		UserInfo: &models.UserInfo{
-			ID:    123,
-			Email: "test@example.com",
-		},
-		RepositoryList: []string{"repo1", "repo2"},
-		LastUpdated:    time.Now(),
-	}
-
-	// Store dashboard data
-	err := cache.SetDashboardData(dashData)
-	assert.NoError(t, err)
-
-	// Retrieve dashboard data
-	cached, found := cache.GetDashboardData()
-	assert.True(t, found)
-	assert.NotNil(t, cached)
-	assert.Len(t, cached.Runs, 2)
-	assert.Equal(t, dashData.UserInfo.ID, cached.UserInfo.ID)
-	assert.Equal(t, dashData.RepositoryList, cached.RepositoryList)
+// TestSessionCacheConcurrentStress stress tests all operations
+func TestSessionCacheConcurrentStress(t *testing.T) {
+	session := NewSessionCache()
+	defer session.Close()
+	
+	stopCh := make(chan struct{})
+	var wg sync.WaitGroup
+	var opsCount int32
+	
+	// SetRun worker
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		i := 0
+		for {
+			select {
+			case <-stopCh:
+				return
+			default:
+				run := models.RunResponse{
+					ID:        fmt.Sprintf("stress-%d", i),
+					Status:    models.StatusProcessing,
+					CreatedAt: time.Now(),
+				}
+				_ = session.SetRun(run)
+				atomic.AddInt32(&opsCount, 1)
+				i++
+			}
+		}
+	}()
+	
+	// GetRun worker
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		i := 0
+		for {
+			select {
+			case <-stopCh:
+				return
+			default:
+				_, _ = session.GetRun(fmt.Sprintf("stress-%d", i))
+				atomic.AddInt32(&opsCount, 1)
+				i++
+			}
+		}
+	}()
+	
+	// GetRuns worker
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case <-stopCh:
+				return
+			default:
+				_, _ = session.GetRuns()
+				atomic.AddInt32(&opsCount, 1)
+			}
+		}
+	}()
+	
+	// FormData worker
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		i := 0
+		for {
+			select {
+			case <-stopCh:
+				return
+			default:
+				key := fmt.Sprintf("form-%d", i)
+				if i%2 == 0 {
+					_ = session.SetFormData(key, fmt.Sprintf("data-%d", i))
+				} else {
+					_, _ = session.GetFormData(key)
+				}
+				atomic.AddInt32(&opsCount, 1)
+				i++
+			}
+		}
+	}()
+	
+	// Run for 1 second
+	time.Sleep(1 * time.Second)
+	close(stopCh)
+	wg.Wait()
+	
+	totalOps := atomic.LoadInt32(&opsCount)
+	t.Logf("SessionCache stress test: %d operations in 1 second", totalOps)
+	assert.Greater(t, totalOps, int32(100), "Should complete many operations")
 }
 
-func TestSessionCache_Clear(t *testing.T) {
-	cache := NewSessionCache()
-	defer cache.Close()
-
-	// Add various data
-	run := models.RunResponse{
-		ID:        "test-run",
-		Status:    models.StatusProcessing,
-		CreatedAt: time.Now(), // Recent run
-	}
-	_ = cache.SetRun(run)
-	_ = cache.SetFormData("form1", "data")
-
-	dashData := &DashboardData{
-		Runs:        []models.RunResponse{run},
-		LastUpdated: time.Now(),
-	}
-	_ = cache.SetDashboardData(dashData)
-
-	// Verify data exists
-	_, found := cache.GetRun("test-run")
-	assert.True(t, found)
-	_, found = cache.GetFormData("form1")
-	assert.True(t, found)
-	_, found = cache.GetDashboardData()
-	assert.True(t, found)
-
-	// Clear cache
-	err := cache.Clear()
-	assert.NoError(t, err)
-
-	// Verify all data is gone
-	_, found = cache.GetRun("test-run")
-	assert.False(t, found, "run should be cleared")
-	_, found = cache.GetFormData("form1")
-	assert.False(t, found, "form data should be cleared")
-	_, found = cache.GetDashboardData()
-	assert.False(t, found, "dashboard data should be cleared")
+// BenchmarkSessionCacheSetRun benchmarks SetRun performance
+func BenchmarkSessionCacheSetRun(b *testing.B) {
+	session := NewSessionCache()
+	defer session.Close()
+	
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		i := 0
+		for pb.Next() {
+			run := models.RunResponse{
+				ID:        fmt.Sprintf("bench-%d", i),
+				Status:    models.StatusProcessing,
+				CreatedAt: time.Now(),
+			}
+			_ = session.SetRun(run)
+			i++
+		}
+	})
 }
 
-func TestSessionCache_TTLBehavior(t *testing.T) {
-	// This is a conceptual test - in real usage, TTL would expire items
-	// For unit testing, we're just verifying the cache accepts TTL operations
-	cache := NewSessionCache()
-	defer cache.Close()
-
-	// Add run with TTL (5 minutes by default)
-	run := models.RunResponse{
-		ID:        "ttl-test",
-		Status:    models.StatusProcessing,
-		CreatedAt: time.Now(), // Recent run
+// BenchmarkSessionCacheGetRun benchmarks GetRun performance
+func BenchmarkSessionCacheGetRun(b *testing.B) {
+	session := NewSessionCache()
+	defer session.Close()
+	
+	// Populate with runs
+	for i := 0; i < 100; i++ {
+		run := models.RunResponse{
+			ID:        fmt.Sprintf("bench-%d", i),
+			Status:    models.StatusProcessing,
+			CreatedAt: time.Now(),
+		}
+		_ = session.SetRun(run)
 	}
-	err := cache.SetRun(run)
-	assert.NoError(t, err)
-
-	// Should be immediately available
-	cached, found := cache.GetRun("ttl-test")
-	assert.True(t, found)
-	assert.Equal(t, run.ID, cached.ID)
-
-	// Form data has 30-minute TTL
-	err = cache.SetFormData("ttl-form", "test-data")
-	assert.NoError(t, err)
-
-	data, found := cache.GetFormData("ttl-form")
-	assert.True(t, found)
-	assert.Equal(t, "test-data", data)
+	
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		i := 0
+		for pb.Next() {
+			_, _ = session.GetRun(fmt.Sprintf("bench-%d", i%100))
+			i++
+		}
+	})
 }

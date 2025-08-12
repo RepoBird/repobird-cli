@@ -2,6 +2,8 @@ package tui
 
 import (
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/repobird/repobird-cli/internal/api"
+	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/repobird/repobird-cli/internal/tui/cache"
 	"github.com/repobird/repobird-cli/internal/tui/messages"
 	"github.com/repobird/repobird-cli/internal/tui/views"
@@ -76,8 +78,11 @@ func (a *App) handleNavigation(msg messages.NavigationMsg) (tea.Model, tea.Cmd) 
 	case messages.NavigateToDetailsMsg:
 		a.viewStack = append(a.viewStack, a.current)
 
-		// Create Details view with just ID
-		a.current = views.NewRunDetailsView(a.client, msg.RunID)
+		// Create a minimal RunResponse with just the ID for loading
+		run := models.RunResponse{
+			ID: msg.RunID,
+		}
+		a.current = views.NewRunDetailsView(a.client, run)
 
 		return a, a.current.Init()
 
@@ -104,18 +109,25 @@ func (a *App) handleNavigation(msg messages.NavigationMsg) (tea.Model, tea.Cmd) 
 	case messages.NavigateToListMsg:
 		a.viewStack = append(a.viewStack, a.current)
 		a.current = views.NewRunListView(a.client)
-		
+
 		// Restore selection if provided
 		if msg.SelectedIndex > 0 {
 			a.setNavigationContext("list_selected_index", msg.SelectedIndex)
 		}
-		
+
 		return a, a.current.Init()
 
 	case messages.NavigateToBulkMsg:
 		a.viewStack = append(a.viewStack, a.current)
-		a.current = views.NewBulkView(a.client)
-		return a, a.current.Init()
+		// BulkView requires a concrete *api.Client, not the interface
+		// For now, we'll skip bulk view if client is not the right type
+		// This should be refactored to accept the interface
+		if apiClient, ok := a.client.(*api.Client); ok {
+			a.current = views.NewBulkView(apiClient)
+			return a, a.current.Init()
+		}
+		// If not the right client type, just return without navigation
+		return a, nil
 
 	case messages.NavigateToErrorMsg:
 		if msg.Recoverable {
@@ -149,21 +161,16 @@ func (a *App) Run() error {
 	return err
 }
 
-// Navigation context methods (temporary until cache methods are added)
-// These will be moved to cache after fix-cache-deadlock.md is complete
+// Navigation context helper methods - delegate to cache
 
 func (a *App) setNavigationContext(key string, value interface{}) {
-	// Temporary implementation - will use cache methods when available
-	// For now, we'll just store in a simple map
-	// This is a placeholder that will be replaced
+	a.cache.SetNavigationContext(key, value)
 }
 
 func (a *App) clearAllNavigationContext() {
-	// Temporary implementation - will use cache methods when available
-	// Clear all navigation context
+	a.cache.ClearAllNavigationContext()
 }
 
 func (a *App) getNavigationContext(key string) interface{} {
-	// Temporary implementation - will use cache methods when available
-	return nil
+	return a.cache.GetNavigationContext(key)
 }

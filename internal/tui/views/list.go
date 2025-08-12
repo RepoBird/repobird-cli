@@ -16,6 +16,7 @@ import (
 	"github.com/repobird/repobird-cli/internal/tui/cache"
 	"github.com/repobird/repobird-cli/internal/tui/components"
 	"github.com/repobird/repobird-cli/internal/tui/debug"
+	"github.com/repobird/repobird-cli/internal/tui/messages"
 	"github.com/repobird/repobird-cli/internal/tui/styles"
 	"github.com/repobird/repobird-cli/internal/utils"
 )
@@ -312,13 +313,14 @@ func (v *RunListView) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, v.keys.Quit):
 		// q goes back to dashboard
 		v.stopPolling()
-		dashboard := NewDashboardView(v.client)
-		return dashboard, dashboard.Init()
+		return v, func() tea.Msg {
+			return messages.NavigateToDashboardMsg{}
+		}
 	case key.Matches(msg, v.keys.Help):
 		// Return to dashboard and show docs
-		dashboard := NewDashboardView(v.client)
-		dashboard.showDocs = true
-		return dashboard, dashboard.Init()
+		return v, func() tea.Msg {
+			return messages.NavigateToDashboardMsg{}
+		}
 	case key.Matches(msg, v.keys.Refresh):
 		cmds = append(cmds, v.loadRuns())
 	case key.Matches(msg, v.keys.Search):
@@ -391,17 +393,19 @@ func (v *RunListView) handleEnterKey() (tea.Model, tea.Cmd) {
 		}
 
 		debug.LogToFilef("DEBUG: Fixed cached run ID from '%s' to '%s'\n", detailed.GetIDString(), cachedRun.GetIDString())
-		detailsView := NewRunDetailsViewWithCache(v.client, cachedRun, v.runs, v.cached, v.cachedAt, v.detailsCache, v.cache)
-		detailsView.width = v.width
-		detailsView.height = v.height
-		return detailsView, nil
+		return v, func() tea.Msg {
+			return messages.NavigateToDetailsMsg{
+				RunID: cachedRun.GetIDString(),
+			}
+		}
 	}
 
 	debug.LogToFilef("DEBUG: No cached data for runID='%s', loading fresh - NAVIGATING TO DETAILS VIEW\n", runID)
-	detailsView := NewRunDetailsViewWithCache(v.client, run, v.runs, v.cached, v.cachedAt, v.detailsCache, v.cache)
-	detailsView.width = v.width
-	detailsView.height = v.height
-	return detailsView, nil
+	return v, func() tea.Msg {
+		return messages.NavigateToDetailsMsg{
+			RunID: run.GetIDString(),
+		}
+	}
 }
 
 // handleNewRunKey handles the New key press to create a new run
@@ -480,18 +484,20 @@ func (v *RunListView) handleRetryNavigation(msg retryNavigationMsg) (tea.Model, 
 		// Use cached data if available now
 		if detailed, ok := v.detailsCache[runID]; ok {
 			debug.LogToFilef("DEBUG: Retry successful - using cached data for runID='%s' - NAVIGATING TO DETAILS VIEW\n", runID)
-			detailsView := NewRunDetailsViewWithCache(v.client, *detailed, v.runs, v.cached, v.cachedAt, v.detailsCache, v.cache)
-			detailsView.width = v.width
-			detailsView.height = v.height
-			return detailsView, nil
+			return v, func() tea.Msg {
+				return messages.NavigateToDetailsMsg{
+					RunID: detailed.GetIDString(),
+				}
+			}
 		}
 
 		// Still not cached, load fresh
 		debug.LogToFilef("DEBUG: Retry - still no cached data for runID='%s', loading fresh - NAVIGATING TO DETAILS VIEW\n", runID)
-		detailsView := NewRunDetailsViewWithCache(v.client, run, v.runs, v.cached, v.cachedAt, v.detailsCache, v.cache)
-		detailsView.width = v.width
-		detailsView.height = v.height
-		return detailsView, nil
+		return v, func() tea.Msg {
+			return messages.NavigateToDetailsMsg{
+				RunID: run.GetIDString(),
+			}
+		}
 	}
 
 	return v, nil

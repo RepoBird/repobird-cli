@@ -2,6 +2,7 @@ package cache
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -12,8 +13,9 @@ import (
 // SimpleCache now wraps HybridCache for backward compatibility
 // while maintaining the same interface
 type SimpleCache struct {
-	hybrid *HybridCache
-	mu     sync.RWMutex // Additional safety for concurrent access
+	hybrid      *HybridCache
+	mu          sync.RWMutex // Additional safety for concurrent access
+	contextData sync.Map     // Thread-safe map for navigation context
 }
 
 // NewSimpleCache creates a cache with the new hybrid architecture
@@ -51,7 +53,7 @@ func getCurrentUserID() string {
 func (c *SimpleCache) GetRuns() []models.RunResponse {
 	// No lock needed - HybridCache handles thread safety
 	runs, _ := c.hybrid.GetRuns()
-	
+
 	// Return copy to avoid mutations
 	result := make([]models.RunResponse, len(runs))
 	copy(result, runs)
@@ -138,4 +140,46 @@ type DashboardData struct {
 	UserInfo       *models.UserInfo
 	RepositoryList []string
 	LastUpdated    time.Time
+}
+
+// Navigation Context Methods - Thread-safe using sync.Map
+
+// SetContext stores a context value
+func (c *SimpleCache) SetContext(key string, value interface{}) {
+	c.contextData.Store(key, value)
+}
+
+// GetContext retrieves a context value
+func (c *SimpleCache) GetContext(key string) interface{} {
+	if val, ok := c.contextData.Load(key); ok {
+		return val
+	}
+	return nil
+}
+
+// ClearContext removes a specific context value
+func (c *SimpleCache) ClearContext(key string) {
+	c.contextData.Delete(key)
+}
+
+// SetNavigationContext stores temporary navigation context
+func (c *SimpleCache) SetNavigationContext(key string, value interface{}) {
+	// Prefix with "nav:" to distinguish navigation context
+	c.SetContext("nav:"+key, value)
+}
+
+// GetNavigationContext retrieves navigation context
+func (c *SimpleCache) GetNavigationContext(key string) interface{} {
+	return c.GetContext("nav:" + key)
+}
+
+// ClearAllNavigationContext removes all navigation context
+func (c *SimpleCache) ClearAllNavigationContext() {
+	// Iterate through all keys and delete those with "nav:" prefix
+	c.contextData.Range(func(k, v interface{}) bool {
+		if key, ok := k.(string); ok && strings.HasPrefix(key, "nav:") {
+			c.contextData.Delete(k)
+		}
+		return true
+	})
 }
