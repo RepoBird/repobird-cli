@@ -1,11 +1,13 @@
 package views
 
 import (
-	"encoding/json"
-	"os"
+	"fmt"
+	"path/filepath"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/repobird/repobird-cli/internal/models"
+	"github.com/repobird/repobird-cli/internal/tui/cache"
+	"github.com/repobird/repobird-cli/internal/tui/debug"
 )
 
 // Configuration file operations and form data persistence
