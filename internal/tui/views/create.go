@@ -110,8 +110,6 @@ func NewCreateRunView(client APIClient) *CreateRunView {
 		cache:     embeddedCache,
 		runType:   models.RunTypeRun,
 		inputMode: components.NormalMode,
-		parentCachedAt:     cfg.ParentCachedAt,
-		parentDetailsCache: cfg.ParentDetailsCache,
 		statusLine:         components.NewStatusLine(),
 		configLoader:       config.NewConfigLoader(),
 		fileSelector:       components.NewFileSelector(80, 10),       // Default dimensions
