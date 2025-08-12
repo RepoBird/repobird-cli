@@ -62,6 +62,15 @@ Comprehensive documentation is available in the `docs/` directory:
 - Keep functions small and focused (<50 lines)
 - Write clear, self-documenting code
 
+### State Management (IMPORTANT)
+- **TUI Views**: Embed cache instances in view structs (no globals)
+- **Cache Pattern**: Use `*cache.SimpleCache` embedded in each view
+- **Initialization**: Create cache with `cache.NewSimpleCache()` in view constructors
+- **Persistence**: Call `cache.SaveToDisk()` on quit, `cache.LoadFromDisk()` on init
+- **Testing**: Use temporary directories for cache in tests (set `XDG_CONFIG_HOME`)
+- **No Global State**: Never use package-level variables for runtime state
+- **Bubble Tea Pattern**: All state flows through Model.Update() method
+
 ### Testing Requirements
 - Minimum 70% test coverage for new code
 - Write unit tests for all public functions

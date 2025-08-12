@@ -62,10 +62,16 @@ type GlobalCache struct {
 }
 
 var globalCache *GlobalCache
+var globalCacheOnce sync.Once
 
-// Initialize cache on package initialization
-func init() {
-	initializeCache()
+// DEPRECATED: Global cache is being phased out in favor of embedded cache in TUI views
+// Keeping the variable for backward compatibility with non-TUI code
+
+// ensureGlobalCache ensures the global cache is initialized (for backward compatibility)
+func ensureGlobalCache() {
+	globalCacheOnce.Do(func() {
+		initializeCache()
+	})
 }
 
 func initializeCache() {
@@ -111,6 +117,7 @@ func GetCachedList() (
 	details map[string]*models.RunResponse,
 	selectedIndex int,
 ) {
+	ensureGlobalCache()
 	globalCache.mu.RLock()
 	defer globalCache.mu.RUnlock()
 
@@ -153,6 +160,7 @@ func GetCachedList() (
 
 // SetCachedList updates the global run list cache
 func SetCachedList(runs []models.RunResponse, details map[string]*models.RunResponse) {
+	ensureGlobalCache()
 	globalCache.mu.Lock()
 	defer globalCache.mu.Unlock()
 
@@ -198,6 +206,7 @@ func SetCachedList(runs []models.RunResponse, details map[string]*models.RunResp
 
 // AddCachedDetail adds a single run detail to the cache
 func AddCachedDetail(runID string, run *models.RunResponse) {
+	ensureGlobalCache()
 	globalCache.mu.Lock()
 	defer globalCache.mu.Unlock()
 
@@ -235,6 +244,7 @@ func AddCachedDetail(runID string, run *models.RunResponse) {
 
 // SetSelectedIndex updates the selected index in the cache
 func SetSelectedIndex(index int) {
+	ensureGlobalCache()
 	globalCache.mu.Lock()
 	defer globalCache.mu.Unlock()
 
@@ -243,6 +253,7 @@ func SetSelectedIndex(index int) {
 
 // SaveFormData saves the current form state
 func SaveFormData(data *FormData) {
+	ensureGlobalCache()
 	globalCache.mu.Lock()
 	defer globalCache.mu.Unlock()
 
@@ -251,6 +262,7 @@ func SaveFormData(data *FormData) {
 
 // GetFormData retrieves the saved form state
 func GetFormData() *FormData {
+	ensureGlobalCache()
 	globalCache.mu.RLock()
 	defer globalCache.mu.RUnlock()
 
@@ -259,6 +271,7 @@ func GetFormData() *FormData {
 
 // ClearFormData clears the saved form state
 func ClearFormData() {
+	ensureGlobalCache()
 	globalCache.mu.Lock()
 	defer globalCache.mu.Unlock()
 
@@ -267,6 +280,7 @@ func ClearFormData() {
 
 // ClearCache clears all cached data (useful for testing)
 func ClearCache() {
+	ensureGlobalCache()
 	globalCache.mu.Lock()
 	defer globalCache.mu.Unlock()
 
@@ -282,6 +296,7 @@ func ClearCache() {
 
 // InitializeCacheForUser reinitializes the cache for a specific user
 func InitializeCacheForUser(userID *int) {
+	ensureGlobalCache()
 	// Clear current cache first (but preserve user info if same user AND form data AND terminal details)
 	var savedUserInfo *models.UserInfo
 	var savedUserInfoTime time.Time
@@ -338,6 +353,7 @@ func InitializeCacheForUser(userID *int) {
 
 // ClearActiveCache clears only the temporary cache (keeps terminal runs)
 func ClearActiveCache() {
+	ensureGlobalCache()
 	globalCache.mu.Lock()
 	defer globalCache.mu.Unlock()
 
@@ -352,6 +368,7 @@ func ClearActiveCache() {
 
 // AddRepositoryToHistory adds a repository to persistent history
 func AddRepositoryToHistory(repo string) error {
+	ensureGlobalCache()
 	globalCache.mu.Lock()
 	defer globalCache.mu.Unlock()
 
@@ -395,6 +412,7 @@ func AddRepositoryToHistory(repo string) error {
 
 // GetRepositoryHistory returns the repository history, most recent first
 func GetRepositoryHistory() ([]string, error) {
+	ensureGlobalCache()
 	globalCache.mu.RLock()
 	defer globalCache.mu.RUnlock()
 
@@ -429,6 +447,7 @@ func GetMostRecentRepository() (string, error) {
 
 // GetCachedUserInfo returns cached user info if available and not expired
 func GetCachedUserInfo() *models.UserInfo {
+	ensureGlobalCache()
 	globalCache.mu.RLock()
 	defer globalCache.mu.RUnlock()
 
@@ -450,6 +469,7 @@ func SetCachedUserInfo(userInfo *models.UserInfo) {
 
 // GetFileHashCache returns the global file hash cache instance
 func GetFileHashCache() *FileHashCache {
+	ensureGlobalCache()
 	globalCache.mu.RLock()
 	defer globalCache.mu.RUnlock()
 	return globalCache.fileHashCache

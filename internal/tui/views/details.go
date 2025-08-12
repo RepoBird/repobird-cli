@@ -11,8 +11,8 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/repobird/repobird-cli/internal/cache"
 	"github.com/repobird/repobird-cli/internal/models"
+	"github.com/repobird/repobird-cli/internal/tui/cache"
 	"github.com/repobird/repobird-cli/internal/tui/components"
 	"github.com/repobird/repobird-cli/internal/tui/debug"
 	"github.com/repobird/repobird-cli/internal/tui/styles"
@@ -63,12 +63,22 @@ type RunDetailsView struct {
 	dashboardSelectedRunIdx     int
 	dashboardSelectedDetailLine int
 	dashboardFocusedColumn      int
+	// Embedded cache
+	cache *cache.SimpleCache
 }
 
 func NewRunDetailsView(client APIClient, run models.RunResponse) *RunDetailsView {
-	// Get the current global cache
-	runs, cached, cachedAt, detailsCache, _ := cache.GetCachedList()
-	return NewRunDetailsViewWithCache(client, run, runs, cached, cachedAt, detailsCache)
+	// Create new cache instance
+	cache := cache.NewSimpleCache()
+	_ = cache.LoadFromDisk()
+
+	// Get cached data
+	runs, cached, detailsCache := cache.GetCachedList()
+	var cachedAt time.Time
+	if cached {
+		cachedAt = time.Now()
+	}
+	return NewRunDetailsViewWithCache(client, run, runs, cached, cachedAt, detailsCache, cache)
 }
 
 // RunDetailsViewConfig holds configuration for creating a new RunDetailsView
@@ -79,6 +89,7 @@ type RunDetailsViewConfig struct {
 	ParentCached       bool
 	ParentCachedAt     time.Time
 	ParentDetailsCache map[string]*models.RunResponse
+	Cache              *cache.SimpleCache // Optional embedded cache
 	// Dashboard state for restoration
 	DashboardSelectedRepoIdx    int
 	DashboardSelectedRunIdx     int
@@ -88,6 +99,13 @@ type RunDetailsViewConfig struct {
 
 // NewRunDetailsViewWithConfig creates a new RunDetailsView with the given configuration
 func NewRunDetailsViewWithConfig(config RunDetailsViewConfig) *RunDetailsView {
+	// Use provided cache or create new one
+	embeddedCache := config.Cache
+	if embeddedCache == nil {
+		embeddedCache = cache.NewSimpleCache()
+		_ = embeddedCache.LoadFromDisk()
+	}
+
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("63"))
@@ -131,6 +149,7 @@ func NewRunDetailsViewWithConfig(config RunDetailsViewConfig) *RunDetailsView {
 		dashboardSelectedRunIdx:     config.DashboardSelectedRunIdx,
 		dashboardSelectedDetailLine: config.DashboardSelectedDetailLine,
 		dashboardFocusedColumn:      config.DashboardFocusedColumn,
+		cache:                       embeddedCache,
 	}
 
 	// Initialize status history with current status if we have cached data
@@ -197,7 +216,9 @@ func NewRunDetailsViewWithCacheAndDimensions(
 	width int,
 	height int,
 ) *RunDetailsView {
-	v := NewRunDetailsViewWithCache(client, run, parentRuns, parentCached, parentCachedAt, parentDetailsCache)
+	// Create cache for this view
+	cache := cache.NewSimpleCache()
+	v := NewRunDetailsViewWithCache(client, run, parentRuns, parentCached, parentCachedAt, parentDetailsCache, cache)
 
 	// Set dimensions immediately if provided
 	if width > 0 && height > 0 {
@@ -218,6 +239,7 @@ func NewRunDetailsViewWithCache(
 	parentCached bool,
 	parentCachedAt time.Time,
 	parentDetailsCache map[string]*models.RunResponse,
+	embeddedCache *cache.SimpleCache,
 ) *RunDetailsView {
 	config := RunDetailsViewConfig{
 		Client:             client,
@@ -226,6 +248,7 @@ func NewRunDetailsViewWithCache(
 		ParentCached:       parentCached,
 		ParentCachedAt:     parentCachedAt,
 		ParentDetailsCache: parentDetailsCache,
+		Cache:              embeddedCache,
 	}
 
 	return NewRunDetailsViewWithConfig(config)
@@ -541,7 +564,7 @@ func (v *RunDetailsView) handleRunDetailsLoaded(msg runDetailsLoadedMsg) {
 	if msg.err == nil {
 		v.updateStatusHistory(string(msg.run.Status), false)
 		// Cache the loaded details for future use
-		cache.AddCachedDetail(msg.run.GetIDString(), &msg.run)
+		v.cache.SetRun(msg.run)
 		debug.LogToFilef("DEBUG: Cached run details for ID '%s' (status: %s)\n", msg.run.GetIDString(), msg.run.Status)
 	}
 	v.updateContent()

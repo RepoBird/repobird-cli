@@ -6,6 +6,7 @@ import (
 
 	"github.com/repobird/repobird-cli/internal/api"
 	"github.com/repobird/repobird-cli/internal/models"
+	"github.com/repobird/repobird-cli/internal/tui/cache"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -37,7 +38,8 @@ func TestNewRunListViewWithCache_UsesCachedData(t *testing.T) {
 	}
 
 	// Act
-	view := NewRunListViewWithCache(client, runs, true, cachedAt, detailsCache, 0)
+	testCache := cache.NewSimpleCache()
+	view := NewRunListViewWithCache(client, runs, true, cachedAt, detailsCache, 0, testCache)
 
 	// Assert
 	assert.False(t, view.loading, "Should not be loading with recent cached data")
@@ -65,7 +67,8 @@ func TestNewRunListViewWithCache_LoadsWhenCacheExpired(t *testing.T) {
 	detailsCache := map[string]*models.RunResponse{}
 
 	// Act
-	view := NewRunListViewWithCache(client, runs, true, cachedAt, detailsCache, 0)
+	testCache := cache.NewSimpleCache()
+	view := NewRunListViewWithCache(client, runs, true, cachedAt, detailsCache, 0, testCache)
 
 	// Assert
 	assert.True(t, view.loading, "Should be loading with expired cache")
@@ -99,7 +102,8 @@ func TestFilterRuns_PreservesRunIDs(t *testing.T) {
 		},
 	}
 
-	view := NewRunListViewWithCache(client, runs, true, time.Now(), nil, 0)
+	testCache := cache.NewSimpleCache()
+	view := NewRunListViewWithCache(client, runs, true, time.Now(), nil, 0, testCache)
 	view.searchQuery = "acme"
 
 	// Act
@@ -137,7 +141,8 @@ func TestFilterRuns_HandlesMixedIDTypes(t *testing.T) {
 		{ID: "", Repository: "test/nil", Status: models.StatusQueued}, // edge case
 	}
 
-	view := NewRunListViewWithCache(client, runs, true, time.Now(), nil, 0)
+	testCache := cache.NewSimpleCache()
+	view := NewRunListViewWithCache(client, runs, true, time.Now(), nil, 0, testCache)
 
 	// Test filtering by ID
 	view.searchQuery = "456"

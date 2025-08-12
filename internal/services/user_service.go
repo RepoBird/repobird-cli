@@ -4,7 +4,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/repobird/repobird-cli/internal/cache"
 	"github.com/repobird/repobird-cli/internal/models"
 )
 
@@ -31,15 +30,8 @@ func (us *UserService) SetCurrentUser(userInfo *models.UserInfo) {
 	us.currentUser = userInfo
 	us.cachedAt = time.Now()
 
-	// Initialize cache for this specific user if we have a valid ID
-	if userInfo != nil && userInfo.ID > 0 {
-		cache.InitializeCacheForUser(&userInfo.ID)
-		cache.InitializeDashboardForUser(&userInfo.ID)
-	} else {
-		// Fall back to shared cache if no user ID
-		cache.InitializeCacheForUser(nil)
-		cache.InitializeDashboardForUser(nil)
-	}
+	// Cache initialization is now handled by individual TUI views with embedded cache
+	// Each view has its own cache instance, no global initialization needed
 }
 
 // GetCurrentUser returns the current authenticated user (cached)
@@ -72,9 +64,7 @@ func (us *UserService) ClearCurrentUser() {
 	us.currentUser = nil
 	us.cachedAt = time.Time{}
 
-	// Reset cache to shared mode
-	cache.InitializeCacheForUser(nil)
-	cache.InitializeDashboardForUser(nil)
+	// Cache is now embedded in TUI views, no global reset needed
 }
 
 // IsUserCacheValid checks if the current user cache is still valid

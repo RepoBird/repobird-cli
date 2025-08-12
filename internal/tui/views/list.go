@@ -10,9 +10,9 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/repobird/repobird-cli/internal/cache"
 	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/repobird/repobird-cli/internal/services"
+	"github.com/repobird/repobird-cli/internal/tui/cache"
 	"github.com/repobird/repobird-cli/internal/tui/components"
 	"github.com/repobird/repobird-cli/internal/tui/debug"
 	"github.com/repobird/repobird-cli/internal/tui/styles"
@@ -44,12 +44,39 @@ type RunListView struct {
 	userInfo *models.UserInfo
 	// Unified status line component
 	statusLine *components.StatusLine
+	// Embedded cache
+	cache *cache.SimpleCache
 }
 
 func NewRunListView(client APIClient) *RunListView {
-	// Try to get cached data from global cache
-	runs, cached, cachedAt, detailsCache, selectedIndex := cache.GetCachedList()
-	return NewRunListViewWithCache(client, runs, cached, cachedAt, detailsCache, selectedIndex)
+	// Create new cache instance
+	cache := cache.NewSimpleCache()
+	_ = cache.LoadFromDisk() // Try to load persisted data
+
+	// Try to get cached data
+	runs, cached, detailsCache := cache.GetCachedList()
+	
+	// Validate cached data is not test data
+	if cached && len(runs) > 0 {
+		for _, run := range runs {
+			if strings.HasPrefix(run.ID, "test-") || run.Repository == "" {
+				// Clear invalid test data
+				cache.Clear()
+				runs = nil
+				cached = false
+				detailsCache = nil
+				debug.LogToFilef("DEBUG: Cleared invalid test data from cache in NewRunListView\n")
+				break
+			}
+		}
+	}
+	
+	selectedIndex := cache.GetSelectedIndex()
+	var cachedAt time.Time
+	if cached {
+		cachedAt = time.Now() // Approximate, could track this better
+	}
+	return NewRunListViewWithCache(client, runs, cached, cachedAt, detailsCache, selectedIndex, cache)
 }
 
 // NewRunListViewWithCacheAndDimensions creates a new list view with cache and dimensions
@@ -63,7 +90,9 @@ func NewRunListViewWithCacheAndDimensions(
 	width int,
 	height int,
 ) *RunListView {
-	v := NewRunListViewWithCache(client, runs, cached, cachedAt, detailsCache, selectedIndex)
+	// Create new cache instance for this view
+	cache := cache.NewSimpleCache()
+	v := NewRunListViewWithCache(client, runs, cached, cachedAt, detailsCache, selectedIndex, cache)
 
 	// Set dimensions immediately if provided
 	if width > 0 && height > 0 {
@@ -83,6 +112,7 @@ func NewRunListViewWithCache(
 	cachedAt time.Time,
 	detailsCache map[string]*models.RunResponse,
 	selectedIndex int,
+	embeddedCache *cache.SimpleCache,
 ) *RunListView {
 	// Enhanced debugging with more details
 	debugInfo := fmt.Sprintf("DEBUG: Creating RunListViewWithCache - cached=%v, runs=%d, detailsCache=%d\n",
@@ -136,6 +166,7 @@ func NewRunListViewWithCache(
 		detailsCache: detailsCache,
 		preloading:   make(map[string]bool),
 		statusLine:   components.NewStatusLine(),
+		cache:        embeddedCache,
 	}
 
 	// If we have cached data, update the table
@@ -274,6 +305,8 @@ func (v *RunListView) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case msg.String() == "Q":
 		// Capital Q to force quit from anywhere
 		v.stopPolling()
+		_ = v.cache.SaveToDisk()
+		v.cache.Stop()
 		return v, tea.Quit
 	case key.Matches(msg, v.keys.Quit):
 		// q goes back to dashboard
@@ -328,7 +361,7 @@ func (v *RunListView) handleEnterKey() (tea.Model, tea.Cmd) {
 	runID := run.GetIDString()
 
 	// Save cursor position to cache before navigating
-	cache.SetSelectedIndex(idx)
+	v.cache.SetSelectedIndex(idx)
 
 	// Debug logging for Enter key press
 	debugInfo := fmt.Sprintf("DEBUG: Enter pressed for run idx=%d, runID='%s', repo='%s'\n",
@@ -357,14 +390,14 @@ func (v *RunListView) handleEnterKey() (tea.Model, tea.Cmd) {
 		}
 
 		debug.LogToFilef("DEBUG: Fixed cached run ID from '%s' to '%s'\n", detailed.GetIDString(), cachedRun.GetIDString())
-		detailsView := NewRunDetailsViewWithCache(v.client, cachedRun, v.runs, v.cached, v.cachedAt, v.detailsCache)
+		detailsView := NewRunDetailsViewWithCache(v.client, cachedRun, v.runs, v.cached, v.cachedAt, v.detailsCache, v.cache)
 		detailsView.width = v.width
 		detailsView.height = v.height
 		return detailsView, nil
 	}
 
 	debug.LogToFilef("DEBUG: No cached data for runID='%s', loading fresh - NAVIGATING TO DETAILS VIEW\n", runID)
-	detailsView := NewRunDetailsViewWithCache(v.client, run, v.runs, v.cached, v.cachedAt, v.detailsCache)
+	detailsView := NewRunDetailsViewWithCache(v.client, run, v.runs, v.cached, v.cachedAt, v.detailsCache, v.cache)
 	detailsView.width = v.width
 	detailsView.height = v.height
 	return detailsView, nil
@@ -374,7 +407,7 @@ func (v *RunListView) handleEnterKey() (tea.Model, tea.Cmd) {
 func (v *RunListView) handleNewRunKey() (tea.Model, tea.Cmd) {
 	debug.LogToFilef("DEBUG: ListView creating NewCreateRunView - runs=%d, cached=%v, detailsCache=%d\n",
 		len(v.runs), v.cached, len(v.detailsCache))
-	createView := NewCreateRunViewWithCache(v.client, v.runs, v.cached, v.cachedAt, v.detailsCache)
+	createView := NewCreateRunViewWithCache(v.client, v.runs, v.cached, v.cachedAt, v.detailsCache, v.cache)
 	createView.width = v.width
 	createView.height = v.height
 	return createView, nil
@@ -393,9 +426,9 @@ func (v *RunListView) handleRunsLoaded(msg runsLoadedMsg) []tea.Cmd {
 	v.cachedAt = time.Now()
 	v.filterRuns()
 
-	// Save to global cache
+	// Save to embedded cache
 	if msg.err == nil && len(msg.runs) > 0 {
-		cache.SetCachedList(msg.runs, v.detailsCache)
+		v.cache.SetCachedList(msg.runs, v.detailsCache)
 	}
 
 	// Start preloading run details in background
@@ -416,8 +449,10 @@ func (v *RunListView) handleRunDetailsPreloaded(msg runDetailsPreloadedMsg) {
 	if msg.err == nil && msg.run != nil {
 		v.detailsCache[msg.runID] = msg.run
 
-		// Also save to global cache
-		cache.AddCachedDetail(msg.runID, msg.run)
+		// Also save to embedded cache
+		if msg.run != nil {
+			v.cache.SetRun(*msg.run)
+		}
 
 		// Debug logging
 		debug.LogToFilef("DEBUG: Successfully cached run with key='%s', actualID='%s', title='%s', cacheSize=%d\n",
@@ -444,7 +479,7 @@ func (v *RunListView) handleRetryNavigation(msg retryNavigationMsg) (tea.Model, 
 		// Use cached data if available now
 		if detailed, ok := v.detailsCache[runID]; ok {
 			debug.LogToFilef("DEBUG: Retry successful - using cached data for runID='%s' - NAVIGATING TO DETAILS VIEW\n", runID)
-			detailsView := NewRunDetailsViewWithCache(v.client, *detailed, v.runs, v.cached, v.cachedAt, v.detailsCache)
+			detailsView := NewRunDetailsViewWithCache(v.client, *detailed, v.runs, v.cached, v.cachedAt, v.detailsCache, v.cache)
 			detailsView.width = v.width
 			detailsView.height = v.height
 			return detailsView, nil
@@ -452,7 +487,7 @@ func (v *RunListView) handleRetryNavigation(msg retryNavigationMsg) (tea.Model, 
 
 		// Still not cached, load fresh
 		debug.LogToFilef("DEBUG: Retry - still no cached data for runID='%s', loading fresh - NAVIGATING TO DETAILS VIEW\n", runID)
-		detailsView := NewRunDetailsViewWithCache(v.client, run, v.runs, v.cached, v.cachedAt, v.detailsCache)
+		detailsView := NewRunDetailsViewWithCache(v.client, run, v.runs, v.cached, v.cachedAt, v.detailsCache, v.cache)
 		detailsView.width = v.width
 		detailsView.height = v.height
 		return detailsView, nil

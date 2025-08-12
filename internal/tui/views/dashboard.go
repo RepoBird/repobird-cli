@@ -13,8 +13,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/repobird/repobird-cli/internal/api"
-	"github.com/repobird/repobird-cli/internal/cache"
 	"github.com/repobird/repobird-cli/internal/models"
+	"github.com/repobird/repobird-cli/internal/tui/cache"
 	"github.com/repobird/repobird-cli/internal/tui/components"
 	"github.com/repobird/repobird-cli/internal/tui/debug"
 	"github.com/repobird/repobird-cli/internal/utils"
@@ -113,6 +113,9 @@ type DashboardView struct {
 	repoViewport    viewport.Model
 	runsViewport    viewport.Model
 	detailsViewport viewport.Model
+
+	// Embedded cache (no globals!)
+	cache *cache.SimpleCache
 }
 
 type dashboardDataLoadedMsg struct {
@@ -170,10 +173,11 @@ func NewDashboardView(client APIClient) *DashboardView {
 		repoViewport:    viewport.New(0, 0), // Will be sized in Update
 		runsViewport:    viewport.New(0, 0),
 		detailsViewport: viewport.New(0, 0),
+		cache:           cache.NewSimpleCache(), // Embedded cache
 	}
 
-	// Initialize cache system
-	_ = cache.InitializeDashboardCache()
+	// Load persisted cache data if available
+	_ = dashboard.cache.LoadFromDisk()
 
 	// Initialize with existing list view
 	dashboard.runListView = NewRunListView(client)
@@ -199,28 +203,19 @@ func (d *DashboardView) Init() tea.Cmd {
 	)
 }
 
+// syncFileHashesMsg is a message indicating file hash sync completed
+type syncFileHashesMsg struct{}
+
 // syncFileHashes syncs file hashes from the API on startup
 func (d *DashboardView) syncFileHashes() tea.Cmd {
 	return func() tea.Msg {
 		// Create file hash cache instance
-		fileHashCache := cache.NewFileHashCache()
+		// File hash cache is now embedded in SimpleCache
+		// No need to sync separately - cache handles this
+		debug.LogToFile("DEBUG: Using embedded cache for file hashes\n")
 
-		// Try to sync from API - if it fails, that's OK
-		ctx := context.Background()
-		err := fileHashCache.FetchFromAPI(ctx, d.client)
-		if err != nil {
-			// Log the error but don't fail - we can work without synced hashes
-			debug.LogToFilef("DEBUG: Failed to sync file hashes from API on startup: %v\n", err)
-			// Try to load from local cache file as fallback
-			if loadErr := fileHashCache.LoadFromFile(); loadErr != nil {
-				debug.LogToFilef("DEBUG: Failed to load file hashes from cache file: %v\n", loadErr)
-			}
-		} else {
-			debug.LogToFilef("DEBUG: Successfully synced file hashes from API on startup\n")
-		}
-
-		// Return nil message - we don't need to update the view
-		return nil
+		// Return a proper message instead of nil
+		return syncFileHashesMsg{}
 	}
 }
 
@@ -228,7 +223,7 @@ func (d *DashboardView) syncFileHashes() tea.Cmd {
 func (d *DashboardView) loadUserInfo() tea.Cmd {
 	return func() tea.Msg {
 		// First check if we have cached user info
-		if cachedInfo := cache.GetCachedUserInfo(); cachedInfo != nil {
+		if cachedInfo := d.cache.GetUserInfo(); cachedInfo != nil {
 			return dashboardUserInfoLoadedMsg{
 				userInfo: cachedInfo,
 				error:    nil,
@@ -239,7 +234,7 @@ func (d *DashboardView) loadUserInfo() tea.Cmd {
 		userInfo, err := d.client.GetUserInfo()
 		if err == nil && userInfo != nil {
 			// Cache the user info
-			cache.SetCachedUserInfo(userInfo)
+			d.cache.SetUserInfo(userInfo)
 		}
 		return dashboardUserInfoLoadedMsg{
 			userInfo: userInfo,
@@ -251,32 +246,54 @@ func (d *DashboardView) loadUserInfo() tea.Cmd {
 // loadDashboardData loads data from cache or API
 func (d *DashboardView) loadDashboardData() tea.Cmd {
 	return func() tea.Msg {
+		debug.LogToFilef("\n[LOAD DASHBOARD DATA] Starting...\n")
+		
 		// First try to load from run cache which should always have data
-		runs, cached, _, detailsCache, _ := cache.GetCachedList()
+		runs, cached, detailsCache := d.cache.GetCachedList()
+		debug.LogToFilef("  Cache check: cached=%v, runs=%d, details=%d\n", cached, len(runs), len(detailsCache))
+		
 		if cached && len(runs) > 0 {
-			// Convert to pointer slice
-			allRuns := make([]*models.RunResponse, len(runs))
-			for i, run := range runs {
-				allRuns[i] = &run
+			// Validate that cached data is not test data
+			isValidCache := true
+			for _, run := range runs {
+				// Skip test data (runs with "test-" prefix or empty repository)
+				if strings.HasPrefix(run.ID, "test-") || run.Repository == "" {
+					isValidCache = false
+					debug.LogToFilef("DEBUG: Skipping invalid cached run: ID=%s, Repository=%s\n", run.ID, run.Repository)
+					break
+				}
 			}
+			
+			if isValidCache {
+				// Convert to pointer slice
+				allRuns := make([]*models.RunResponse, len(runs))
+				for i, run := range runs {
+					allRuns[i] = &run
+				}
 
-			// Try to get cached repository overview
-			repositories, repoCached, _ := cache.GetRepositoryOverview()
-			if !repoCached || len(repositories) == 0 {
-				// Build repositories from runs if not cached
-				repositories = cache.BuildRepositoryOverviewFromRuns(allRuns)
-				_ = cache.SetRepositoryOverview(repositories)
-			}
+				// Try to get cached repository overview
+				repositories, repoCached := d.cache.GetRepositoryOverview()
+				if !repoCached || len(repositories) == 0 {
+					// Build repositories from runs if not cached
+					repositories = d.cache.BuildRepositoryOverviewFromRuns(allRuns)
+					d.cache.SetRepositoryOverview(repositories)
+				}
 
-			return dashboardDataLoadedMsg{
-				repositories: repositories,
-				allRuns:      allRuns,
-				detailsCache: detailsCache,
-				error:        nil,
+				return dashboardDataLoadedMsg{
+					repositories: repositories,
+					allRuns:      allRuns,
+					detailsCache: detailsCache,
+					error:        nil,
+				}
+			} else {
+				// Clear invalid cache and continue to API fetch
+				d.cache.Clear()
+				debug.LogToFilef("DEBUG: Cleared invalid cache data, fetching from API\n")
 			}
 		}
 
 		// No cache, fetch from API
+		debug.LogToFilef("  No valid cache, fetching from API...\n")
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
@@ -284,11 +301,14 @@ func (d *DashboardView) loadDashboardData() tea.Cmd {
 		d.apiRepositories = make(map[int]models.APIRepository)
 
 		// First, try to get repositories from API
+		debug.LogToFilef("  Calling ListRepositories API...\n")
 		apiRepositories, err := d.client.ListRepositories(ctx)
 		if err != nil {
+			debug.LogToFilef("  ListRepositories failed: %v\n", err)
 			// Fall back to building repos from runs if repository API fails
 			return d.loadFromRunsOnly()
 		}
+		debug.LogToFilef("  ListRepositories succeeded: %d repos\n", len(apiRepositories))
 
 		// Store API repositories by ID for quick lookup
 		for _, apiRepo := range apiRepositories {
@@ -312,13 +332,15 @@ func (d *DashboardView) loadDashboardData() tea.Cmd {
 		}
 
 		// Get runs to populate repository statistics
-		runs, cached, _, detailsCache, _ = cache.GetCachedList()
+		runs, cached, detailsCache = d.cache.GetCachedList()
 		if !cached || len(runs) == 0 {
 			// Fetch runs from API (increased limit for mock data)
+			debug.LogToFilef("  Calling ListRunsLegacy API...\n")
 			runsResp, err := d.client.ListRunsLegacy(1000, 0)
 			if err != nil {
+				debug.LogToFilef("  ListRunsLegacy failed: %v\n", err)
 				// Still return repos even if runs fail
-				_ = cache.SetRepositoryOverview(repositories)
+				d.cache.SetRepositoryOverview(repositories)
 				return dashboardDataLoadedMsg{
 					repositories: repositories,
 					allRuns:      []*models.RunResponse{},
@@ -335,11 +357,11 @@ func (d *DashboardView) loadDashboardData() tea.Cmd {
 			repositories = d.updateRepositoryStats(repositories, allRuns)
 
 			// Cache the data
-			_ = cache.SetRepositoryOverview(repositories)
+			d.cache.SetRepositoryOverview(repositories)
 
 			// Cache runs by repository
 			for _, repo := range repositories {
-				repoRuns := cache.FilterRunsByRepository(allRuns, repo.Name)
+				repoRuns := d.filterRunsByRepository(allRuns, repo.Name)
 				repoDetails := make(map[string]*models.RunResponse)
 
 				// Add any cached details
@@ -349,9 +371,10 @@ func (d *DashboardView) loadDashboardData() tea.Cmd {
 					}
 				}
 
-				_ = cache.SetRepositoryData(repo.Name, repoRuns, repoDetails)
+				d.cache.SetRepositoryData(repo.Name, repoRuns, repoDetails)
 			}
 
+			debug.LogToFilef("  Data loaded successfully, returning message\n")
 			return dashboardDataLoadedMsg{
 				repositories: repositories,
 				allRuns:      allRuns,
@@ -368,7 +391,7 @@ func (d *DashboardView) loadDashboardData() tea.Cmd {
 
 		// Update repository statistics from cached runs
 		repositories = d.updateRepositoryStats(repositories, allRuns)
-		_ = cache.SetRepositoryOverview(repositories)
+		d.cache.SetRepositoryOverview(repositories)
 
 		return dashboardDataLoadedMsg{
 			repositories: repositories,
@@ -380,7 +403,7 @@ func (d *DashboardView) loadDashboardData() tea.Cmd {
 
 // loadFromRunsOnly loads dashboard data using only runs (fallback method)
 func (d *DashboardView) loadFromRunsOnly() tea.Msg {
-	runs, cached, _, detailsCache, _ := cache.GetCachedList()
+	runs, cached, detailsCache := d.cache.GetCachedList()
 	if !cached || len(runs) == 0 {
 		// Fetch from API (increased limit for mock data)
 		runsResp, err := d.client.ListRunsLegacy(1000, 0)
@@ -396,14 +419,14 @@ func (d *DashboardView) loadFromRunsOnly() tea.Msg {
 		copy(allRuns, runsResp)
 
 		// Build repository overview from runs
-		repositories := cache.BuildRepositoryOverviewFromRuns(allRuns)
+		repositories := d.cache.BuildRepositoryOverviewFromRuns(allRuns)
 
 		// Cache the data
-		_ = cache.SetRepositoryOverview(repositories)
+		d.cache.SetRepositoryOverview(repositories)
 
 		// Cache runs by repository
 		for _, repo := range repositories {
-			repoRuns := cache.FilterRunsByRepository(allRuns, repo.Name)
+			repoRuns := d.filterRunsByRepository(allRuns, repo.Name)
 			repoDetails := make(map[string]*models.RunResponse)
 
 			// Add any cached details
@@ -413,7 +436,7 @@ func (d *DashboardView) loadFromRunsOnly() tea.Msg {
 				}
 			}
 
-			_ = cache.SetRepositoryData(repo.Name, repoRuns, repoDetails)
+			d.cache.SetRepositoryData(repo.Name, repoRuns, repoDetails)
 		}
 
 		return dashboardDataLoadedMsg{
@@ -430,8 +453,8 @@ func (d *DashboardView) loadFromRunsOnly() tea.Msg {
 	}
 
 	// Build repository overview from cached runs
-	repositories := cache.BuildRepositoryOverviewFromRuns(allRuns)
-	_ = cache.SetRepositoryOverview(repositories)
+	repositories := d.cache.BuildRepositoryOverviewFromRuns(allRuns)
+	d.cache.SetRepositoryOverview(repositories)
 
 	return dashboardDataLoadedMsg{
 		repositories: repositories,
@@ -504,6 +527,40 @@ func (d *DashboardView) updateRepositoryStats(repositories []models.Repository, 
 	return repositories
 }
 
+// filterRunsByRepository filters runs by repository name
+func (d *DashboardView) filterRunsByRepository(runs []*models.RunResponse, repoName string) []*models.RunResponse {
+	var filtered []*models.RunResponse
+	repoIDSet := make(map[int]bool)
+
+	// First pass: collect all runs that match by name and build ID set
+	for _, run := range runs {
+		runRepoName := run.GetRepositoryName()
+		if runRepoName == repoName {
+			filtered = append(filtered, run)
+			// If this run has a repo ID, track it
+			if run.RepoID > 0 {
+				repoIDSet[run.RepoID] = true
+			}
+		}
+	}
+
+	// Second pass: also include runs that match by repo ID
+	if len(repoIDSet) > 0 {
+		for _, run := range runs {
+			// Skip if already included
+			if run.GetRepositoryName() == repoName {
+				continue
+			}
+			// Include if repo ID matches
+			if run.RepoID > 0 && repoIDSet[run.RepoID] {
+				filtered = append(filtered, run)
+			}
+		}
+	}
+
+	return filtered
+}
+
 // selectRepository loads data for a specific repository
 func (d *DashboardView) selectRepository(repo *models.Repository) tea.Cmd {
 	if repo == nil {
@@ -550,7 +607,33 @@ func (d *DashboardView) selectRepository(repo *models.Repository) tea.Cmd {
 func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
+	// Debug log all incoming messages
+	debug.LogToFilef("\n[DASHBOARD UPDATE] Received message type: %T\n", msg)
+	debug.LogToFilef("  Loading: %v, Initializing: %v\n", d.loading, d.initializing)
+	
+	// Always handle quit keys regardless of loading state
+	if keyMsg, ok := msg.(tea.KeyMsg); ok {
+		debug.LogToFilef("  Key pressed: %s (Type: %v)\n", keyMsg.String(), keyMsg.Type)
+		// Handle force quit regardless of state
+		if keyMsg.String() == "Q" || (keyMsg.Type == tea.KeyCtrlC) {
+			debug.LogToFilef("  FORCE QUIT requested\n")
+			d.cache.SaveToDisk()
+			return d, tea.Quit
+		}
+		// Handle normal quit when not in special modes
+		if keyMsg.String() == "q" && !d.showStatusInfo && !d.showDocs && !d.showURLSelectionPrompt && d.fzfMode == nil {
+			debug.LogToFilef("  Normal quit requested\n")
+			d.cache.SaveToDisk()
+			return d, tea.Quit
+		}
+	}
+
 	switch msg := msg.(type) {
+	case nil:
+		// Handle nil messages gracefully to prevent freezing
+		debug.LogToFilef("  WARNING: Received nil message, ignoring\n")
+		return d, nil
+		
 	case spinner.TickMsg:
 		if d.loading || d.initializing {
 			var cmd tea.Cmd
@@ -581,12 +664,13 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		d.updateViewportSizes()
 
 	case dashboardDataLoadedMsg:
+		debug.LogToFilef("\n[DASHBOARD DATA LOADED MSG RECEIVED]\n")
 		d.loading = false
 		d.initializing = false
 		if msg.error != nil {
+			debug.LogToFilef("  ERROR: %v\n", msg.error)
 			d.error = msg.error
 		} else {
-			debug.LogToFilef("\n[DASHBOARD DATA LOADED]\n")
 			debug.LogToFilef("  Repositories loaded: %d\n", len(msg.repositories))
 			debug.LogToFilef("  Total runs loaded: %d\n", len(msg.allRuns))
 			debug.LogToFilef("  Details cache loaded: %d\n", len(msg.detailsCache))
@@ -657,14 +741,16 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case dashboardUserInfoLoadedMsg:
 		if msg.error == nil && msg.userInfo != nil {
 			d.userInfo = msg.userInfo
-			// Store user ID and reinitialize caches if needed
+			// Store user ID (no need to reinitialize embedded cache)
 			if d.userID == nil || (d.userID != nil && *d.userID != msg.userInfo.ID) {
 				d.userID = &msg.userInfo.ID
-				// Reinitialize caches with user-specific paths
-				cache.InitializeCacheForUser(d.userID)
-				cache.InitializeDashboardForUser(d.userID)
+				// Each view has its own cache instance, no global initialization needed
 			}
 		}
+
+	case syncFileHashesMsg:
+		// File hash sync completed, no action needed
+		debug.LogToFilef("  File hash sync completed\n")
 
 	case yankBlinkMsg:
 		// Single blink: toggle off after being on
@@ -804,7 +890,7 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case msg.Type == tea.KeyRunes && string(msg.Runes) == "n":
 			// Navigate to create new run view
 			// Check if we have existing form data to determine if this is a navigation back
-			existingFormData := cache.GetFormData()
+			existingFormData := d.cache.GetFormData()
 
 			// Debug: Log what form data exists when navigating to create view
 			if existingFormData != nil {
@@ -890,6 +976,9 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			d.docsSelectedRow = 0
 			return d, nil
 		case key.Matches(msg, d.keys.Quit):
+			// Save cache to disk before quitting
+			_ = d.cache.SaveToDisk()
+			d.cache.Stop()
 			return d, tea.Quit
 		case key.Matches(msg, d.keys.Refresh):
 			d.loading = true
@@ -1394,7 +1483,7 @@ func (d *DashboardView) View() string {
 		logoStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("33")). // Blue color for logo
 			Bold(true)
-		
+
 		// Style for loading text
 		loadingTextStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("63")). // Bright cyan color
@@ -1874,13 +1963,13 @@ func (d *DashboardView) updateRepoViewportContent() {
 		if d.loading {
 			emptyMsg = "Loading repositories..."
 		}
-		
+
 		// Apply highlighting if this column is focused and selected
 		maxWidth := d.repoViewport.Width
 		if maxWidth <= 0 {
 			maxWidth = 30
 		}
-		
+
 		if d.focusedColumn == 0 && d.selectedRepoIdx == 0 {
 			// Apply focused highlight for better visibility
 			emptyMsg = lipgloss.NewStyle().
@@ -1897,7 +1986,7 @@ func (d *DashboardView) updateRepoViewportContent() {
 				Inline(true).
 				Render(emptyMsg)
 		}
-		
+
 		items = []string{emptyMsg}
 	}
 
@@ -1924,7 +2013,7 @@ func (d *DashboardView) updateRunsViewportContent() {
 		if d.loading {
 			msg = "Loading runs..."
 		}
-		
+
 		// Apply highlighting if this column is focused
 		if d.focusedColumn == 1 && d.selectedRunIdx == 0 {
 			msg = lipgloss.NewStyle().
@@ -1950,7 +2039,7 @@ func (d *DashboardView) updateRunsViewportContent() {
 				Inline(true).
 				Render(msg)
 		}
-		
+
 		items = []string{msg}
 	} else {
 		for i, run := range d.filteredRuns {
@@ -2040,7 +2129,7 @@ func (d *DashboardView) updateRunsViewportContent() {
 
 		if len(items) == 0 {
 			msg := fmt.Sprintf("No runs for %s", d.selectedRepo.Name)
-			
+
 			// Apply highlighting if this column is focused
 			if d.focusedColumn == 1 && d.selectedRunIdx == 0 {
 				msg = lipgloss.NewStyle().
@@ -2065,7 +2154,7 @@ func (d *DashboardView) updateRunsViewportContent() {
 					Inline(true).
 					Render(msg)
 			}
-			
+
 			items = []string{msg}
 		}
 	}
@@ -2092,7 +2181,7 @@ func (d *DashboardView) updateDetailsViewportContent() {
 		if d.loading {
 			msg = "Loading details..."
 		}
-		
+
 		// Apply highlighting if this column is focused
 		if d.focusedColumn == 2 && d.selectedDetailLine == 0 {
 			msg = lipgloss.NewStyle().
@@ -2117,10 +2206,9 @@ func (d *DashboardView) updateDetailsViewportContent() {
 				Inline(true).
 				Render(msg)
 		}
-		
+
 		displayLines = []string{msg}
 	} else {
-
 		// Build lines with selection highlighting and proper width constraints
 		for i, line := range d.detailLines {
 			// Check if we should show RepoBird URL hint for ID line
@@ -2836,6 +2924,8 @@ func (d *DashboardView) handleStatusInfoNavigation(msg tea.KeyMsg) (tea.Model, t
 		return d, nil
 	case "Q":
 		// Capital Q to force quit from anywhere
+		_ = d.cache.SaveToDisk()
+		d.cache.Stop()
 		return d, tea.Quit
 	default:
 		// Ignore other keys while in status info
@@ -2853,6 +2943,8 @@ func (d *DashboardView) handleHelpNavigation(msg tea.KeyMsg) (tea.Model, tea.Cmd
 		return d, nil
 	case "Q":
 		// Force quit
+		_ = d.cache.SaveToDisk()
+		d.cache.Stop()
 		return d, tea.Quit
 	}
 

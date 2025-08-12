@@ -78,49 +78,58 @@ Contains business logic and domain models, isolated from external concerns.
 - **Interfaces**: Service and repository contracts
 - **Business Rules**: Validation and state transitions
 
-### 5. Cache System (`/internal/cache/`)
-Multi-level caching for performance and offline support with user isolation.
+### 5. Cache System (`/internal/tui/cache/`)
+**Embedded state management** following Bubble Tea patterns - no global variables.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Cache Architecture                       │
+│                 Embedded Cache Architecture                 │
 ├─────────────────────────────────────────────────────────────┤
-│ In-Memory Cache (Global)                                    │
-│ ├── Active Details (30s TTL)                               │
-│ ├── Terminal Details (Never expires)                       │
-│ ├── Run List (Refresh-based)                              │
-│ └── Form Data & User Info                                  │
+│ View-Embedded Caches (Per TUI View)                        │
+│ ├── SimpleCache with TTLCache v3 (5 min TTL)              │
+│ ├── Thread-safe with mutex protection                      │
+│ ├── Automatic expiration and cleanup                       │
+│ └── No global state - embedded in views                    │
 ├─────────────────────────────────────────────────────────────┤
-│ Persistent Cache (Disk)                                    │
-│ ├── Terminal Runs (.json files)                           │
-│ ├── Repository History                                     │
-│ └── Dashboard Data                                         │
+│ Persistent Cache (XDG Standard)                            │
+│ ├── Cross-session data persistence                         │
+│ ├── 1-hour expiration for saved data                       │
+│ └── ~/.config/repobird/cache.json                         │
 ├─────────────────────────────────────────────────────────────┤
-│ User-Specific Storage                                       │
-│ ~/.cache/repobird/users/user-{id}/                        │
+│ Test Isolation                                             │
+│ └── Uses XDG_CONFIG_HOME for test directories             │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**Cache Types & Behavior:**
+**Cache Implementation Pattern:**
 
-1. **Terminal Details Cache** (`terminalDetails`):
-   - Stores DONE/FAILED runs permanently
-   - Never expires (persistent across sessions)
-   - Automatically saved to disk on cache
-   - Loaded from disk on application start
+1. **Embedded Cache Instances**:
+   ```go
+   type DashboardView struct {
+       cache *cache.SimpleCache  // Embedded, not global
+       // ... other fields
+   }
+   ```
 
-2. **Active Details Cache** (`details`):
-   - Stores RUNNING/PENDING runs temporarily
-   - 30-second TTL for freshness
-   - Cleared when status changes to terminal
+2. **Initialization in Constructors**:
+   ```go
+   func NewDashboardView(client APIClient) *DashboardView {
+       cache := cache.NewSimpleCache()
+       _ = cache.LoadFromDisk()  // Load persisted data
+       // ...
+   }
+   ```
 
-3. **Run List Cache** (`runs`):
-   - Cached until explicit refresh
-   - Triggers details cache population
-   - Used for dashboard display
+3. **Data Types Cached**:
+   - Run lists and details (5 min TTL)
+   - User information (10 min TTL)
+   - Repository overviews
+   - File hashes for deduplication
 
-**User-Based Cache Separation:**
-The cache system supports user-specific storage to prevent data mixing:
+**State Management Best Practices:**
+- **No Global Variables**: Each view owns its cache instance
+- **Bubble Tea Pattern**: State flows through Update() method
+- **Test Isolation**: Tests use temporary directories via XDG_CONFIG_HOME
 
 ```
 ~/.cache/repobird/

@@ -39,6 +39,14 @@ type RepoDataCache struct {
 }
 
 var dashboardCache *DashboardCache
+var dashboardCacheOnce sync.Once
+
+// ensureDashboardCache ensures the dashboard cache is initialized
+func ensureDashboardCache() {
+	dashboardCacheOnce.Do(func() {
+		_ = InitializeDashboardCache()
+	})
+}
 
 // InitializeDashboardCache sets up the dashboard cache system
 func InitializeDashboardCache() error {

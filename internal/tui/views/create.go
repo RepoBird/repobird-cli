@@ -1,7 +1,6 @@
 package views
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -17,9 +16,9 @@ import (
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/repobird/repobird-cli/internal/cache"
 	"github.com/repobird/repobird-cli/internal/config"
 	"github.com/repobird/repobird-cli/internal/models"
+	"github.com/repobird/repobird-cli/internal/tui/cache"
 	"github.com/repobird/repobird-cli/internal/tui/components"
 	"github.com/repobird/repobird-cli/internal/tui/debug"
 	"github.com/repobird/repobird-cli/internal/utils"
@@ -98,10 +97,15 @@ type CreateRunView struct {
 	isDuplicateConfirm bool
 	duplicateRunID     string
 	pendingTask        models.RunRequest
+	// Embedded cache
+	cache *cache.SimpleCache
 }
 
 func NewCreateRunView(client APIClient) *CreateRunView {
-	return NewCreateRunViewWithCache(client, nil, false, time.Time{}, nil)
+	// Create new cache instance
+	cache := cache.NewSimpleCache()
+	_ = cache.LoadFromDisk()
+	return NewCreateRunViewWithCache(client, nil, false, time.Time{}, nil, cache)
 }
 
 // CreateRunViewConfig holds configuration for creating a new CreateRunView
@@ -111,12 +115,20 @@ type CreateRunViewConfig struct {
 	ParentCached       bool
 	ParentCachedAt     time.Time
 	ParentDetailsCache map[string]*models.RunResponse
-	SelectedRepository string // Pre-selected repository from dashboard
+	SelectedRepository string             // Pre-selected repository from dashboard
+	Cache              *cache.SimpleCache // Optional embedded cache
 }
 
 // NewCreateRunViewWithConfig creates a new CreateRunView with the given configuration
 func NewCreateRunViewWithConfig(cfg CreateRunViewConfig) *CreateRunView {
 	debug.LogToFile("DEBUG: NewCreateRunViewWithConfig called\n")
+
+	// Use provided cache or create new one
+	embeddedCache := cfg.Cache
+	if embeddedCache == nil {
+		embeddedCache = cache.NewSimpleCache()
+		_ = embeddedCache.LoadFromDisk()
+	}
 
 	v := &CreateRunView{
 		client:             cfg.Client,
@@ -131,6 +143,7 @@ func NewCreateRunViewWithConfig(cfg CreateRunViewConfig) *CreateRunView {
 		configLoader:       config.NewConfigLoader(),
 		fileSelector:       components.NewFileSelector(80, 10),       // Default dimensions
 		configFileSelector: components.NewConfigFileSelector(80, 20), // Enhanced selector with preview
+		cache:              embeddedCache,
 	}
 
 	v.repoSelector = components.NewRepositorySelector()
@@ -239,7 +252,7 @@ func (v *CreateRunView) initializeInputFields() {
 
 // loadFormData loads saved form data from cache
 func (v *CreateRunView) loadFormData() {
-	savedData := cache.GetFormData()
+	savedData := v.cache.GetFormData()
 	if savedData != nil && len(v.fields) >= 5 {
 		debug.LogToFilef("DEBUG: loadFormData START - Repository: %s, Prompt: %d chars, Source: %s, Target: %s, Title: %s\n",
 			savedData.Repository, len(savedData.Prompt), savedData.Source, savedData.Target, savedData.Title)
@@ -303,6 +316,7 @@ func NewCreateRunViewWithCache(
 	parentCached bool,
 	parentCachedAt time.Time,
 	parentDetailsCache map[string]*models.RunResponse,
+	embeddedCache *cache.SimpleCache,
 ) *CreateRunView {
 	debug.LogToFilef("DEBUG: Creating CreateView - parentRuns=%d, parentCached=%v, detailsCache=%d\n",
 		len(parentRuns), parentCached, len(parentDetailsCache))
@@ -313,6 +327,7 @@ func NewCreateRunViewWithCache(
 		ParentCached:       parentCached,
 		ParentCachedAt:     parentCachedAt,
 		ParentDetailsCache: parentDetailsCache,
+		Cache:              embeddedCache,
 	}
 
 	return NewCreateRunViewWithConfig(config)
@@ -451,7 +466,6 @@ func (v *CreateRunView) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "y":
 			// Confirm reset - clear all fields and cache
 			v.clearAllFields()
-			cache.ClearFormData()
 			v.resetConfirmMode = false
 			v.lastLoadedFile = ""
 			v.runType = models.RunTypeRun
@@ -672,17 +686,14 @@ func (v *CreateRunView) handleRunCreated(msg runCreatedMsg) (tea.Model, tea.Cmd)
 	}
 
 	// Clear form data on successful submission
-	cache.ClearFormData()
+	v.cache.SetFormData(nil)
 	v.success = true
 	v.createdRun = &msg.run
 
 	// Add the file hash to cache if we have one
 	if v.currentFileHash != "" {
-		fileHashCache := cache.GetFileHashCache()
-		if fileHashCache != nil {
-			fileHashCache.AddHash(v.currentFileHash)
-			debug.LogToFilef("DEBUG: Added file hash %s to cache after successful submission\n", v.currentFileHash)
-		}
+		v.cache.SetFileHash(v.lastLoadedFile, v.currentFileHash)
+		debug.LogToFilef("DEBUG: Added file hash %s to cache after successful submission\n", v.currentFileHash)
 	}
 
 	debug.LogToFilef("DEBUG: Run created successfully with ID='%s', navigating to details\n", runID)
@@ -916,8 +927,9 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Store the file hash and check if it's a duplicate
 		v.currentFileHash = msg.fileHash
 		if msg.fileHash != "" {
-			fileHashCache := cache.GetFileHashCache()
-			v.isDuplicateRun = fileHashCache.HasHash(msg.fileHash)
+			// Check if this file hash already exists
+			existingHash := v.cache.GetFileHash(v.lastLoadedFile)
+			v.isDuplicateRun = (existingHash == msg.fileHash)
 			debug.LogToFilef("DEBUG: File hash %s - isDuplicate: %v\n", msg.fileHash, v.isDuplicateRun)
 		} else {
 			v.isDuplicateRun = false
@@ -932,7 +944,7 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		v.saveFormData()
 
 		// Debug: Verify what was saved
-		savedData := cache.GetFormData()
+		savedData := v.cache.GetFormData()
 		if savedData != nil {
 			debug.LogToFilef("DEBUG: Verified saved data - Repository=%s, Prompt=%d chars, Source=%s, Target=%s, Title=%s\n",
 				savedData.Repository, len(savedData.Prompt), savedData.Source, savedData.Target, savedData.Title)
@@ -1153,7 +1165,7 @@ func (v *CreateRunView) saveFormData() {
 	debug.LogToFilef("DEBUG: Saving form data - Repository: %s, Prompt: %d chars, Source: %s, Target: %s, Title: %s\n",
 		formData.Repository, len(formData.Prompt), formData.Source, formData.Target, formData.Title)
 
-	cache.SaveFormData(formData)
+	v.cache.SetFormData(formData)
 }
 
 func (v *CreateRunView) clearAllFields() {
@@ -1163,7 +1175,7 @@ func (v *CreateRunView) clearAllFields() {
 	v.promptArea.SetValue("")
 	v.contextArea.SetValue("")
 	v.filePathInput.SetValue("")
-	cache.ClearFormData()
+	v.cache.SetFormData(nil)
 }
 
 func (v *CreateRunView) clearCurrentField() {
@@ -2137,7 +2149,7 @@ func (v *CreateRunView) prepareTask() (models.RunRequest, error) {
 		// Add repository to history after successful validation
 		if task.Repository != "" {
 			go func() {
-				_ = cache.AddRepositoryToHistory(task.Repository)
+				v.cache.AddRepositoryToHistory(task.Repository)
 			}()
 		}
 	}
@@ -2272,7 +2284,7 @@ func (v *CreateRunView) activateFZFMode() {
 	}
 
 	// Add repositories from history
-	if history, err := cache.GetRepositoryHistory(); err == nil {
+	if history, err := v.cache.GetRepositoryHistory(); err == nil {
 		for _, repoName := range history {
 			if repoName != "" {
 				// Skip if already added (git repo)
@@ -2347,7 +2359,7 @@ func (v *CreateRunView) loadConfigFromFile(filePath string) tea.Cmd {
 		}
 
 		// Calculate file hash for duplicate detection
-		fileHash, hashErr := cache.CalculateFileHash(filePath)
+		fileHash, hashErr := cache.CalculateFileHashFromPath(filePath)
 		if hashErr != nil {
 			debug.LogToFilef("DEBUG: Failed to calculate file hash: %v\n", hashErr)
 			// Continue without hash - not a critical error
@@ -2388,7 +2400,7 @@ func (v *CreateRunView) loadFileHashCache() tea.Cmd {
 		debug.LogToFile("DEBUG: loadFileHashCache - starting\n")
 
 		// First ensure we have user info to set the correct cache directory
-		userInfo := cache.GetCachedUserInfo()
+		userInfo := v.cache.GetUserInfo()
 		if userInfo == nil {
 			debug.LogToFile("DEBUG: loadFileHashCache - fetching user info first\n")
 			// Fetch user info to get user ID for cache directory
@@ -2396,38 +2408,14 @@ func (v *CreateRunView) loadFileHashCache() tea.Cmd {
 			if err != nil {
 				debug.LogToFilef("DEBUG: loadFileHashCache - failed to get user info: %v\n", err)
 			} else if userInfo != nil {
-				cache.SetCachedUserInfo(userInfo)
-				// Update cache to use user-specific directory
-				if userInfo.ID > 0 {
-					userID := userInfo.ID
-					cache.InitializeCacheForUser(&userID)
-					debug.LogToFilef("DEBUG: loadFileHashCache - set cache user to %d\n", userID)
-				}
+				v.cache.SetUserInfo(userInfo)
+				debug.LogToFilef("DEBUG: loadFileHashCache - cached user info for user %d\n", userInfo.ID)
 			}
 		}
 
-		fileHashCache := cache.GetFileHashCache()
-		if fileHashCache == nil {
-			debug.LogToFile("DEBUG: loadFileHashCache - file hash cache is nil\n")
-			return nil
-		}
-
-		// Check if already loaded
-		if fileHashCache.IsLoaded() {
-			debug.LogToFile("DEBUG: loadFileHashCache - already loaded from cache\n")
-			return nil
-		}
-
-		// Load from API
-		debug.LogToFile("DEBUG: loadFileHashCache - calling EnsureLoaded to fetch from API\n")
-		ctx := context.Background()
-		err := fileHashCache.EnsureLoaded(ctx, v.client)
-		if err != nil {
-			debug.LogToFilef("DEBUG: Failed to load file hash cache: %v\n", err)
-			// Non-critical error, continue without cache
-		} else {
-			debug.LogToFile("DEBUG: loadFileHashCache - successfully loaded file hashes\n")
-		}
+		// File hash cache is now embedded in the SimpleCache
+		// No need to load separately
+		debug.LogToFile("DEBUG: loadFileHashCache - using embedded cache\n")
 
 		return nil
 	}

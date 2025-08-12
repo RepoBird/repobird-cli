@@ -9,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/repobird/repobird-cli/internal/api"
 	"github.com/repobird/repobird-cli/internal/models"
+	"github.com/repobird/repobird-cli/internal/tui/cache"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -35,12 +36,13 @@ func TestNewRunDetailsViewWithCache_UsesPreloadedData(t *testing.T) {
 		UpdatedAt:  time.Now().Add(5 * time.Minute),
 	}
 
-	cache := map[string]*models.RunResponse{
+	detailsCache := map[string]*models.RunResponse{
 		"test-run-123": cachedRun,
 	}
 
 	// Act
-	view := NewRunDetailsViewWithCache(client, originalRun, nil, true, time.Now(), cache)
+	testCache := cache.NewSimpleCache()
+	view := NewRunDetailsViewWithCache(client, originalRun, nil, true, time.Now(), detailsCache, testCache)
 
 	// Assert
 	assert.False(t, view.loading, "Should not be loading when cached data is available")
@@ -61,10 +63,11 @@ func TestNewRunDetailsViewWithCache_LoadsWhenNoCachedData(t *testing.T) {
 	}
 
 	// Empty cache
-	cache := map[string]*models.RunResponse{}
+	detailsCache := map[string]*models.RunResponse{}
 
 	// Act
-	view := NewRunDetailsViewWithCache(client, run, nil, true, time.Now(), cache)
+	testCache := cache.NewSimpleCache()
+	view := NewRunDetailsViewWithCache(client, run, nil, true, time.Now(), detailsCache, testCache)
 
 	// Assert
 	assert.True(t, view.loading, "Should be loading when no cached data is available")
@@ -84,7 +87,8 @@ func TestNewRunDetailsViewWithCache_HandlesNilCache(t *testing.T) {
 	}
 
 	// Act
-	view := NewRunDetailsViewWithCache(client, run, nil, false, time.Time{}, nil)
+	testCache := cache.NewSimpleCache()
+	view := NewRunDetailsViewWithCache(client, run, nil, false, time.Time{}, nil, testCache)
 
 	// Assert
 	assert.True(t, view.loading, "Should be loading when cache is nil")
@@ -105,7 +109,8 @@ func TestRunDetailsView_LoadingStateHandling(t *testing.T) {
 	}
 
 	// Create view without cache (should be loading)
-	view := NewRunDetailsViewWithCache(client, run, nil, false, time.Time{}, nil)
+	testCache := cache.NewSimpleCache()
+	view := NewRunDetailsViewWithCache(client, run, nil, false, time.Time{}, nil, testCache)
 
 	// Should be in loading state
 	assert.True(t, view.loading, "Should be loading when no cached data")
@@ -167,7 +172,8 @@ func TestRunDetailsView_TitleDisplayHandling(t *testing.T) {
 				Title:      tt.runTitle,
 			}
 
-			view := NewRunDetailsViewWithCache(client, run, nil, false, time.Time{}, nil)
+			testCache := cache.NewSimpleCache()
+			view := NewRunDetailsViewWithCache(client, run, nil, false, time.Time{}, nil, testCache)
 			view.loading = false // Simulate loaded state
 			view.updateContent()
 

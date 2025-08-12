@@ -12,7 +12,7 @@ import (
 	"github.com/repobird/repobird-cli/internal/api"
 	"github.com/repobird/repobird-cli/internal/api/dto"
 	"github.com/repobird/repobird-cli/internal/bulk"
-	"github.com/repobird/repobird-cli/internal/cache"
+	"github.com/repobird/repobird-cli/internal/tui/cache"
 	"github.com/repobird/repobird-cli/internal/tui/components"
 	"github.com/repobird/repobird-cli/internal/tui/debug"
 	"github.com/repobird/repobird-cli/internal/utils"
@@ -103,6 +103,9 @@ type BulkFZFView struct {
 
 	// Keys
 	keys bulkKeyMap
+
+	// Embedded cache
+	cache *cache.SimpleCache
 }
 
 // NewBulkFZFView creates a new bulk view with FZF
@@ -111,11 +114,16 @@ func NewBulkFZFView(client *api.Client) *BulkFZFView {
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
+	// Create embedded cache
+	embeddedCache := cache.NewSimpleCache()
+	_ = embeddedCache.LoadFromDisk()
+
 	return &BulkFZFView{
 		client:          client,
 		mode:            BulkModeFileSelect,
 		fileSelector:    components.NewBulkFileSelector(80, 20),
 		statusLine:      components.NewStatusLine(),
+		cache:           embeddedCache,
 		helpView:        components.NewHelpView(),
 		spinner:         s,
 		selectedFiles:   []string{},
@@ -1121,20 +1129,19 @@ func (v *BulkFZFView) submitRuns() tea.Cmd {
 		debug.LogToFileWithTimestampf("BULK_DEBUG: API response: successful runs: %d, failed: %d\n", len(resp.Data.Successful), len(resp.Data.Failed))
 
 		// Update file hash cache with successful runs
-		fileHashCache := cache.NewFileHashCache()
 		for i, run := range resp.Data.Successful {
 			// Add the file hash from the corresponding run item if it was successful
 			if run.RequestIndex >= 0 && run.RequestIndex < len(runItems) {
 				fileHash := runItems[run.RequestIndex].FileHash
 				if fileHash != "" {
-					fileHashCache.AddHash(fileHash)
+					v.cache.SetFileHash(fmt.Sprintf("bulk_run_%d", run.ID), fileHash)
 					debug.LogToFileWithTimestampf("BULK_DEBUG: Added file hash to cache for run ID %d: %s\n", run.ID, fileHash)
 				}
 			} else if i < len(runItems) {
 				// Fallback to index if RequestIndex is not set
 				fileHash := runItems[i].FileHash
 				if fileHash != "" {
-					fileHashCache.AddHash(fileHash)
+					v.cache.SetFileHash(fmt.Sprintf("bulk_run_%d", run.ID), fileHash)
 					debug.LogToFileWithTimestampf("BULK_DEBUG: Added file hash to cache for run ID %d (by index): %s\n", run.ID, fileHash)
 				}
 			}
