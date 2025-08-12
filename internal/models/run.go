@@ -205,12 +205,6 @@ func LoadRunConfigFromFileWithPrompts(filepath string) (*RunConfig, *prompts.Val
 	return parseJSONWithUnknownFieldsAndPrompts(file)
 }
 
-// parseJSONWithUnknownFields parses JSON allowing unknown fields and warns about them
-func parseJSONWithUnknownFields(file *os.File) (*RunConfig, error) {
-	config, _, err := parseJSONWithUnknownFieldsAndPrompts(file)
-	return config, err
-}
-
 // parseJSONWithUnknownFieldsAndPrompts parses JSON allowing unknown fields and creates validation prompts
 func parseJSONWithUnknownFieldsAndPrompts(file *os.File) (*RunConfig, *prompts.ValidationPromptHandler, error) {
 	// Reset file position for multiple reads

@@ -12,6 +12,7 @@ import (
 	"github.com/repobird/repobird-cli/internal/domain"
 	"github.com/repobird/repobird-cli/internal/errors"
 	"github.com/repobird/repobird-cli/internal/models"
+	"github.com/repobird/repobird-cli/internal/prompts"
 	"github.com/repobird/repobird-cli/internal/utils"
 )
 
@@ -52,9 +53,21 @@ func runCommand(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
 		// Load configuration from file (supports JSON, YAML, and Markdown)
 		filename := args[0]
-		runConfig, additionalContext, err = utils.LoadConfigFromFile(filename)
+		var promptHandler *prompts.ValidationPromptHandler
+		runConfig, additionalContext, promptHandler, err = utils.LoadConfigFromFileWithPrompts(filename)
 		if err != nil {
 			return fmt.Errorf("failed to load configuration file: %w", err)
+		}
+
+		// Process any validation prompts before proceeding
+		if promptHandler != nil && promptHandler.HasPrompts() {
+			shouldContinue, err := promptHandler.ProcessPrompts()
+			if err != nil {
+				return fmt.Errorf("failed to process validation prompts: %w", err)
+			}
+			if !shouldContinue {
+				return fmt.Errorf("operation cancelled by user")
+			}
 		}
 	} else {
 		// Read JSON from stdin with unknown field handling

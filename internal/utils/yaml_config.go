@@ -9,6 +9,7 @@ import (
 
 	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/repobird/repobird-cli/internal/prompts"
+	"github.com/repobird/repobird-cli/internal/tui/debug"
 	"gopkg.in/yaml.v3"
 )
 
@@ -70,15 +71,45 @@ func parseYAMLWithUnknownFieldsAndPrompts(data []byte) (*models.RunConfig, *prom
 	// First, parse into a generic map to detect unknown fields
 	var genericMap map[string]interface{}
 	if err := yaml.Unmarshal(data, &genericMap); err != nil {
+		debug.LogToFilef("parseYAMLWithUnknownFieldsAndPrompts: Failed to unmarshal into generic map: %v\n", err)
 		return nil, nil, fmt.Errorf("failed to parse YAML: %w", err)
 	}
 
-	// Parse into our known structure without strict field checking
+	// Extract known fields from the map instead of using decoder.Decode
+	// This allows us to ignore unknown fields completely
 	var config YAMLConfig
-	decoder := yaml.NewDecoder(strings.NewReader(string(data)))
-	// Remove the KnownFields(true) restriction to allow unknown fields
-	if err := decoder.Decode(&config); err != nil {
-		return nil, nil, fmt.Errorf("failed to parse YAML: %w", err)
+
+	// Manually extract the known fields from the map
+	if prompt, ok := genericMap["prompt"].(string); ok {
+		config.Prompt = prompt
+	}
+	if repository, ok := genericMap["repository"].(string); ok {
+		config.Repository = repository
+	}
+	if source, ok := genericMap["source"].(string); ok {
+		config.Source = source
+	}
+	if target, ok := genericMap["target"].(string); ok {
+		config.Target = target
+	}
+	if runType, ok := genericMap["runType"].(string); ok {
+		config.RunType = runType
+	}
+	if title, ok := genericMap["title"].(string); ok {
+		config.Title = title
+	}
+	if context, ok := genericMap["context"].(string); ok {
+		config.Context = context
+	}
+	if filesInterface, ok := genericMap["files"]; ok {
+		if filesArray, ok := filesInterface.([]interface{}); ok {
+			config.Files = make([]string, 0, len(filesArray))
+			for _, file := range filesArray {
+				if fileStr, ok := file.(string); ok {
+					config.Files = append(config.Files, fileStr)
+				}
+			}
+		}
 	}
 
 	// Create validation prompt handler
@@ -167,15 +198,6 @@ func findUnsupportedYAMLFieldsWithSuggestions(data map[string]interface{}) ([]st
 	return unsupported, suggestions
 }
 
-// validateYAMLConfig validates required fields in the YAML configuration
-func validateYAMLConfig(config *YAMLConfig) error {
-	validationErr := validateYAMLConfigForPrompts(config)
-	if validationErr != nil {
-		return validationErr
-	}
-	return nil
-}
-
 // validateYAMLConfigForPrompts validates and applies defaults without failing on validation errors
 func validateYAMLConfigForPrompts(config *YAMLConfig) error {
 	// Convert to RunConfig for validation
@@ -212,23 +234,15 @@ func validateYAMLConfigForPrompts(config *YAMLConfig) error {
 
 // LoadConfigFromFile loads configuration from JSON, YAML, or Markdown files
 func LoadConfigFromFile(filepath string) (*models.RunConfig, string, error) {
-	config, additionalContext, promptHandler, err := LoadConfigFromFileWithPrompts(filepath)
-	if err != nil {
-		return nil, "", err
-	}
+	// For TUI compatibility, use the non-prompting version
+	return LoadConfigFromFileNoPrompts(filepath)
+}
 
-	// Process any validation prompts before proceeding
-	if promptHandler != nil && promptHandler.HasPrompts() {
-		shouldContinue, err := promptHandler.ProcessPrompts()
-		if err != nil {
-			return nil, "", err
-		}
-		if !shouldContinue {
-			return nil, "", fmt.Errorf("operation cancelled by user")
-		}
-	}
-
-	return config, additionalContext, nil
+// LoadConfigFromFileNoPrompts loads config without showing validation prompts
+func LoadConfigFromFileNoPrompts(filepath string) (*models.RunConfig, string, error) {
+	config, additionalContext, _, err := LoadConfigFromFileWithPrompts(filepath)
+	// Ignore validation prompts for TUI compatibility
+	return config, additionalContext, err
 }
 
 // LoadConfigFromFileWithPrompts loads configuration and returns validation prompts for processing
@@ -257,12 +271,6 @@ func LoadConfigFromFileWithPrompts(filepath string) (*models.RunConfig, string, 
 		// Try to detect format by content
 		return detectAndParseConfigWithPrompts(filepath)
 	}
-}
-
-// detectAndParseConfig attempts to detect the file format and parse accordingly
-func detectAndParseConfig(filepath string) (*models.RunConfig, string, error) {
-	config, additionalContext, _, err := detectAndParseConfigWithPrompts(filepath)
-	return config, additionalContext, err
 }
 
 // detectAndParseConfigWithPrompts attempts to detect the file format and parse accordingly with validation prompts

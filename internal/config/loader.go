@@ -24,7 +24,8 @@ func (c *ConfigLoader) LoadConfig(filePath string) (*models.RunRequest, error) {
 	}
 
 	// Use the unified loader that supports JSON, YAML, and Markdown
-	runConfig, additionalContext, err := utils.LoadConfigFromFile(filePath)
+	// Use the non-prompting version for TUI compatibility
+	runConfig, additionalContext, err := utils.LoadConfigFromFileNoPrompts(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load config file: %w", err)
 	}
