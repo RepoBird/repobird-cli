@@ -5,6 +5,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/spinner"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -30,10 +32,16 @@ type StatusLine struct {
 	tempMessageTime     time.Time
 	tempMessageDuration time.Duration
 	tempMessageColor    lipgloss.Color
+	isLoading           bool
+	loadingSpinner      spinner.Model
 }
 
 // NewStatusLine creates a new status line component
 func NewStatusLine() *StatusLine {
+	s := spinner.New()
+	s.Spinner = spinner.Dot
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("63"))
+	
 	return &StatusLine{
 		style: lipgloss.NewStyle().
 			Background(lipgloss.Color("235")).
@@ -41,6 +49,7 @@ func NewStatusLine() *StatusLine {
 			Padding(0, 1),
 		helpStyle: lipgloss.NewStyle().
 			Foreground(lipgloss.Color("240")),
+		loadingSpinner: s,
 	}
 }
 
@@ -59,6 +68,22 @@ func (s *StatusLine) SetLeft(content string) *StatusLine {
 // SetRight sets the right content of the status line
 func (s *StatusLine) SetRight(content string) *StatusLine {
 	s.rightContent = content
+	return s
+}
+
+// SetLoading sets the loading state of the status line
+func (s *StatusLine) SetLoading(loading bool) *StatusLine {
+	s.isLoading = loading
+	return s
+}
+
+// UpdateSpinner updates the loading spinner animation
+func (s *StatusLine) UpdateSpinner() *StatusLine {
+	if s.isLoading {
+		var cmd tea.Cmd
+		s.loadingSpinner, cmd = s.loadingSpinner.Update(spinner.TickMsg{})
+		_ = cmd // Ignore the command since we're just updating the view
+	}
 	return s
 }
 
@@ -128,6 +153,16 @@ func (s *StatusLine) Render() string {
 		return ""
 	}
 
+	// Add loading spinner to right content if loading
+	rightContent := s.rightContent
+	if s.isLoading {
+		if rightContent != "" {
+			rightContent = s.loadingSpinner.View() + " " + rightContent
+		} else {
+			rightContent = s.loadingSpinner.View()
+		}
+	}
+
 	// Check for active temporary message
 	if s.HasActiveMessage() {
 		// Create temporary message style - keep background consistent
@@ -160,7 +195,6 @@ func (s *StatusLine) Render() string {
 	// Truncate individual parts if they're too long
 	maxPartWidth := s.width / 3
 	leftContent := s.leftContent
-	rightContent := s.rightContent
 	helpContent := s.helpContent
 
 	if lipgloss.Width(leftContent) > maxPartWidth {

@@ -597,6 +597,8 @@ func (v *RunDetailsView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if v.loading || v.pollingStatus {
 			var cmd tea.Cmd
 			v.spinner, cmd = v.spinner.Update(msg)
+			// Also update the status line spinner
+			v.statusLine.UpdateSpinner()
 			cmds = append(cmds, cmd)
 		}
 	}
@@ -876,12 +878,22 @@ func (v *RunDetailsView) renderStatusBar() string {
 		options = "o:url q:back j/k:nav y:copy Y:all r:refresh ?:help Q:quit"
 	}
 
+	// Determine if we're loading
+	isLoadingData := v.loading
+
+	// Set right content based on loading state
+	rightContent := ""
+	if isLoadingData {
+		rightContent = "loading"
+	}
+
 	// Use unified status line system
 	return v.statusLine.
 		SetWidth(v.width).
 		SetLeft("[DETAILS]").
-		SetRight("").
+		SetRight(rightContent).
 		SetHelp(options).
+		SetLoading(isLoadingData).
 		Render()
 }
 

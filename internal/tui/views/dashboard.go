@@ -529,6 +529,8 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if d.loading || d.initializing {
 			var cmd tea.Cmd
 			d.spinner, cmd = d.spinner.Update(msg)
+			// Also update the status line spinner
+			d.statusLine.UpdateSpinner()
 			return d, cmd
 		}
 
@@ -3628,8 +3630,15 @@ func (d *DashboardView) hasCurrentSelectionURL() bool {
 func (d *DashboardView) renderStatusLine(layoutName string) string {
 	// Data freshness indicator - keep it very short
 	dataInfo := ""
-	if d.loading && len(d.repositories) > 0 {
-		dataInfo = "loading"
+	isLoadingData := false
+	
+	if d.loading || d.initializing {
+		isLoadingData = true
+		if len(d.repositories) > 0 {
+			dataInfo = "refreshing"
+		} else {
+			dataInfo = "loading"
+		}
 	} else if !d.lastDataRefresh.IsZero() {
 		elapsed := time.Since(d.lastDataRefresh)
 		if elapsed < time.Minute {
@@ -3653,6 +3662,7 @@ func (d *DashboardView) renderStatusLine(layoutName string) string {
 			SetRight(dataInfo).
 			SetHelp(promptHelp).
 			SetStyle(yellowStyle).
+			SetLoading(isLoadingData).
 			Render()
 	}
 
@@ -3672,6 +3682,7 @@ func (d *DashboardView) renderStatusLine(layoutName string) string {
 		SetRight(dataInfo).
 		SetHelp(shortHelp).
 		ResetStyle().
+		SetLoading(isLoadingData).
 		Render()
 }
 

@@ -501,6 +501,8 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if v.loading {
 			var cmd tea.Cmd
 			v.spinner, cmd = v.spinner.Update(msg)
+			// Also update the status line spinner
+			v.statusLine.UpdateSpinner()
 			cmds = append(cmds, cmd)
 		}
 	}
@@ -615,22 +617,29 @@ func (v *RunListView) updateTable() {
 }
 
 func (v *RunListView) renderStatusBar() string {
+	// Determine if we're loading
+	isLoadingData := v.loading
+
 	// Build data info string
-	dataInfo := fmt.Sprintf("%d runs | %s", len(v.filteredRuns), v.table.StatusLine())
+	dataInfo := ""
+	if isLoadingData {
+		dataInfo = "loading"
+	} else {
+		dataInfo = fmt.Sprintf("%d runs | %s", len(v.filteredRuns), v.table.StatusLine())
 
-	activeCount := 0
-	for _, run := range v.runs {
-		if isActiveStatus(string(run.Status)) {
-			activeCount++
+		activeCount := 0
+		for _, run := range v.runs {
+			if isActiveStatus(string(run.Status)) {
+				activeCount++
+			}
 		}
-	}
 
-	// Add remaining runs counter if user info is available
-	if v.userInfo != nil {
-		tier := v.userInfo.Tier
-		if tier == "" {
-			tier = "free"
-		}
+		// Add remaining runs counter if user info is available
+		if v.userInfo != nil {
+			tier := v.userInfo.Tier
+			if tier == "" {
+				tier = "free"
+			}
 
 		// Show tier-specific runs with hardcoded totals
 		if v.userInfo.TierDetails != nil {
@@ -669,10 +678,10 @@ func (v *RunListView) renderStatusBar() string {
 			// Fallback to legacy display
 			dataInfo += fmt.Sprintf(" | %s: %d/%d runs", tier, v.userInfo.RemainingRuns, v.userInfo.TotalRuns)
 		}
-	}
 
-	if activeCount > 0 {
-		dataInfo += fmt.Sprintf(" | ⟳ %d active", activeCount)
+		if activeCount > 0 {
+			dataInfo += fmt.Sprintf(" | ⟳ %d active", activeCount)
+		}
 	}
 
 	// Help text
@@ -684,6 +693,7 @@ func (v *RunListView) renderStatusBar() string {
 		SetLeft("[LIST]").
 		SetRight(dataInfo).
 		SetHelp(helpText).
+		SetLoading(isLoadingData).
 		Render()
 }
 
