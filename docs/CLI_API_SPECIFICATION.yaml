@@ -1051,10 +1051,10 @@ paths:
                   batchTitle: Q1 2024 Bug Fixes
                   force: true
                   runs:
-                    - prompt: Fix bug #123
+                    - prompt: Fix bug # 123
                       title: Critical auth fix
                       fileHash: abc123
-                    - prompt: Fix bug #124
+                    - prompt: Fix bug # 124
                       context: Users report timeout issues
                       fileHash: def456
       responses:
