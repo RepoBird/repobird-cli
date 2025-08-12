@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/your-org/repobird-cli/internal/utils"
 )
 
 // MessageType represents different types of temporary messages
@@ -272,15 +273,10 @@ func (s *StatusLine) Render() string {
 	return finalStyle.Render(statusContent)
 }
 
-// truncateWithEllipsis truncates a string to fit within maxWidth with ellipsis
+// truncateWithEllipsis is now replaced by utils.TruncateWithEllipsis
+// Keeping this as an alias for backward compatibility
 func truncateWithEllipsis(s string, maxWidth int) string {
-	if maxWidth <= 3 {
-		return "..."
-	}
-	if lipgloss.Width(s) <= maxWidth {
-		return s
-	}
-	return s[:maxWidth-3] + "..."
+	return utils.TruncateWithEllipsis(s, maxWidth)
 }
 
 // DashboardStatusLine creates a status line for the dashboard

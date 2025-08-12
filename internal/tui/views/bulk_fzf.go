@@ -15,6 +15,7 @@ import (
 	"github.com/repobird/repobird-cli/internal/cache"
 	"github.com/repobird/repobird-cli/internal/tui/components"
 	"github.com/repobird/repobird-cli/internal/tui/debug"
+	"github.com/repobird/repobird-cli/internal/utils"
 )
 
 // BulkViewMode represents different modes of the bulk view
@@ -47,11 +48,10 @@ type bulkFZFFilesValidatedMsg struct {
 }
 
 // Helper functions
+// truncateString is now replaced by utils.TruncateSimple
+// Keeping this as an alias for backward compatibility
 func truncateString(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
-	}
-	return s[:maxLen-3] + "..."
+	return utils.TruncateSimple(s, maxLen)
 }
 
 func countSelected(runs []BulkRunItem) int {
