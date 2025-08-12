@@ -345,10 +345,11 @@ func (v *BulkFZFView) renderFileSelectView() string {
 		statusText = fmt.Sprintf("[BULK] %d file(s)", len(v.selectedFiles))
 	}
 
-	// Shorter status commands to prevent overflow
+	// Use SetHelp to put commands right after the label instead of far right
 	statusLine := v.statusLine.SetWidth(v.width).
 		SetLeft(statusText).
-		SetRight("f:files | Enter:load | ?:help | q:back").
+		SetRight("").
+		SetHelp("f:files | Enter:load | ?:help | q:back").
 		Render()
 
 	// Join content and status bar
@@ -457,10 +458,11 @@ func (v *BulkFZFView) renderRunListView() string {
 	selectedCount := countSelected(v.runs)
 	statusText := fmt.Sprintf("[RUNS] %d selected", selectedCount)
 
-	// Shorter status commands to prevent overflow
+	// Use SetHelp to put commands right after the label instead of far right
 	statusLine := v.statusLine.SetWidth(v.width).
 		SetLeft(statusText).
-		SetRight("Space:toggle | a:all | n:none | Enter:submit | ?:help | q:back").
+		SetRight("").
+		SetHelp("Space:toggle | Ctrl+A:all | Ctrl+D:none | Enter:submit | ?:help | q:back").
 		Render()
 
 	// Join content and status bar
@@ -616,10 +618,11 @@ func (v *BulkFZFView) renderResultsView() string {
 	panel := panelStyle.Render(content.String())
 	panelWithMargin := lipgloss.NewStyle().MarginTop(2).Render(panel)
 
-	// Setup statusline with shorter text
+	// Use SetHelp to put commands right after the label instead of far right
 	statusLine := v.statusLine.SetWidth(v.width).
 		SetLeft("[RESULTS]").
-		SetRight("Enter:new | ?:help | q:back").
+		SetRight("").
+		SetHelp("Enter:new | ?:help | q:back").
 		Render()
 
 	// Join content and status bar
@@ -708,14 +711,14 @@ func (v *BulkFZFView) handleRunListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			v.runs[v.selectedRunIdx].Selected = !v.runs[v.selectedRunIdx].Selected
 		}
 
-	case "a":
+	case "ctrl+a":
 		// Select all
 		for i := range v.runs {
 			v.runs[i].Selected = true
 		}
 
-	case "n":
-		// Select none
+	case "ctrl+d":
+		// Select none (ctrl+d for deselect)
 		for i := range v.runs {
 			v.runs[i].Selected = false
 		}

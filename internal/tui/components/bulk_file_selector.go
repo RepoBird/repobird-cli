@@ -307,7 +307,7 @@ func (b *BulkFileSelector) Update(msg tea.Msg) (*BulkFileSelector, tea.Cmd) {
 				}
 			}
 
-		case "a":
+		case "ctrl+a":
 			// Select all visible items
 			for i := range b.filteredFiles {
 				b.filteredFiles[i].Selected = true
@@ -322,8 +322,8 @@ func (b *BulkFileSelector) Update(msg tea.Msg) (*BulkFileSelector, tea.Cmd) {
 				}
 			}
 
-		case "n":
-			// Deselect all
+		case "ctrl+d":
+			// Deselect all (ctrl+d for deselect)
 			for i := range b.filteredFiles {
 				b.filteredFiles[i].Selected = false
 				b.selectedFiles[b.filteredFiles[i].Path] = false
@@ -646,7 +646,7 @@ func (b *BulkFileSelector) View(statusLine *StatusLine) string {
 
 		statusLine.SetWidth(b.width).
 			SetLeft(leftStatus).
-			SetRight("Space: toggle | a: all | n: none | Enter: submit (2+ files) | Esc: cancel")
+			SetRight("Space:toggle | Ctrl+A:all | Ctrl+D:none | Enter:submit | Esc:cancel")
 
 		// Join content and status bar
 		return lipgloss.JoinVertical(
