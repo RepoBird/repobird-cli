@@ -29,12 +29,38 @@ The dashboard uses a Miller Columns layout with three main sections:
 
 ## Navigation
 
+The TUI uses a message-based navigation architecture that provides consistent behavior across all views.
+
 ### Basic Navigation
 - **Tab** - Cycle through columns
 - **↑↓** or **j/k** - Move up/down in current column
 - **←→** or **h/l** - Move between columns
 - **Enter** - Select item and move to next column
 - **Backspace** - Move to previous column
+
+### Navigation Architecture
+
+The TUI implements a clean navigation system with the following components:
+
+#### App Router
+- Central navigation controller handling all view transitions
+- Maintains navigation history stack for back navigation
+- Manages shared context between views
+
+#### Navigation Messages
+All view transitions use type-safe navigation messages:
+- `NavigateToCreateMsg` - Go to create run view
+- `NavigateToDetailsMsg` - Go to run details view
+- `NavigateToListMsg` - Go to run list view
+- `NavigateBackMsg` - Go back in navigation history
+- `NavigateToDashboardMsg` - Return to dashboard (clears history)
+- `NavigateToErrorMsg` - Show error view with recovery options
+
+#### View History
+- **Back navigation** - Press `q`, `ESC`, or `b` to go back
+- **Navigation stack** - Views are pushed onto a stack for history
+- **Dashboard reset** - Pressing `d` clears history and returns to dashboard
+- **Error recovery** - Recoverable errors allow going back, non-recoverable clear history
 
 ### Fuzzy Search (FZF Mode)
 
@@ -267,6 +293,36 @@ Switch layouts using:
 - **2** - All runs
 - **3** - Repositories only
 - **l** - Cycle through layouts
+
+## Shared Components
+
+The TUI uses reusable components for consistency across views:
+
+### ScrollableList Component
+- Multi-column scrollable lists with keyboard navigation
+- Supports both row and column navigation
+- Consistent selection highlighting and keyboard shortcuts
+- Used in Dashboard, List View, and other list-based views
+
+### Form Component
+- Input forms with validation and field management
+- Support for text input, text area, and select fields
+- Real-time validation with error messages
+- Consistent styling and keyboard navigation
+- Used in Create Run view and configuration forms
+
+### ErrorView Component
+- Consistent error display with recovery options
+- Recoverable errors allow going back to previous view
+- Non-recoverable errors clear navigation history
+- User-friendly error messages with suggested actions
+
+### Navigation Context
+Views can share temporary data through navigation context:
+- Form data preservation during navigation
+- Selected repository/run information
+- User preferences and temporary state
+- Automatically cleared when returning to dashboard
 
 ## Advanced Features
 

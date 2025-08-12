@@ -341,6 +341,65 @@ func TestConcurrentCache(t *testing.T) {
 }
 ```
 
+### Testing Cache Deadlock Prevention
+```go
+func TestCacheDeadlockPrevention(t *testing.T) {
+    // Test proper lock ordering in cache hierarchy
+    cache := cache.NewSimpleCache()
+    
+    // Simulate high contention scenario
+    var wg sync.WaitGroup
+    errChan := make(chan error, 200)
+    
+    // Mix of read/write operations that could cause deadlocks
+    for i := 0; i < 100; i++ {
+        // Concurrent writes
+        wg.Add(1)
+        go func(n int) {
+            defer wg.Done()
+            run := &models.Run{ID: fmt.Sprintf("run-%d", n)}
+            if err := cache.Set(run.ID, run); err != nil {
+                errChan <- err
+            }
+        }(i)
+        
+        // Concurrent reads
+        wg.Add(1)
+        go func(n int) {
+            defer wg.Done()
+            if _, err := cache.Get(fmt.Sprintf("run-%d", n)); err != nil {
+                errChan <- err
+            }
+        }(i)
+    }
+    
+    wg.Wait()
+    close(errChan)
+    
+    // Check for any errors indicating deadlocks
+    for err := range errChan {
+        t.Errorf("Cache operation failed: %v", err)
+    }
+}
+```
+
+### Race Detection Best Practices
+To run tests with race detection for cache-related code:
+
+```bash
+# Always run cache tests with race detection
+go test -race ./internal/cache/...
+
+# Run TUI tests that use cache
+go test -race ./internal/tui/...
+
+# Full race detection on entire codebase
+go test -race ./...
+
+# Check specific cache deadlock scenarios
+go test -race -run "TestCache.*Deadlock" ./internal/cache/...
+```
+
 ### Testing with Context
 ```go
 func TestWithTimeout(t *testing.T) {
@@ -591,6 +650,398 @@ func TestTUIMessages(t *testing.T) {
     if len(listView.runs) != 1 {
         t.Error("expected runs to be loaded")
     }
+}
+```
+
+## Testing Navigation Architecture
+
+The TUI uses a message-based navigation system that requires specific testing patterns.
+
+### Testing Navigation Messages
+
+Test that views properly generate navigation messages:
+
+```go
+func TestNavigationMessages(t *testing.T) {
+    t.Run("Navigate to details", func(t *testing.T) {
+        mockClient := &MockAPIClient{}
+        view := views.NewDashboardView(mockClient)
+        
+        // Simulate pressing Enter on a run
+        model, cmd := view.Update(tea.KeyMsg{Type: tea.KeyEnter})
+        
+        // Execute the command to get the message
+        var msg tea.Msg
+        if cmd != nil {
+            msg = cmd()
+        }
+        
+        // Verify navigation message is correct
+        navMsg, ok := msg.(messages.NavigateToDetailsMsg)
+        assert.True(t, ok, "Expected NavigateToDetailsMsg")
+        assert.NotEmpty(t, navMsg.RunID, "RunID should be set")
+    })
+    
+    t.Run("Navigate back", func(t *testing.T) {
+        view := views.NewCreateRunView(mockClient)
+        
+        // Simulate pressing escape key
+        model, cmd := view.Update(tea.KeyMsg{Type: tea.KeyEsc})
+        
+        var msg tea.Msg
+        if cmd != nil {
+            msg = cmd()
+        }
+        
+        // Verify back navigation message
+        _, ok := msg.(messages.NavigateBackMsg)
+        assert.True(t, ok, "Expected NavigateBackMsg")
+    })
+}
+```
+
+### Testing App Router
+
+Test the central navigation router that handles all view transitions:
+
+```go
+func TestAppRouter(t *testing.T) {
+    t.Run("Initialize with dashboard", func(t *testing.T) {
+        mockClient := &MockAPIClient{}
+        app := NewApp(mockClient)
+        
+        cmd := app.Init()
+        assert.NotNil(t, cmd)
+        assert.IsType(t, &views.DashboardView{}, app.current)
+        assert.Len(t, app.viewStack, 0)
+    })
+    
+    t.Run("Navigate to create view", func(t *testing.T) {
+        mockClient := &MockAPIClient{}
+        app := NewApp(mockClient)
+        _ = app.Init()
+        
+        // Send navigation message
+        model, cmd := app.Update(messages.NavigateToCreateMsg{
+            SelectedRepository: "test/repo",
+        })
+        
+        appModel := model.(*App)
+        assert.IsType(t, &views.CreateRunView{}, appModel.current)
+        assert.Len(t, appModel.viewStack, 1)
+        
+        // Verify context was set
+        repo := appModel.cache.GetNavigationContext("selected_repo")
+        assert.Equal(t, "test/repo", repo)
+    })
+    
+    t.Run("Navigate back through history", func(t *testing.T) {
+        mockClient := &MockAPIClient{}
+        app := NewApp(mockClient)
+        _ = app.Init()
+        
+        // Build navigation stack
+        app.Update(messages.NavigateToCreateMsg{})
+        app.Update(messages.NavigateToDetailsMsg{RunID: "123"})
+        
+        // Navigate back
+        model, _ := app.Update(messages.NavigateBackMsg{})
+        appModel := model.(*App)
+        
+        assert.IsType(t, &views.CreateRunView{}, appModel.current)
+        assert.Len(t, appModel.viewStack, 1)
+        
+        // Navigate back again
+        model, _ = appModel.Update(messages.NavigateBackMsg{})
+        appModel = model.(*App)
+        
+        assert.IsType(t, &views.DashboardView{}, appModel.current)
+        assert.Len(t, appModel.viewStack, 0)
+    })
+}
+```
+
+### Testing Navigation Context
+
+Test context sharing between views:
+
+```go
+func TestNavigationContext(t *testing.T) {
+    t.Run("Context preserved during navigation", func(t *testing.T) {
+        cache := cache.NewSimpleCache()
+        
+        // Set navigation context
+        cache.SetNavigationContext("user_input", "test_value")
+        cache.SetNavigationContext("form_data", map[string]string{
+            "title": "Test Run",
+            "repo":  "org/repo",
+        })
+        
+        // Verify context retrieval
+        userInput := cache.GetNavigationContext("user_input")
+        assert.Equal(t, "test_value", userInput)
+        
+        formData := cache.GetNavigationContext("form_data")
+        assert.NotNil(t, formData)
+        
+        data := formData.(map[string]string)
+        assert.Equal(t, "Test Run", data["title"])
+        assert.Equal(t, "org/repo", data["repo"])
+    })
+    
+    t.Run("Context cleared on dashboard navigation", func(t *testing.T) {
+        cache := cache.NewSimpleCache()
+        
+        // Set context
+        cache.SetNavigationContext("temp_data", "should_be_cleared")
+        cache.SetContext("permanent_data", "should_persist")
+        
+        // Clear navigation context (simulating dashboard navigation)
+        cache.ClearAllNavigationContext()
+        
+        // Verify navigation context cleared, regular context preserved
+        assert.Nil(t, cache.GetNavigationContext("temp_data"))
+        assert.Equal(t, "should_persist", cache.GetContext("permanent_data"))
+    })
+}
+```
+
+### Testing Shared Components
+
+Test the reusable UI components:
+
+```go
+func TestScrollableListComponent(t *testing.T) {
+    t.Run("Basic functionality", func(t *testing.T) {
+        list := components.NewScrollableList(
+            components.WithColumns(3),
+            components.WithValueNavigation(true),
+        )
+        
+        items := [][]string{
+            {"Run 123", "DONE", "org/repo"},
+            {"Run 456", "RUNNING", "org/other"},
+        }
+        list.SetItems(items)
+        
+        // Test selection
+        selected := list.GetSelected()
+        assert.Equal(t, []string{"Run 123", "DONE", "org/repo"}, selected)
+        
+        // Test navigation
+        model, _ := list.Update(tea.KeyMsg{Type: tea.KeyDown})
+        updatedList := model.(*components.ScrollableList)
+        
+        selected = updatedList.GetSelected()
+        assert.Equal(t, []string{"Run 456", "RUNNING", "org/other"}, selected)
+    })
+    
+    t.Run("Keyboard navigation", func(t *testing.T) {
+        list := components.NewScrollableList(
+            components.WithColumns(2),
+            components.WithKeyNavigation(true),
+        )
+        
+        items := [][]string{
+            {"Item 1", "Value 1"},
+            {"Item 2", "Value 2"},
+        }
+        list.SetItems(items)
+        
+        // Test column navigation
+        model, _ := list.Update(tea.KeyMsg{Type: tea.KeyRight})
+        updatedList := model.(*components.ScrollableList)
+        
+        assert.Equal(t, 1, updatedList.GetFocusedColumn())
+    })
+}
+
+func TestFormComponent(t *testing.T) {
+    t.Run("Field management", func(t *testing.T) {
+        form := components.NewForm()
+        
+        fields := []components.FormField{
+            {
+                Key:      "title",
+                Label:    "Title",
+                Type:     components.TextInput,
+                Required: true,
+            },
+            {
+                Key:     "run_type",
+                Label:   "Run Type",
+                Type:    components.Select,
+                Options: []string{"run", "plan"},
+            },
+        }
+        form.SetFields(fields)
+        
+        // Set values
+        form.SetValue("title", "Test Run")
+        form.SetValue("run_type", "run")
+        
+        // Verify form data
+        assert.True(t, form.IsComplete())
+        
+        data := form.GetData()
+        assert.Equal(t, "Test Run", data["title"])
+        assert.Equal(t, "run", data["run_type"])
+    })
+    
+    t.Run("Validation", func(t *testing.T) {
+        form := components.NewForm(components.WithValidation(true))
+        
+        fields := []components.FormField{
+            {
+                Key:      "repository",
+                Label:    "Repository",
+                Type:     components.TextInput,
+                Required: true,
+                Validator: func(value string) error {
+                    if !strings.Contains(value, "/") {
+                        return errors.New("repository must be in org/repo format")
+                    }
+                    return nil
+                },
+            },
+        }
+        form.SetFields(fields)
+        
+        // Test invalid input
+        form.SetValue("repository", "invalid")
+        assert.False(t, form.IsValid())
+        
+        // Test valid input
+        form.SetValue("repository", "org/repo")
+        assert.True(t, form.IsValid())
+    })
+}
+```
+
+### Integration Testing for Navigation
+
+Test complete navigation flows:
+
+```go
+func TestNavigationIntegration(t *testing.T) {
+    t.Run("Complete flow: Dashboard -> Create -> Details -> Back", func(t *testing.T) {
+        mockClient := &MockAPIClient{
+            CreateRunFunc: func(ctx context.Context, req *RunRequest) (*Run, error) {
+                return &Run{ID: "test-123", Status: "DONE"}, nil
+            },
+            GetRunFunc: func(ctx context.Context, id string) (*Run, error) {
+                return &Run{ID: id, Status: "DONE"}, nil
+            },
+        }
+        
+        app := NewApp(mockClient)
+        _ = app.Init()
+        
+        // Navigate to create
+        model, _ := app.Update(messages.NavigateToCreateMsg{
+            SelectedRepository: "test/repo",
+        })
+        app = model.(*App)
+        assert.IsType(t, &views.CreateRunView{}, app.current)
+        
+        // Navigate to details
+        model, _ = app.Update(messages.NavigateToDetailsMsg{
+            RunID: "test-123",
+        })
+        app = model.(*App)
+        assert.IsType(t, &views.RunDetailsView{}, app.current)
+        
+        // Navigate back to create
+        model, _ = app.Update(messages.NavigateBackMsg{})
+        app = model.(*App)
+        assert.IsType(t, &views.CreateRunView{}, app.current)
+        
+        // Navigate back to dashboard
+        model, _ = app.Update(messages.NavigateBackMsg{})
+        app = model.(*App)
+        assert.IsType(t, &views.DashboardView{}, app.current)
+        assert.Len(t, app.viewStack, 0)
+    })
+    
+    t.Run("Dashboard navigation clears history", func(t *testing.T) {
+        mockClient := &MockAPIClient{}
+        app := NewApp(mockClient)
+        _ = app.Init()
+        
+        // Build navigation stack
+        app.Update(messages.NavigateToCreateMsg{})
+        app.Update(messages.NavigateToDetailsMsg{RunID: "123"})
+        assert.Len(t, app.viewStack, 2)
+        
+        // Navigate directly to dashboard
+        model, _ := app.Update(messages.NavigateToDashboardMsg{})
+        app = model.(*App)
+        
+        assert.IsType(t, &views.DashboardView{}, app.current)
+        assert.Len(t, app.viewStack, 0) // Stack cleared
+    })
+}
+```
+
+### Testing Error Navigation
+
+Test error view navigation and recovery:
+
+```go
+func TestErrorNavigation(t *testing.T) {
+    t.Run("Recoverable error navigation", func(t *testing.T) {
+        mockClient := &MockAPIClient{}
+        app := NewApp(mockClient)
+        _ = app.Init()
+        
+        // Navigate to create view
+        app.Update(messages.NavigateToCreateMsg{})
+        
+        // Encounter recoverable error
+        model, _ := app.Update(messages.NavigateToErrorMsg{
+            Error:       errors.New("validation error"),
+            Message:     "Invalid input",
+            Recoverable: true,
+        })
+        app = model.(*App)
+        
+        assert.IsType(t, &views.ErrorView{}, app.current)
+        assert.Len(t, app.viewStack, 2) // Dashboard + Create in stack
+        
+        // Navigate back (should recover)
+        model, _ = app.Update(messages.NavigateBackMsg{})
+        app = model.(*App)
+        
+        assert.IsType(t, &views.CreateRunView{}, app.current)
+        assert.Len(t, app.viewStack, 1)
+    })
+    
+    t.Run("Non-recoverable error clears stack", func(t *testing.T) {
+        mockClient := &MockAPIClient{}
+        app := NewApp(mockClient)
+        _ = app.Init()
+        
+        // Build navigation stack
+        app.Update(messages.NavigateToCreateMsg{})
+        app.Update(messages.NavigateToDetailsMsg{RunID: "123"})
+        
+        // Encounter non-recoverable error
+        model, _ := app.Update(messages.NavigateToErrorMsg{
+            Error:       errors.New("fatal error"),
+            Message:     "System failure",
+            Recoverable: false,
+        })
+        app = model.(*App)
+        
+        assert.IsType(t, &views.ErrorView{}, app.current)
+        assert.Len(t, app.viewStack, 0) // Stack cleared
+        
+        // Navigate back goes to dashboard
+        model, _ = app.Update(messages.NavigateBackMsg{})
+        app = model.(*App)
+        
+        assert.IsType(t, &views.DashboardView{}, app.current)
+    })
 }
 ```
 
@@ -1077,6 +1528,12 @@ go test -run TestThatFailed ./package
 
 # Run with race detector
 go test -race -run TestThatFailed ./package
+
+# Run race detection on cache tests specifically
+go test -race ./internal/cache/...
+
+# Check for cache deadlocks
+go test -race -v ./internal/cache/... 2>&1 | grep -i "race\|deadlock"
 
 # Get stack trace
 GOTRACEBACK=all go test -run TestThatFailed ./package

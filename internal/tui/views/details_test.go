@@ -198,7 +198,8 @@ func TestRunDetailsView_HandleWindowSizeMsg(t *testing.T) {
 		Status: models.StatusDone,
 		Title:  "Test Run",
 	}
-	view := NewRunDetailsView(client, run)
+	testCache := cache.NewSimpleCache()
+	view := NewRunDetailsView(client, testCache, run.GetIDString())
 
 	tests := []struct {
 		name   string
@@ -314,7 +315,8 @@ func TestRunDetailsView_PreventBlackScreen(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			view := NewRunDetailsView(client, run)
+			testCache := cache.NewSimpleCache()
+	view := NewRunDetailsView(client, testCache, run.GetIDString())
 			view = tt.setupFunc(view)
 
 			viewOutput := view.View()
@@ -353,7 +355,8 @@ func TestRunDetailsView_ViewportRespectsDimensions(t *testing.T) {
 		Status: models.StatusDone,
 		Title:  "Test Run",
 	}
-	view := NewRunDetailsView(client, run)
+	testCache := cache.NewSimpleCache()
+	view := NewRunDetailsView(client, testCache, run.GetIDString())
 
 	tests := []struct {
 		name   string

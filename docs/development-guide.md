@@ -185,20 +185,42 @@ func (c *Client) NewEndpointWithRetry(ctx context.Context, param string) (*Respo
 
 ### 4. Adding TUI Views
 
+The TUI uses a message-based navigation pattern where views communicate through messages rather than creating child views directly.
+
+#### Navigation Pattern
+
 Create `/internal/tui/views/newview.go`:
 ```go
 package views
 
 import (
     tea "github.com/charmbracelet/bubbletea"
+    "github.com/repobird/repobird-cli/internal/tui/cache"
+    "github.com/repobird/repobird-cli/internal/tui/components"
+    "github.com/repobird/repobird-cli/internal/tui/messages"
 )
 
 type NewView struct {
+    client APIClient           // API client dependency
+    cache  *cache.SimpleCache // Embedded cache instance
+    
+    // UI components (use shared components when possible)
+    list   *components.ScrollableList
+    form   *components.Form
+    
     // State fields
+    width  int
+    height int
+    // ... other state
 }
 
-func NewNewView() *NewView {
-    return &NewView{}
+func NewNewView(client APIClient) *NewView {
+    return &NewView{
+        client: client,
+        cache:  cache.NewSimpleCache(), // Create cache instance
+        list:   components.NewScrollableList(),
+        form:   components.NewForm(),
+    }
 }
 
 func (v *NewView) Init() tea.Cmd {
@@ -208,17 +230,218 @@ func (v *NewView) Init() tea.Cmd {
 func (v *NewView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
     switch msg := msg.(type) {
     case tea.KeyMsg:
-        // Handle keys
+        switch msg.String() {
+        case "b", "esc":
+            // Navigate back using message
+            return v, func() tea.Msg {
+                return messages.NavigateBackMsg{}
+            }
+        case "d":
+            // Navigate to dashboard using message
+            return v, func() tea.Msg {
+                return messages.NavigateToDashboardMsg{}
+            }
+        case "enter":
+            // Navigate to another view with context
+            return v, func() tea.Msg {
+                return messages.NavigateToDetailsMsg{
+                    RunID: v.getSelectedRunID(),
+                }
+            }
+        }
+    case tea.WindowSizeMsg:
+        v.width = msg.Width
+        v.height = msg.Height
+        // Update component dimensions
+        v.list.Update(msg)
+        v.form.Update(msg)
     }
-    return v, nil
+    
+    // Update child components
+    var cmds []tea.Cmd
+    listModel, listCmd := v.list.Update(msg)
+    v.list = listModel.(*components.ScrollableList)
+    cmds = append(cmds, listCmd)
+    
+    formModel, formCmd := v.form.Update(msg)
+    v.form = formModel.(*components.Form)
+    cmds = append(cmds, formCmd)
+    
+    return v, tea.Batch(cmds...)
 }
 
 func (v *NewView) View() string {
-    return "View content"
+    if v.width == 0 || v.height == 0 {
+        return ""
+    }
+    
+    // Use shared components for consistent UI
+    return v.list.View() + "\n" + v.form.View()
+}
+
+// Helper methods
+func (v *NewView) getSelectedRunID() string {
+    // Implementation
+    return ""
 }
 ```
 
-### 5. Adding TUI Components
+#### Using Navigation Context
+
+Views can share data through navigation context:
+
+```go
+// In the originating view (e.g., Dashboard)
+func (v *DashboardView) navigateToCreate() tea.Cmd {
+    // Set context before navigation
+    v.cache.SetNavigationContext("selected_repo", v.getSelectedRepo())
+    v.cache.SetNavigationContext("user_preference", "advanced")
+    
+    return func() tea.Msg {
+        return messages.NavigateToCreateMsg{
+            SelectedRepository: v.getSelectedRepo(),
+        }
+    }
+}
+
+// In the target view (e.g., CreateRunView)
+func (v *CreateRunView) Init() tea.Cmd {
+    // Retrieve context
+    if repo := v.cache.GetNavigationContext("selected_repo"); repo != nil {
+        v.setRepository(repo.(string))
+    }
+    
+    if pref := v.cache.GetNavigationContext("user_preference"); pref != nil {
+        v.setMode(pref.(string))
+    }
+    
+    return nil
+}
+```
+
+### 5. Using Shared Components
+
+The TUI provides reusable components to ensure consistency and reduce code duplication.
+
+#### ScrollableList Component
+
+Use for multi-column scrollable lists with keyboard navigation:
+
+```go
+import "github.com/repobird/repobird-cli/internal/tui/components"
+
+// Create with configuration
+list := components.NewScrollableList(
+    components.WithColumns(3),
+    components.WithKeyNavigation(true),
+    components.WithValueNavigation(true),
+    components.WithDimensions(100, 50),
+    components.WithColumnWidths([]int{40, 30, 30}),
+)
+
+// Set data
+items := [][]string{
+    {"Run ID", "Status", "Repository"},
+    {"123", "DONE", "org/repo"},
+    {"456", "RUNNING", "org/other"},
+}
+list.SetItems(items)
+
+// Handle in Update method
+listModel, cmd := list.Update(msg)
+v.list = listModel.(*components.ScrollableList)
+
+// Get selection
+selected := list.GetSelected()           // Current row data
+index := list.GetSelectedIndex()         // Current row index
+list.SetSelected(5)                      // Set selection programmatically
+
+// Render
+listView := list.View()
+```
+
+#### Form Component
+
+Use for input forms with validation and field management:
+
+```go
+// Create form
+form := components.NewForm(
+    components.WithFormDimensions(80, 30),
+    components.WithValidation(true),
+)
+
+// Define fields
+fields := []components.FormField{
+    {
+        Key:         "repository",
+        Label:       "Repository",
+        Type:        components.TextInput,
+        Required:    true,
+        Placeholder: "org/repo",
+        Validator: func(value string) error {
+            if !strings.Contains(value, "/") {
+                return errors.New("repository must be in org/repo format")
+            }
+            return nil
+        },
+    },
+    {
+        Key:      "description",
+        Label:    "Description",
+        Type:     components.TextArea,
+        Required: false,
+    },
+    {
+        Key:     "run_type",
+        Label:   "Run Type",
+        Type:    components.Select,
+        Options: []string{"run", "plan", "approval"},
+    },
+}
+form.SetFields(fields)
+
+// Handle in Update method
+formModel, cmd := form.Update(msg)
+v.form = formModel.(*components.Form)
+
+// Get form data
+if form.IsComplete() {
+    data := form.GetData()
+    repository := data["repository"].(string)
+    description := data["description"].(string)
+}
+
+// Set values programmatically
+form.SetValue("repository", "my-org/my-repo")
+
+// Render
+formView := form.View()
+```
+
+#### ErrorView Component
+
+Use for consistent error display with recovery options:
+
+```go
+// Navigate to error view using message
+return v, func() tea.Msg {
+    return messages.NavigateToErrorMsg{
+        Error:       err,
+        Message:     "Failed to load run details",
+        Recoverable: true, // Allow going back
+    }
+}
+
+// For non-recoverable errors
+return v, func() tea.Msg {
+    return messages.NavigateToErrorMsg{
+        Error:       err,
+        Message:     "Critical system error",
+        Recoverable: false, // Clears navigation stack
+    }
+}
+```
 
 #### FZF Selector Component
 
@@ -285,6 +508,71 @@ case components.FZFSelectedMsg:
 if v.fzfMode != nil && v.fzfMode.IsActive() {
     return v.renderWithFZFOverlay(baseView)
 }
+```
+
+#### Navigation Best Practices
+
+**✅ DO:**
+- Use navigation messages for all view transitions
+- Embed `*cache.SimpleCache` in view structs for state management
+- Use shared components for consistency
+- Set navigation context before navigating
+- Handle window resize in all views
+- Clear navigation context when returning to dashboard
+
+**❌ DON'T:**
+- Create child views directly in Update methods
+- Use global variables for view state
+- Store navigation state in view fields
+- Bypass the App router for navigation
+- Create duplicate UI components
+
+**Message-Based Navigation Pattern:**
+```go
+// ✅ CORRECT: Use navigation messages
+case "enter":
+    return v, func() tea.Msg {
+        return messages.NavigateToDetailsMsg{
+            RunID: selectedID,
+            FromCreate: true,
+        }
+    }
+
+// ❌ INCORRECT: Direct view creation
+case "enter":
+    detailsView := views.NewRunDetailsView(v.client, selectedID)
+    return detailsView, detailsView.Init()
+```
+
+**Context Management Pattern:**
+```go
+// ✅ CORRECT: Use navigation context
+v.cache.SetNavigationContext("form_data", formValues)
+return v, func() tea.Msg {
+    return messages.NavigateToConfirmMsg{}
+}
+
+// ❌ INCORRECT: Pass data in message fields
+return v, func() tea.Msg {
+    return messages.NavigateToConfirmMsg{
+        FormData: formValues, // Tight coupling
+    }
+}
+```
+
+**Component Update Pattern:**
+```go
+// ✅ CORRECT: Proper component updates
+var cmds []tea.Cmd
+listModel, listCmd := v.list.Update(msg)
+v.list = listModel.(*components.ScrollableList)
+cmds = append(cmds, listCmd)
+
+return v, tea.Batch(cmds...)
+
+// ❌ INCORRECT: Ignoring component updates
+v.list.Update(msg) // Lost return values
+return v, nil
 ```
 
 ## Code Style Guidelines
@@ -424,6 +712,71 @@ make benchmark
 go test -bench=BenchmarkCache ./internal/cache
 ```
 
+## Cache Concurrency Patterns
+
+### Safe Cache Operations
+The cache system uses a layered approach to prevent deadlocks:
+
+```go
+// Pattern 1: Proper lock ordering in SimpleCache
+func (c *SimpleCache) Get(key string) (*Run, error) {
+    c.mu.RLock()
+    // Release lock BEFORE calling HybridCache to prevent deadlocks
+    c.mu.RUnlock()
+    
+    return c.hybridCache.Get(key)
+}
+
+// Pattern 2: Single-decision routing in HybridCache  
+func (h *HybridCache) Get(key string) (*Run, error) {
+    // Make routing decision WITHOUT holding locks
+    if h.shouldUseSession(key) {
+        return h.sessionCache.Get(key)
+    }
+    return h.permanentCache.Get(key)
+}
+
+// Pattern 3: Lock-free file I/O in PermanentCache
+func (p *PermanentCache) saveToFile(data []byte) error {
+    tempFile := p.filePath + ".tmp"
+    // Write to temp file, then atomic rename
+    if err := os.WriteFile(tempFile, data, 0644); err != nil {
+        return err
+    }
+    return os.Rename(tempFile, p.filePath)
+}
+```
+
+### Batch Update Pattern
+For TUI views handling multiple cache operations:
+
+```go
+// Collect all updates first
+updates := make(map[string]*Run)
+for _, runID := range runIDs {
+    if run, err := fetchFromAPI(runID); err == nil {
+        updates[runID] = run
+    }
+}
+
+// Apply all updates in a single batch
+cache.BatchUpdate(updates)
+```
+
+### Race Detection
+Run tests with race detection enabled:
+
+```bash
+# Enable race detector for all tests
+go test -race ./...
+
+# Focus on cache-related tests
+go test -race ./internal/cache/...
+
+# Integration tests with race detection
+make test-integration GOFLAGS=-race
+```
+
 ## Debugging
 
 ### Enable Debug Logging
@@ -446,6 +799,18 @@ debug.LogToFilef("Formatted: %v", data)
 
 # Or manually
 REPOBIRD_DEBUG=true repobird tui 2>debug.log
+```
+
+### Debug Cache Issues
+```bash
+# Enable cache-specific debugging
+export REPOBIRD_DEBUG_CACHE=true
+
+# Monitor cache operations
+tail -f /tmp/repobird_debug.log | grep -i cache
+
+# Check for deadlock patterns
+go test -race -v ./internal/cache/... 2>&1 | grep -i "race\|deadlock"
 ```
 
 ### Using Delve Debugger

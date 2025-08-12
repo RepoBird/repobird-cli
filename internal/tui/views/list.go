@@ -412,7 +412,7 @@ func (v *RunListView) handleEnterKey() (tea.Model, tea.Cmd) {
 func (v *RunListView) handleNewRunKey() (tea.Model, tea.Cmd) {
 	debug.LogToFilef("DEBUG: ListView creating NewCreateRunView - runs=%d, cached=%v, detailsCache=%d\n",
 		len(v.runs), v.cached, len(v.detailsCache))
-	createView := NewCreateRunViewWithCache(v.client, v.runs, v.cached, v.cachedAt, v.detailsCache, v.cache)
+	createView := NewCreateRunViewWithCache(v.client, v.cache)
 	createView.width = v.width
 	createView.height = v.height
 	return createView, nil

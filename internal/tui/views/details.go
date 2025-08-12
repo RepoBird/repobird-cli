@@ -22,6 +22,7 @@ import (
 
 type RunDetailsView struct {
 	client        APIClient
+	runID         string // Store just the ID for loading
 	run           models.RunResponse
 	keys          components.KeyMap
 	help          help.Model
@@ -37,11 +38,6 @@ type RunDetailsView struct {
 	logs          string
 	statusHistory []string
 	pollingStatus bool // Track if currently fetching status
-	// Cache from parent list view
-	parentRuns         []models.RunResponse
-	parentCached       bool
-	parentCachedAt     time.Time
-	parentDetailsCache map[string]*models.RunResponse
 	// Cache retry mechanism
 	cacheRetryCount int
 	maxCacheRetries int
@@ -59,12 +55,7 @@ type RunDetailsView struct {
 	fieldIndices   []int    // Line indices of selectable fields in the viewport
 	fieldRanges    [][2]int // Start and end line indices for each field (for multi-line fields)
 	navigationMode bool     // Whether we're in navigation mode
-	// Dashboard state for restoration
-	dashboardSelectedRepoIdx    int
-	dashboardSelectedRunIdx     int
-	dashboardSelectedDetailLine int
-	dashboardFocusedColumn      int
-	// Embedded cache
+	// Shared cache from app level
 	cache *cache.SimpleCache
 }
 
@@ -87,36 +78,46 @@ func (v *RunDetailsView) Init() tea.Cmd {
 		})
 	}
 
-	// Only load details if not already loaded from cache
-	debug.LogToFilef("DEBUG: Init() - v.loading=%t, status='%s'\n", v.loading, v.run.Status)
+	// Load run details if needed
+	debug.LogToFilef("DEBUG: Init() - v.loading=%t, runID='%s'\n", v.loading, v.runID)
 	if v.loading {
-		debug.LogToFilef("DEBUG: Need to load data for run '%s'\n", v.run.GetIDString())
-		// Try cache one more time before making API call
-		if v.parentDetailsCache != nil && v.cacheRetryCount < v.maxCacheRetries {
-			runID := v.run.GetIDString()
-			if cachedRun, exists := v.parentDetailsCache[runID]; exists && cachedRun != nil {
-				// Cache hit on retry!
-				debug.LogToFilef("DEBUG: Cache retry successful for runID='%s'\n", runID)
-
-				v.run = *cachedRun
-				v.loading = false
-				v.updateStatusHistory(string(cachedRun.Status), false)
-				v.updateContent()
+		debug.LogToFilef("DEBUG: Need to load data for run '%s'\n", v.runID)
+		
+		// Check cache first
+		if v.cache != nil {
+			// Try to get from cache
+			runs, _, detailsCache := v.cache.GetCachedList()
+			if detailsCache != nil {
+				if cachedRun, exists := detailsCache[v.runID]; exists && cachedRun != nil {
+					// Cache hit!
+					debug.LogToFilef("DEBUG: Cache hit for runID='%s'\n", v.runID)
+					v.run = *cachedRun
+					v.loading = false
+					v.updateStatusHistory(string(cachedRun.Status), false)
+					v.updateContent()
+				} else {
+					// Cache miss, load from API
+					debug.LogToFilef("DEBUG: Cache miss - making API call for runID='%s'\n", v.runID)
+					cmds = append(cmds, v.loadRunDetails())
+					cmds = append(cmds, v.spinner.Tick)
+				}
 			} else {
-				v.cacheRetryCount++
-				debug.LogToFilef("DEBUG: Cache miss on retry %d - making API call for runID='%s'\n", v.cacheRetryCount, runID)
-				// Still no cache hit, load from API
+				// No cache available, load from API
+				debug.LogToFilef("DEBUG: No cache available - making API call for runID='%s'\n", v.runID)
 				cmds = append(cmds, v.loadRunDetails())
 				cmds = append(cmds, v.spinner.Tick)
 			}
+			
+			// Also save runs to avoid unused variable error
+			_ = runs
 		} else {
-			debug.LogToFilef("DEBUG: No cache available - making API call for runID='%s'\n", v.run.GetIDString())
-			// Load from API
+			// No cache, load from API
+			debug.LogToFilef("DEBUG: No cache configured - making API call for runID='%s'\n", v.runID)
 			cmds = append(cmds, v.loadRunDetails())
 			cmds = append(cmds, v.spinner.Tick)
 		}
 	} else {
-		debug.LogToFilef("DEBUG: Using cached data for run '%s' (status: %s)\n", v.run.GetIDString(), v.run.Status)
+		debug.LogToFilef("DEBUG: Already have data for run '%s' (status: %s)\n", v.runID, v.run.Status)
 	}
 
 	// Only start polling for active runs (startPolling checks status internally)
@@ -545,39 +546,38 @@ func (v *RunDetailsView) updateContent() {
 // Status history and highlighting methods are defined in details_rendering.go
 
 func (v *RunDetailsView) loadRunDetails() tea.Cmd {
-	// Capture the current run ID to ensure it doesn't get lost
-	originalRunID := v.run.GetIDString()
-	originalRun := v.run
+	// Use the stored runID directly
+	runID := v.runID
 
 	return func() tea.Msg {
-		if originalRunID == "" {
+		if runID == "" {
 			// Debug: Log empty run ID issue
 			debug.LogToFile("DEBUG: LoadRunDetails called with empty runID - returning error\n")
-			return runDetailsLoadedMsg{run: originalRun, err: fmt.Errorf("invalid run ID: empty string")}
+			return runDetailsLoadedMsg{run: v.run, err: fmt.Errorf("invalid run ID: empty string")}
 		}
 
 		// Debug: Log API call for run details
-		debug.LogToFilef("DEBUG: LoadRunDetails calling GetRun for runID='%s'\n", originalRunID)
+		debug.LogToFilef("DEBUG: LoadRunDetails calling GetRun for runID='%s'\n", runID)
 
-		runPtr, err := v.client.GetRun(originalRunID)
+		runPtr, err := v.client.GetRun(runID)
 		if err != nil {
-			debug.LogToFilef("DEBUG: GetRun failed for runID='%s', err=%v\n", originalRunID, err)
-			return runDetailsLoadedMsg{run: originalRun, err: fmt.Errorf("API error for run %s: %w", originalRunID, err)}
+			debug.LogToFilef("DEBUG: GetRun failed for runID='%s', err=%v\n", runID, err)
+			return runDetailsLoadedMsg{run: v.run, err: fmt.Errorf("API error for run %s: %w", runID, err)}
 		}
 
 		if runPtr == nil {
-			debug.LogToFilef("DEBUG: GetRun returned nil for runID='%s'\n", originalRunID)
-			return runDetailsLoadedMsg{run: originalRun, err: fmt.Errorf("API returned nil for run %s", originalRunID)}
+			debug.LogToFilef("DEBUG: GetRun returned nil for runID='%s'\n", runID)
+			return runDetailsLoadedMsg{run: v.run, err: fmt.Errorf("API returned nil for run %s", runID)}
 		}
 
 		// Ensure the returned run has the correct ID
 		updatedRun := *runPtr
-		if updatedRun.GetIDString() == "" && originalRun.ID != "" {
-			updatedRun.ID = originalRun.ID
+		if updatedRun.GetIDString() == "" && runID != "" {
+			updatedRun.ID = runID
 		}
 
 		debug.LogToFilef("DEBUG: LoadRunDetails successful for runID='%s', newID='%s'\n",
-			originalRunID, updatedRun.GetIDString())
+			runID, updatedRun.GetIDString())
 
 		return runDetailsLoadedMsg{run: updatedRun, err: nil}
 	}

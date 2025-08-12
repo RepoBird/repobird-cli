@@ -31,20 +31,44 @@ The command layer handles user interaction through CLI commands using the Cobra 
 - **TUI Command**: Launches the interactive terminal interface
 
 ### 2. TUI Layer (`/internal/tui/`)
-The Terminal User Interface provides rich, interactive experiences using Bubble Tea.
+The Terminal User Interface provides rich, interactive experiences using Bubble Tea with a message-based navigation architecture.
 
 ```
-┌──────────────────────────────────┐
-│         TUI Application          │
-├──────────────────────────────────┤
-│  Views  │ Components │  Styles   │
-├──────────────────────────────────┤
-│    Forms   │   Debug Utilities   │
-└──────────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│                    App (Router)                          │
+│              Implements tea.Model Interface              │
+├──────────────────────────────────────────────────────────┤
+│  Navigation Stack  │  Message Handling  │  Context Mgmt │
+├──────────────────────────────────────────────────────────┤
+│             Views (Dashboard, Create, List, Details)     │
+├──────────────────────────────────────────────────────────┤
+│     Shared Components (ScrollableList, Form, Error)      │
+├──────────────────────────────────────────────────────────┤
+│    Navigation Messages   │   Debug Utilities   │ Styles  │
+└──────────────────────────────────────────────────────────┘
+```
+
+**Navigation Architecture:**
+The TUI uses a centralized message-based navigation system where views communicate through messages rather than creating child views directly.
+
+**Key Components:**
+- **App Router** (`app.go`): Central navigation controller implementing Bubble Tea Model
+- **Navigation Messages** (`messages/navigation.go`): Type-safe navigation requests
+- **View Stack**: History management for back navigation
+- **Shared Components**: Reusable UI components (ScrollableList, Form)
+- **Navigation Context**: Temporary state sharing via cache
+
+**Navigation Flow:**
+```
+View A → NavigateToViewBMsg → App Router → Create View B → Push A to Stack
+View B → NavigateBackMsg → App Router → Pop Stack → Restore View A
+Any View → NavigateToDashboardMsg → App Router → Clear Stack → Dashboard
 ```
 
 Key features:
-- Multi-view navigation (List → Details → Create)
+- Message-based navigation (no direct view creation)
+- Navigation history with back support
+- Context preservation during navigation
 - Real-time status updates
 - Vim-style keybindings
 - Clipboard integration
@@ -253,23 +277,55 @@ Poll Loop (with interruption handling)
 ## Concurrency Model
 
 ### Thread-Safe Operations
-- Cache operations use sync.RWMutex
+- Cache operations use proper lock ordering to prevent deadlocks
 - API client uses context for cancellation
 - TUI uses message passing (actor model)
+- Single-decision routing in HybridCache to avoid nested locks
+- Lock-free file I/O in PermanentCache
+
+### Cache Concurrency Architecture
+```
+┌─────────────────────────────────────┐
+│         SimpleCache (top)           │
+│  - Acquires lock first              │
+│  - Releases before HybridCache call │
+└─────────────┬───────────────────────┘
+              ↓
+┌─────────────────────────────────────┐
+│        HybridCache (middle)         │
+│  - Single-decision routing          │
+│  - No lock during child calls       │
+└────────┬────────────┬───────────────┘
+         ↓            ↓
+┌──────────────┐ ┌───────────────────┐
+│ SessionCache │ │  PermanentCache   │
+│ - Own mutex  │ │ - Lock-free I/O   │
+└──────────────┘ └───────────────────┘
+```
 
 ### Concurrent Patterns
 ```go
-// Parallel API calls
+// Parallel API calls with proper error handling
 var wg sync.WaitGroup
+errChan := make(chan error, len(runIDs))
 for _, id := range runIDs {
     wg.Add(1)
     go func(id string) {
         defer wg.Done()
-        fetchRun(id)
+        if err := fetchRun(id); err != nil {
+            errChan <- err
+        }
     }(id)
 }
 wg.Wait()
+close(errChan)
 ```
+
+### Deadlock Prevention
+- **Lock Ordering**: Always acquire locks in consistent order (SimpleCache → HybridCache → Session/Permanent)
+- **No Nested Locks**: Release parent locks before calling child methods
+- **Atomic Operations**: Use lock-free patterns for file I/O operations
+- **Batch Updates**: Group cache operations to minimize lock contention
 
 ## Performance Optimizations
 
@@ -425,13 +481,67 @@ Enable with `--debug` flag:
 - Batch operations
 - Webhook notifications
 
+## TUI Navigation Patterns
+
+### Message-Based Navigation
+The TUI implements a clean message-based navigation pattern following Bubble Tea best practices:
+
+```go
+// Navigation messages are type-safe and explicit
+type NavigateToCreateMsg struct {
+    SelectedRepository string
+}
+
+// Views return navigation messages, not new views
+func (v *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+    case "n":
+        return v, func() tea.Msg {
+            return messages.NavigateToCreateMsg{
+                SelectedRepository: v.selectedRepo,
+            }
+        }
+}
+
+// App router handles all navigation
+func (a *App) handleNavigation(msg NavigationMsg) (tea.Model, tea.Cmd) {
+    switch msg := msg.(type) {
+    case NavigateToCreateMsg:
+        a.viewStack = append(a.viewStack, a.current)
+        a.current = views.NewCreateRunView(a.client)
+        return a, a.current.Init()
+    }
+}
+```
+
+### Shared Components Architecture
+Reusable components reduce code duplication and ensure consistency:
+
+- **ScrollableList**: Multi-column scrollable lists with keyboard navigation
+- **Form**: Input forms with validation and mode management
+- **ErrorView**: Consistent error display with recovery options
+
+### Navigation Context Management
+Context sharing without tight coupling:
+
+```go
+// Set navigation context
+cache.SetNavigationContext("selected_repo", "org/repo")
+
+// Retrieve in target view
+repo := cache.GetNavigationContext("selected_repo")
+
+// Clear when returning to dashboard
+cache.ClearAllNavigationContext()
+```
+
 ## Technology Stack
 
 ### Core Technologies
 - **Go 1.20+**: Primary language
 - **Cobra**: CLI framework
 - **Viper**: Configuration management
-- **Bubble Tea**: TUI framework
+- **Bubble Tea**: TUI framework with message-based architecture
+- **Lipgloss**: Terminal styling
 - **Standard library**: HTTP, crypto, encoding
 
 ### Development Tools
@@ -439,6 +549,7 @@ Enable with `--debug` flag:
 - **golangci-lint**: Code quality
 - **gosec**: Security analysis
 - **go test**: Testing framework
+- **testify**: Test assertions and mocking
 
 ## Best Practices Applied
 
@@ -447,3 +558,5 @@ Enable with `--debug` flag:
 3. **12-Factor App**: Configuration, logging, disposability
 4. **Go Idioms**: Error handling, interfaces, channels
 5. **Security First**: Secure by default, defense in depth
+6. **Message-Based Architecture**: Loose coupling via message passing
+7. **Component Reusability**: Shared components for consistency

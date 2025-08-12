@@ -52,11 +52,6 @@ type CreateRunView struct {
 	// Clipboard feedback (still need blink timing)
 	yankBlink     bool
 	yankBlinkTime time.Time
-	// Cache from parent list view
-	parentRuns         []models.RunResponse
-	parentCached       bool
-	parentCachedAt     time.Time
-	parentDetailsCache map[string]*models.RunResponse
 	// Repository selector
 	repoSelector *components.RepositorySelector
 	// FZF mode for repository selection
@@ -97,42 +92,30 @@ func NewCreateRunView(client APIClient) *CreateRunView {
 	// Create new cache instance
 	cache := cache.NewSimpleCache()
 	_ = cache.LoadFromDisk()
-	return NewCreateRunViewWithCache(client, nil, false, time.Time{}, nil, cache)
+	return NewCreateRunViewWithCache(client, cache)
 }
 
 // CreateRunViewConfig holds configuration for creating a new CreateRunView
 type CreateRunViewConfig struct {
 	Client             APIClient
-	ParentRuns         []models.RunResponse
-	ParentCached       bool
-	ParentCachedAt     time.Time
-	ParentDetailsCache map[string]*models.RunResponse
-	SelectedRepository string             // Pre-selected repository from dashboard
-	Cache              *cache.SimpleCache // Optional embedded cache
+	SelectedRepository string // Pre-selected repository from dashboard
 }
 
 // NewCreateRunViewWithConfig creates a new CreateRunView with the given configuration
 func NewCreateRunViewWithConfig(cfg CreateRunViewConfig) *CreateRunView {
 	debug.LogToFile("DEBUG: NewCreateRunViewWithConfig called\n")
 
-	// Use provided cache or create new one
-	embeddedCache := cfg.Cache
-	if embeddedCache == nil {
-		embeddedCache = cache.NewSimpleCache()
-		_ = embeddedCache.LoadFromDisk()
-	}
+	// Create own cache instance
+	embeddedCache := cache.NewSimpleCache()
+	_ = embeddedCache.LoadFromDisk()
 
 	view := &CreateRunView{
-		client:             cfg.Client,
-		keys:               components.DefaultKeyMap,
-		help:               help.New(),
-		parentRuns:         cfg.ParentRuns,
-		parentCached:       cfg.ParentCached,
-		parentCachedAt:     cfg.ParentCachedAt,
-		parentDetailsCache: cfg.ParentDetailsCache,
-		cache:              embeddedCache,
-		runType:            models.RunTypeRun,
-		inputMode:          components.NormalMode,
+		client:    cfg.Client,
+		keys:      components.DefaultKeyMap,
+		help:      help.New(),
+		cache:     embeddedCache,
+		runType:   models.RunTypeRun,
+		inputMode: components.NormalMode,
 	}
 
 	// Initialize components
@@ -155,26 +138,17 @@ func NewCreateRunViewWithConfig(cfg CreateRunViewConfig) *CreateRunView {
 
 func NewCreateRunViewWithCache(
 	client APIClient,
-	parentRuns []models.RunResponse,
-	parentCached bool,
-	parentCachedAt time.Time,
-	parentDetailsCache map[string]*models.RunResponse,
 	embeddedCache *cache.SimpleCache,
 ) *CreateRunView {
-	debug.LogToFilef("DEBUG: Creating CreateView - parentRuns=%d, parentCached=%v, detailsCache=%d\n",
-		len(parentRuns), parentCached, len(parentDetailsCache))
+	debug.LogToFile("DEBUG: Creating CreateView with cache\n")
 
 	view := &CreateRunView{
-		client:             client,
-		keys:               components.DefaultKeyMap,
-		help:               help.New(),
-		parentRuns:         parentRuns,
-		parentCached:       parentCached,
-		parentCachedAt:     parentCachedAt,
-		parentDetailsCache: parentDetailsCache,
-		cache:              embeddedCache,
-		runType:            models.RunTypeRun,
-		inputMode:          components.NormalMode,
+		client:    client,
+		keys:      components.DefaultKeyMap,
+		help:      help.New(),
+		cache:     embeddedCache,
+		runType:   models.RunTypeRun,
+		inputMode: components.NormalMode,
 	}
 
 	// Initialize components

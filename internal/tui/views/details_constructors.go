@@ -6,7 +6,6 @@ import (
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/repobird/repobird-cli/internal/tui/cache"
@@ -14,33 +13,59 @@ import (
 	"github.com/repobird/repobird-cli/internal/tui/debug"
 )
 
-// RunDetailsViewConfig holds configuration for creating a new RunDetailsView
-type RunDetailsViewConfig struct {
-	Client             APIClient
-	Run                models.RunResponse
-	ParentRuns         []models.RunResponse
-	ParentCached       bool
-	ParentCachedAt     time.Time
-	ParentDetailsCache map[string]*models.RunResponse
-	Cache              *cache.SimpleCache // Optional embedded cache
-	// Dashboard state for restoration
-	DashboardSelectedRepoIdx    int
-	DashboardSelectedRunIdx     int
-	DashboardSelectedDetailLine int
-	DashboardFocusedColumn      int
+// NewRunDetailsView creates a new RunDetailsView with minimal parameters (new pattern)
+func NewRunDetailsView(client APIClient, cache *cache.SimpleCache, runID string) *RunDetailsView {
+	// Create spinner
+	s := spinner.New()
+	s.Spinner = spinner.Dot
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("63"))
+
+	// Create viewport
+	vp := viewport.New(80, 20)
+
+	// Create the view with minimal state
+	v := &RunDetailsView{
+		client:          client,
+		runID:           runID,
+		run:             models.RunResponse{ID: runID}, // Minimal run object for loading
+		keys:            components.DefaultKeyMap,
+		help:            help.New(),
+		viewport:        vp,
+		spinner:         s,
+		loading:         true, // Always start loading
+		showLogs:        false,
+		statusHistory:   make([]string, 0),
+		cacheRetryCount: 0,
+		maxCacheRetries: 3,
+		statusLine:      components.NewStatusLine(),
+		cache:           cache, // Shared cache from app level
+		width:           80,    // default width
+		height:          24,    // default height
+		navigationMode:  true,  // Start in navigation mode
+	}
+
+	return v
 }
 
-// DetailsOption is a functional option for configuring RunDetailsView
+// Backward compatibility constructors - these delegate to the new minimal constructor
+
+// RunDetailsViewConfig holds configuration for creating a new RunDetailsView
+type RunDetailsViewConfig struct {
+	Client APIClient
+	RunID  string // Just the run ID, view will load its own data
+}
+
+// DetailsOption is a functional option for configuring RunDetailsView (deprecated)
 type DetailsOption func(*RunDetailsView)
 
-// WithCache sets a custom cache for the details view
+// WithCache sets a custom cache for the details view (deprecated)
 func WithCache(c *cache.SimpleCache) DetailsOption {
 	return func(v *RunDetailsView) {
 		v.cache = c
 	}
 }
 
-// WithDimensions sets the width and height for the details view
+// WithDimensions sets the width and height for the details view (deprecated)
 func WithDimensions(width, height int) DetailsOption {
 	return func(v *RunDetailsView) {
 		if width > 0 && height > 0 {
@@ -50,118 +75,64 @@ func WithDimensions(width, height int) DetailsOption {
 	}
 }
 
-// WithDashboardState configures the view to return to dashboard with restored state
+// WithDashboardState configures the view to return to dashboard with restored state (deprecated)
 func WithDashboardState(selectedRepoIdx, selectedRunIdx, selectedDetailLine, focusedColumn int) DetailsOption {
 	return func(v *RunDetailsView) {
-		v.dashboardSelectedRepoIdx = selectedRepoIdx
-		v.dashboardSelectedRunIdx = selectedRunIdx
-		v.dashboardSelectedDetailLine = selectedDetailLine
-		v.dashboardFocusedColumn = focusedColumn
+		// These fields no longer exist in the simplified view - ignore
+		debug.LogToFilef("DEBUG: WithDashboardState called but dashboard state fields are deprecated\n")
 	}
 }
 
-// WithParentData sets parent runs and cache data
+// WithParentData sets parent runs and cache data (deprecated)
 func WithParentData(parentRuns []models.RunResponse, parentCached bool, parentCachedAt time.Time, parentDetailsCache map[string]*models.RunResponse) DetailsOption {
 	return func(v *RunDetailsView) {
-		v.parentRuns = parentRuns
-		v.parentCached = parentCached
-		v.parentCachedAt = parentCachedAt
-		v.parentDetailsCache = parentDetailsCache
+		// These fields no longer exist in the simplified view - ignore
+		debug.LogToFilef("DEBUG: WithParentData called but parent data fields are deprecated\n")
+		
+		// If we have cache data, try to use it
+		if v.cache != nil && parentDetailsCache != nil {
+			// Store details cache in the shared cache if needed
+			for _, runData := range parentDetailsCache {
+				if runData != nil {
+					// Store in cache for future use
+					v.cache.SetRun(*runData)
+				}
+			}
+		}
 	}
 }
 
-// WithConfig applies all settings from a RunDetailsViewConfig
+// WithConfig applies all settings from a RunDetailsViewConfig (deprecated)
 func WithConfig(config RunDetailsViewConfig) DetailsOption {
 	return func(v *RunDetailsView) {
-		// Apply all config fields
-		if config.Cache != nil {
-			v.cache = config.Cache
-		}
-		v.parentRuns = config.ParentRuns
-		v.parentCached = config.ParentCached
-		v.parentCachedAt = config.ParentCachedAt
-		v.parentDetailsCache = config.ParentDetailsCache
-		v.dashboardSelectedRepoIdx = config.DashboardSelectedRepoIdx
-		v.dashboardSelectedRunIdx = config.DashboardSelectedRunIdx
-		v.dashboardSelectedDetailLine = config.DashboardSelectedDetailLine
-		v.dashboardFocusedColumn = config.DashboardFocusedColumn
+		debug.LogToFilef("DEBUG: WithConfig called - now using minimal config pattern\n")
+		// Parent state passing is removed - view loads its own data
 	}
 }
 
-// NewRunDetailsView creates a new RunDetailsView with functional options
-func NewRunDetailsView(client APIClient, run models.RunResponse, opts ...DetailsOption) *RunDetailsView {
-	// Create default cache instance
+// Backward compatibility - Old constructor pattern (deprecated)
+// This maintains backward compatibility but should be migrated to NewRunDetailsView
+func NewRunDetailsViewWithFunctionalOptions(client APIClient, run models.RunResponse, opts ...DetailsOption) *RunDetailsView {
+	// Extract run ID
+	runID := run.GetIDString()
+	
+	// Create with new minimal constructor
 	defaultCache := cache.NewSimpleCache()
 	_ = defaultCache.LoadFromDisk()
-
-	// Get cached data
-	runs, cached, detailsCache := defaultCache.GetCachedList()
-	var cachedAt time.Time
-	if cached {
-		cachedAt = time.Now()
-	}
-
-	// Create spinner
-	s := spinner.New()
-	s.Spinner = spinner.Dot
-	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("63"))
-
-	// Create viewport
-	vp := viewport.New(80, 20)
-
-	// Check if we have preloaded data for this run
-	needsLoading := true
-	runID := run.GetIDString()
-
-	// Check cache for preloaded data
-	if detailsCache != nil {
-		if cachedRun, exists := detailsCache[runID]; exists && cachedRun != nil {
-			debug.LogToFilef("DEBUG: Cache HIT for runID='%s'\n", runID)
-			run = *cachedRun
-			needsLoading = false
-		} else {
-			debug.LogToFilef("DEBUG: Cache MISS for runID='%s'\n", runID)
-		}
-	}
-
-	// Create the view with defaults
-	v := &RunDetailsView{
-		client:             client,
-		run:                run,
-		keys:               components.DefaultKeyMap,
-		help:               help.New(),
-		viewport:           vp,
-		spinner:            s,
-		loading:            needsLoading,
-		showLogs:           false,
-		parentRuns:         runs,
-		parentCached:       cached,
-		parentCachedAt:     cachedAt,
-		parentDetailsCache: detailsCache,
-		statusHistory:      make([]string, 0),
-		cacheRetryCount:    0,
-		maxCacheRetries:    3,
-		statusLine:         components.NewStatusLine(),
-		cache:              defaultCache,
-		width:              80,   // default width
-		height:             24,   // default height
-		navigationMode:     true, // Start in navigation mode
-	}
-
-	// Apply all options
-	for _, opt := range opts {
-		opt(v)
-	}
-
-	// Initialize status history with current status if we have cached data
-	if !needsLoading {
+	
+	v := NewRunDetailsView(client, defaultCache, runID)
+	
+	// If we already have run data, use it
+	if run.Status != "" || run.Title != "" {
+		v.run = run
+		v.loading = false
 		v.updateStatusHistory(string(run.Status), false)
 		v.updateContent()
 	}
 
-	// Apply dimensions to viewport after options
-	if v.width > 0 && v.height > 0 {
-		v.handleWindowSizeMsg(tea.WindowSizeMsg{Width: v.width, Height: v.height})
+	// Apply all options (mostly for backward compatibility)
+	for _, opt := range opts {
+		opt(v)
 	}
 
 	return v
@@ -169,10 +140,13 @@ func NewRunDetailsView(client APIClient, run models.RunResponse, opts ...Details
 
 // NewRunDetailsViewWithConfig creates a new RunDetailsView with the given configuration (backward compatibility)
 func NewRunDetailsViewWithConfig(config RunDetailsViewConfig) *RunDetailsView {
-	return NewRunDetailsView(config.Client, config.Run, WithConfig(config))
+	cacheInstance := cache.NewSimpleCache()
+	_ = cacheInstance.LoadFromDisk()
+	
+	return NewRunDetailsView(config.Client, cacheInstance, config.RunID)
 }
 
-// NewRunDetailsViewWithDashboardState creates a new details view with dashboard state for restoration (backward compatibility)
+// NewRunDetailsViewWithDashboardState creates a new details view (backward compatibility)
 func NewRunDetailsViewWithDashboardState(
 	client APIClient,
 	run models.RunResponse,
@@ -187,11 +161,40 @@ func NewRunDetailsViewWithDashboardState(
 	selectedDetailLine int,
 	focusedColumn int,
 ) *RunDetailsView {
-	return NewRunDetailsView(client, run,
-		WithParentData(parentRuns, parentCached, parentCachedAt, parentDetailsCache),
-		WithDimensions(width, height),
-		WithDashboardState(selectedRepoIdx, selectedRunIdx, selectedDetailLine, focusedColumn),
-	)
+	runID := run.GetIDString()
+	defaultCache := cache.NewSimpleCache()
+	_ = defaultCache.LoadFromDisk()
+	
+	// Store parent cache data
+	if parentDetailsCache != nil {
+		for _, runData := range parentDetailsCache {
+			if runData != nil {
+				defaultCache.SetRun(*runData)
+			}
+		}
+	}
+	
+	view := NewRunDetailsView(client, defaultCache, runID)
+	
+	// Set dimensions
+	if width > 0 && height > 0 {
+		view.width = width
+		view.height = height
+	}
+	
+	// Use provided run data if available
+	if run.Status != "" || run.Title != "" {
+		view.run = run
+		view.loading = false
+		view.updateStatusHistory(string(run.Status), false)
+		view.updateContent()
+	}
+	
+	// Dashboard state fields are deprecated - just log
+	debug.LogToFilef("DEBUG: Dashboard state parameters ignored in new pattern (repo=%d, run=%d, detail=%d, column=%d)\n", 
+		selectedRepoIdx, selectedRunIdx, selectedDetailLine, focusedColumn)
+	
+	return view
 }
 
 // NewRunDetailsViewWithCacheAndDimensions creates a new details view with cache and dimensions (backward compatibility)
@@ -205,13 +208,40 @@ func NewRunDetailsViewWithCacheAndDimensions(
 	width int,
 	height int,
 ) *RunDetailsView {
-	// Create cache for this view
-	c := cache.NewSimpleCache()
-	return NewRunDetailsView(client, run,
-		WithCache(c),
-		WithParentData(parentRuns, parentCached, parentCachedAt, parentDetailsCache),
-		WithDimensions(width, height),
-	)
+	runID := run.GetIDString()
+	viewCache := cache.NewSimpleCache()
+	_ = viewCache.LoadFromDisk()
+	
+	// Store parent cache data
+	if parentDetailsCache != nil {
+		for _, runData := range parentDetailsCache {
+			if runData != nil {
+				viewCache.SetRun(*runData)
+			}
+		}
+	}
+	
+	v := NewRunDetailsView(client, viewCache, runID)
+	
+	// Set dimensions
+	if width > 0 && height > 0 {
+		v.width = width
+		v.height = height
+	}
+	
+	// Use provided run data if available
+	if run.Status != "" || run.Title != "" {
+		v.run = run
+		v.loading = false
+		v.updateStatusHistory(string(run.Status), false)
+		v.updateContent()
+	}
+	
+	// Parent run data is deprecated - just log
+	debug.LogToFilef("DEBUG: Parent run data ignored in new pattern (%d runs, cached=%t)\n", 
+		len(parentRuns), parentCached)
+	
+	return v
 }
 
 // NewRunDetailsViewWithCache maintains backward compatibility
@@ -224,8 +254,37 @@ func NewRunDetailsViewWithCache(
 	parentDetailsCache map[string]*models.RunResponse,
 	embeddedCache *cache.SimpleCache,
 ) *RunDetailsView {
-	return NewRunDetailsView(client, run,
-		WithCache(embeddedCache),
-		WithParentData(parentRuns, parentCached, parentCachedAt, parentDetailsCache),
-	)
+	runID := run.GetIDString()
+	
+	// Use provided cache or create new one
+	viewCache := embeddedCache
+	if viewCache == nil {
+		viewCache = cache.NewSimpleCache()
+		_ = viewCache.LoadFromDisk()
+	}
+	
+	// Store parent cache data
+	if parentDetailsCache != nil {
+		for _, runData := range parentDetailsCache {
+			if runData != nil {
+				viewCache.SetRun(*runData)
+			}
+		}
+	}
+	
+	v := NewRunDetailsView(client, viewCache, runID)
+	
+	// Use provided run data if available
+	if run.Status != "" || run.Title != "" {
+		v.run = run
+		v.loading = false
+		v.updateStatusHistory(string(run.Status), false)
+		v.updateContent()
+	}
+	
+	// Parent run data is deprecated - just log
+	debug.LogToFilef("DEBUG: Parent run data ignored in new pattern (%d runs, cached=%t)\n", 
+		len(parentRuns), parentCached)
+	
+	return v
 }

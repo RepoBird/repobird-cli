@@ -36,7 +36,8 @@ type DashboardView struct {
 	selectedDetailLine int      // Selected line in details column
 	detailLines        []string // Lines in details column for selection
 
-	// Layout views (simplified for now)
+	// All-runs layout using shared component
+	allRunsList *components.ScrollableList
 	runListView *RunListView
 
 	// Dimensions
@@ -159,8 +160,12 @@ func NewDashboardView(client APIClient) *DashboardView {
 	// Load persisted cache data if available
 	_ = dashboard.cache.LoadFromDisk()
 
-	// Initialize with existing list view
-	dashboard.runListView = NewRunListView(client)
+	// Initialize shared scrollable list component for all-runs layout
+	dashboard.allRunsList = components.NewScrollableList(
+		components.WithColumns(4), // ID, Repository, Status, Created
+		components.WithValueNavigation(true),
+		components.WithKeymaps(components.DefaultKeyMap),
+	)
 
 	return dashboard
 }
@@ -178,8 +183,8 @@ func (d *DashboardView) Init() tea.Cmd {
 		d.loadDashboardData(),
 		d.loadUserInfo(),
 		d.syncFileHashes(),
-		// Don't initialize runListView here as it loads its own data
-		// d.runListView.Init(),
+		// Initialize shared all-runs list component
+		d.allRunsList.Init(),
 		d.spinner.Tick,
 	)
 }
@@ -237,12 +242,9 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			d.helpView.SetSize(msg.Width, msg.Height)
 		}
 
-		// Update child view dimensions
-		if d.runListView != nil {
-			_, childCmd := d.runListView.Update(msg)
-			if childCmd != nil {
-				cmds = append(cmds, childCmd)
-			}
+		// Update shared list component dimensions
+		if d.allRunsList != nil {
+			d.allRunsList.Update(msg)
 		}
 
 		// Update viewport sizes for Miller columns
@@ -509,9 +511,9 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		case msg.Type == tea.KeyRunes && string(msg.Runes) == "b":
-			// Navigate to bulk runs view
+			// Navigate back (alternative back navigation)
 			return d, func() tea.Msg {
-				return messages.NavigateToBulkMsg{}
+				return messages.NavigateBackMsg{}
 			}
 		case key.Matches(msg, d.keys.Enter) && d.currentLayout == models.LayoutTripleColumn && d.focusedColumn == 2 && d.selectedRunData != nil:
 			// If we're in the details column (column 2) in the triple column layout, open the full details view
@@ -563,15 +565,10 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return d, nil
 			}
 		case msg.Type == tea.KeyRunes && string(msg.Runes) == "v":
-			// Open file viewer
-			fileViewerView, err := NewFileViewerView(d.client)
-			if err == nil {
-				fileViewerView.width = d.width
-				fileViewerView.height = d.height
-				return fileViewerView, nil
+			// Navigate to file viewer
+			return d, func() tea.Msg {
+				return messages.NavigateToFileViewerMsg{}
 			}
-			d.statusLine.SetTemporaryMessageWithType(fmt.Sprintf("✗ Failed to open file viewer: %v", err), components.MessageError, 2*time.Second)
-			return d, nil
 		case msg.Type == tea.KeyRunes && string(msg.Runes) == "G":
 			// Vim: Go to bottom of current column
 			d.waitingForG = false // Cancel any pending 'gg' command
@@ -641,22 +638,26 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					cmds = append(cmds, cmd)
 				}
 			case models.LayoutAllRuns:
-				// Delegate to run list view
-				model, childCmd := d.runListView.Update(msg)
-				d.runListView = model.(*RunListView)
-				if childCmd != nil {
-					cmds = append(cmds, childCmd)
+				// Handle navigation with shared scrollable list
+				d.allRunsList.Update(msg)
+				// Handle selection actions for all-runs layout
+				if key.Matches(msg, d.keys.Enter) {
+					selected := d.allRunsList.GetSelected()
+					if len(selected) > 0 && selected[0] != "" {
+						// Navigate to details view with selected run ID
+						return d, func() tea.Msg {
+							return messages.NavigateToDetailsMsg{
+								RunID: selected[0], // First column is run ID
+							}
+						}
+					}
 				}
 			}
 		}
 	default:
-		// Delegate other messages to child views if needed
-		if d.currentLayout == models.LayoutAllRuns && d.runListView != nil {
-			model, childCmd := d.runListView.Update(msg)
-			d.runListView = model.(*RunListView)
-			if childCmd != nil {
-				cmds = append(cmds, childCmd)
-			}
+		// Handle other messages for all-runs layout
+		if d.currentLayout == models.LayoutAllRuns && d.allRunsList != nil {
+			d.allRunsList.Update(msg)
 		}
 	}
 
@@ -1265,7 +1266,7 @@ func (d *DashboardView) updateDetailLines() {
 
 	// Add single-line fields (truncated for display, original for copying)
 	addLine(fmt.Sprintf("ID: %s", run.GetIDString()))
-	addLine(fmt.Sprintf("Status: %s", run.Status))
+	addLine(fmt.Sprintf("Status: %s", string(run.Status)))
 	addLine(fmt.Sprintf("Repository: %s", run.GetRepositoryName()))
 
 	// Show run type - normalize API values to display values
@@ -1346,10 +1347,37 @@ func (d *DashboardView) updateDetailLines() {
 	d.updateDetailsViewportContent()
 }
 
+// updateAllRunsListData converts runs data for the shared scrollable list component
+func (d *DashboardView) updateAllRunsListData() {
+	if d.allRunsList == nil {
+		return
+	}
+
+	var items [][]string
+	for _, run := range d.allRuns {
+		if run == nil {
+			continue
+		}
+		
+		// Format row data: [ID, Repository, Status, Created]
+		row := []string{
+			run.ID,
+			run.Repository,
+			string(run.Status),
+			run.CreatedAt.Format("2006-01-02 15:04"),
+		}
+		items = append(items, row)
+	}
+	
+	d.allRunsList.SetItems(items)
+}
+
 // copyToClipboard copies the given text to clipboard
 func (d *DashboardView) renderAllRunsLayout() string {
-	// Use the existing run list view
-	runListContent := d.runListView.View()
+	// Update data in shared scrollable list component
+	d.updateAllRunsListData()
+	// Use shared scrollable list component
+	runListContent := d.allRunsList.View()
 
 	// Create statusline
 	statusline := d.renderStatusLine("RUNS")

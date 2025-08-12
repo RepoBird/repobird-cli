@@ -3,7 +3,6 @@ package tui
 import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/repobird/repobird-cli/internal/api"
-	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/repobird/repobird-cli/internal/tui/cache"
 	"github.com/repobird/repobird-cli/internal/tui/messages"
 	"github.com/repobird/repobird-cli/internal/tui/views"
@@ -25,6 +24,9 @@ func NewApp(client APIClient) *App {
 
 // Init implements tea.Model interface - initializes with dashboard view
 func (a *App) Init() tea.Cmd {
+	// Initialize shared cache
+	_ = a.cache.LoadFromDisk()
+	
 	// Initialize with dashboard view
 	a.current = views.NewDashboardView(a.client)
 	return a.current.Init()
@@ -78,11 +80,8 @@ func (a *App) handleNavigation(msg messages.NavigationMsg) (tea.Model, tea.Cmd) 
 	case messages.NavigateToDetailsMsg:
 		a.viewStack = append(a.viewStack, a.current)
 
-		// Create a minimal RunResponse with just the ID for loading
-		run := models.RunResponse{
-			ID: msg.RunID,
-		}
-		a.current = views.NewRunDetailsView(a.client, run)
+		// Create with new minimal constructor pattern
+		a.current = views.NewRunDetailsView(a.client, a.cache, msg.RunID)
 
 		return a, a.current.Init()
 

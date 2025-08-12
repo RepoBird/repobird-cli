@@ -78,6 +78,9 @@ Comprehensive documentation is available in the `docs/` directory:
 - **User Isolation**: Each user has separate cache directory (`~/.config/repobird/cache/users/{hash}/`)
 - **No Manual Save/Load**: Persistence is automatic - `SaveToDisk()`/`LoadFromDisk()` are now no-ops
 - **Performance**: Terminal/old runs load in <10ms from disk, 90% reduction in API calls
+- **Concurrency Safety**: Fixed deadlock issues through proper lock ordering and single-decision routing
+- **Lock-Free File I/O**: PermanentCache uses atomic file operations without holding locks
+- **Batch Updates**: Dashboard view uses batch cache updates to prevent lock contention
 
 ### Testing Requirements
 - Minimum 70% test coverage for new code
@@ -296,15 +299,30 @@ When working on this codebase:
 
 ### TUI Implementation Patterns
 - **Bubble Tea Model-Update-View**: All TUI views implement `Update(tea.Msg) (tea.Model, tea.Cmd)` pattern
-- **Message Passing**: Component communication via message passing, no direct method calls between views
+- **Message-Based Navigation**: Views use navigation messages to transition between views via central App router
+- **App Router**: Central navigation controller in `internal/tui/app.go` handles all view transitions and maintains view history stack
+- **Navigation Messages**: Type-safe navigation messages in `internal/tui/messages/navigation.go` (NavigateToCreateMsg, NavigateBackMsg, etc.)
+- **Shared Components**: Reusable UI components in `internal/tui/components/` (ScrollableList, Form, ErrorView)
+- **Navigation Context**: Temporary state sharing via `cache.SetNavigationContext()` without tight coupling
+- **View History Stack**: Back navigation support with `NavigateBackMsg`, dashboard reset with `NavigateToDashboardMsg`
 - **State Management**: Embed `*cache.SimpleCache` in view structs, never use globals
 - **Debug Logging**: Use `debug.LogToFilef()` from `internal/tui/debug` package (configurable via `REPOBIRD_DEBUG_LOG`)
+
+#### Navigation Architecture
+- **Anti-Pattern**: Never create child views directly in Update methods - use navigation messages instead
+- **Message Flow**: View → Navigation Message → App Router → New View → Push to Stack
+- **Context Management**: Use navigation context for temporary data, cleared on dashboard return
+- **Error Recovery**: Recoverable errors allow back navigation, non-recoverable errors clear history stack
 
 ### Testing Patterns  
 - **Table-Driven Tests**: Use struct slices with test cases for systematic testing
 - **Test Isolation**: Set `XDG_CONFIG_HOME` to temp directory in tests for cache isolation
 - **Mocking**: Use `github.com/stretchr/testify` for assertions and mocks
 - **Coverage Target**: Maintain 70%+ test coverage for new code
+- **Navigation Testing**: Test navigation messages, App router transitions, and view history stack
+- **Component Testing**: Test shared components (ScrollableList, Form) with proper Update/View cycles
+- **Integration Testing**: Test complete navigation flows (Dashboard → Create → Details → Back)
+- **Context Testing**: Test navigation context sharing and cleanup between views
 
 ### Build & Development
 - **make ci vs make check**: `ci` includes security checks and coverage, `check` is faster (fmt-check, vet, lint, test)
