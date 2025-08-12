@@ -45,6 +45,14 @@ func (m *MockViewWithCoreKeymap) SetHandleKeyFunc(f func(tea.KeyMsg) (bool, tea.
 	m.handleKeyFunc = f
 }
 
+// MockViewWithoutKeymap does NOT implement CoreViewKeymap interface
+type MockViewWithoutKeymap struct{}
+
+// Implement tea.Model interface only
+func (m *MockViewWithoutKeymap) Init() tea.Cmd                           { return nil }
+func (m *MockViewWithoutKeymap) Update(msg tea.Msg) (tea.Model, tea.Cmd) { return m, nil }
+func (m *MockViewWithoutKeymap) View() string                            { return "mock view without keymap" }
+
 func TestCoreKeymapSystemIntegration(t *testing.T) {
 	t.Run("app processes disabled keys correctly", func(t *testing.T) {
 		mockClient := &MockAPIClient{}

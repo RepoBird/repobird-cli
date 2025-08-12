@@ -174,7 +174,9 @@ func NewDashboardView(client APIClient) *DashboardView {
 
 // IsKeyDisabled implements the CoreViewKeymap interface
 func (d *DashboardView) IsKeyDisabled(keyString string) bool {
-	return d.disabledKeys[keyString]
+	disabled := d.disabledKeys[keyString]
+	debug.LogToFilef("🔍 IsKeyDisabled('%s'): map=%v, result=%t 🔍\n", keyString, d.disabledKeys, disabled)
+	return disabled
 }
 
 // HandleKey implements the CoreViewKeymap interface
@@ -402,13 +404,25 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return d, nil
 
 	case tea.KeyMsg:
+		debug.LogToFilef("🔑 DASHBOARD KEYMSG: key='%s' 🔑\n", msg.String())
+		debug.LogToFilef("🔒 IsKeyDisabled result: %t 🔒\n", d.IsKeyDisabled(msg.String()))
+		
 		// If FZF mode is active, handle input there first
 		if d.fzfMode != nil && d.fzfMode.IsActive() {
+			debug.LogToFilef("FZF mode is active, delegating to FZF\n")
 			newFzf, cmd := d.fzfMode.Update(msg)
 			d.fzfMode = newFzf
 			return d, cmd
 		}
 
+		// Check if this key is disabled by the CoreViewKeymap interface
+		if d.IsKeyDisabled(msg.String()) {
+			debug.LogToFilef("🚫 DASHBOARD: Key '%s' is DISABLED - IGNORING 🚫\n", msg.String())
+			// Key is disabled - ignore it completely
+			return d, nil
+		}
+
+		debug.LogToFilef("✅ DASHBOARD: Key '%s' is NOT disabled, proceeding with local handling ✅\n", msg.String())
 		// Handle dashboard-specific keys
 		switch {
 		case msg.Type == tea.KeyEsc && d.showURLSelectionPrompt:
@@ -654,38 +668,6 @@ func (d *DashboardView) isEmptyLine(line string) bool {
 	return strings.TrimSpace(line) == ""
 }
 
-// findNextNonEmptyLine finds the next non-empty line starting from current index
-func (d *DashboardView) findNextNonEmptyLine(startIdx int, direction int) int {
-	if len(d.detailLines) == 0 {
-		return startIdx
-	}
-
-	idx := startIdx
-	for {
-		idx += direction
-
-		// Check bounds
-		if idx < 0 {
-			return startIdx // No non-empty line found upward
-		}
-		if idx >= len(d.detailLines) {
-			return startIdx // No non-empty line found downward
-		}
-
-		// Check if line is non-empty
-		if !d.isEmptyLine(d.detailLines[idx]) {
-			return idx
-		}
-
-		// Prevent infinite loop (shouldn't happen but safety check)
-		if idx == 0 && direction < 0 {
-			return startIdx
-		}
-		if idx == len(d.detailLines)-1 && direction > 0 {
-			return startIdx
-		}
-	}
-}
 
 // handleMillerColumnsNavigation handles navigation in the Miller Columns layout
 func (d *DashboardView) handleMillerColumnsNavigation(msg tea.KeyMsg) tea.Cmd {
@@ -1245,44 +1227,8 @@ func (d *DashboardView) updateAllRunsListData() {
 }
 
 // copyToClipboard copies the given text to clipboard
-func (d *DashboardView) renderAllRunsLayout() string {
-	// Update data in shared scrollable list component
-	d.updateAllRunsListData()
-	// Use shared scrollable list component
-	runListContent := d.allRunsList.View()
-
-	// Create statusline
-	statusline := d.renderStatusLine("RUNS")
-
-	// Add notification above status line if there's a message
-	var parts []string
-	parts = append(parts, runListContent)
-	if notificationLine := d.renderNotificationLine(); notificationLine != "" {
-		parts = append(parts, notificationLine)
-	}
-	parts = append(parts, statusline)
-
-	return lipgloss.JoinVertical(lipgloss.Left, parts...)
-}
 
 // renderRepositoriesLayout renders the repositories-only layout
-func (d *DashboardView) renderRepositoriesLayout() string {
-	// Render repositories table
-	content := "" // d.renderRepositoriesTable() - method being refactored
-
-	// Create statusline
-	statusline := d.renderStatusLine("REPOS")
-
-	// Add notification above status line if there's a message
-	var parts []string
-	parts = append(parts, content)
-	if notificationLine := d.renderNotificationLine(); notificationLine != "" {
-		parts = append(parts, notificationLine)
-	}
-	parts = append(parts, statusline)
-
-	return lipgloss.JoinVertical(lipgloss.Left, parts...)
-}
 
 // updateViewportSizes updates the viewport dimensions based on window size
 func (d *DashboardView) updateViewportSizes() {
@@ -1692,327 +1638,10 @@ func (d *DashboardView) scrollToSelected(column int) {
 }
 
 // renderRepositoriesColumn renders the left column with real repositories
-func (d *DashboardView) renderRepositoriesColumn(width, height int) string {
-	// Create title with underline
-	titleStyle := lipgloss.NewStyle().
-		Bold(true).
-		Width(width).
-		Padding(0, 1).
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderBottom(true).
-		BorderForeground(lipgloss.Color("63"))
-
-	if d.focusedColumn == 0 {
-		titleStyle = titleStyle.Foreground(lipgloss.Color("63"))
-	} else {
-		titleStyle = titleStyle.Foreground(lipgloss.Color("240"))
-	}
-	titleText := fmt.Sprintf("Repositories [%d]", len(d.repositories))
-	title := titleStyle.Render(titleText)
-
-	// Build items list
-	var items []string
-	for i, repo := range d.repositories {
-		statusIcon := d.getRepositoryStatusIcon(&repo)
-		item := fmt.Sprintf("%s %s", statusIcon, repo.Name)
-
-		// Truncate if too long
-		if len(item) > width-2 {
-			item = item[:width-5] + "..."
-		}
-
-		// Highlight selected repository
-		if i == d.selectedRepoIdx {
-			if d.focusedColumn == 0 {
-				// Single blink: bright green briefly when yankBlink is true
-				if d.yankBlink && time.Since(d.yankBlinkTime) < 250*time.Millisecond {
-					// Bright green flash
-					item = lipgloss.NewStyle().
-						Width(width).
-						Background(lipgloss.Color("82")). // Bright green
-						Foreground(lipgloss.Color("0")).  // Black text
-						Bold(true).
-						Render(item)
-				} else {
-					// Normal focused highlight
-					item = lipgloss.NewStyle().
-						Width(width).
-						Background(lipgloss.Color("63")).
-						Foreground(lipgloss.Color("255")).
-						Render(item)
-				}
-			} else {
-				item = lipgloss.NewStyle().
-					Width(width).
-					Background(lipgloss.Color("240")).
-					Foreground(lipgloss.Color("255")).
-					Render(item)
-			}
-		}
-
-		items = append(items, item)
-	}
-
-	if len(items) == 0 {
-		items = []string{"No repositories"}
-	}
-
-	// Update viewport content if needed
-	d.updateRepoViewportContent()
-
-	// Calculate content height (subtract title height)
-	contentHeight := height - 2
-
-	// Render viewport content with padding
-	contentStyle := lipgloss.NewStyle().
-		Width(width).
-		Height(contentHeight).
-		Padding(0, 1)
-
-	return lipgloss.JoinVertical(lipgloss.Left, title, contentStyle.Render(d.repoViewport.View()))
-}
 
 // renderRunsColumn renders the center column with runs for selected repository
-func (d *DashboardView) renderRunsColumn(width, height int) string {
-	// Create title with underline
-	titleStyle := lipgloss.NewStyle().
-		Bold(true).
-		Width(width).
-		Padding(0, 1).
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderBottom(true).
-		BorderForeground(lipgloss.Color("33"))
-
-	if d.focusedColumn == 1 {
-		titleStyle = titleStyle.Foreground(lipgloss.Color("33"))
-	} else {
-		titleStyle = titleStyle.Foreground(lipgloss.Color("240"))
-	}
-	titleText := "Runs"
-	if d.selectedRepo != nil && len(d.filteredRuns) > 0 {
-		titleText = fmt.Sprintf("Runs [%d]", len(d.filteredRuns))
-	}
-	title := titleStyle.Render(titleText)
-
-	var items []string
-	if d.selectedRepo == nil {
-		items = []string{"Select a repository"}
-	} else {
-		for i, run := range d.filteredRuns {
-			statusIcon := d.getRunStatusIcon(run.Status)
-			displayTitle := run.Title
-			if displayTitle == "" {
-				displayTitle = "Untitled Run"
-			}
-
-			// Truncate based on available width
-			maxTitleLen := width - 5 // Account for icon and padding
-			if len(displayTitle) > maxTitleLen {
-				displayTitle = displayTitle[:maxTitleLen-3] + "..."
-			}
-
-			item := fmt.Sprintf("%s %s", statusIcon, displayTitle)
-
-			// Highlight selected run
-			if i == d.selectedRunIdx {
-				if d.focusedColumn == 1 {
-					// Custom blinking: toggle between bright and normal colors
-					if d.yankBlink && time.Since(d.yankBlinkTime) < 250*time.Millisecond {
-						if d.yankBlink {
-							// Bright green when visible
-							item = lipgloss.NewStyle().
-								Width(width).
-								Background(lipgloss.Color("82")). // Bright green
-								Foreground(lipgloss.Color("0")).  // Black text
-								Bold(true).
-								Render(item)
-						} else {
-							// Normal highlight when "off"
-							item = lipgloss.NewStyle().
-								Width(width).
-								Background(lipgloss.Color("33")).
-								Foreground(lipgloss.Color("255")).
-								Render(item)
-						}
-					} else {
-						// Normal focused highlight (no blinking)
-						item = lipgloss.NewStyle().
-							Width(width).
-							Background(lipgloss.Color("33")).
-							Foreground(lipgloss.Color("255")).
-							Render(item)
-					}
-				} else {
-					item = lipgloss.NewStyle().
-						Width(width).
-						Background(lipgloss.Color("240")).
-						Foreground(lipgloss.Color("255")).
-						Render(item)
-				}
-			}
-
-			items = append(items, item)
-		}
-
-		if len(items) == 0 {
-			items = []string{fmt.Sprintf("No runs for %s", d.selectedRepo.Name)}
-		}
-	}
-
-	// Update viewport content if needed
-	d.updateRunsViewportContent()
-
-	// Calculate content height (subtract title height)
-	contentHeight := height - 2
-
-	// Render viewport content with padding
-	contentStyle := lipgloss.NewStyle().
-		Width(width).
-		Height(contentHeight).
-		Padding(0, 1)
-
-	return lipgloss.JoinVertical(lipgloss.Left, title, contentStyle.Render(d.runsViewport.View()))
-}
 
 // renderDetailsColumn renders the right column with run details
-func (d *DashboardView) renderDetailsColumn(width, height int) string {
-	// Create title with underline
-	titleStyle := lipgloss.NewStyle().
-		Bold(true).
-		Width(width).
-		Padding(0, 1).
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderBottom(true).
-		BorderForeground(lipgloss.Color("240"))
-
-	if d.focusedColumn == 2 {
-		titleStyle = titleStyle.Foreground(lipgloss.Color("63"))
-	} else {
-		titleStyle = titleStyle.Foreground(lipgloss.Color("240"))
-	}
-	title := titleStyle.Render("Run Details")
-
-	var displayLines []string
-	if d.selectedRunData == nil {
-		displayLines = []string{"Select a run"}
-	} else {
-		// Calculate available content width
-		contentWidth := width - 2 // Account for padding
-		if contentWidth < 5 {
-			contentWidth = 5
-		}
-
-		// Build lines with selection highlighting and proper width constraints
-		for i, line := range d.detailLines {
-			// Check if we should show RepoBird URL hint for ID line
-			displayLine := line
-			if d.focusedColumn == 2 && i == d.selectedDetailLine && i == 0 && d.selectedRunData != nil {
-				// This is the ID line and it's selected, add URL hint if possible
-				runID := d.selectedRunData.GetIDString()
-				if utils.IsNonEmptyNumber(runID) {
-					repobirdURL := utils.GenerateRepoBirdURL(runID)
-					// Truncate URL to fit within available width, keeping the line readable
-					maxURLLen := contentWidth - len(line) - 3 // 3 chars for " - "
-					if maxURLLen > 10 {                       // Only show if we have reasonable space
-						truncatedURL := repobirdURL
-						if len(truncatedURL) > maxURLLen {
-							truncatedURL = truncatedURL[:maxURLLen-3] + "..."
-						}
-						displayLine = line + " - " + truncatedURL
-					}
-				}
-			}
-
-			// Apply width constraint using lipgloss to prevent overflow
-			styledLine := lipgloss.NewStyle().
-				MaxWidth(contentWidth).
-				Inline(true). // Force single line
-				Render(displayLine)
-
-			if d.focusedColumn == 2 && i == d.selectedDetailLine {
-				// Custom blinking: toggle between bright and normal colors
-				if d.copiedMessage != "" && time.Since(d.copiedMessageTime) < 250*time.Millisecond {
-					if d.yankBlink {
-						// Bright green when visible
-						styledLine = lipgloss.NewStyle().
-							MaxWidth(contentWidth).
-							Inline(true).
-							Background(lipgloss.Color("82")). // Bright green
-							Foreground(lipgloss.Color("0")).  // Black text
-							Bold(true).
-							Render(displayLine)
-					} else {
-						// Normal highlight when "off"
-						styledLine = lipgloss.NewStyle().
-							MaxWidth(contentWidth).
-							Inline(true).
-							Background(lipgloss.Color("63")).
-							Foreground(lipgloss.Color("255")).
-							Render(displayLine)
-					}
-				} else {
-					// Normal focused highlight (no blinking)
-					styledLine = lipgloss.NewStyle().
-						MaxWidth(contentWidth).
-						Inline(true).
-						Background(lipgloss.Color("63")).
-						Foreground(lipgloss.Color("255")).
-						Render(displayLine)
-				}
-			}
-			displayLines = append(displayLines, styledLine)
-		}
-
-		// Special handling for plan field if it's the last item
-		// Calculate remaining vertical space
-		contentHeight := height - 2 // Subtract title height
-		usedLines := len(displayLines)
-		remainingLines := contentHeight - usedLines
-
-		// If we have a plan field and remaining space, expand it
-		if d.selectedRunData != nil &&
-			strings.Contains(strings.ToLower(d.selectedRunData.RunType), "plan") &&
-			d.selectedRunData.Status == models.StatusDone &&
-			d.selectedRunData.Plan != "" &&
-			remainingLines > 0 {
-			// Find the plan line (should be last)
-			for i := len(d.detailLines) - 1; i >= 0; i-- {
-				if strings.HasPrefix(d.detailLines[i], "Plan:") || (i > 0 && d.detailLines[i-1] == "Plan:") {
-					// Replace the truncated plan with wrapped version
-					wrapped := d.wrapTextWithLimit(d.selectedRunData.Plan, contentWidth, remainingLines)
-					if len(wrapped) > 0 {
-						// Remove the truncated plan line
-						if i < len(displayLines) {
-							displayLines = displayLines[:i]
-						}
-						// Add wrapped lines
-						for _, wLine := range wrapped {
-							styledLine := lipgloss.NewStyle().
-								MaxWidth(contentWidth).
-								Render(wLine)
-							displayLines = append(displayLines, styledLine)
-						}
-					}
-					break
-				}
-			}
-		}
-	}
-
-	// Update viewport content if needed
-	d.updateDetailsViewportContent()
-
-	// Calculate content height (subtract title height)
-	contentHeight := height - 2
-
-	// Render viewport content with padding
-	contentStyle := lipgloss.NewStyle().
-		Width(width).
-		Height(contentHeight).
-		Padding(0, 1)
-
-	return lipgloss.JoinVertical(lipgloss.Left, title, contentStyle.Render(d.detailsViewport.View()))
-}
 
 // initializeStatusInfoFields initializes the selectable fields for the status info overlay
 func (d *DashboardView) initializeStatusInfoFields() {
@@ -3010,44 +2639,6 @@ func (d *DashboardView) getDocsPages() [][]string {
 // Use utils.TruncateMultiline instead if this functionality is needed
 //
 
-func (d *DashboardView) renderNotificationLine() string {
-	// If we're showing a status message in the status line, don't show notification
-	if d.statusLine.HasActiveMessage() {
-		return ""
-	}
-
-	if d.copiedMessage == "" || time.Since(d.copiedMessageTime) >= 250*time.Millisecond {
-		return ""
-	}
-
-	var notificationStyle lipgloss.Style
-	if time.Since(d.copiedMessageTime) < 250*time.Millisecond {
-		if d.yankBlink {
-			// Bright and bold when visible
-			notificationStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("82")).
-				Background(lipgloss.Color("235")).
-				Bold(true).
-				Width(d.width)
-		} else {
-			// Dimmer when "off" for blinking effect
-			notificationStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("240")).
-				Background(lipgloss.Color("235")).
-				Width(d.width)
-		}
-	} else {
-		// After blinking period, show normally
-		notificationStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("82")).
-			Background(lipgloss.Color("235")).
-			Bold(true).
-			Width(d.width)
-	}
-
-	return notificationStyle.Render(" " + d.copiedMessage)
-}
-
 // hasCurrentSelectionURL checks if the current selection contains a URL or can generate a RepoBird URL
 func (d *DashboardView) hasCurrentSelectionURL() bool {
 	switch d.focusedColumn {
@@ -3092,60 +2683,6 @@ func (d *DashboardView) hasCurrentSelectionURL() bool {
 }
 
 // renderStatusLine renders the universal status line
-func (d *DashboardView) renderStatusLine(layoutName string) string {
-	// Data freshness indicator - keep it very short
-	dataInfo := ""
-	isLoadingData := false
-
-	if d.loading || d.initializing {
-		isLoadingData = true
-		// Don't show any text when loading, just the spinner
-	} else if !d.lastDataRefresh.IsZero() {
-		elapsed := time.Since(d.lastDataRefresh)
-		if elapsed < time.Minute {
-			dataInfo = "fresh"
-		} else {
-			dataInfo = fmt.Sprintf("%dm ago", int(elapsed.Minutes()))
-		}
-	}
-
-	// Handle URL selection prompt with yellow background
-	if d.showURLSelectionPrompt {
-		promptHelp := "Open URL: (o)RepoBird (g)GitHub [ESC]cancel"
-		yellowStyle := lipgloss.NewStyle().
-			Background(lipgloss.Color("220")).
-			Foreground(lipgloss.Color("232")).
-			Padding(0, 1)
-
-		return d.statusLine.
-			SetWidth(d.width).
-			SetLeft(fmt.Sprintf("[%s]", layoutName)).
-			SetRight(dataInfo).
-			SetHelp(promptHelp).
-			SetStyle(yellowStyle).
-			SetLoading(isLoadingData).
-			Render()
-	}
-
-	// Compact help text
-	shortHelp := "n:new f:fuzzy s:status y:copy ?:docs r:refresh q:quit"
-
-	// Add URL opening hint if current selection has a URL
-	if d.hasCurrentSelectionURL() {
-		shortHelp = "o:open-url " + shortHelp
-	}
-
-	// Use the unified status line with temporary message support
-	// Reset to default style (not URL prompt)
-	return d.statusLine.
-		SetWidth(d.width).
-		SetLeft(fmt.Sprintf("[%s]", layoutName)).
-		SetRight(dataInfo).
-		SetHelp(shortHelp).
-		ResetStyle().
-		SetLoading(isLoadingData).
-		Render()
-}
 
 // getAPIRepositoryForRepo finds the corresponding APIRepository for a Repository
 func (d *DashboardView) getAPIRepositoryForRepo(repo *models.Repository) *models.APIRepository {

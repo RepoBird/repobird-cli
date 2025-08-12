@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/repobird-ai/repobird-cli/internal/tui/components"
+	"github.com/repobird/repobird-cli/internal/tui/components"
 )
 
 // activateFZFMode activates FZF mode for the current column

@@ -158,6 +158,30 @@ func (c *CreateView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Model
 - **Maintainable**: Single place to understand key processing
 - **Debuggable**: Clear flow for tracing key handling
 - **Backward Compatible**: Views without keymap interface work unchanged
+- **No Conflicts**: View-scoped keymaps prevent conflicts during navigation
+
+## How Keymap Conflicts Are Prevented
+
+### View-Scoped Processing
+- **No Global Registry**: No global keymap state that needs cleanup
+- **Per-View Interface Check**: `a.current.(keymap.CoreViewKeymap)` checked fresh on every key press
+- **Automatic Transition**: When views change, old view keymap is simply replaced - no deregistration needed
+
+### Navigation Flow
+```
+Key Press → App.processKeyWithFiltering() → Current View Keymap Check → Action Execution
+```
+
+1. **Interface Check**: System checks if current view implements `CoreViewKeymap`
+2. **View Control**: If implemented, view controls which keys are disabled/customized
+3. **Isolated Scope**: Each view's keymap is completely isolated from others
+4. **Clean Transitions**: View changes automatically update keymap behavior
+
+### No Registration/Deregistration Required
+- Views simply implement the interface (or don't)
+- No setup/teardown of keymap state
+- No memory leaks or stale key bindings
+- View stack preserves keymap behavior when navigating back
 
 ## Debugging Key Issues
 

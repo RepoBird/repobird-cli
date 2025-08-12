@@ -27,6 +27,15 @@ The dashboard uses a Miller Columns layout with three main sections:
    - Displays prompt, context, and output
    - Scrollable content for long outputs
 
+### Loading States
+
+The dashboard includes animated loading indicators when data is being fetched:
+
+- **Initial Load**: Shows spinning dot loader with "Loading dashboard data..." message
+- **Background Refresh**: Cached content remains visible with loading indicator in status bar
+- **Navigation**: Only current view renders - previous views preserved in memory for fast back navigation
+- **View Transitions**: Single-view-at-a-time architecture with navigation stack for performance
+
 ## Navigation
 
 The TUI uses a message-based navigation architecture that provides consistent behavior across all views.

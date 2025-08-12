@@ -39,22 +39,28 @@ func (a *App) Init() tea.Cmd {
 func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Handle navigation messages first
 	if navMsg, ok := msg.(messages.NavigationMsg); ok {
+		debug.LogToFilef("🚀 APP: Received NavigationMsg: %T 🚀\n", navMsg)
 		return a.handleNavigation(navMsg)
 	}
 
 	// Centralized key processing
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
+		debug.LogToFilef("⌨️ APP: Received KeyMsg: '%s' ⌨️\n", keyMsg.String())
 		if handled, model, cmd := a.processKeyWithFiltering(keyMsg); handled {
+			debug.LogToFilef("✋ APP: Key '%s' was HANDLED by centralized processor ✋\n", keyMsg.String())
 			return model, cmd
 		}
+		debug.LogToFilef("➡️ APP: Key '%s' NOT handled by centralized processor, delegating to view ➡️\n", keyMsg.String())
 	}
 
 	// Otherwise delegate to current view
+	debug.LogToFilef("📤 APP: Delegating to current view: %T 📤\n", a.current)
 	newModel, cmd := a.current.Update(msg)
 
 	// Check if the model changed (old pattern - view created child)
 	// We should handle this gracefully for backward compatibility
 	if newModel != a.current {
+		debug.LogToFilef("🔄 APP: View returned different model (old pattern) 🔄\n")
 		// View returned a different model (old navigation pattern)
 		// Accept it but this should be migrated to use messages
 		a.current = newModel
@@ -194,35 +200,48 @@ func (a *App) getNavigationContext(key string) interface{} {
 // processKeyWithFiltering is the centralized key processor that handles all key filtering and routing
 func (a *App) processKeyWithFiltering(keyMsg tea.KeyMsg) (handled bool, model tea.Model, cmd tea.Cmd) {
 	keyString := keyMsg.String()
+	debug.LogToFilef("🔧 PROCESSOR: Processing key '%s' 🔧\n", keyString)
 
 	// Check if current view implements CoreViewKeymap
 	if viewKeymap, hasKeymap := a.current.(keymap.CoreViewKeymap); hasKeymap {
+		debug.LogToFilef("✅ PROCESSOR: View %T implements CoreViewKeymap ✅\n", a.current)
+		
 		// First check if view wants to disable this key entirely
 		if viewKeymap.IsKeyDisabled(keyString) {
+			debug.LogToFilef("🚫 PROCESSOR: Key '%s' is DISABLED by view - returning handled=true 🚫\n", keyString)
 			// Key is disabled - ignore it completely
 			return true, a, nil
 		}
+		debug.LogToFilef("✅ PROCESSOR: Key '%s' is NOT disabled by view ✅\n", keyString)
 
 		// Check if view wants to handle this key with custom logic
 		if handled, model, cmd := viewKeymap.HandleKey(keyMsg); handled {
+			debug.LogToFilef("🎯 PROCESSOR: Key '%s' handled by view's custom handler 🎯\n", keyString)
 			// View provided custom handling
 			return true, model, cmd
 		}
+		debug.LogToFilef("➡️ PROCESSOR: Key '%s' not handled by view's custom handler ➡️\n", keyString)
+	} else {
+		debug.LogToFilef("❌ PROCESSOR: View %T does NOT implement CoreViewKeymap ❌\n", a.current)
 	}
 
 	// Get the default action for this key from registry
 	action := a.keyRegistry.GetAction(keyString)
+	debug.LogToFilef("🗂️ PROCESSOR: Key '%s' maps to action: %v 🗂️\n", keyString, action)
 
 	// Handle global actions that should always work regardless of view state
 	if keymap.IsGlobalAction(action) {
+		debug.LogToFilef("🌍 PROCESSOR: Key '%s' is GLOBAL action - handling 🌍\n", keyString)
 		return a.handleGlobalAction(action, keyMsg)
 	}
 
 	// Handle navigation actions
 	if keymap.IsNavigationAction(action) {
+		debug.LogToFilef("🧭 PROCESSOR: Key '%s' is NAVIGATION action - handling 🧭\n", keyString)
 		return a.handleNavigationAction(action, keyMsg)
 	}
 
+	debug.LogToFilef("📋 PROCESSOR: Key '%s' is VIEW-SPECIFIC - returning handled=false 📋\n", keyString)
 	// For ActionViewSpecific or unknown keys, let the view handle them
 	return false, a, nil
 }

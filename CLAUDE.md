@@ -110,7 +110,21 @@ Comprehensive documentation is available in the `docs/` directory:
 ### FZF Integration
 The TUI includes built-in fuzzy search functionality:
 
-#### Dashboard View (`internal/tui/views/dashboard.go`)
+#### Dashboard View File Organization
+The dashboard view is split across multiple files for maintainability:
+
+- **`dashboard.go`** (2,738 lines) - Core Update/View/Init methods and state management
+- **`dash_rendering.go`** (583 lines) - All layout rendering (columns, layouts, status lines)
+- **`dash_data.go`** (461 lines) - Data loading, repository operations, and cache management
+- **`dash_status_info.go`** (253 lines) - Status/user info overlay handling
+- **`dash_formatting.go`** (222 lines) - Text formatting, truncation, and icon utilities
+- **`dash_fzf.go`** (124 lines) - FZF overlay positioning and activation logic
+- **`dash_messages.go`** (42 lines) - Custom message types for dashboard operations  
+- **`dash_clipboard.go`** (38 lines) - Clipboard operations and yank animations
+
+**Total**: ~4,460 lines across 8 focused files (reduced from 3,423 lines in single file)
+
+#### Dashboard FZF Integration
 - Press `f` on any column to activate FZF mode
 - Shows dropdown overlay at cursor position
 - Filters repositories, runs, or details based on input
@@ -321,6 +335,7 @@ When working on this codebase:
 - **Navigation Context**: Temporary state sharing via `cache.SetNavigationContext()` without tight coupling
 - **View History Stack**: Back navigation support with `NavigateBackMsg`, dashboard reset with `NavigateToDashboardMsg`
 - **🆕 Core Keymap System**: Centralized key processing with per-view customization (see Key Management section)
+- **🆕 View File Organization**: Large views split into focused files (e.g., dashboard split into 8 files by functionality)
 - **Debug Logging**: Use `debug.LogToFilef()` from `internal/tui/debug` package (configurable via `REPOBIRD_DEBUG_LOG`)
 
 #### Navigation Architecture

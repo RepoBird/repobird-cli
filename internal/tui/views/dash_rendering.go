@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/repobird-ai/repobird-cli/internal/models"
-	"github.com/repobird-ai/repobird-cli/internal/utils"
+	"github.com/repobird/repobird-cli/internal/models"
+	"github.com/repobird/repobird-cli/internal/utils"
 )
 
 // renderTripleColumnLayout renders the main dashboard layout with three columns
