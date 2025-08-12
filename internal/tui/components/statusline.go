@@ -40,8 +40,8 @@ type StatusLine struct {
 func NewStatusLine() *StatusLine {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
-	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("63"))
-	
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("226")) // Bright yellow for better visibility
+
 	return &StatusLine{
 		style: lipgloss.NewStyle().
 			Background(lipgloss.Color("235")).

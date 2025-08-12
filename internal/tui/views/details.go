@@ -883,9 +883,7 @@ func (v *RunDetailsView) renderStatusBar() string {
 
 	// Set right content based on loading state
 	rightContent := ""
-	if isLoadingData {
-		rightContent = "loading"
-	}
+	// Don't show any text when loading, just the spinner
 
 	// Use unified status line system
 	return v.statusLine.

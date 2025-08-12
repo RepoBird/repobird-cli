@@ -2098,6 +2098,53 @@ func (v *CreateRunView) selectRepository() tea.Cmd {
 	}
 }
 
+// prepareTask prepares a task from either file or form input
+func (v *CreateRunView) prepareTask() (models.RunRequest, error) {
+	var task models.RunRequest
+	var err error
+
+	if v.useFileInput {
+		task, err = v.prepareTaskFromFile(v.filePathInput.Value())
+		if err != nil {
+			return task, err
+		}
+	} else {
+		task = v.prepareTaskFromForm()
+		v.autoDetectGitInfo(&task)
+
+		if err := v.validateTask(&task); err != nil {
+			return task, err
+		}
+
+		// Generate file hash for form-based submission if not already set
+		if v.currentFileHash == "" {
+			// Create a deterministic hash from the task content
+			config := &models.RunConfig{
+				Prompt:     task.Prompt,
+				Repository: task.Repository,
+				Source:     task.Source,
+				Target:     task.Target,
+				RunType:    string(task.RunType),
+				Title:      task.Title,
+				Context:    task.Context,
+			}
+			if hash, err := cache.CalculateConfigHash(config); err == nil && hash != "" {
+				v.currentFileHash = hash
+				debug.LogToFilef("DEBUG: Generated file hash for form-based submission: %s\n", hash)
+			}
+		}
+
+		// Add repository to history after successful validation
+		if task.Repository != "" {
+			go func() {
+				_ = cache.AddRepositoryToHistory(task.Repository)
+			}()
+		}
+	}
+
+	return task, nil
+}
+
 func (v *CreateRunView) submitRun() tea.Cmd {
 	// Set submitting state immediately
 	v.isSubmitting = true
@@ -2109,28 +2156,9 @@ func (v *CreateRunView) submitRun() tea.Cmd {
 		// Save form data before submitting in case submission fails
 		v.saveFormData()
 
-		var task models.RunRequest
-		var err error
-
-		if v.useFileInput {
-			task, err = v.prepareTaskFromFile(v.filePathInput.Value())
-			if err != nil {
-				return runCreatedMsg{err: err}
-			}
-		} else {
-			task = v.prepareTaskFromForm()
-			v.autoDetectGitInfo(&task)
-
-			if err := v.validateTask(&task); err != nil {
-				return runCreatedMsg{err: err}
-			}
-
-			// Add repository to history after successful validation
-			if task.Repository != "" {
-				go func() {
-					_ = cache.AddRepositoryToHistory(task.Repository)
-				}()
-			}
+		task, err := v.prepareTask()
+		if err != nil {
+			return runCreatedMsg{err: err}
 		}
 
 		run, err := v.submitToAPI(task)
@@ -2151,29 +2179,9 @@ func (v *CreateRunView) submitWithForce() tea.Cmd {
 	return func() tea.Msg {
 		debug.LogToFile("DEBUG: submitWithForce() called - retrying submission with force override\n")
 
-		// Use the pending task that was prepared during the initial submit
-		var task models.RunRequest
-		var err error
-
-		if v.useFileInput {
-			task, err = v.prepareTaskFromFile(v.filePathInput.Value())
-			if err != nil {
-				return runCreatedMsg{err: err}
-			}
-		} else {
-			task = v.prepareTaskFromForm()
-			v.autoDetectGitInfo(&task)
-
-			if err := v.validateTask(&task); err != nil {
-				return runCreatedMsg{err: err}
-			}
-
-			// Add repository to history after successful validation
-			if task.Repository != "" {
-				go func() {
-					_ = cache.AddRepositoryToHistory(task.Repository)
-				}()
-			}
+		task, err := v.prepareTask()
+		if err != nil {
+			return runCreatedMsg{err: err}
 		}
 
 		// Submit to API with force flag

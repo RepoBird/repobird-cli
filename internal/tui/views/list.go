@@ -622,9 +622,7 @@ func (v *RunListView) renderStatusBar() string {
 
 	// Build data info string
 	dataInfo := ""
-	if isLoadingData {
-		dataInfo = "loading"
-	} else {
+	if !isLoadingData {
 		dataInfo = fmt.Sprintf("%d runs | %s", len(v.filteredRuns), v.table.StatusLine())
 
 		activeCount := 0
@@ -641,42 +639,43 @@ func (v *RunListView) renderStatusBar() string {
 				tier = "free"
 			}
 
-		// Show tier-specific runs with hardcoded totals
-		if v.userInfo.TierDetails != nil {
-			// Hardcoded tier totals
-			// Check if tier contains "free" or "Free" (handles "Free Plan v1", etc.)
-			var totalProRuns, totalPlanRuns int
-			tierLower := strings.ToLower(tier)
-			if strings.Contains(tierLower, "free") {
-				// Free tier
-				totalProRuns = 3
-				totalPlanRuns = 5
-			} else if strings.Contains(tierLower, "pro") {
-				// Pro tier
-				totalProRuns = 30
-				totalPlanRuns = 35
+			// Show tier-specific runs with hardcoded totals
+			if v.userInfo.TierDetails != nil {
+				// Hardcoded tier totals
+				// Check if tier contains "free" or "Free" (handles "Free Plan v1", etc.)
+				var totalProRuns, totalPlanRuns int
+				tierLower := strings.ToLower(tier)
+				if strings.Contains(tierLower, "free") {
+					// Free tier
+					totalProRuns = 3
+					totalPlanRuns = 5
+				} else if strings.Contains(tierLower, "pro") {
+					// Pro tier
+					totalProRuns = 30
+					totalPlanRuns = 35
+				} else {
+					// Default to pro tier totals for unknown tiers
+					totalProRuns = 30
+					totalPlanRuns = 35
+				}
+
+				// Handle admin credits that exceed defaults
+				actualProTotal := totalProRuns
+				actualPlanTotal := totalPlanRuns
+				if v.userInfo.TierDetails.RemainingProRuns > totalProRuns {
+					actualProTotal = v.userInfo.TierDetails.RemainingProRuns
+				}
+				if v.userInfo.TierDetails.RemainingPlanRuns > totalPlanRuns {
+					actualPlanTotal = v.userInfo.TierDetails.RemainingPlanRuns
+				}
+
+				dataInfo += fmt.Sprintf(" | %s: %d/%d pro, %d/%d plan", tier,
+					v.userInfo.TierDetails.RemainingProRuns, actualProTotal,
+					v.userInfo.TierDetails.RemainingPlanRuns, actualPlanTotal)
 			} else {
-				// Default to pro tier totals for unknown tiers
-				totalProRuns = 30
-				totalPlanRuns = 35
+				// Fallback to legacy display
+				dataInfo += fmt.Sprintf(" | %s: %d/%d runs", tier, v.userInfo.RemainingRuns, v.userInfo.TotalRuns)
 			}
-
-			// Handle admin credits that exceed defaults
-			actualProTotal := totalProRuns
-			actualPlanTotal := totalPlanRuns
-			if v.userInfo.TierDetails.RemainingProRuns > totalProRuns {
-				actualProTotal = v.userInfo.TierDetails.RemainingProRuns
-			}
-			if v.userInfo.TierDetails.RemainingPlanRuns > totalPlanRuns {
-				actualPlanTotal = v.userInfo.TierDetails.RemainingPlanRuns
-			}
-
-			dataInfo += fmt.Sprintf(" | %s: %d/%d pro, %d/%d plan", tier,
-				v.userInfo.TierDetails.RemainingProRuns, actualProTotal,
-				v.userInfo.TierDetails.RemainingPlanRuns, actualPlanTotal)
-		} else {
-			// Fallback to legacy display
-			dataInfo += fmt.Sprintf(" | %s: %d/%d runs", tier, v.userInfo.RemainingRuns, v.userInfo.TotalRuns)
 		}
 
 		if activeCount > 0 {

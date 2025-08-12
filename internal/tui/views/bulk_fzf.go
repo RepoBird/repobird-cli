@@ -1120,6 +1120,26 @@ func (v *BulkFZFView) submitRuns() tea.Cmd {
 
 		debug.LogToFileWithTimestampf("BULK_DEBUG: API response: successful runs: %d, failed: %d\n", len(resp.Data.Successful), len(resp.Data.Failed))
 
+		// Update file hash cache with successful runs
+		fileHashCache := cache.NewFileHashCache()
+		for i, run := range resp.Data.Successful {
+			// Add the file hash from the corresponding run item if it was successful
+			if run.RequestIndex >= 0 && run.RequestIndex < len(runItems) {
+				fileHash := runItems[run.RequestIndex].FileHash
+				if fileHash != "" {
+					fileHashCache.AddHash(fileHash)
+					debug.LogToFileWithTimestampf("BULK_DEBUG: Added file hash to cache for run ID %d: %s\n", run.ID, fileHash)
+				}
+			} else if i < len(runItems) {
+				// Fallback to index if RequestIndex is not set
+				fileHash := runItems[i].FileHash
+				if fileHash != "" {
+					fileHashCache.AddHash(fileHash)
+					debug.LogToFileWithTimestampf("BULK_DEBUG: Added file hash to cache for run ID %d (by index): %s\n", run.ID, fileHash)
+				}
+			}
+		}
+
 		// Convert response to results
 		var results []BulkRunResult
 		for _, run := range resp.Data.Successful {

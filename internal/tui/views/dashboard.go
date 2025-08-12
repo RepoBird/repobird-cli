@@ -193,9 +193,35 @@ func (d *DashboardView) Init() tea.Cmd {
 	return tea.Batch(
 		d.loadDashboardData(),
 		d.loadUserInfo(),
+		d.syncFileHashes(),
 		d.runListView.Init(),
 		d.spinner.Tick,
 	)
+}
+
+// syncFileHashes syncs file hashes from the API on startup
+func (d *DashboardView) syncFileHashes() tea.Cmd {
+	return func() tea.Msg {
+		// Create file hash cache instance
+		fileHashCache := cache.NewFileHashCache()
+
+		// Try to sync from API - if it fails, that's OK
+		ctx := context.Background()
+		err := fileHashCache.FetchFromAPI(ctx, d.client)
+		if err != nil {
+			// Log the error but don't fail - we can work without synced hashes
+			debug.LogToFilef("DEBUG: Failed to sync file hashes from API on startup: %v\n", err)
+			// Try to load from local cache file as fallback
+			if loadErr := fileHashCache.LoadFromFile(); loadErr != nil {
+				debug.LogToFilef("DEBUG: Failed to load file hashes from cache file: %v\n", loadErr)
+			}
+		} else {
+			debug.LogToFilef("DEBUG: Successfully synced file hashes from API on startup\n")
+		}
+
+		// Return nil message - we don't need to update the view
+		return nil
+	}
 }
 
 // loadUserInfo loads user information from the API
@@ -3631,14 +3657,10 @@ func (d *DashboardView) renderStatusLine(layoutName string) string {
 	// Data freshness indicator - keep it very short
 	dataInfo := ""
 	isLoadingData := false
-	
+
 	if d.loading || d.initializing {
 		isLoadingData = true
-		if len(d.repositories) > 0 {
-			dataInfo = "refreshing"
-		} else {
-			dataInfo = "loading"
-		}
+		// Don't show any text when loading, just the spinner
 	} else if !d.lastDataRefresh.IsZero() {
 		elapsed := time.Since(d.lastDataRefresh)
 		if elapsed < time.Minute {
