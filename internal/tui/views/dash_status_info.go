@@ -548,3 +548,28 @@ func (d *DashboardView) getDocsPages() [][]string {
 		},
 	}
 }
+
+// renderStatusInfo renders the status/user info overlay
+func (d *DashboardView) renderStatusInfo() string {
+	if !d.showStatusInfo {
+		return ""
+	}
+
+	// Use the status info fields that were prepared in initializeStatusInfoFields
+	if len(d.statusInfoFields) == 0 {
+		return "Status info not available"
+	}
+
+	// Create a simple list view for now
+	var content strings.Builder
+	content.WriteString("User Info\n")
+	content.WriteString("=========\n\n")
+
+	for i, field := range d.statusInfoFields {
+		if i < len(d.statusInfoKeys) {
+			content.WriteString(fmt.Sprintf("%s %s\n", d.statusInfoKeys[i], field))
+		}
+	}
+
+	return content.String()
+}

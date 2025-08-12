@@ -343,3 +343,12 @@ func (s *ScrollableList) Focus() {
 func (s *ScrollableList) Blur() {
 	// No-op for now, but could be used for focus management
 }
+
+// SetSize updates the dimensions of the scrollable list
+func (s *ScrollableList) SetSize(width, height int) {
+	s.width = width
+	s.height = height
+	s.viewport.Width = width
+	s.viewport.Height = height
+	s.updateColumnWidths()
+}

@@ -141,20 +141,14 @@ func NewRunListViewWithCache(
 	}
 
 	v := &RunListView{
-		client:       client,
-		table:        components.NewTable(columns),
-		keys:         components.DefaultKeyMap,
-		help:         help.New(),
-		spinner:      s,
-		loading:      shouldLoad,
-		runs:         runs,
-		filteredRuns: runs,
-		cached:       cached,
-		cachedAt:     cachedAt,
-		detailsCache: detailsCache,
-		preloading:   make(map[string]bool),
-		statusLine:   components.NewStatusLine(),
-		cache:        embeddedCache,
+		client:     client,
+		table:      components.NewTable(columns),
+		keys:       components.DefaultKeyMap,
+		help:       help.New(),
+		spinner:    s,
+		loading:    shouldLoad,
+		statusLine: components.NewStatusLine(),
+		cache:      embeddedCache,
 	}
 
 	return v

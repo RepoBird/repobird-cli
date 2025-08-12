@@ -2,7 +2,6 @@ package views
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/help"
@@ -15,7 +14,6 @@ import (
 	"github.com/repobird/repobird-cli/internal/tui/cache"
 	"github.com/repobird/repobird-cli/internal/tui/components"
 	"github.com/repobird/repobird-cli/internal/tui/debug"
-	"github.com/repobird/repobird-cli/internal/tui/keymap"
 	"github.com/repobird/repobird-cli/internal/tui/messages"
 	"github.com/repobird/repobird-cli/internal/utils"
 )
@@ -800,9 +798,8 @@ func (d *DashboardView) View() string {
 		return d.renderStatusInfo()
 	}
 
-	// Always include status line in normal view
-	statusline := d.renderStatusLine("DASH")
-	return lipgloss.JoinVertical(lipgloss.Left, finalView, statusline)
+	// Status line is already included in the layout-specific rendering functions
+	return finalView
 }
 
 // renderTripleColumnLayout renders the Miller Columns layout with real data
