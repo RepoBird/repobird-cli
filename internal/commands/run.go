@@ -57,22 +57,10 @@ func runCommand(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("failed to load configuration file: %w", err)
 		}
 	} else {
-		// Read JSON from stdin
-		var runReq models.RunRequest
-		if err := json.NewDecoder(os.Stdin).Decode(&runReq); err != nil {
+		// Read JSON from stdin with unknown field handling
+		runConfig, err = utils.ParseJSONFromStdin()
+		if err != nil {
 			return fmt.Errorf("failed to parse JSON from stdin: %w", err)
-		}
-
-		// Convert RunRequest to RunConfig
-		runConfig = &models.RunConfig{
-			Prompt:     runReq.Prompt,
-			Repository: runReq.Repository,
-			Source:     runReq.Source,
-			Target:     runReq.Target,
-			RunType:    string(runReq.RunType),
-			Title:      runReq.Title,
-			Context:    runReq.Context,
-			Files:      runReq.Files,
 		}
 	}
 
