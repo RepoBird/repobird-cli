@@ -180,9 +180,8 @@ func printRunDetails(run *models.RunResponse) {
 	}
 }
 
+// truncate is now replaced by utils.TruncateSimple
+// Keeping this as an alias for backward compatibility
 func truncate(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
-	}
-	return s[:maxLen-3] + "..."
+	return utils.TruncateSimple(s, maxLen)
 }

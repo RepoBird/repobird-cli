@@ -541,10 +541,8 @@ func max(a, b int) int {
 	return b
 }
 
-// truncateString truncates a string to the specified length
+// truncateString is now replaced by utils.TruncateSimple
+// Keeping this as an alias for backward compatibility
 func truncateString(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
-	}
-	return s[:maxLen-3] + "..."
+	return utils.TruncateSimple(s, maxLen)
 }

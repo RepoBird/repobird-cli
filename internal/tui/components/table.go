@@ -6,6 +6,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/repobird/repobird-cli/internal/tui/styles"
+	"github.com/repobird/repobird-cli/internal/utils"
 )
 
 type Column struct {
@@ -247,14 +248,15 @@ func (t *Table) renderRow(index int) string {
 	return styles.TableRowStyle.Render(content)
 }
 
+// truncate is now replaced by utils.TruncateSimple
+// Keeping this as an alias for backward compatibility
+// Note: This has slightly different behavior for width <= 3 (no ellipsis)
 func truncate(s string, width int) string {
-	if len(s) <= width {
-		return s
-	}
-	if width <= 3 {
+	// Preserve original behavior for width <= 3
+	if width <= 3 && len(s) > width {
 		return s[:width]
 	}
-	return s[:width-3] + "..."
+	return utils.TruncateSimple(s, width)
 }
 
 func (t *Table) StatusLine() string {

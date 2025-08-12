@@ -8,7 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/your-org/repobird-cli/internal/utils"
+	"github.com/repobird/repobird-cli/internal/utils"
 )
 
 // MessageType represents different types of temporary messages

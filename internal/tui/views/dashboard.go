@@ -1373,6 +1373,15 @@ func (d *DashboardView) View() string {
 	}
 
 	if d.loading || d.initializing {
+		// ASCII logo for RepoBird AI
+		logo := `
+██████╗ ███████╗██████╗  ██████╗ ██████╗ ██╗██████╗ ██████╗      █████╗ ██╗
+██╔══██╗██╔════╝██╔══██╗██╔═══██╗██╔══██╗██║██╔══██╗██╔══██╗    ██╔══██╗██║
+██████╔╝█████╗  ██████╔╝██║   ██║██████╔╝██║██████╔╝██║  ██║    ███████║██║
+██╔══██╗██╔══╝  ██╔═══╝ ██║   ██║██╔══██╗██║██╔══██╗██║  ██║    ██╔══██║██║
+██║  ██║███████╗██║     ╚██████╔╝██████╔╝██║██║  ██║██████╔╝    ██║  ██║██║
+╚═╝  ╚═╝╚══════╝╚═╝      ╚═════╝ ╚═════╝ ╚═╝╚═╝  ╚═╝╚═════╝     ╚═╝  ╚═╝╚═╝`
+
 		// Use the animated spinner + loading text
 		loadingText := d.spinner.View() + " Loading dashboard data..."
 
@@ -1381,14 +1390,30 @@ func (d *DashboardView) View() string {
 		statusLineHeight := 1 // Status line is always 1 line
 		availableHeight := d.height - titleHeight - statusLineHeight
 
-		// Center the loading text vertically in the available space
-		loadingStyle := lipgloss.NewStyle().
+		// Style for the logo
+		logoStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("33")). // Blue color for logo
+			Bold(true)
+		
+		// Style for loading text
+		loadingTextStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("63")). // Bright cyan color
 			Bold(true).
+			MarginTop(2) // Add space between logo and loading text
+
+		// Combine logo and loading text
+		combinedContent := lipgloss.JoinVertical(
+			lipgloss.Center,
+			logoStyle.Render(logo),
+			loadingTextStyle.Render(loadingText),
+		)
+
+		// Center everything vertically and horizontally in the available space
+		centerStyle := lipgloss.NewStyle().
 			Width(d.width).
 			Height(availableHeight).
 			Align(lipgloss.Center, lipgloss.Center)
-		content = loadingStyle.Render(loadingText)
+		content = centerStyle.Render(combinedContent)
 
 		// Always show status line even during loading
 		statusline := d.renderStatusLine("DASH")
@@ -1844,7 +1869,36 @@ func (d *DashboardView) updateRepoViewportContent() {
 	}
 
 	if len(items) == 0 {
-		items = []string{"No repositories"}
+		// Show loading or empty state with proper highlighting
+		emptyMsg := "No repositories"
+		if d.loading {
+			emptyMsg = "Loading repositories..."
+		}
+		
+		// Apply highlighting if this column is focused and selected
+		maxWidth := d.repoViewport.Width
+		if maxWidth <= 0 {
+			maxWidth = 30
+		}
+		
+		if d.focusedColumn == 0 && d.selectedRepoIdx == 0 {
+			// Apply focused highlight for better visibility
+			emptyMsg = lipgloss.NewStyle().
+				Width(maxWidth).
+				MaxWidth(maxWidth).
+				Inline(true).
+				Background(lipgloss.Color("63")).
+				Foreground(lipgloss.Color("255")).
+				Render(emptyMsg)
+		} else {
+			emptyMsg = lipgloss.NewStyle().
+				Width(maxWidth).
+				MaxWidth(maxWidth).
+				Inline(true).
+				Render(emptyMsg)
+		}
+		
+		items = []string{emptyMsg}
 	}
 
 	content := strings.Join(items, "\n")
@@ -1858,19 +1912,53 @@ func (d *DashboardView) updateRepoViewportContent() {
 func (d *DashboardView) updateRunsViewportContent() {
 	var items []string
 
-	if d.selectedRepo != nil {
+	// Calculate width for proper rendering
+	maxWidth := d.runsViewport.Width
+	if maxWidth <= 0 {
+		maxWidth = 40 // Fallback minimum
+	}
+
+	if d.selectedRepo == nil {
+		// No repository selected - show message with proper highlighting
+		msg := "Select a repository"
+		if d.loading {
+			msg = "Loading runs..."
+		}
+		
+		// Apply highlighting if this column is focused
+		if d.focusedColumn == 1 && d.selectedRunIdx == 0 {
+			msg = lipgloss.NewStyle().
+				Width(maxWidth).
+				MaxWidth(maxWidth).
+				Inline(true).
+				Background(lipgloss.Color("63")).
+				Foreground(lipgloss.Color("255")).
+				Render(msg)
+		} else if d.focusedColumn == 1 {
+			// Column is focused but not this item
+			msg = lipgloss.NewStyle().
+				Width(maxWidth).
+				MaxWidth(maxWidth).
+				Inline(true).
+				Background(lipgloss.Color("240")).
+				Foreground(lipgloss.Color("255")).
+				Render(msg)
+		} else {
+			msg = lipgloss.NewStyle().
+				Width(maxWidth).
+				MaxWidth(maxWidth).
+				Inline(true).
+				Render(msg)
+		}
+		
+		items = []string{msg}
+	} else {
 		for i, run := range d.filteredRuns {
 			statusIcon := d.getRunStatusIcon(run.Status)
 			runID := run.GetIDString()
 			title := run.Title
 			if title == "" {
 				title = "Untitled"
-			}
-
-			// Calculate actual available width
-			maxWidth := d.runsViewport.Width
-			if maxWidth <= 0 {
-				maxWidth = 40 // Fallback minimum
 			}
 
 			// Build the item with proper truncation
@@ -1951,7 +2039,34 @@ func (d *DashboardView) updateRunsViewportContent() {
 		}
 
 		if len(items) == 0 {
-			items = []string{fmt.Sprintf("No runs for %s", d.selectedRepo.Name)}
+			msg := fmt.Sprintf("No runs for %s", d.selectedRepo.Name)
+			
+			// Apply highlighting if this column is focused
+			if d.focusedColumn == 1 && d.selectedRunIdx == 0 {
+				msg = lipgloss.NewStyle().
+					Width(maxWidth).
+					MaxWidth(maxWidth).
+					Inline(true).
+					Background(lipgloss.Color("63")).
+					Foreground(lipgloss.Color("255")).
+					Render(msg)
+			} else if d.focusedColumn == 1 {
+				msg = lipgloss.NewStyle().
+					Width(maxWidth).
+					MaxWidth(maxWidth).
+					Inline(true).
+					Background(lipgloss.Color("240")).
+					Foreground(lipgloss.Color("255")).
+					Render(msg)
+			} else {
+				msg = lipgloss.NewStyle().
+					Width(maxWidth).
+					MaxWidth(maxWidth).
+					Inline(true).
+					Render(msg)
+			}
+			
+			items = []string{msg}
 		}
 	}
 
@@ -1966,14 +2081,45 @@ func (d *DashboardView) updateRunsViewportContent() {
 func (d *DashboardView) updateDetailsViewportContent() {
 	var displayLines []string
 
+	// Calculate available content width
+	contentWidth := d.detailsViewport.Width
+	if contentWidth <= 0 {
+		contentWidth = 30 // Fallback minimum
+	}
+
 	if d.selectedRunData == nil {
-		displayLines = []string{"Select a run"}
-	} else {
-		// Calculate available content width
-		contentWidth := d.detailsViewport.Width
-		if contentWidth <= 0 {
-			contentWidth = 30 // Fallback minimum
+		msg := "Select a run"
+		if d.loading {
+			msg = "Loading details..."
 		}
+		
+		// Apply highlighting if this column is focused
+		if d.focusedColumn == 2 && d.selectedDetailLine == 0 {
+			msg = lipgloss.NewStyle().
+				Width(contentWidth).
+				MaxWidth(contentWidth).
+				Inline(true).
+				Background(lipgloss.Color("63")).
+				Foreground(lipgloss.Color("255")).
+				Render(msg)
+		} else if d.focusedColumn == 2 {
+			msg = lipgloss.NewStyle().
+				Width(contentWidth).
+				MaxWidth(contentWidth).
+				Inline(true).
+				Background(lipgloss.Color("240")).
+				Foreground(lipgloss.Color("255")).
+				Render(msg)
+		} else {
+			msg = lipgloss.NewStyle().
+				Width(contentWidth).
+				MaxWidth(contentWidth).
+				Inline(true).
+				Render(msg)
+		}
+		
+		displayLines = []string{msg}
+	} else {
 
 		// Build lines with selection highlighting and proper width constraints
 		for i, line := range d.detailLines {
@@ -3402,6 +3548,7 @@ func (d *DashboardView) getDocsPages() [][]string {
 
 // truncateString truncates a string to the specified width, adding ellipsis if needed
 // truncateString truncates a string to the specified width - DEPRECATED (kept for reference)
+// Use utils.TruncateMultiline instead if this functionality is needed
 //
 //nolint:unused
 func (d *DashboardView) truncateString(s string, maxWidth int) string {

@@ -37,7 +37,7 @@ func NewRunCommand(c *Container) *cobra.Command {
 }
 ```
 
-### 2. Duplicate Code - Truncate Functions
+### 2. Duplicate Code - Truncate Functions ✅
 **Problem**: 6+ different truncate implementations doing the same thing
 - `/internal/tui/components/statusline.go:276` - `truncateWithEllipsis`
 - `/internal/tui/views/bulk_fzf.go:50` - `truncateString`
@@ -46,29 +46,13 @@ func NewRunCommand(c *Container) *cobra.Command {
 - `/internal/tui/components/table.go:250` - `truncate`
 - `/internal/commands/status.go:183` - `truncate`
 
-**Solution**:
-```go
-// Create single utility function
-// internal/utils/strings.go
-package utils
+**Solution**: ✅ COMPLETED
+Created three specialized utility functions in `/internal/utils/strings.go`:
+- `TruncateWithEllipsis()` - Uses lipgloss.Width() for proper display width (handles unicode/emoji)
+- `TruncateSimple()` - Fast byte-based truncation for non-display purposes
+- `TruncateMultiline()` - Handles newlines, tabs, and uses runes for unicode
 
-import "github.com/charmbracelet/lipgloss"
-
-func TruncateWithEllipsis(s string, maxWidth int) string {
-    if maxWidth <= 3 {
-        return "..."
-    }
-    if lipgloss.Width(s) <= maxWidth {
-        return s
-    }
-    // Handle unicode properly
-    runes := []rune(s)
-    if len(runes) > maxWidth-3 {
-        return string(runes[:maxWidth-3]) + "..."
-    }
-    return s
-}
-```
+All truncate implementations have been replaced with appropriate utility function calls while preserving their specific behaviors (e.g., table.go's no-ellipsis for width <= 3).
 
 ## High Priority Issues (P1)
 

@@ -15,7 +15,7 @@ func TruncateWithEllipsis(s string, maxWidth int) string {
 	if lipgloss.Width(s) <= maxWidth {
 		return s
 	}
-	
+
 	// Use runes to handle unicode properly when truncating
 	runes := []rune(s)
 	for i := len(runes); i > 0; i-- {
