@@ -44,6 +44,17 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a.handleNavigation(navMsg)
 	}
 
+	// Handle window size messages centrally
+	if wsMsg, ok := msg.(tea.WindowSizeMsg); ok {
+		debug.LogToFilef("📐 APP: Received WindowSizeMsg: width=%d, height=%d 📐\n", wsMsg.Width, wsMsg.Height)
+		// Delegate to current view - all views should handle this
+		newModel, cmd := a.current.Update(msg)
+		if newModel != a.current {
+			a.current = newModel
+		}
+		return a, cmd
+	}
+
 	// Centralized key processing
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
 		debug.LogToFilef("⌨️ APP: Received KeyMsg: '%s' ⌨️\n", keyMsg.String())

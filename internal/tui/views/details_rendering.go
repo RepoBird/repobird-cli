@@ -7,6 +7,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/repobird/repobird-cli/internal/models"
+	"github.com/repobird/repobird-cli/internal/tui/debug"
 	"github.com/repobird/repobird-cli/internal/tui/styles"
 	"github.com/repobird/repobird-cli/internal/utils"
 )
@@ -118,8 +119,12 @@ func (v *RunDetailsView) renderContentWithCursor() []string {
 	visibleLines := []string{}
 	contentWidth := v.viewport.Width
 	if contentWidth <= 0 {
-		contentWidth = v.width - 6 // Account for box borders and padding
+		contentWidth = v.width - 4 // Account for minimal box borders only
 	}
+
+	// Debug: Log viewport rendering details
+	debug.LogToFilef("DEBUG: renderContentWithCursor - viewportHeight=%d, contentWidth=%d, offset=%d\n", 
+		viewportHeight, contentWidth, viewportOffset)
 
 	for i := viewportOffset; i < len(allLines) && i < viewportOffset+viewportHeight; i++ {
 		line := allLines[i]
@@ -140,13 +145,12 @@ func (v *RunDetailsView) renderContentWithCursor() []string {
 		}
 
 		if shouldHighlight {
-			// Apply highlight style
+			// Apply highlight style using full available width
 			highlightedLine := applyHighlightStyle(line, contentWidth, v.yankBlink, v.yankBlinkTime)
 			visibleLines = append(visibleLines, highlightedLine)
 		} else {
-			// Non-selected lines with width constraint
+			// Non-selected lines - use full available width
 			styledLine := lipgloss.NewStyle().
-				Width(contentWidth).
 				MaxWidth(contentWidth).
 				Inline(true).
 				Render(line)

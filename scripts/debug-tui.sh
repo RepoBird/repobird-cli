@@ -22,5 +22,8 @@ echo ""
 
 # Build and run the TUI
 cd "$PROJECT_DIR"
-make build
+if ! make build; then
+    echo "Build failed. Cannot run TUI."
+    exit 1
+fi
 REPOBIRD_ENV=dev ./build/repobird tui

@@ -42,7 +42,7 @@ func (d *DashboardView) initializeStatusInfoFields() {
 
 		// Plan info
 		lineNum++ // Skip one line for Plan section
-		tierDisplay := strings.Title(strings.ToLower(d.userInfo.PlanTier))
+		tierDisplay := strings.Title(strings.ToLower(d.userInfo.Tier))
 		if tierDisplay == "" {
 			tierDisplay = "Basic"
 		}
@@ -52,15 +52,15 @@ func (d *DashboardView) initializeStatusInfoFields() {
 		lineNum++
 
 		// Usage info based on plan type
-		if d.userInfo.PlanTier == "FREE" || d.userInfo.PlanTier == "BASIC" {
+		if d.userInfo.Tier == "FREE" || d.userInfo.Tier == "BASIC" {
 			// Show runs remaining for usage-based plans
 			var runsRemaining string
-			if d.userInfo.Usage.TotalCalls > 0 {
-				remaining := d.userInfo.Usage.TotalCalls - d.userInfo.Usage.UsedCalls
+			if d.userInfo.TotalRuns > 0 {
+				remaining := d.userInfo.RemainingRuns
 				if remaining < 0 {
 					remaining = 0
 				}
-				runsRemaining = fmt.Sprintf("%d / %d", remaining, d.userInfo.Usage.TotalCalls)
+				runsRemaining = fmt.Sprintf("%d / %d", remaining, d.userInfo.TotalRuns)
 			} else {
 				runsRemaining = "Unknown"
 			}
@@ -70,8 +70,9 @@ func (d *DashboardView) initializeStatusInfoFields() {
 			lineNum++
 
 			// Also show percentage usage if we have the data
-			if d.userInfo.Usage.TotalCalls > 0 {
-				percentage := float64(d.userInfo.Usage.UsedCalls) / float64(d.userInfo.Usage.TotalCalls) * 100
+			if d.userInfo.TotalRuns > 0 {
+				usedRuns := d.userInfo.TotalRuns - d.userInfo.RemainingRuns
+				percentage := float64(usedRuns) / float64(d.userInfo.TotalRuns) * 100
 
 				var usageValue string
 				if percentage >= 90 {
@@ -87,10 +88,11 @@ func (d *DashboardView) initializeStatusInfoFields() {
 				d.statusInfoFieldLines = append(d.statusInfoFieldLines, lineNum)
 				lineNum++
 			}
-		} else if d.userInfo.PlanTier == "PRO" {
+		} else if d.userInfo.Tier == "PRO" {
 			// Show percentage for PRO plans
-			if d.userInfo.Usage.TotalCalls > 0 {
-				percentage := float64(d.userInfo.Usage.UsedCalls) / float64(d.userInfo.Usage.TotalCalls) * 100
+			if d.userInfo.TotalRuns > 0 {
+				usedRuns := d.userInfo.TotalRuns - d.userInfo.RemainingRuns
+				percentage := float64(usedRuns) / float64(d.userInfo.TotalRuns) * 100
 				d.statusInfoKeys = append(d.statusInfoKeys, "Usage:")
 				d.statusInfoFields = append(d.statusInfoFields, fmt.Sprintf("%.1f%%", percentage))
 				d.statusInfoFieldLines = append(d.statusInfoFieldLines, lineNum)
@@ -168,6 +170,42 @@ func (d *DashboardView) handleStatusInfoNavigation(msg tea.KeyMsg) (tea.Model, t
 				d.statusInfoKeyOffset = 0
 				d.statusInfoValueOffset = 0
 			}
+		} else if msg.String() == "g" {
+			d.statusInfoSelectedRow = 0
+		} else if msg.String() == "G" {
+			if len(d.statusInfoFields) > 0 {
+				d.statusInfoSelectedRow = len(d.statusInfoFields) - 1
+				// Reset horizontal scroll
+				d.statusInfoKeyOffset = 0
+				d.statusInfoValueOffset = 0
+			}
+		} else if msg.String() == "y" {
+			// Copy current field to clipboard
+			if d.statusInfoSelectedRow >= 0 && d.statusInfoSelectedRow < len(d.statusInfoFields) {
+				var textToCopy string
+				if d.statusInfoFocusColumn == 0 && d.statusInfoSelectedRow < len(d.statusInfoKeys) {
+					// Copy the key (without the colon)
+					textToCopy = strings.TrimSuffix(d.statusInfoKeys[d.statusInfoSelectedRow], ":")
+				} else {
+					// Copy the value
+					textToCopy = d.statusInfoFields[d.statusInfoSelectedRow]
+				}
+
+				if err := d.copyToClipboard(textToCopy); err == nil {
+					// Show success message temporarily
+					d.copiedMessage = fmt.Sprintf("Copied: %s", textToCopy)
+					if len(d.copiedMessage) > 50 {
+						d.copiedMessage = d.copiedMessage[:47] + "..."
+					}
+					d.copiedMessageTime = time.Now()
+
+					// Start the blink animation
+					return d, tea.Batch(
+						d.startYankBlinkAnimation(),
+						d.startMessageClearTimer(2*time.Second),
+					)
+				}
+			}
 		}
 	case tea.KeyUp:
 		if msg.String() == "k" || msg.Type == tea.KeyUp {
@@ -206,41 +244,6 @@ func (d *DashboardView) handleStatusInfoNavigation(msg tea.KeyMsg) (tea.Model, t
 				if len(value) > d.statusInfoValueOffset+valueMaxWidth {
 					d.statusInfoValueOffset++
 					debug.LogToFilef("DEBUG: Scrolling value to offset %d\n", d.statusInfoValueOffset)
-				}
-			}
-		}
-	case tea.KeyRunes:
-		if msg.String() == "g" {
-			d.statusInfoSelectedRow = 0
-		} else if msg.String() == "G" {
-			if len(d.statusInfoFields) > 0 {
-				d.statusInfoSelectedRow = len(d.statusInfoFields) - 1
-			}
-		} else if msg.String() == "y" {
-			// Copy current field to clipboard
-			if d.statusInfoSelectedRow >= 0 && d.statusInfoSelectedRow < len(d.statusInfoFields) {
-				var textToCopy string
-				if d.statusInfoFocusColumn == 0 && d.statusInfoSelectedRow < len(d.statusInfoKeys) {
-					// Copy the key (without the colon)
-					textToCopy = strings.TrimSuffix(d.statusInfoKeys[d.statusInfoSelectedRow], ":")
-				} else {
-					// Copy the value
-					textToCopy = d.statusInfoFields[d.statusInfoSelectedRow]
-				}
-
-				if err := d.copyToClipboard(textToCopy); err == nil {
-					// Show success message temporarily
-					d.copiedMessage = fmt.Sprintf("Copied: %s", textToCopy)
-					if len(d.copiedMessage) > 50 {
-						d.copiedMessage = d.copiedMessage[:47] + "..."
-					}
-					d.copiedMessageTime = time.Now()
-
-					// Start the blink animation
-					return d, tea.Batch(
-						d.startYankBlinkAnimation(),
-						d.startMessageClearTimer(2*time.Second),
-					)
 				}
 			}
 		}

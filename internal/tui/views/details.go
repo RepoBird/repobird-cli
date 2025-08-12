@@ -131,6 +131,9 @@ func (v *RunDetailsView) handleWindowSizeMsg(msg tea.WindowSizeMsg) {
 	v.width = msg.Width
 	v.height = msg.Height
 
+	// Debug: Log window size changes
+	debug.LogToFilef("DEBUG: Details view handleWindowSizeMsg - width=%d, height=%d\n", msg.Width, msg.Height)
+
 	// Calculate actual height for viewport:
 	// - Title: 2 lines (title + blank line)
 	// - Header info: 2-3 lines (status, repo, etc.)
@@ -146,6 +149,10 @@ func (v *RunDetailsView) handleWindowSizeMsg(msg tea.WindowSizeMsg) {
 	v.viewport.Width = msg.Width
 	v.viewport.Height = viewportHeight
 	v.help.Width = msg.Width
+
+	// Debug: Log viewport dimensions
+	debug.LogToFilef("DEBUG: Details viewport - width=%d, height=%d (non-viewport=%d)\n", 
+		msg.Width, viewportHeight, nonViewportHeight)
 
 	// Update content to reflow for new width
 	v.updateContent()
@@ -219,6 +226,10 @@ func (v *RunDetailsView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		v.handleWindowSizeMsg(msg)
+		return v, nil
+
 	case tea.KeyMsg:
 		return v.handleKeyInput(msg)
 
@@ -258,17 +269,21 @@ func (v *RunDetailsView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (v *RunDetailsView) View() string {
 	if v.height == 0 || v.width == 0 {
 		// Terminal dimensions not yet known
+		debug.LogToFilef("DEBUG: Details view dimensions not set - width=%d, height=%d\n", v.width, v.height)
 		return ""
 	}
+
+	// Debug: Log rendering dimensions
+	debug.LogToFilef("DEBUG: Details view rendering - terminal width=%d, height=%d\n", v.width, v.height)
 
 	// For very small terminals, render minimal content
 	if v.height < 5 || v.width < 20 {
 		return "Run ID: " + v.run.GetIDString()
 	}
 
-	// Calculate box dimensions - leave room for statusline at bottom and ensure top border shows
-	boxWidth := v.width - 4   // Leave 2 chars margin on each side
-	boxHeight := v.height - 3 // Leave room for statusline at bottom and top margin
+	// Calculate box dimensions - use full screen width/height minus minimal margins
+	boxWidth := v.width - 2   // Leave 1 char margin on each side
+	boxHeight := v.height - 2 // Leave 1 line margin at top and bottom for statusline
 
 	if boxWidth < 10 {
 		boxWidth = 10
@@ -276,6 +291,9 @@ func (v *RunDetailsView) View() string {
 	if boxHeight < 3 {
 		boxHeight = 3
 	}
+
+	// Debug: Log box dimensions
+	debug.LogToFilef("DEBUG: Details box dimensions - width=%d, height=%d\n", boxWidth, boxHeight)
 
 	// Box style with rounded border
 	boxStyle := lipgloss.NewStyle().
@@ -345,9 +363,13 @@ func (v *RunDetailsView) View() string {
 			Padding(1, 2)
 		innerContent = lipgloss.JoinVertical(lipgloss.Left, title, errorStyle.Render(errorText))
 	} else {
-		// Render content with scrollable viewport
-		v.viewport.Width = boxWidth - 4 // Account for border and padding
+		// Render content with scrollable viewport - use more of the available space
+		v.viewport.Width = boxWidth - 2 // Account for border only
 		v.viewport.Height = contentHeight
+
+		// Debug: Log viewport dimensions during rendering
+		debug.LogToFilef("DEBUG: Details viewport during render - width=%d, height=%d\n", 
+			v.viewport.Width, v.viewport.Height)
 
 		// Get content with highlighting
 		contentLines := v.renderContentWithCursor()
@@ -365,15 +387,23 @@ func (v *RunDetailsView) View() string {
 	// Wrap in the box
 	boxedContent := boxStyle.Render(innerContent)
 
-	// Center the box on screen (leaving room for statusline and top margin)
-	// Add 1 line of top margin to ensure top border is visible
-	centeredBox := lipgloss.Place(v.width, v.height-1, lipgloss.Center, lipgloss.Center, boxedContent)
-
-	// Create the statusline
+	// Don't center the box - use full available space
+	// Just place the box at top-left with statusline at bottom
 	statusLine := v.renderStatusBar()
 
-	// Join the centered box and statusline
-	return lipgloss.JoinVertical(lipgloss.Left, centeredBox, statusLine)
+	// Use the full height minus statusline for the box
+	mainContentHeight := v.height - 1 // Reserve 1 line for statusline
+	mainContent := lipgloss.NewStyle().
+		Width(v.width).
+		Height(mainContentHeight).
+		Align(lipgloss.Center, lipgloss.Center).
+		Render(boxedContent)
+
+	// Debug: Log final layout dimensions
+	debug.LogToFilef("DEBUG: Details final layout - main content height=%d, statusline height=1\n", mainContentHeight)
+
+	// Join the main content and statusline
+	return lipgloss.JoinVertical(lipgloss.Left, mainContent, statusLine)
 }
 
 // renderContentWithCursor renders the content with a visible row selector
