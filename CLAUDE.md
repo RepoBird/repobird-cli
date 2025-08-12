@@ -294,6 +294,34 @@ When working on this codebase:
 9. Document any non-obvious design decisions in code comments in docs/ markdown files.
 10. When debugging TUI issues, use `debug.LogToFilef()` to write to `/tmp/repobird_debug.log` and check logs with `tail -f /tmp/repobird_debug.log`
 
+### TUI Implementation Patterns
+- **Bubble Tea Model-Update-View**: All TUI views implement `Update(tea.Msg) (tea.Model, tea.Cmd)` pattern
+- **Message Passing**: Component communication via message passing, no direct method calls between views
+- **State Management**: Embed `*cache.SimpleCache` in view structs, never use globals
+- **Debug Logging**: Use `debug.LogToFilef()` from `internal/tui/debug` package (configurable via `REPOBIRD_DEBUG_LOG`)
+
+### Testing Patterns  
+- **Table-Driven Tests**: Use struct slices with test cases for systematic testing
+- **Test Isolation**: Set `XDG_CONFIG_HOME` to temp directory in tests for cache isolation
+- **Mocking**: Use `github.com/stretchr/testify` for assertions and mocks
+- **Coverage Target**: Maintain 70%+ test coverage for new code
+
+### Build & Development
+- **make ci vs make check**: `ci` includes security checks and coverage, `check` is faster (fmt-check, vet, lint, test)
+- **Cross-compilation**: `make build-all` targets: darwin/amd64, darwin/arm64, linux/amd64, linux/arm64, windows/amd64  
+- **Environment Modes**: `REPOBIRD_ENV=dev` (development) vs `REPOBIRD_ENV=prod` (production) affects frontend URL generation
+
+### Code Organization
+- **Interfaces**: Define in `internal/domain/interfaces.go` and `internal/tui/interfaces.go`
+- **internal/ vs pkg/**: `internal/` for private code, `pkg/` only for truly reusable public APIs
+- **Error Handling**: Use structured `internal/errors` package with `ErrorType` classification and user-friendly formatting
+- **Context Usage**: All API calls and cancellable operations use context.Context for timeouts and cancellation
+
+### Performance Guidelines
+- **HTTP Client**: Pre-configured with 45-minute timeout, circuit breaker, and retry logic with exponential backoff
+- **No Explicit Concurrency**: Standard library HTTP client handles connection pooling, avoid manual goroutines unless needed
+- **Memory Management**: TUI views handle large datasets (1000+ runs) with efficient caching and pagination
+
 ## Quick Troubleshooting
 
 ### API Key Issues
