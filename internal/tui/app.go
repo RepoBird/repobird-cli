@@ -194,7 +194,7 @@ func (a *App) getNavigationContext(key string) interface{} {
 // processKeyWithFiltering is the centralized key processor that handles all key filtering and routing
 func (a *App) processKeyWithFiltering(keyMsg tea.KeyMsg) (handled bool, model tea.Model, cmd tea.Cmd) {
 	keyString := keyMsg.String()
-	
+
 	// Check if current view implements CoreViewKeymap
 	if viewKeymap, hasKeymap := a.current.(keymap.CoreViewKeymap); hasKeymap {
 		// First check if view wants to disable this key entirely
@@ -202,27 +202,27 @@ func (a *App) processKeyWithFiltering(keyMsg tea.KeyMsg) (handled bool, model te
 			// Key is disabled - ignore it completely
 			return true, a, nil
 		}
-		
+
 		// Check if view wants to handle this key with custom logic
 		if handled, model, cmd := viewKeymap.HandleKey(keyMsg); handled {
 			// View provided custom handling
 			return true, model, cmd
 		}
 	}
-	
+
 	// Get the default action for this key from registry
 	action := a.keyRegistry.GetAction(keyString)
-	
+
 	// Handle global actions that should always work regardless of view state
 	if keymap.IsGlobalAction(action) {
 		return a.handleGlobalAction(action, keyMsg)
 	}
-	
+
 	// Handle navigation actions
 	if keymap.IsNavigationAction(action) {
 		return a.handleNavigationAction(action, keyMsg)
 	}
-	
+
 	// For ActionViewSpecific or unknown keys, let the view handle them
 	return false, a, nil
 }
@@ -245,7 +245,7 @@ func (a *App) handleGlobalAction(action keymap.KeyAction, keyMsg tea.KeyMsg) (ha
 // handleNavigationAction processes navigation actions like back, new, etc.
 func (a *App) handleNavigationAction(action keymap.KeyAction, keyMsg tea.KeyMsg) (handled bool, model tea.Model, cmd tea.Cmd) {
 	var navMsg messages.NavigationMsg
-	
+
 	switch action {
 	case keymap.ActionNavigateBack:
 		navMsg = messages.NavigateBackMsg{}
@@ -268,11 +268,11 @@ func (a *App) handleNavigationAction(action keymap.KeyAction, keyMsg tea.KeyMsg)
 	default:
 		return false, a, nil
 	}
-	
+
 	if navMsg != nil {
 		model, cmd := a.handleNavigation(navMsg)
 		return true, model, cmd
 	}
-	
+
 	return false, a, nil
 }

@@ -10,7 +10,7 @@ import (
 
 // MockViewWithCoreKeymap implements the new CoreViewKeymap interface
 type MockViewWithCoreKeymap struct {
-	disabledKeys map[string]bool
+	disabledKeys  map[string]bool
 	handleKeyFunc func(tea.KeyMsg) (bool, tea.Model, tea.Cmd)
 }
 

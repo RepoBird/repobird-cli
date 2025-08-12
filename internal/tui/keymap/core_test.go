@@ -130,7 +130,7 @@ func TestCoreViewKeymapInterface(t *testing.T) {
 
 		keyMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("x")}
 		handled, model, cmd := view.HandleKey(keyMsg)
-		
+
 		assert.True(t, handled)
 		assert.Equal(t, view, model)
 		assert.Nil(t, cmd)
@@ -139,13 +139,13 @@ func TestCoreViewKeymapInterface(t *testing.T) {
 
 	t.Run("interface compliance", func(t *testing.T) {
 		view := NewMockView()
-		
+
 		// Should be able to assign to interface
 		var keymap CoreViewKeymap = view
-		
+
 		// Should be able to call interface methods
 		assert.False(t, keymap.IsKeyDisabled("test"))
-		
+
 		keyMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("test")}
 		handled, model, cmd := keymap.HandleKey(keyMsg)
 		assert.False(t, handled)

@@ -14,12 +14,21 @@ RepoBird CLI is a Go-based command-line tool for interacting with the RepoBird A
 ## Documentation
 Comprehensive documentation is available in the `docs/` directory:
 
-- **[Architecture Overview](docs/architecture.md)** - System design, components, patterns
-- **[API Reference](docs/api-reference.md)** - Endpoints, client methods, error handling
-- **[Development Guide](docs/development-guide.md)** - Setup, building, contributing
-- **[Testing Guide](docs/testing-guide.md)** - Test strategies, patterns, coverage
-- **[Configuration Guide](docs/configuration-guide.md)** - Settings, environment, security
-- **[Troubleshooting Guide](docs/troubleshooting.md)** - Common issues and solutions
+### Core Architecture & Design
+- **[Architecture Overview](docs/architecture.md)** - System design, components, patterns, and overall codebase structure
+- **[API Reference](docs/api-reference.md)** - REST endpoints, client methods, error handling, and authentication patterns
+- **[TUI Guide](docs/tui-guide.md)** - Terminal UI implementation, Bubble Tea patterns, and view architecture
+- **[Keymap Architecture](docs/keymap-architecture.md)** - Centralized key processing system, per-view customization, and implementation guide
+
+### Development & Operations  
+- **[Development Guide](docs/development-guide.md)** - Setup, building, contributing, and coding standards
+- **[Testing Guide](docs/testing-guide.md)** - Test strategies, patterns, coverage requirements, and best practices
+- **[Configuration Guide](docs/configuration-guide.md)** - Settings management, environment variables, and security practices
+- **[Troubleshooting Guide](docs/troubleshooting.md)** - Common issues, debugging techniques, and solutions
+
+### Feature-Specific Guides
+- **[Bulk Runs](docs/bulk-runs.md)** - Bulk operation workflows, configuration files, and batch processing
+- **[Dashboard Layouts](docs/dashboard-layouts.md)** - Multi-column layouts, navigation patterns, and view states
 
 ## Architecture
 
@@ -293,8 +302,11 @@ When working on this codebase:
 5. Update CLI help text when adding new features
 6. Keep dependencies minimal - prefer standard library
 7. Ensure cross-platform compatibility (Linux, macOS, Windows)
-8. create final todo list item of run linting and formatting after all other todo changes: `make lint-fix fmt`
-9. Document any non-obvious design decisions in code comments in docs/ markdown files.
+8. For significant changes, always create these final todo items (in order):
+   - `☐ Update detailed documentation in docs/ directory (if applicable)`
+   - `☐ Update CLAUDE.md with general/critical info needed for future development`
+   - `☐ Run linting and formatting: make lint-fix fmt`
+9. Document any non-obvious design decisions in code comments and docs/ markdown files.
 10. When debugging TUI issues, use `debug.LogToFilef()` to write to `/tmp/repobird_debug.log` and check logs with `tail -f /tmp/repobird_debug.log`
 
 ### TUI Implementation Patterns
@@ -308,6 +320,7 @@ When working on this codebase:
 - **Shared Components**: Reusable UI components in `internal/tui/components/` (ScrollableList, Form, ErrorView)
 - **Navigation Context**: Temporary state sharing via `cache.SetNavigationContext()` without tight coupling
 - **View History Stack**: Back navigation support with `NavigateBackMsg`, dashboard reset with `NavigateToDashboardMsg`
+- **🆕 Core Keymap System**: Centralized key processing with per-view customization (see Key Management section)
 - **Debug Logging**: Use `debug.LogToFilef()` from `internal/tui/debug` package (configurable via `REPOBIRD_DEBUG_LOG`)
 
 #### Navigation Architecture
@@ -318,6 +331,96 @@ When working on this codebase:
 - **Shared State**: Single cache instance shared across all views from app-level
 - **Context Management**: Use navigation context for temporary data, cleared on dashboard return
 - **Error Recovery**: Recoverable errors allow back navigation, non-recoverable errors clear history stack
+
+### Key Management (Core Keymap System)
+
+#### **Architecture Overview**
+The TUI uses a centralized key processing system that provides consistent, extensible key handling across all views:
+
+```
+Key Press → App.processKeyWithFiltering() → View Keymap Check → Action Execution
+```
+
+#### **Core Components**
+
+**1. CoreKeyRegistry (`internal/tui/keymap/core.go`)**
+- Central registry of all keys and their default actions
+- Maps keystrings to actions: `ActionNavigateBack`, `ActionGlobalQuit`, `ActionViewSpecific`, etc.
+- Extensible: new keys and actions can be registered
+
+**2. CoreViewKeymap Interface**
+```go
+type CoreViewKeymap interface {
+    IsKeyDisabled(keyString string) bool
+    HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Model, cmd tea.Cmd)
+}
+```
+
+**3. Centralized Processing (`App.processKeyWithFiltering()`)**
+- Single point where ALL keys are processed
+- Checks view keymaps before executing actions
+- Handles global actions (force quit) regardless of view state
+- Routes navigation actions through proper channels
+
+#### **Key Action Types**
+- **Navigation Actions**: `b` (back), `B` (bulk), `n` (new), `r` (refresh), `q` (quit), `?` (help)
+- **Global Actions**: `Q` (force quit), `ctrl+c` (force quit) - always work regardless of view
+- **View-Specific Actions**: `s` (status), `f` (filter), `enter`, `tab`, arrow keys - handled by views
+
+#### **Per-View Key Customization**
+
+**Disable Keys Example (Dashboard)**:
+```go
+type DashboardView struct {
+    disabledKeys map[string]bool
+}
+
+func NewDashboardView(client APIClient) *DashboardView {
+    return &DashboardView{
+        disabledKeys: map[string]bool{
+            "b": true,    // Disable back navigation
+            "esc": true,  // Disable escape key
+        },
+    }
+}
+
+func (d *DashboardView) IsKeyDisabled(keyString string) bool {
+    return d.disabledKeys[keyString]
+}
+```
+
+**Custom Key Handling Example**:
+```go
+func (v *CreateView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Model, cmd tea.Cmd) {
+    if keyMsg.String() == "ctrl+s" && v.isFormValid() {
+        // Custom save behavior
+        return true, v, v.submitForm()
+    }
+    return false, v, nil // Let system handle other keys
+}
+```
+
+#### **Implementation Guidelines**
+
+**For New Views**:
+1. Implement `CoreViewKeymap` interface if you need key customization
+2. Use `IsKeyDisabled()` to disable unwanted keys
+3. Use `HandleKey()` for custom key behaviors
+4. Views without interface work normally (all keys enabled)
+
+**Key Processing Priority**:
+1. **Disabled Check**: If `IsKeyDisabled(key)` returns true → ignore completely
+2. **Custom Handler**: If `HandleKey()` returns handled=true → use custom result  
+3. **Global Actions**: Force quit, etc. → handled by app regardless of view
+4. **Navigation Actions**: Back, bulk, etc. → converted to navigation messages
+5. **View-Specific**: All other keys → delegated to view's Update() method
+
+**Benefits**:
+- ✅ **Consistent**: Same key behavior across all views
+- ✅ **Extensible**: Any view can disable/customize any key
+- ✅ **Maintainable**: Single place to understand key processing
+- ✅ **Debuggable**: Easy to trace what happens with any key press
+- ✅ **Backward Compatible**: Existing views work unchanged
 
 **Note**: View architecture refactored (2025-08-12) to follow clean Bubble Tea patterns:
 - **Dashboard**: Uses shared `ScrollableList` component instead of child views
