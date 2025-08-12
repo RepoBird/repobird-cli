@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/adrg/xdg"
 	"github.com/repobird/repobird-cli/internal/models"
@@ -49,7 +50,7 @@ func hashUserID(userID string) string {
 	return fmt.Sprintf("user-%x", h[:8])
 }
 
-// GetRun retrieves a cached run from disk (only terminal states)
+// GetRun retrieves a cached run from disk (terminal states or old stuck runs)
 func (p *PermanentCache) GetRun(id string) (*models.RunResponse, bool) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
@@ -65,9 +66,9 @@ func (p *PermanentCache) GetRun(id string) (*models.RunResponse, bool) {
 		return nil, false
 	}
 	
-	// Only return if run is in terminal state
-	if !isTerminalState(run.Status) {
-		// Clean up non-terminal runs from disk
+	// Only return if run should be permanently cached
+	if !shouldPermanentlyCache(run) {
+		// Clean up runs that shouldn't be cached
 		_ = os.Remove(path)
 		return nil, false
 	}
@@ -75,10 +76,10 @@ func (p *PermanentCache) GetRun(id string) (*models.RunResponse, bool) {
 	return &run, true
 }
 
-// SetRun stores a run to disk (only terminal states)
+// SetRun stores a run to disk (terminal states or old stuck runs)
 func (p *PermanentCache) SetRun(run models.RunResponse) error {
-	// Only cache terminal states
-	if !isTerminalState(run.Status) {
+	// Only cache runs that should be permanent
+	if !shouldPermanentlyCache(run) {
 		return nil
 	}
 	
@@ -127,11 +128,11 @@ func (p *PermanentCache) GetAllRuns() ([]models.RunResponse, bool) {
 			continue
 		}
 		
-		// Only include terminal state runs
-		if isTerminalState(run.Status) {
+		// Only include runs that should be permanently cached
+		if shouldPermanentlyCache(run) {
 			runs = append(runs, run)
 		} else {
-			// Clean up non-terminal runs
+			// Clean up runs that shouldn't be cached
 			_ = os.Remove(path)
 		}
 	}
@@ -330,4 +331,21 @@ func isTerminalState(status models.RunStatus) bool {
 		statusStr == "COMPLETED" ||
 		statusStr == "CANCELLED" ||
 		statusStr == "ERROR"
+}
+
+// shouldPermanentlyCache checks if a run should be cached permanently
+// This includes terminal states AND runs older than 2 hours (stuck runs)
+func shouldPermanentlyCache(run models.RunResponse) bool {
+	// Terminal states are always cached
+	if isTerminalState(run.Status) {
+		return true
+	}
+	
+	// Runs older than 2 hours should be cached permanently
+	// (they're likely stuck in an invalid state)
+	if time.Since(run.CreatedAt) > 2*time.Hour {
+		return true
+	}
+	
+	return false
 }

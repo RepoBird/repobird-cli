@@ -640,7 +640,8 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			d.spinner, cmd = d.spinner.Update(msg)
 			// Also update the status line spinner
 			d.statusLine.UpdateSpinner()
-			return d, cmd
+			// Don't return early - continue processing other messages
+			cmds = append(cmds, cmd)
 		}
 
 	case tea.WindowSizeMsg:
@@ -2949,9 +2950,9 @@ func (d *DashboardView) handleHelpNavigation(msg tea.KeyMsg) (tea.Model, tea.Cmd
 	}
 
 	// Pass other keys to the help view
-	updatedHelp, cmd := d.helpView.Update(msg)
+	updatedHelp, helpCmd := d.helpView.Update(msg)
 	d.helpView = updatedHelp
-	return d, cmd
+	return d, helpCmd
 }
 
 // renderStatusInfo renders the status/user info overlay

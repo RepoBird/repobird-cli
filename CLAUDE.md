@@ -73,10 +73,11 @@ Comprehensive documentation is available in the `docs/` directory:
 #### Cache Architecture
 - **Hybrid Cache**: Automatic routing between disk (permanent) and memory (session) storage
 - **Terminal Runs**: Automatically persisted to disk (DONE/FAILED/CANCELLED states)
-- **Active Runs**: Kept in memory with 5-minute TTL (RUNNING/PENDING states)
+- **Stuck Runs**: Runs older than 2 hours are permanently cached (likely stuck in invalid state)
+- **Active Runs**: Kept in memory with 5-minute TTL (RUNNING/PENDING states less than 2 hours old)
 - **User Isolation**: Each user has separate cache directory (`~/.config/repobird/cache/users/{hash}/`)
 - **No Manual Save/Load**: Persistence is automatic - `SaveToDisk()`/`LoadFromDisk()` are now no-ops
-- **Performance**: Terminal runs load in <10ms from disk, 90% reduction in API calls
+- **Performance**: Terminal/old runs load in <10ms from disk, 90% reduction in API calls
 
 ### Testing Requirements
 - Minimum 70% test coverage for new code

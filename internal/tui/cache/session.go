@@ -43,8 +43,9 @@ func (s *SessionCache) GetRun(id string) (*models.RunResponse, bool) {
 	}
 	
 	// Only return active runs from session cache
-	if isTerminalState(run.Status) {
-		// Remove terminal runs from session cache
+	// (terminal or old runs should be in permanent cache)
+	if shouldPermanentlyCache(run) {
+		// Remove from session cache
 		s.cache.Delete("run:" + id)
 		return nil, false
 	}
@@ -52,14 +53,15 @@ func (s *SessionCache) GetRun(id string) (*models.RunResponse, bool) {
 	return &run, true
 }
 
-// SetRun stores a run in memory (only active states)
+// SetRun stores a run in memory (only active, recent states)
 func (s *SessionCache) SetRun(run models.RunResponse) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	
-	// Only cache active states
-	if isTerminalState(run.Status) {
-		// Remove from session cache if terminal
+	// Only cache active, recent runs
+	// (terminal or old runs should go to permanent cache)
+	if shouldPermanentlyCache(run) {
+		// Remove from session cache
 		s.cache.Delete("run:" + run.ID)
 		return nil
 	}
@@ -77,10 +79,10 @@ func (s *SessionCache) GetRuns() ([]models.RunResponse, bool) {
 	item := s.cache.Get("runs:all")
 	if item != nil {
 		if runs, ok := item.Value().([]models.RunResponse); ok {
-			// Filter to only return active runs
+			// Filter to only return active, recent runs
 			activeRuns := make([]models.RunResponse, 0)
 			for _, run := range runs {
-				if !isTerminalState(run.Status) {
+				if !shouldPermanentlyCache(run) {
 					activeRuns = append(activeRuns, run)
 				}
 			}
@@ -94,7 +96,7 @@ func (s *SessionCache) GetRuns() ([]models.RunResponse, bool) {
 	for key, item := range items {
 		if len(key) > 4 && key[:4] == "run:" {
 			if run, ok := item.Value().(models.RunResponse); ok {
-				if !isTerminalState(run.Status) {
+				if !shouldPermanentlyCache(run) {
 					runs = append(runs, run)
 				}
 			}
@@ -112,9 +114,9 @@ func (s *SessionCache) SetRuns(runs []models.RunResponse) error {
 	// Cache the full list for quick retrieval
 	s.cache.Set("runs:all", runs, 5*time.Minute)
 	
-	// Also cache individual active runs
+	// Also cache individual active, recent runs
 	for _, run := range runs {
-		if !isTerminalState(run.Status) {
+		if !shouldPermanentlyCache(run) {
 			s.cache.Set("run:"+run.ID, run, 5*time.Minute)
 		}
 	}

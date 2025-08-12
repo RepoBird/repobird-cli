@@ -54,17 +54,17 @@ func (h *HybridCache) GetRun(id string) (*models.RunResponse, bool) {
 	return nil, false
 }
 
-// SetRun routes to appropriate cache based on status
+// SetRun routes to appropriate cache based on status and age
 func (h *HybridCache) SetRun(run models.RunResponse) error {
-	if isTerminalState(run.Status) {
-		// Move to permanent storage
+	if shouldPermanentlyCache(run) {
+		// Move to permanent storage (terminal or old runs)
 		_ = h.session.InvalidateRun(run.ID)
 		if h.permanent != nil {
 			return h.permanent.SetRun(run)
 		}
 	}
 	
-	// Keep in session cache for active runs
+	// Keep in session cache for active, recent runs
 	return h.session.SetRun(run)
 }
 
@@ -108,21 +108,21 @@ func (h *HybridCache) GetRuns() ([]models.RunResponse, bool) {
 
 // SetRuns stores multiple runs, routing each to the appropriate cache
 func (h *HybridCache) SetRuns(runs []models.RunResponse) error {
-	// Separate runs by state
-	var activeRuns []models.RunResponse
-	var terminalRuns []models.RunResponse
+	// Separate runs by cache destination
+	var sessionRuns []models.RunResponse
+	var permanentRuns []models.RunResponse
 	
 	for _, run := range runs {
-		if isTerminalState(run.Status) {
-			terminalRuns = append(terminalRuns, run)
+		if shouldPermanentlyCache(run) {
+			permanentRuns = append(permanentRuns, run)
 		} else {
-			activeRuns = append(activeRuns, run)
+			sessionRuns = append(sessionRuns, run)
 		}
 	}
 	
-	// Store terminal runs in permanent cache
-	if h.permanent != nil && len(terminalRuns) > 0 {
-		for _, run := range terminalRuns {
+	// Store permanent runs (terminal or old) in permanent cache
+	if h.permanent != nil && len(permanentRuns) > 0 {
+		for _, run := range permanentRuns {
 			if err := h.permanent.SetRun(run); err != nil {
 				// Log error but continue
 				_ = err
@@ -130,9 +130,9 @@ func (h *HybridCache) SetRuns(runs []models.RunResponse) error {
 		}
 	}
 	
-	// Store active runs in session cache
-	if len(activeRuns) > 0 {
-		return h.session.SetRuns(activeRuns)
+	// Store active, recent runs in session cache
+	if len(sessionRuns) > 0 {
+		return h.session.SetRuns(sessionRuns)
 	}
 	
 	return nil

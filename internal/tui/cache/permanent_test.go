@@ -291,3 +291,79 @@ func TestPermanentCache_AnonymousUser(t *testing.T) {
 	_, err = os.Stat(anonDir)
 	assert.NoError(t, err, "anonymous directory should exist")
 }
+
+func TestPermanentCache_OldStuckRuns(t *testing.T) {
+	// Setup test directory
+	tmpDir := t.TempDir()
+	os.Setenv("XDG_CONFIG_HOME", tmpDir)
+	defer os.Unsetenv("XDG_CONFIG_HOME")
+	
+	cache, err := NewPermanentCache("test-user")
+	require.NoError(t, err)
+	
+	// Create a run that's stuck in PROCESSING for more than 2 hours
+	oldStuckRun := models.RunResponse{
+		ID:        "stuck-run",
+		Status:    models.StatusProcessing,
+		CreatedAt: time.Now().Add(-3 * time.Hour), // 3 hours old
+	}
+	
+	// Should be cached even though it's not terminal
+	err = cache.SetRun(oldStuckRun)
+	assert.NoError(t, err)
+	
+	cached, found := cache.GetRun("stuck-run")
+	assert.True(t, found, "old stuck run should be cached")
+	assert.Equal(t, oldStuckRun.ID, cached.ID)
+	assert.Equal(t, models.StatusProcessing, cached.Status)
+	
+	// Recent active run should NOT be cached
+	recentActiveRun := models.RunResponse{
+		ID:        "recent-active",
+		Status:    models.StatusProcessing,
+		CreatedAt: time.Now().Add(-30 * time.Minute), // Only 30 minutes old
+	}
+	
+	err = cache.SetRun(recentActiveRun)
+	assert.NoError(t, err)
+	
+	_, found = cache.GetRun("recent-active")
+	assert.False(t, found, "recent active run should not be cached")
+}
+
+func TestPermanentCache_MixedAgeRuns(t *testing.T) {
+	// Setup test directory
+	tmpDir := t.TempDir()
+	os.Setenv("XDG_CONFIG_HOME", tmpDir)
+	defer os.Unsetenv("XDG_CONFIG_HOME")
+	
+	cache, err := NewPermanentCache("test-user")
+	require.NoError(t, err)
+	
+	runs := []models.RunResponse{
+		{ID: "terminal-new", Status: models.StatusDone, CreatedAt: time.Now()},
+		{ID: "terminal-old", Status: models.StatusFailed, CreatedAt: time.Now().Add(-5 * time.Hour)},
+		{ID: "stuck-old", Status: models.StatusProcessing, CreatedAt: time.Now().Add(-3 * time.Hour)},
+		{ID: "active-new", Status: models.StatusProcessing, CreatedAt: time.Now().Add(-30 * time.Minute)},
+		{ID: "stuck-queued", Status: models.StatusQueued, CreatedAt: time.Now().Add(-4 * time.Hour)},
+	}
+	
+	// Set all runs
+	for _, run := range runs {
+		_ = cache.SetRun(run)
+	}
+	
+	// Verify which ones were cached
+	expectedCached := map[string]bool{
+		"terminal-new": true,  // Terminal state
+		"terminal-old": true,  // Terminal state
+		"stuck-old":    true,  // Old stuck run (>2 hours)
+		"active-new":   false, // Recent active run
+		"stuck-queued": true,  // Old stuck run (>2 hours)
+	}
+	
+	for id, shouldBeCached := range expectedCached {
+		_, found := cache.GetRun(id)
+		assert.Equal(t, shouldBeCached, found, "run %s cache status incorrect", id)
+	}
+}

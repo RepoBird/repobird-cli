@@ -378,8 +378,9 @@ func TestHybridCache_FallbackToSessionOnly(t *testing.T) {
 	
 	// Should still work with session-only
 	run := models.RunResponse{
-		ID:     "session-only",
-		Status: models.StatusProcessing,
+		ID:        "session-only",
+		Status:    models.StatusProcessing,
+		CreatedAt: time.Now(),
 	}
 	err := cache.SetRun(run)
 	assert.NoError(t, err)
@@ -390,8 +391,9 @@ func TestHybridCache_FallbackToSessionOnly(t *testing.T) {
 	
 	// Terminal runs won't persist without permanent cache
 	terminalRun := models.RunResponse{
-		ID:     "terminal",
-		Status: models.StatusDone,
+		ID:        "terminal",
+		Status:    models.StatusDone,
+		CreatedAt: time.Now(),
 	}
 	err = cache.SetRun(terminalRun)
 	assert.NoError(t, err)
@@ -399,4 +401,57 @@ func TestHybridCache_FallbackToSessionOnly(t *testing.T) {
 	// Won't be found because session cache doesn't store terminal runs
 	_, found = cache.GetRun("terminal")
 	assert.False(t, found, "terminal run can't be stored without permanent cache")
+}
+
+func TestHybridCache_OldStuckRunRouting(t *testing.T) {
+	// Setup test directory
+	tmpDir := t.TempDir()
+	os.Setenv("XDG_CONFIG_HOME", tmpDir)
+	defer os.Unsetenv("XDG_CONFIG_HOME")
+	
+	cache, err := NewHybridCache("test-user")
+	require.NoError(t, err)
+	defer cache.Close()
+	
+	// Old stuck run (should go to permanent)
+	oldRun := models.RunResponse{
+		ID:        "old-stuck",
+		Status:    models.StatusProcessing,
+		CreatedAt: time.Now().Add(-3 * time.Hour),
+	}
+	
+	// Recent active run (should go to session)
+	recentRun := models.RunResponse{
+		ID:        "recent-active",
+		Status:    models.StatusProcessing,
+		CreatedAt: time.Now().Add(-30 * time.Minute),
+	}
+	
+	// Set both runs
+	err = cache.SetRun(oldRun)
+	assert.NoError(t, err)
+	err = cache.SetRun(recentRun)
+	assert.NoError(t, err)
+	
+	// Both should be retrievable
+	cached, found := cache.GetRun("old-stuck")
+	assert.True(t, found, "old stuck run should be found")
+	assert.Equal(t, oldRun.ID, cached.ID)
+	
+	cached, found = cache.GetRun("recent-active")
+	assert.True(t, found, "recent active run should be found")
+	assert.Equal(t, recentRun.ID, cached.ID)
+	
+	// Create new cache instance - old run should persist
+	cache2, err := NewHybridCache("test-user")
+	require.NoError(t, err)
+	defer cache2.Close()
+	
+	// Old run should persist (from permanent cache)
+	cached, found = cache2.GetRun("old-stuck")
+	assert.True(t, found, "old stuck run should persist")
+	
+	// Recent run should not persist (was only in session cache)
+	_, found = cache2.GetRun("recent-active")
+	assert.False(t, found, "recent active run should not persist")
 }
