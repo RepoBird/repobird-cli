@@ -141,13 +141,13 @@ func (b *BulkFileSelector) LoadFilesProgressiveCmd() tea.Cmd {
 			return filesLoadedMsg{files: nil, err: err}
 		}
 
-		// Start with a smaller batch for immediate feedback
+		// Start with a reasonable depth to find files in subdirectories like run-tasks/
 		opts := utils.FileDiscoveryOptions{
-			MaxDepth:       1, // Start with current directory only
+			MaxDepth:       5, // Increase depth to find files in subdirectories
 			IgnorePatterns: utils.DefaultIgnorePatterns,
 			FileExtensions: []string{".json", ".yaml", ".yml", ".jsonl", ".md", ".markdown"},
 			SortByModTime:  true,
-			MaxFiles:       20, // Small initial batch
+			MaxFiles:       200, // Increase file limit for more files
 		}
 
 		files, _ := utils.FindFiles(currentDir, opts)
@@ -179,11 +179,11 @@ func (b *BulkFileSelector) findConfigFiles() ([]FileItem, error) {
 
 	// Use utils.FindFiles with proper options for config files
 	opts := utils.FileDiscoveryOptions{
-		MaxDepth:       3,                           // Limit depth to 3 levels as requested
+		MaxDepth:       5,                           // Increase depth to find files in subdirectories like run-tasks/
 		IgnorePatterns: utils.DefaultIgnorePatterns, // Use the default ignore patterns
 		FileExtensions: []string{".json", ".yaml", ".yml", ".jsonl", ".md", ".markdown"},
 		SortByModTime:  true,
-		MaxFiles:       100, // Limit to prevent overload
+		MaxFiles:       500, // Increase limit for more files in subdirectories
 	}
 
 	configFiles, err := utils.FindFiles(currentDir, opts)
@@ -275,8 +275,8 @@ func (b *BulkFileSelector) Update(msg tea.Msg) (*BulkFileSelector, tea.Cmd) {
 				}
 			}
 
-			// Require at least 2 files for bulk run
-			if len(selected) >= 2 {
+			// Allow 1 or more files (single config file can contain multiple runs)
+			if len(selected) >= 1 {
 				b.active = false
 				return b, func() tea.Msg {
 					return BulkFileSelectedMsg{
@@ -337,17 +337,23 @@ func (b *BulkFileSelector) Update(msg tea.Msg) (*BulkFileSelector, tea.Cmd) {
 				}
 			}
 
-		case "up", "k", "ctrl+p":
+		case "up", "ctrl+p", "ctrl+k":
 			if b.cursor > 0 {
 				b.cursor--
-				b.updatePreview()
+			} else if len(b.filteredFiles) > 0 {
+				// Wraparound to bottom
+				b.cursor = len(b.filteredFiles) - 1
 			}
+			b.updatePreview()
 
-		case "down", "j", "ctrl+n":
+		case "down", "ctrl+n", "ctrl+j":
 			if b.cursor < len(b.filteredFiles)-1 {
 				b.cursor++
-				b.updatePreview()
+			} else if len(b.filteredFiles) > 0 {
+				// Wraparound to top
+				b.cursor = 0
 			}
+			b.updatePreview()
 
 		case "pgup":
 			b.cursor = max(0, b.cursor-10)
@@ -643,7 +649,7 @@ func (b *BulkFileSelector) View(statusLine *StatusLine) string {
 		statusLine.SetWidth(b.width).
 			SetLeft(leftStatus).
 			SetRight("").
-			SetHelp("Space:toggle | Ctrl+A:all | Ctrl+D:none | Enter:submit | Esc:cancel")
+			SetHelp("↑↓/Ctrl+K/J:nav | Space:toggle | Ctrl+A:all | Ctrl+D:none | Enter:submit | Esc:cancel")
 
 		// Join content and status bar
 		return lipgloss.JoinVertical(

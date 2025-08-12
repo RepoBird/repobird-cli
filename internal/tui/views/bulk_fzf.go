@@ -211,11 +211,14 @@ func (v *BulkFZFView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return v, nil
 	}
 
-	// Update file selector if active
+	// Update file selector for non-key messages (to avoid double processing keys)
 	if v.fileSelector != nil && v.fileSelector.IsActive() {
-		newSelector, cmd := v.fileSelector.Update(msg)
-		v.fileSelector = newSelector
-		cmds = append(cmds, cmd)
+		// Only process non-key messages here to avoid duplicate key handling
+		if _, isKeyMsg := msg.(tea.KeyMsg); !isKeyMsg {
+			newSelector, cmd := v.fileSelector.Update(msg)
+			v.fileSelector = newSelector
+			cmds = append(cmds, cmd)
+		}
 	}
 
 	return v, tea.Batch(cmds...)
@@ -298,7 +301,7 @@ func (v *BulkFZFView) renderFileSelectView() string {
 			"Select configuration files for bulk run creation:",
 			"",
 			"• Press 'f' to open file selector with FZF filtering",
-			"• Select multiple files to combine into a batch",
+			"• Select one or more files (single files with multiple runs supported)",
 			"• Supports JSON, YAML, JSONL, and Markdown formats",
 			"• Maximum 10 runs per batch",
 			"",
@@ -698,11 +701,17 @@ func (v *BulkFZFView) handleRunListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "up", "k":
 		if v.selectedRunIdx > 0 {
 			v.selectedRunIdx--
+		} else if len(v.runs) > 0 {
+			// Wraparound to bottom
+			v.selectedRunIdx = len(v.runs) - 1
 		}
 
 	case "down", "j":
 		if v.selectedRunIdx < len(v.runs)-1 {
 			v.selectedRunIdx++
+		} else if len(v.runs) > 0 {
+			// Wraparound to top
+			v.selectedRunIdx = 0
 		}
 
 	case " ", "space":
