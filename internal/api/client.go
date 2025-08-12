@@ -574,14 +574,24 @@ func (c *Client) GetFileHashes(ctx context.Context) ([]models.FileHashEntry, err
 }
 
 // CreateBulkRuns creates multiple runs in a batch
+// Note: This operation may take several minutes for large batches as the server
+// processes each run sequentially. The server will return 207 Multi-Status if
+// some runs are still being processed.
 func (c *Client) CreateBulkRuns(ctx context.Context, req *dto.BulkRunRequest) (*dto.BulkRunResponse, error) {
-	resp, err := c.doRequestWithRetry(ctx, "POST", EndpointBulkRuns, req)
+	// For bulk operations, we use a longer timeout as the server may need
+	// several minutes to process all runs
+	bulkCtx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	defer cancel()
+
+	resp, err := c.doRequestWithRetry(bulkCtx, "POST", EndpointBulkRuns, req)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	if err := ValidateResponseOKOrCreated(resp); err != nil {
+	// Accept 200 OK, 201 Created, or 207 Multi-Status for bulk operations
+	// 207 indicates partial completion - some runs created, others pending
+	if err := ValidateResponse(resp, http.StatusOK, http.StatusCreated, http.StatusMultiStatus); err != nil {
 		return nil, err
 	}
 
@@ -589,6 +599,9 @@ func (c *Client) CreateBulkRuns(ctx context.Context, req *dto.BulkRunRequest) (*
 	if err := json.NewDecoder(resp.Body).Decode(&bulkResp); err != nil {
 		return nil, fmt.Errorf("failed to decode bulk runs response: %w", err)
 	}
+
+	// Add status code to response for caller to handle appropriately
+	bulkResp.StatusCode = resp.StatusCode
 
 	return &bulkResp, nil
 }

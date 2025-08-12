@@ -31,7 +31,8 @@ type BulkOptions struct {
 
 // BulkRunResponse represents the response after creating bulk runs
 type BulkRunResponse struct {
-	Data BulkRunData `json:"data"`
+	Data       BulkRunData `json:"data"`
+	StatusCode int         `json:"-"` // HTTP status code from the response (not part of JSON)
 }
 
 // BulkRunData contains the actual bulk run response data

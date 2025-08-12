@@ -437,14 +437,30 @@ func (v *BulkFZFView) renderFileSelectView() string {
 		}
 		content.WriteString("\n")
 
-		// Actions
-		content.WriteString(instructionsStyle.Render(strings.Join([]string{
+		// Actions with note about invalid files
+		actionText := []string{
 			"Actions:",
-			"  Enter - Load selected files and proceed",
+			"  Enter - Load valid files and proceed (invalid files skipped)",
 			"  f     - Add more files",
 			"  c     - Clear selection",
 			"  b/q   - Go back to dashboard",
-		}, "\n")))
+		}
+
+		// Add warning if there are invalid files
+		hasInvalidFiles := false
+		for _, file := range v.selectedFiles {
+			if valid, exists := v.fileValidations[file]; exists && !valid {
+				hasInvalidFiles = true
+				break
+			}
+		}
+
+		if hasInvalidFiles {
+			actionText = append(actionText, "",
+				"⚠️  Invalid files (marked with ✗) will be automatically skipped")
+		}
+
+		content.WriteString(instructionsStyle.Render(strings.Join(actionText, "\n")))
 	}
 
 	// Create bordered panel following create.go pattern
@@ -818,6 +834,15 @@ func (v *BulkFZFView) handleFileSelectKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		return v, tea.Quit
 
 	case "f":
+		// Filter out invalid files from selection before showing selector
+		var validFiles []string
+		for _, file := range v.selectedFiles {
+			if valid, exists := v.fileValidations[file]; !exists || valid {
+				validFiles = append(validFiles, file)
+			}
+		}
+		v.selectedFiles = validFiles
+
 		// Activate file selector
 		cmd := v.fileSelector.Activate()
 		// Just return the activation command, it handles its own ticking
@@ -830,24 +855,33 @@ func (v *BulkFZFView) handleFileSelectKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		return v, nil
 
 	case "enter":
-		// Load files if any selected and all are valid
+		// Load files if any selected - invalid files will be skipped
 		if len(v.selectedFiles) > 0 {
-			// Check if all files are valid
-			allValid := true
+			// Count valid files
+			validCount := 0
 			for _, file := range v.selectedFiles {
-				if valid, exists := v.fileValidations[file]; exists && !valid {
-					allValid = false
-					break
+				if valid, exists := v.fileValidations[file]; !exists || valid {
+					validCount++
 				}
 			}
 
-			if !allValid {
+			if validCount == 0 {
 				v.statusLine.SetTemporaryMessageWithType(
-					"❌ Cannot proceed - remove invalid files first",
+					"❌ No valid files to load",
 					components.MessageError,
 					3*time.Second,
 				)
 				return v, nil
+			}
+
+			// Show message if some files will be skipped
+			invalidCount := len(v.selectedFiles) - validCount
+			if invalidCount > 0 {
+				v.statusLine.SetTemporaryMessageWithType(
+					fmt.Sprintf("⚠️  Skipping %d invalid file(s)", invalidCount),
+					components.MessageWarning,
+					2*time.Second,
+				)
 			}
 
 			return v, v.loadSelectedFiles()
@@ -979,15 +1013,23 @@ func (v *BulkFZFView) validateSelectedFiles() tea.Cmd {
 
 func (v *BulkFZFView) loadSelectedFiles() tea.Cmd {
 	return func() tea.Msg {
-		// Load bulk configuration from files
-		config, err := bulk.LoadBulkConfig(v.selectedFiles)
-		if err != nil {
-			// Try to identify which file caused the error
-			for _, file := range v.selectedFiles {
-				if valid, exists := v.fileValidations[file]; exists && !valid {
-					return bulkFZFErrMsg{fmt.Errorf("cannot load configs - file '%s' is invalid", file)}
-				}
+		// Filter out invalid files
+		var validFiles []string
+		for _, file := range v.selectedFiles {
+			if valid, exists := v.fileValidations[file]; !exists || valid {
+				validFiles = append(validFiles, file)
+			} else {
+				debug.LogToFileWithTimestampf("BULK_DEBUG: Skipping invalid file: %s\n", file)
 			}
+		}
+
+		if len(validFiles) == 0 {
+			return bulkFZFErrMsg{fmt.Errorf("no valid files to load")}
+		}
+
+		// Load bulk configuration from valid files only
+		config, err := bulk.LoadBulkConfig(validFiles)
+		if err != nil {
 			return bulkFZFErrMsg{err}
 		}
 

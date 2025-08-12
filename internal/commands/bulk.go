@@ -3,6 +3,7 @@ package commands
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -184,14 +185,54 @@ func runBulk(cmd *cobra.Command, args []string) error {
 	fmt.Println(lipgloss.NewStyle().Bold(true).Render("Submitting bulk runs..."))
 	fmt.Printf("Repository: %s\n", bulkConfig.Repository)
 	fmt.Printf("Total runs: %d\n", len(bulkConfig.Runs))
+	fmt.Println("\nThis may take a few minutes for large batches. Please wait...")
+
+	// Show a simple spinner while waiting
+	spinner := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+	spinnerIdx := 0
+	done := make(chan bool)
+
+	// Start spinner in background
+	go func() {
+		ticker := time.NewTicker(100 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-done:
+				fmt.Print("\r\033[K") // Clear the spinner line
+				return
+			case <-ticker.C:
+				fmt.Printf("\r%s Processing...", spinner[spinnerIdx])
+				spinnerIdx = (spinnerIdx + 1) % len(spinner)
+			}
+		}
+	}()
 
 	bulkResp, err := client.CreateBulkRuns(ctx, bulkRequest)
+	done <- true // Stop spinner
+
 	if err != nil {
 		return fmt.Errorf("%s", errors.FormatUserError(err))
 	}
 
-	// Display results
-	if len(bulkResp.Data.Failed) > 0 {
+	// Handle different status codes
+	if bulkResp.StatusCode == http.StatusMultiStatus {
+		// 207 Multi-Status: Some runs still processing
+		fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render("\n⚠ Bulk submission in progress:"))
+		fmt.Printf("The server is still processing your runs. This is normal for large batches.\n")
+		fmt.Printf("Created: %d/%d runs so far\n", bulkResp.Data.Metadata.TotalSuccessful, bulkResp.Data.Metadata.TotalRequested)
+
+		if len(bulkResp.Data.Failed) > 0 {
+			fmt.Println("\nFailed runs:")
+			for _, runErr := range bulkResp.Data.Failed {
+				fmt.Printf("  ✗ Run %d: %s\n", runErr.RequestIndex+1, runErr.Message)
+			}
+		}
+
+		fmt.Println("\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("14")).Render("ℹ  The remaining runs are being processed in the background."))
+		fmt.Println("Use --follow or check status to monitor progress.")
+	} else if len(bulkResp.Data.Failed) > 0 {
+		// Some runs failed
 		fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render("\n⚠ Partial success:"))
 		fmt.Printf("Created: %d/%d runs\n", bulkResp.Data.Metadata.TotalSuccessful, bulkResp.Data.Metadata.TotalRequested)
 
@@ -199,6 +240,7 @@ func runBulk(cmd *cobra.Command, args []string) error {
 			fmt.Printf("  ✗ Run %d: %s\n", runErr.RequestIndex+1, runErr.Message)
 		}
 	} else {
+		// All runs created successfully
 		fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Render("\n✓ All runs created successfully"))
 	}
 
