@@ -42,6 +42,10 @@ type bulkFZFErrMsg struct {
 	err error
 }
 
+type bulkFZFFilesValidatedMsg struct {
+	validations map[string]bool
+}
+
 // Helper functions
 func truncateString(s string, maxLen int) string {
 	if len(s) <= maxLen {
@@ -73,8 +77,9 @@ type BulkFZFView struct {
 	mode BulkViewMode
 
 	// File selection
-	fileSelector  *components.BulkFileSelector
-	selectedFiles []string
+	fileSelector    *components.BulkFileSelector
+	selectedFiles   []string
+	fileValidations map[string]bool // Track validation status for each file
 
 	// Configuration
 	bulkConfig *bulk.BulkConfig
@@ -107,15 +112,16 @@ func NewBulkFZFView(client *api.Client) *BulkFZFView {
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
 	return &BulkFZFView{
-		client:        client,
-		mode:          BulkModeFileSelect,
-		fileSelector:  components.NewBulkFileSelector(80, 20),
-		statusLine:    components.NewStatusLine(),
-		helpView:      components.NewHelpView(),
-		spinner:       s,
-		selectedFiles: []string{},
-		runs:          []BulkRunItem{},
-		keys:          defaultBulkKeyMap(),
+		client:          client,
+		mode:            BulkModeFileSelect,
+		fileSelector:    components.NewBulkFileSelector(80, 20),
+		statusLine:      components.NewStatusLine(),
+		helpView:        components.NewHelpView(),
+		spinner:         s,
+		selectedFiles:   []string{},
+		fileValidations: make(map[string]bool),
+		runs:            []BulkRunItem{},
+		keys:            defaultBulkKeyMap(),
 	}
 }
 
@@ -209,9 +215,36 @@ func (v *BulkFZFView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case components.BulkFileSelectedMsg:
 		if !msg.Canceled && len(msg.Files) > 0 {
 			v.selectedFiles = msg.Files
-			return v, v.loadSelectedFiles()
+			// Validate files individually
+			return v, v.validateSelectedFiles()
 		}
 		// If canceled, stay in file select mode
+
+	case bulkFZFFilesValidatedMsg:
+		// Store validation results
+		v.fileValidations = msg.validations
+		// Update status based on validation results
+		invalidCount := 0
+		for _, valid := range msg.validations {
+			if !valid {
+				invalidCount++
+			}
+		}
+
+		if invalidCount > 0 {
+			v.statusLine.SetTemporaryMessageWithType(
+				fmt.Sprintf("⚠️  %d invalid file(s) detected - review before loading", invalidCount),
+				components.MessageWarning,
+				5*time.Second,
+			)
+		} else {
+			v.statusLine.SetTemporaryMessageWithType(
+				fmt.Sprintf("✓ All %d files valid", len(v.selectedFiles)),
+				components.MessageSuccess,
+				3*time.Second,
+			)
+		}
+		return v, nil
 
 	case bulkFZFErrMsg:
 		// Handle error loading config files
@@ -372,7 +405,7 @@ func (v *BulkFZFView) renderFileSelectView() string {
 			"Press 'f' to begin file selection or 'b'/'q' to go back",
 		}, "\n")))
 	} else {
-		// Show selected files
+		// Show selected files with validation status
 		selectedStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("42")).
 			Bold(true)
@@ -380,7 +413,27 @@ func (v *BulkFZFView) renderFileSelectView() string {
 		content.WriteString("\n\n")
 
 		for i, file := range v.selectedFiles {
-			content.WriteString(fmt.Sprintf("  %d. %s\n", i+1, file))
+			// Check validation status for this file
+			validationIcon := "⏳" // Loading/not validated yet
+			iconColor := lipgloss.Color("241")
+
+			if valid, exists := v.fileValidations[file]; exists {
+				if valid {
+					validationIcon = "✓"
+					iconColor = lipgloss.Color("42") // Green
+				} else {
+					validationIcon = "✗"
+					iconColor = lipgloss.Color("196") // Red
+				}
+			}
+
+			// Render icon with color
+			icon := lipgloss.NewStyle().
+				Foreground(iconColor).
+				Bold(true).
+				Render(validationIcon)
+
+			content.WriteString(fmt.Sprintf("  %s %d. %s\n", icon, i+1, file))
 		}
 		content.WriteString("\n")
 
@@ -771,13 +824,32 @@ func (v *BulkFZFView) handleFileSelectKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		return v, cmd
 
 	case "c":
-		// Clear selection
+		// Clear selection and validations
 		v.selectedFiles = []string{}
+		v.fileValidations = make(map[string]bool)
 		return v, nil
 
 	case "enter":
-		// Load files if any selected
+		// Load files if any selected and all are valid
 		if len(v.selectedFiles) > 0 {
+			// Check if all files are valid
+			allValid := true
+			for _, file := range v.selectedFiles {
+				if valid, exists := v.fileValidations[file]; exists && !valid {
+					allValid = false
+					break
+				}
+			}
+
+			if !allValid {
+				v.statusLine.SetTemporaryMessageWithType(
+					"❌ Cannot proceed - remove invalid files first",
+					components.MessageError,
+					3*time.Second,
+				)
+				return v, nil
+			}
+
 			return v, v.loadSelectedFiles()
 		}
 	}
@@ -869,6 +941,7 @@ func (v *BulkFZFView) handleResultsKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Start new batch
 		v.mode = BulkModeFileSelect
 		v.selectedFiles = []string{}
+		v.fileValidations = make(map[string]bool)
 		v.runs = []BulkRunItem{}
 		v.results = []BulkRunResult{}
 		v.error = nil
@@ -881,11 +954,40 @@ func (v *BulkFZFView) handleResultsKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // Commands
+func (v *BulkFZFView) validateSelectedFiles() tea.Cmd {
+	return func() tea.Msg {
+		validations := make(map[string]bool)
+
+		// Validate each file individually
+		for _, file := range v.selectedFiles {
+			// Try to parse the file to check if it's valid
+			_, err := bulk.ParseBulkConfig(file)
+			validations[file] = (err == nil)
+
+			if err != nil {
+				debug.LogToFileWithTimestampf("BULK_DEBUG: File %s validation failed: %v\n", file, err)
+			} else {
+				debug.LogToFileWithTimestampf("BULK_DEBUG: File %s validated successfully\n", file)
+			}
+		}
+
+		return bulkFZFFilesValidatedMsg{
+			validations: validations,
+		}
+	}
+}
+
 func (v *BulkFZFView) loadSelectedFiles() tea.Cmd {
 	return func() tea.Msg {
 		// Load bulk configuration from files
 		config, err := bulk.LoadBulkConfig(v.selectedFiles)
 		if err != nil {
+			// Try to identify which file caused the error
+			for _, file := range v.selectedFiles {
+				if valid, exists := v.fileValidations[file]; exists && !valid {
+					return bulkFZFErrMsg{fmt.Errorf("cannot load configs - file '%s' is invalid", file)}
+				}
+			}
 			return bulkFZFErrMsg{err}
 		}
 
