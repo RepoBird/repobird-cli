@@ -217,53 +217,54 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		// Handle keyboard input based on current mode
 		// TODO: These functions are in create_input.go
-		switch v.inputMode {
-		case components.InsertMode:
+		// switch v.inputMode {
+		// case components.InsertMode:
 			// return v.handleInsertMode(msg)
-		case components.NormalMode:
+		// case components.NormalMode:
 			// return v.handleNormalMode(msg)
-		case components.ErrorMode:
+		// case components.ErrorMode:
 			// return v.handleErrorMode(msg)
-		}
+		// }
 
-	case runCreatedMsg:
+	// TODO: Message handlers moved to other files
+	// case runCreatedMsg:
 		// TODO: This function is in create_submission.go
 		// return v.handleRunCreated(msg)
 		
-	case repositorySelectedMsg:
+	// case repositorySelectedMsg:
 		// TODO: This function is in create_repository.go
 		// return v.handleRepositorySelected(msg)
 		
-	case configLoadedMsg:
+	// case configLoadedMsg:
 		// TODO: This function is in create_config.go
 		// v.populateFormFromConfig(msg.config, msg.filePath)
 		// v.currentFileHash = msg.fileHash
-		return v, nil
+		// return v, nil
 		
-	case configLoadErrorMsg:
-		v.error = msg.err
-		v.initErrorFocus()
-		return v, nil
+	// case configLoadErrorMsg:
+		// v.error = msg.err
+		// v.initErrorFocus()
+		// return v, nil
 		
-	case clipboardResultMsg:
-		if msg.success {
-			v.yankBlink = true
-			v.yankBlinkTime = time.Now()
+	// case clipboardResultMsg:
+		// if msg.success {
+			// v.yankBlink = true
+			// v.yankBlinkTime = time.Now()
 			// TODO: These functions are in create_messages.go
-			return v, tea.Batch(v.startYankBlinkAnimation(), v.startClearStatusTimer())
-		}
-		return v, nil
+			// return v, tea.Batch(v.startYankBlinkAnimation(), v.startClearStatusTimer())
+		// }
+		// return v, nil
 		
-	case yankBlinkMsg:
+	// case yankBlinkMsg:
 		// Single blink: toggle off after being on
-		if v.yankBlink {
-			v.yankBlink = false // Turn off after being on - completes the single blink
-		}
-		return v, nil
+		// if v.yankBlink {
+			// v.yankBlink = false // Turn off after being on - completes the single blink
+		// }
+		// return v, nil
 		
-	case clearStatusMsg:
-		v.yankBlink = false
-		return v, nil
+	// case clearStatusMsg:
+		// v.yankBlink = false
+		// return v, nil
 	}
 
 	return v, tea.Batch(cmds...)
@@ -295,7 +296,8 @@ func (v *CreateRunView) initErrorFocus() {
 	v.prevFocusIndex = v.focusIndex
 	v.prevBackButtonFocused = v.backButtonFocused
 	v.prevSubmitButtonFocused = v.submitButtonFocused
-	v.inputMode = components.ErrorMode
+	// TODO: ErrorMode is in components
+	// v.inputMode = components.ErrorMode
 	v.errorButtonFocused = true
 	v.errorRowFocused = false
 }
