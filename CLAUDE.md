@@ -312,9 +312,18 @@ When working on this codebase:
 
 #### Navigation Architecture
 - **Anti-Pattern**: Never create child views directly in Update methods - use navigation messages instead
-- **Message Flow**: View → Navigation Message → App Router → New View → Push to Stack
+- **Message Flow**: View → Navigation Message → App Router → NewView(client, cache, id) → Push to Stack
+- **Constructor Pattern**: All views use minimal `NewView(client, cache, id)` pattern, max 3 parameters
+- **Self-Loading**: Views load their own data in `Init()`, no parent state passing
+- **Shared State**: Single cache instance shared across all views from app-level
 - **Context Management**: Use navigation context for temporary data, cleared on dashboard return
 - **Error Recovery**: Recoverable errors allow back navigation, non-recoverable errors clear history stack
+
+**Note**: Dashboard and view architecture refactored (2025-08-12) to follow clean Bubble Tea patterns:
+- Dashboard uses shared `ScrollableList` component instead of child views
+- All views use minimal constructors: `NewView(client, cache, id)` 
+- Navigation via messages only - no direct view creation
+- Views are self-loading in `Init()` - no parent state coupling
 
 ### Testing Patterns  
 - **Table-Driven Tests**: Use struct slices with test cases for systematic testing

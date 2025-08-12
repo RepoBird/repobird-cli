@@ -15,6 +15,7 @@ import (
 	"github.com/repobird/repobird-cli/internal/tui/cache"
 	"github.com/repobird/repobird-cli/internal/tui/components"
 	"github.com/repobird/repobird-cli/internal/tui/debug"
+	"github.com/repobird/repobird-cli/internal/tui/keymap"
 	"github.com/repobird/repobird-cli/internal/tui/messages"
 	"github.com/repobird/repobird-cli/internal/utils"
 )
@@ -24,6 +25,7 @@ type DashboardView struct {
 	client APIClient
 	keys   components.KeyMap
 	help   help.Model
+	keymap keymap.ViewKeymap // Navigation keys available for this view
 
 	// Dashboard state
 	currentLayout      models.LayoutType
@@ -141,6 +143,7 @@ func NewDashboardView(client APIClient) *DashboardView {
 		client:          client,
 		keys:            components.DefaultKeyMap,
 		help:            help.New(),
+		keymap:          keymap.NewKeymapWithDisabled(keymap.NavigationKeyBack), // Disable 'b' key on dashboard
 		currentLayout:   models.LayoutTripleColumn,
 		loading:         true,
 		initializing:    true,
@@ -167,6 +170,11 @@ func NewDashboardView(client APIClient) *DashboardView {
 	)
 
 	return dashboard
+}
+
+// IsNavigationKeyEnabled implements the ViewKeymap interface
+func (d *DashboardView) IsNavigationKeyEnabled(key keymap.NavigationKey) bool {
+	return d.keymap.IsNavigationKeyEnabled(key)
 }
 
 // Init implements the tea.Model interface
@@ -475,44 +483,16 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return d.handleStatusInfoNavigation(msg)
 		case msg.Type == tea.KeyRunes && string(msg.Runes) == "n":
 			// Navigate to create new run view
-			// Check if we have existing form data to determine if this is a navigation back
-			existingFormData := d.cache.GetFormData()
-
-			// Debug: Log what form data exists when navigating to create view
-			if existingFormData != nil {
-				debug.LogToFilef("DEBUG: Dashboard 'n' - Found existing form data: Repository=%s, Prompt=%d chars, Source=%s, Target=%s, Title=%s\n",
-					existingFormData.Repository, len(existingFormData.Prompt), existingFormData.Source, existingFormData.Target, existingFormData.Title)
-			} else {
-				debug.LogToFile("DEBUG: Dashboard 'n' - No existing form data found\n")
-			}
-
-			config := CreateRunViewConfig{
-				Client: d.client,
-			}
-
-			// Only pass selected repository if:
-			// 1. A repository is selected in dashboard AND
-			// 2. Either no form data exists OR the form repository is empty
+			var selectedRepository string
 			if d.selectedRepo != nil {
-				if existingFormData == nil || existingFormData.Repository == "" {
-					config.SelectedRepository = d.selectedRepo.Name
-					debug.LogToFilef("DEBUG: Dashboard passing selected repository: %s\n", d.selectedRepo.Name)
-				} else {
-					debug.LogToFilef("DEBUG: Dashboard preserving existing repository: %s\n", existingFormData.Repository)
-				}
-				// Otherwise preserve the existing form data repository
+				selectedRepository = d.selectedRepo.Name
 			}
 
 			// Return navigation message to create view
 			return d, func() tea.Msg {
 				return messages.NavigateToCreateMsg{
-					SelectedRepository: config.SelectedRepository,
+					SelectedRepository: selectedRepository,
 				}
-			}
-		case msg.Type == tea.KeyRunes && string(msg.Runes) == "b":
-			// Navigate back (alternative back navigation)
-			return d, func() tea.Msg {
-				return messages.NavigateBackMsg{}
 			}
 		case key.Matches(msg, d.keys.Enter) && d.currentLayout == models.LayoutTripleColumn && d.focusedColumn == 2 && d.selectedRunData != nil:
 			// If we're in the details column (column 2) in the triple column layout, open the full details view

@@ -22,63 +22,49 @@ import (
 )
 
 type RunListView struct {
-	client       APIClient
-	runs         []models.RunResponse
-	table        *components.Table
-	keys         components.KeyMap
-	help         help.Model
-	width        int
-	height       int
-	loading      bool
-	error        error
-	spinner      spinner.Model
-	pollTicker   *time.Ticker
-	pollStop     chan bool
-	searchMode   bool
-	searchQuery  string
-	filteredRuns []models.RunResponse
-	cached       bool
-	cachedAt     time.Time
-	// Preloaded run details cache
-	detailsCache map[string]*models.RunResponse
-	preloading   map[string]bool
+	client      APIClient
+	cache       *cache.SimpleCache
+	table       *components.Table
+	keys        components.KeyMap
+	help        help.Model
+	width       int
+	height      int
+	loading     bool
+	error       error
+	spinner     spinner.Model
+	pollTicker  *time.Ticker
+	pollStop    chan bool
+	searchMode  bool
+	searchQuery string
 	// User info for remaining runs counter
 	userInfo *models.UserInfo
 	// Unified status line component
 	statusLine *components.StatusLine
-	// Embedded cache
-	cache *cache.SimpleCache
 }
 
 func NewRunListView(client APIClient) *RunListView {
-	// Create new cache instance
-	cache := cache.NewSimpleCache()
-	_ = cache.LoadFromDisk() // Try to load persisted data
-
-	// Try to get cached data
-	runs, cached, detailsCache := cache.GetCachedList()
-
-	// Validate cached data is not test data
-	if cached && len(runs) > 0 {
-		for _, run := range runs {
-			if strings.HasPrefix(run.ID, "test-") || run.Repository == "" {
-				// Clear invalid test data
-				cache.Clear()
-				runs = nil
-				cached = false
-				detailsCache = nil
-				debug.LogToFilef("DEBUG: Cleared invalid test data from cache in NewRunListView\n")
-				break
-			}
-		}
+	columns := []components.Column{
+		{Title: "ID", Width: 8, MinWidth: 8, Flex: 0},           // Fixed width
+		{Title: "Status", Width: 12, MinWidth: 12, Flex: 0},     // Fixed width
+		{Title: "Repository", Width: 25, MinWidth: 20, Flex: 2}, // Flexible, gets 2x space
+		{Title: "Time", Width: 10, MinWidth: 10, Flex: 0},       // Fixed width
+		{Title: "Branch", Width: 15, MinWidth: 12, Flex: 1},     // Flexible, gets 1x space
 	}
 
-	selectedIndex := cache.GetSelectedIndex()
-	var cachedAt time.Time
-	if cached {
-		cachedAt = time.Now() // Approximate, could track this better
+	s := spinner.New()
+	s.Spinner = spinner.Dot
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("63"))
+
+	return &RunListView{
+		client:     client,
+		cache:      cache.NewSimpleCache(),
+		table:      components.NewTable(columns),
+		keys:       components.DefaultKeyMap,
+		help:       help.New(),
+		spinner:    s,
+		loading:    true,
+		statusLine: components.NewStatusLine(),
 	}
-	return NewRunListViewWithCache(client, runs, cached, cachedAt, detailsCache, selectedIndex, cache)
 }
 
 // NewRunListViewWithCacheAndDimensions creates a new list view with cache and dimensions
@@ -332,10 +318,8 @@ func (v *RunListView) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return v.handleNewRunKey()
 	case key.Matches(msg, v.keys.Up):
 		v.table.MoveUp()
-		cmds = append(cmds, v.preloadSelectedRun())
 	case key.Matches(msg, v.keys.Down):
 		v.table.MoveDown()
-		cmds = append(cmds, v.preloadSelectedRun())
 	case msg.String() == "shift+k" || msg.String() == "shift+up":
 		v.table.PageUp()
 	case msg.String() == "shift+j" || msg.String() == "shift+down":
@@ -356,51 +340,20 @@ func (v *RunListView) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // handleEnterKey handles Enter key press to navigate to run details
 func (v *RunListView) handleEnterKey() (tea.Model, tea.Cmd) {
 	idx := v.table.GetSelectedIndex()
-	if idx < 0 || idx >= len(v.filteredRuns) {
+	filteredRuns := v.getFilteredRuns()
+	if idx < 0 || idx >= len(filteredRuns) {
 		return v, nil
 	}
 
-	run := v.filteredRuns[idx]
+	run := filteredRuns[idx]
 	runID := run.GetIDString()
 
 	// Save cursor position to cache before navigating
 	v.cache.SetSelectedIndex(idx)
 
-	// Debug logging for Enter key press
-	debugInfo := fmt.Sprintf("DEBUG: Enter pressed for run idx=%d, runID='%s', repo='%s'\n",
+	debug.LogToFilef("DEBUG: Enter pressed for run idx=%d, runID='%s', repo='%s' - NAVIGATING TO DETAILS VIEW\n",
 		idx, runID, run.Repository)
-	debugInfo += fmt.Sprintf("DEBUG: Cache size=%d, runID in cache=%v, preloading=%v\n",
-		len(v.detailsCache), v.detailsCache[runID] != nil, v.preloading[runID])
-	debug.LogToFile(debugInfo)
 
-	// Check if this run is currently being preloaded
-	if v.preloading[runID] {
-		debug.LogToFilef("DEBUG: Run %s is still preloading, adding small delay...\n", runID)
-		return v, func() tea.Msg {
-			time.Sleep(100 * time.Millisecond)
-			return retryNavigationMsg{runIndex: idx}
-		}
-	}
-
-	// Use preloaded details if available
-	if detailed, ok := v.detailsCache[runID]; ok {
-		debug.LogToFilef("DEBUG: Using cached data for runID='%s' - NAVIGATING TO DETAILS VIEW\n", runID)
-
-		// Fix: Ensure the cached run has the correct ID
-		cachedRun := *detailed
-		if cachedRun.GetIDString() == "" && run.ID != "" {
-			cachedRun.ID = run.ID
-		}
-
-		debug.LogToFilef("DEBUG: Fixed cached run ID from '%s' to '%s'\n", detailed.GetIDString(), cachedRun.GetIDString())
-		return v, func() tea.Msg {
-			return messages.NavigateToDetailsMsg{
-				RunID: cachedRun.GetIDString(),
-			}
-		}
-	}
-
-	debug.LogToFilef("DEBUG: No cached data for runID='%s', loading fresh - NAVIGATING TO DETAILS VIEW\n", runID)
 	return v, func() tea.Msg {
 		return messages.NavigateToDetailsMsg{
 			RunID: run.GetIDString(),
@@ -410,12 +363,12 @@ func (v *RunListView) handleEnterKey() (tea.Model, tea.Cmd) {
 
 // handleNewRunKey handles the New key press to create a new run
 func (v *RunListView) handleNewRunKey() (tea.Model, tea.Cmd) {
-	debug.LogToFilef("DEBUG: ListView creating NewCreateRunView - runs=%d, cached=%v, detailsCache=%d\n",
-		len(v.runs), v.cached, len(v.detailsCache))
-	createView := NewCreateRunViewWithCache(v.client, v.cache)
-	createView.width = v.width
-	createView.height = v.height
-	return createView, nil
+	debug.LogToFile("DEBUG: ListView navigating to create view\n")
+
+	// Return navigation message instead of creating view directly
+	return v, func() tea.Msg {
+		return messages.NavigateToCreateMsg{}
+	}
 }
 
 // handleRunsLoaded handles the runsLoadedMsg message
@@ -425,47 +378,15 @@ func (v *RunListView) handleRunsLoaded(msg runsLoadedMsg) []tea.Cmd {
 	debug.LogToFilef("DEBUG: ENTERED runsLoadedMsg case - %d runs loaded\n", len(msg.runs))
 
 	v.loading = false
-	v.runs = msg.runs
 	v.error = msg.err
-	v.cached = true
-	v.cachedAt = time.Now()
-	v.filterRuns()
 
-	// Save to embedded cache
+	// Save to cache
 	if msg.err == nil && len(msg.runs) > 0 {
-		v.cache.SetCachedList(msg.runs, v.detailsCache)
-	}
-
-	// Start preloading run details in background
-	if msg.err == nil && len(msg.runs) > 0 {
-		cmds = append(cmds, v.preloadRunDetails())
+		v.cache.SetRuns(msg.runs)
+		v.filterRuns()
 	}
 
 	return cmds
-}
-
-// handleRunDetailsPreloaded handles the runDetailsPreloadedMsg message
-func (v *RunListView) handleRunDetailsPreloaded(msg runDetailsPreloadedMsg) {
-	debug.LogToFilef("DEBUG: ENTERED runDetailsPreloadedMsg case for runID='%s', err=%v, run!=nil=%v\n",
-		msg.runID, msg.err, msg.run != nil)
-
-	// Cache the loaded run details
-	v.preloading[msg.runID] = false
-	if msg.err == nil && msg.run != nil {
-		v.detailsCache[msg.runID] = msg.run
-
-		// Also save to embedded cache
-		if msg.run != nil {
-			v.cache.SetRun(*msg.run)
-		}
-
-		// Debug logging
-		debug.LogToFilef("DEBUG: Successfully cached run with key='%s', actualID='%s', title='%s', cacheSize=%d\n",
-			msg.runID, msg.run.GetIDString(), msg.run.Title, len(v.detailsCache))
-	} else {
-		// Log errors too
-		debug.LogToFilef("DEBUG: Failed to cache run with key='%s', err=%v\n", msg.runID, msg.err)
-	}
 }
 
 // handleRetryNavigation handles the retryNavigationMsg message
@@ -525,16 +446,10 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case runsLoadedMsg:
 		cmds = append(cmds, v.handleRunsLoaded(msg)...)
 
-	case runDetailsPreloadedMsg:
-		v.handleRunDetailsPreloaded(msg)
-
 	case userInfoLoadedMsg:
 		if msg.err == nil && msg.userInfo != nil {
 			v.userInfo = msg.userInfo
 		}
-
-	case retryNavigationMsg:
-		return v.handleRetryNavigation(msg)
 
 	case pollTickMsg:
 		cmds = append(cmds, v.handlePolling(msg)...)
@@ -613,28 +528,34 @@ func (v *RunListView) View() string {
 	return strings.Join(lines, "\n")
 }
 
-func (v *RunListView) filterRuns() {
-	if v.searchQuery == "" {
-		v.filteredRuns = v.runs
-	} else {
-		v.filteredRuns = []models.RunResponse{}
-		query := strings.ToLower(v.searchQuery)
-		for _, run := range v.runs {
-			if strings.Contains(strings.ToLower(run.GetIDString()), query) ||
-				strings.Contains(strings.ToLower(run.Repository), query) ||
-				strings.Contains(strings.ToLower(string(run.Status)), query) ||
-				strings.Contains(strings.ToLower(run.Source), query) ||
-				strings.Contains(strings.ToLower(run.Target), query) {
-				v.filteredRuns = append(v.filteredRuns, run)
-			}
-		}
-	}
-	v.updateTable()
+// Helper methods for cache access
+func (v *RunListView) getRuns() []models.RunResponse {
+	return v.cache.GetRuns()
 }
 
-func (v *RunListView) updateTable() {
-	rows := make([]components.Row, len(v.filteredRuns))
-	for i, run := range v.filteredRuns {
+func (v *RunListView) getFilteredRuns() []models.RunResponse {
+	runs := v.getRuns()
+	if v.searchQuery == "" {
+		return runs
+	}
+
+	var filtered []models.RunResponse
+	query := strings.ToLower(v.searchQuery)
+	for _, run := range runs {
+		if strings.Contains(strings.ToLower(run.GetIDString()), query) ||
+			strings.Contains(strings.ToLower(run.Repository), query) ||
+			strings.Contains(strings.ToLower(string(run.Status)), query) ||
+			strings.Contains(strings.ToLower(run.Source), query) ||
+			strings.Contains(strings.ToLower(run.Target), query) {
+			filtered = append(filtered, run)
+		}
+	}
+	return filtered
+}
+
+func (v *RunListView) updateTableFromRuns(runs []models.RunResponse) {
+	rows := make([]components.Row, len(runs))
+	for i, run := range runs {
 		statusIcon := styles.GetStatusIcon(string(run.Status))
 		statusText := fmt.Sprintf("%s %s", statusIcon, run.Status)
 		timeAgo := formatTimeAgo(run.CreatedAt)
@@ -658,6 +579,11 @@ func (v *RunListView) updateTable() {
 	v.table.SetRows(rows)
 }
 
+func (v *RunListView) filterRuns() {
+	filteredRuns := v.getFilteredRuns()
+	v.updateTableFromRuns(filteredRuns)
+}
+
 func (v *RunListView) renderStatusBar() string {
 	// Determine if we're loading
 	isLoadingData := v.loading
@@ -665,10 +591,11 @@ func (v *RunListView) renderStatusBar() string {
 	// Build data info string
 	dataInfo := ""
 	if !isLoadingData {
-		dataInfo = fmt.Sprintf("%d runs | %s", len(v.filteredRuns), v.table.StatusLine())
+		filteredRuns := v.getFilteredRuns()
+		dataInfo = fmt.Sprintf("%d runs | %s", len(filteredRuns), v.table.StatusLine())
 
 		activeCount := 0
-		for _, run := range v.runs {
+		for _, run := range v.getRuns() {
 			if isActiveStatus(string(run.Status)) {
 				activeCount++
 			}
@@ -791,7 +718,7 @@ func (v *RunListView) stopPolling() {
 }
 
 func (v *RunListView) hasActiveRuns() bool {
-	for _, run := range v.runs {
+	for _, run := range v.getRuns() {
 		if isActiveStatus(string(run.Status)) {
 			return true
 		}

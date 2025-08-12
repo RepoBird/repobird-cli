@@ -31,20 +31,21 @@ The command layer handles user interaction through CLI commands using the Cobra 
 - **TUI Command**: Launches the interactive terminal interface
 
 ### 2. TUI Layer (`/internal/tui/`)
-The Terminal User Interface provides rich, interactive experiences using Bubble Tea with a message-based navigation architecture.
+The Terminal User Interface provides rich, interactive experiences using Bubble Tea with a clean message-based navigation architecture.
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│                    App (Router)                          │
-│              Implements tea.Model Interface              │
+│                App Router (app.go)                       │
+│      Central navigation hub with view history stack     │
 ├──────────────────────────────────────────────────────────┤
-│  Navigation Stack  │  Message Handling  │  Context Mgmt │
+│  Navigation Messages → Router → NewView(client,cache,id) │
 ├──────────────────────────────────────────────────────────┤
-│             Views (Dashboard, Create, List, Details)     │
+│    Views: Dashboard │ Create │ List │ Details │ Error    │
+│     Self-loading, minimal constructors, no coupling     │
 ├──────────────────────────────────────────────────────────┤
-│     Shared Components (ScrollableList, Form, Error)      │
+│  Shared Components: ScrollableList │ Form │ StatusLine   │
 ├──────────────────────────────────────────────────────────┤
-│    Navigation Messages   │   Debug Utilities   │ Styles  │
+│    Cache (SharedState) │ Messages │ Debug │ Styles       │
 └──────────────────────────────────────────────────────────┘
 ```
 

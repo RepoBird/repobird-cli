@@ -48,13 +48,34 @@ The TUI implements a clean navigation system with the following components:
 - Manages shared context between views
 
 #### Navigation Messages
-All view transitions use type-safe navigation messages:
-- `NavigateToCreateMsg` - Go to create run view
-- `NavigateToDetailsMsg` - Go to run details view
-- `NavigateToListMsg` - Go to run list view
-- `NavigateBackMsg` - Go back in navigation history
-- `NavigateToDashboardMsg` - Return to dashboard (clears history)
-- `NavigateToErrorMsg` - Show error view with recovery options
+All navigation is handled through type-safe messages rather than direct view creation:
+
+- `NavigateToCreateMsg` - Navigate to create run view
+- `NavigateToDetailsMsg` - Navigate to run details view  
+- `NavigateToListMsg` - Navigate to run list view
+- `NavigateToBulkMsg` - Navigate to bulk operations view
+- `NavigateBackMsg` - Navigate to previous view in stack
+- `NavigateToDashboardMsg` - Navigate to dashboard (clears stack)
+
+#### View Constructor Pattern
+All views use minimal constructors with shared cache:
+
+```go
+// Clean minimal constructor (max 3 params)
+NewView(client APIClient, cache *cache.SimpleCache, id string)
+
+// Views are self-loading in Init()
+func (v *View) Init() tea.Cmd {
+    return v.loadOwnData() // No parent state coupling
+}
+```
+
+#### Shared Components
+The TUI uses reusable components across views:
+- `ScrollableList` - Multi-column scrollable lists with navigation
+- `Form` - Input forms with validation and navigation  
+- `StatusLine` - Unified status bar with loading and data info
+- `KeyMap` - Standard keybindings for consistent behavior
 
 #### View History
 - **Back navigation** - Press `q`, `ESC`, or `b` to go back

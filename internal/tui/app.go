@@ -4,6 +4,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/repobird/repobird-cli/internal/api"
 	"github.com/repobird/repobird-cli/internal/tui/cache"
+	"github.com/repobird/repobird-cli/internal/tui/keymap"
 	"github.com/repobird/repobird-cli/internal/tui/messages"
 	"github.com/repobird/repobird-cli/internal/tui/views"
 )
@@ -43,6 +44,21 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
 		if keyMsg.String() == "ctrl+c" {
 			return a, tea.Quit
+		}
+
+		// Check if current view implements ViewKeymap and if navigation keys should be intercepted
+		if viewWithKeymap, hasKeymap := a.current.(keymap.ViewKeymap); hasKeymap {
+			// Convert key press to NavigationKey and check if it's enabled
+			if navKey := a.keyMsgToNavigationKey(keyMsg); navKey != "" {
+				if !viewWithKeymap.IsNavigationKeyEnabled(navKey) {
+					// Key is disabled for this view - ignore it
+					return a, nil
+				}
+				// Key is enabled - convert to navigation message if appropriate
+				if navMsg := a.navigationKeyToMessage(navKey); navMsg != nil {
+					return a.handleNavigation(navMsg)
+				}
+			}
 		}
 	}
 
@@ -186,4 +202,40 @@ func (a *App) clearAllNavigationContext() {
 
 func (a *App) getNavigationContext(key string) interface{} {
 	return a.cache.GetNavigationContext(key)
+}
+
+// keyMsgToNavigationKey converts a tea.KeyMsg to a NavigationKey if it matches
+func (a *App) keyMsgToNavigationKey(keyMsg tea.KeyMsg) keymap.NavigationKey {
+	switch keyMsg.String() {
+	case "b":
+		return keymap.NavigationKeyBack
+	case "B":
+		return keymap.NavigationKeyBulk
+	case "n":
+		return keymap.NavigationKeyNew
+	case "r":
+		return keymap.NavigationKeyRefresh
+	case "s":
+		return keymap.NavigationKeyStatus
+	case "?":
+		return keymap.NavigationKeyHelp
+	case "q":
+		return keymap.NavigationKeyQuit
+	default:
+		return ""
+	}
+}
+
+// navigationKeyToMessage converts a NavigationKey to the appropriate navigation message
+func (a *App) navigationKeyToMessage(navKey keymap.NavigationKey) messages.NavigationMsg {
+	switch navKey {
+	case keymap.NavigationKeyBack:
+		return messages.NavigateBackMsg{}
+	case keymap.NavigationKeyBulk:
+		return messages.NavigateToBulkMsg{}
+	default:
+		// For other keys (n, r, s, ?, q), let the view handle them
+		// These are not global navigation keys that should be intercepted
+		return nil
+	}
 }
