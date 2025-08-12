@@ -157,18 +157,6 @@ func NewRunListViewWithCache(
 		cache:        embeddedCache,
 	}
 
-	// If we have cached data, update the table
-	if !shouldLoad && runs != nil && len(runs) > 0 {
-		v.updateTable()
-		// Restore cursor position but ensure we don't scroll unnecessarily
-		if selectedIndex >= 0 && selectedIndex < len(v.filteredRuns) {
-			// First reset scroll to top
-			v.table.ResetScroll()
-			// Then set the selected index
-			v.table.SetSelectedIndex(selectedIndex)
-		}
-	}
-
 	return v
 }
 
@@ -192,10 +180,12 @@ func (v *RunListView) Init() tea.Cmd {
 		debug.LogToFile("DEBUG: ListView Init has no dimensions stored\n")
 	}
 
-	// If we have cached data, use it - don't auto-refresh
-	if v.cached && v.runs != nil && len(v.runs) > 0 {
-		// Don't show loading, data is already displayed
+	// Check if we have cached data first
+	cachedRuns := v.cache.GetRuns()
+	if len(cachedRuns) > 0 {
+		// Use cached data
 		v.loading = false
+		v.updateTableFromRuns(cachedRuns)
 		cmds = append(cmds, v.startPolling())
 	} else {
 		// Need to load data
@@ -255,7 +245,7 @@ func (v *RunListView) handleWindowSizeMsg(msg tea.WindowSizeMsg) {
 	// reset scroll to ensure title and headers are visible
 	if msg.Width > 0 && msg.Height > 0 {
 		// Update the table again to ensure proper rendering
-		v.updateTable()
+		v.filterRuns()
 	}
 }
 
@@ -387,41 +377,6 @@ func (v *RunListView) handleRunsLoaded(msg runsLoadedMsg) []tea.Cmd {
 	}
 
 	return cmds
-}
-
-// handleRetryNavigation handles the retryNavigationMsg message
-func (v *RunListView) handleRetryNavigation(msg retryNavigationMsg) (tea.Model, tea.Cmd) {
-	debug.LogToFilef("DEBUG: ENTERED retryNavigationMsg case for runIndex=%d\n", msg.runIndex)
-
-	// Retry navigation after a small delay
-	idx := msg.runIndex
-	if idx >= 0 && idx < len(v.filteredRuns) {
-		run := v.filteredRuns[idx]
-		runID := run.GetIDString()
-
-		debug.LogToFilef("DEBUG: Retrying navigation for runID='%s', cache size=%d, in cache=%v\n",
-			runID, len(v.detailsCache), v.detailsCache[runID] != nil)
-
-		// Use cached data if available now
-		if detailed, ok := v.detailsCache[runID]; ok {
-			debug.LogToFilef("DEBUG: Retry successful - using cached data for runID='%s' - NAVIGATING TO DETAILS VIEW\n", runID)
-			return v, func() tea.Msg {
-				return messages.NavigateToDetailsMsg{
-					RunID: detailed.GetIDString(),
-				}
-			}
-		}
-
-		// Still not cached, load fresh
-		debug.LogToFilef("DEBUG: Retry - still no cached data for runID='%s', loading fresh - NAVIGATING TO DETAILS VIEW\n", runID)
-		return v, func() tea.Msg {
-			return messages.NavigateToDetailsMsg{
-				RunID: run.GetIDString(),
-			}
-		}
-	}
-
-	return v, nil
 }
 
 // handlePolling handles the pollTickMsg message
@@ -745,4 +700,3 @@ type userInfoLoadedMsg struct {
 	userInfo *models.UserInfo
 	err      error
 }
-

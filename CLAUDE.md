@@ -319,11 +319,14 @@ When working on this codebase:
 - **Context Management**: Use navigation context for temporary data, cleared on dashboard return
 - **Error Recovery**: Recoverable errors allow back navigation, non-recoverable errors clear history stack
 
-**Note**: Dashboard and view architecture refactored (2025-08-12) to follow clean Bubble Tea patterns:
-- Dashboard uses shared `ScrollableList` component instead of child views
-- All views use minimal constructors: `NewView(client, cache, id)` 
+**Note**: View architecture refactored (2025-08-12) to follow clean Bubble Tea patterns:
+- **Dashboard**: Uses shared `ScrollableList` component instead of child views
+- **CreateRunView**: Refactored to use `NewCreateRunView(client)` exclusively with navigation context
+- **RunListView**: Simplified to single constructor, removed cache metadata fields, uses cache methods directly
+- All views use minimal constructors: `NewView(client, cache, id)` pattern
 - Navigation via messages only - no direct view creation
 - Views are self-loading in `Init()` - no parent state coupling
+- Cache encapsulation: Views use `cache.GetRuns()`, `cache.SetRuns()` instead of managing cache state
 
 ### Testing Patterns  
 - **Table-Driven Tests**: Use struct slices with test cases for systematic testing

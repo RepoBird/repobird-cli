@@ -104,17 +104,16 @@ func NewCreateRunView(client APIClient) *CreateRunView {
 	_ = embeddedCache.LoadFromDisk()
 
 	v := &CreateRunView{
-		client:    client,
-		keys:      components.DefaultKeyMap,
-		help:      help.New(),
-		cache:     embeddedCache,
-		runType:   models.RunTypeRun,
-		inputMode: components.NormalMode,
+		client:             client,
+		keys:               components.DefaultKeyMap,
+		help:               help.New(),
+		cache:              embeddedCache,
+		runType:            models.RunTypeRun,
+		inputMode:          components.NormalMode,
 		statusLine:         components.NewStatusLine(),
 		configLoader:       config.NewConfigLoader(),
 		fileSelector:       components.NewFileSelector(80, 10),       // Default dimensions
 		configFileSelector: components.NewConfigFileSelector(80, 20), // Enhanced selector with preview
-		cache:              embeddedCache,
 	}
 
 	v.repoSelector = components.NewRepositorySelector()

@@ -403,6 +403,23 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return d, cmd
 		}
 
+		// Check keymap to see if this key is disabled for this view
+		if keyStr := msg.String(); keyStr != "" {
+			switch keyStr {
+			case "b":
+				if !d.keymap.IsNavigationKeyEnabled(keymap.NavigationKeyBack) {
+					// Back key is disabled for dashboard - ignore it
+					return d, nil
+				}
+			case "B":
+				if !d.keymap.IsNavigationKeyEnabled(keymap.NavigationKeyBulk) {
+					// Bulk key is disabled for this view - ignore it
+					return d, nil
+				}
+				// Add other navigation keys as needed
+			}
+		}
+
 		// Handle dashboard-specific keys
 		switch {
 		case msg.Type == tea.KeyEsc && d.showURLSelectionPrompt:
