@@ -49,20 +49,32 @@ The Terminal User Interface provides rich, interactive experiences using Bubble 
 ```
 
 **Navigation Architecture:**
-The TUI uses a centralized message-based navigation system where views communicate through messages rather than creating child views directly.
+The TUI uses a centralized message-based navigation system with clean view constructors and shared state management.
 
 **Key Components:**
-- **App Router** (`app.go`): Central navigation controller implementing Bubble Tea Model
+- **App Router** (`app.go`): Central navigation controller with shared cache instance
 - **Navigation Messages** (`messages/navigation.go`): Type-safe navigation requests
+- **Minimal Constructors**: Views created with `NewView(client, cache, id)` pattern
 - **View Stack**: History management for back navigation
-- **Shared Components**: Reusable UI components (ScrollableList, Form)
-- **Navigation Context**: Temporary state sharing via cache
+- **Shared Cache**: Single cache instance passed to all views
+- **Self-Loading Views**: Views load their own data in `Init()` method
 
 **Navigation Flow:**
 ```
-View A → NavigateToViewBMsg → App Router → Create View B → Push A to Stack
+View A → NavigateToViewBMsg → App Router → NewView(client, cache, id) → Push A to Stack
 View B → NavigateBackMsg → App Router → Pop Stack → Restore View A
 Any View → NavigateToDashboardMsg → App Router → Clear Stack → Dashboard
+```
+
+**Constructor Pattern:**
+```go
+// Clean minimal constructor with shared cache
+func NewRunDetailsView(client APIClient, cache *cache.SimpleCache, runID string) *RunDetailsView
+
+// Views load their own data in Init()
+func (v *RunDetailsView) Init() tea.Cmd {
+    return v.loadRunDetails() // Self-loading pattern
+}
 ```
 
 Key features:
@@ -143,9 +155,13 @@ Contains business logic and domain models, isolated from external concerns.
 **Implementation Pattern:**
 
 ```go
+// All views embed shared cache instance from app-level
 type DashboardView struct {
-    cache *cache.SimpleCache  // Now wraps HybridCache internally
+    cache *cache.SimpleCache  // Shared cache from App
 }
+
+// Views created with minimal constructors
+view := NewDashboardView(client, cache)  // Instead of complex params
 
 func NewDashboardView(client APIClient) *DashboardView {
     cache := cache.NewSimpleCache()  // Automatic user detection

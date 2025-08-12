@@ -88,7 +88,7 @@ func WithParentData(parentRuns []models.RunResponse, parentCached bool, parentCa
 	return func(v *RunDetailsView) {
 		// These fields no longer exist in the simplified view - ignore
 		debug.LogToFilef("DEBUG: WithParentData called but parent data fields are deprecated\n")
-		
+
 		// If we have cache data, try to use it
 		if v.cache != nil && parentDetailsCache != nil {
 			// Store details cache in the shared cache if needed
@@ -115,13 +115,13 @@ func WithConfig(config RunDetailsViewConfig) DetailsOption {
 func NewRunDetailsViewWithFunctionalOptions(client APIClient, run models.RunResponse, opts ...DetailsOption) *RunDetailsView {
 	// Extract run ID
 	runID := run.GetIDString()
-	
+
 	// Create with new minimal constructor
 	defaultCache := cache.NewSimpleCache()
 	_ = defaultCache.LoadFromDisk()
-	
+
 	v := NewRunDetailsView(client, defaultCache, runID)
-	
+
 	// If we already have run data, use it
 	if run.Status != "" || run.Title != "" {
 		v.run = run
@@ -142,7 +142,7 @@ func NewRunDetailsViewWithFunctionalOptions(client APIClient, run models.RunResp
 func NewRunDetailsViewWithConfig(config RunDetailsViewConfig) *RunDetailsView {
 	cacheInstance := cache.NewSimpleCache()
 	_ = cacheInstance.LoadFromDisk()
-	
+
 	return NewRunDetailsView(config.Client, cacheInstance, config.RunID)
 }
 
@@ -164,7 +164,7 @@ func NewRunDetailsViewWithDashboardState(
 	runID := run.GetIDString()
 	defaultCache := cache.NewSimpleCache()
 	_ = defaultCache.LoadFromDisk()
-	
+
 	// Store parent cache data
 	if parentDetailsCache != nil {
 		for _, runData := range parentDetailsCache {
@@ -173,15 +173,15 @@ func NewRunDetailsViewWithDashboardState(
 			}
 		}
 	}
-	
+
 	view := NewRunDetailsView(client, defaultCache, runID)
-	
+
 	// Set dimensions
 	if width > 0 && height > 0 {
 		view.width = width
 		view.height = height
 	}
-	
+
 	// Use provided run data if available
 	if run.Status != "" || run.Title != "" {
 		view.run = run
@@ -189,11 +189,11 @@ func NewRunDetailsViewWithDashboardState(
 		view.updateStatusHistory(string(run.Status), false)
 		view.updateContent()
 	}
-	
+
 	// Dashboard state fields are deprecated - just log
-	debug.LogToFilef("DEBUG: Dashboard state parameters ignored in new pattern (repo=%d, run=%d, detail=%d, column=%d)\n", 
+	debug.LogToFilef("DEBUG: Dashboard state parameters ignored in new pattern (repo=%d, run=%d, detail=%d, column=%d)\n",
 		selectedRepoIdx, selectedRunIdx, selectedDetailLine, focusedColumn)
-	
+
 	return view
 }
 
@@ -211,7 +211,7 @@ func NewRunDetailsViewWithCacheAndDimensions(
 	runID := run.GetIDString()
 	viewCache := cache.NewSimpleCache()
 	_ = viewCache.LoadFromDisk()
-	
+
 	// Store parent cache data
 	if parentDetailsCache != nil {
 		for _, runData := range parentDetailsCache {
@@ -220,15 +220,15 @@ func NewRunDetailsViewWithCacheAndDimensions(
 			}
 		}
 	}
-	
+
 	v := NewRunDetailsView(client, viewCache, runID)
-	
+
 	// Set dimensions
 	if width > 0 && height > 0 {
 		v.width = width
 		v.height = height
 	}
-	
+
 	// Use provided run data if available
 	if run.Status != "" || run.Title != "" {
 		v.run = run
@@ -236,11 +236,11 @@ func NewRunDetailsViewWithCacheAndDimensions(
 		v.updateStatusHistory(string(run.Status), false)
 		v.updateContent()
 	}
-	
+
 	// Parent run data is deprecated - just log
-	debug.LogToFilef("DEBUG: Parent run data ignored in new pattern (%d runs, cached=%t)\n", 
+	debug.LogToFilef("DEBUG: Parent run data ignored in new pattern (%d runs, cached=%t)\n",
 		len(parentRuns), parentCached)
-	
+
 	return v
 }
 
@@ -255,14 +255,14 @@ func NewRunDetailsViewWithCache(
 	embeddedCache *cache.SimpleCache,
 ) *RunDetailsView {
 	runID := run.GetIDString()
-	
+
 	// Use provided cache or create new one
 	viewCache := embeddedCache
 	if viewCache == nil {
 		viewCache = cache.NewSimpleCache()
 		_ = viewCache.LoadFromDisk()
 	}
-	
+
 	// Store parent cache data
 	if parentDetailsCache != nil {
 		for _, runData := range parentDetailsCache {
@@ -271,9 +271,9 @@ func NewRunDetailsViewWithCache(
 			}
 		}
 	}
-	
+
 	v := NewRunDetailsView(client, viewCache, runID)
-	
+
 	// Use provided run data if available
 	if run.Status != "" || run.Title != "" {
 		v.run = run
@@ -281,10 +281,10 @@ func NewRunDetailsViewWithCache(
 		v.updateStatusHistory(string(run.Status), false)
 		v.updateContent()
 	}
-	
+
 	// Parent run data is deprecated - just log
-	debug.LogToFilef("DEBUG: Parent run data ignored in new pattern (%d runs, cached=%t)\n", 
+	debug.LogToFilef("DEBUG: Parent run data ignored in new pattern (%d runs, cached=%t)\n",
 		len(parentRuns), parentCached)
-	
+
 	return v
 }

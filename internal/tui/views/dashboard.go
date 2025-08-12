@@ -38,7 +38,6 @@ type DashboardView struct {
 
 	// All-runs layout using shared component
 	allRunsList *components.ScrollableList
-	runListView *RunListView
 
 	// Dimensions
 	width  int
@@ -1358,7 +1357,7 @@ func (d *DashboardView) updateAllRunsListData() {
 		if run == nil {
 			continue
 		}
-		
+
 		// Format row data: [ID, Repository, Status, Created]
 		row := []string{
 			run.ID,
@@ -1368,7 +1367,7 @@ func (d *DashboardView) updateAllRunsListData() {
 		}
 		items = append(items, row)
 	}
-	
+
 	d.allRunsList.SetItems(items)
 }
 

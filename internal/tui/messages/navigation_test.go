@@ -83,7 +83,7 @@ func TestNavigationMessages(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Test that all messages implement the NavigationMsg interface
 			assert.Equal(t, tt.expected, tt.msg.IsNavigation())
-			
+
 			// Verify the message is actually a NavigationMsg
 			_, ok := tt.msg.(NavigationMsg)
 			assert.True(t, ok, "Message should implement NavigationMsg interface")

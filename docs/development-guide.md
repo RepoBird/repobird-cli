@@ -185,10 +185,11 @@ func (c *Client) NewEndpointWithRetry(ctx context.Context, param string) (*Respo
 
 ### 4. Adding TUI Views
 
-The TUI uses a message-based navigation pattern where views communicate through messages rather than creating child views directly.
+The TUI uses a message-based navigation pattern with minimal view constructors and shared cache management.
 
-#### Navigation Pattern
+#### Constructor Pattern
 
+**✅ NEW: Minimal Constructor Pattern**
 Create `/internal/tui/views/newview.go`:
 ```go
 package views
@@ -202,29 +203,54 @@ import (
 
 type NewView struct {
     client APIClient           // API client dependency
-    cache  *cache.SimpleCache // Embedded cache instance
+    cache  *cache.SimpleCache  // Shared cache from app-level
+    id     string              // Resource ID for loading data
     
     // UI components (use shared components when possible)
     list   *components.ScrollableList
     form   *components.Form
     
-    // State fields
+    // State fields (NO parent state)
     width  int
     height int
-    // ... other state
+    loading bool
+    // ... other view-specific state only
 }
 
-func NewNewView(client APIClient) *NewView {
+// ✅ NEW: Minimal constructor - maximum 3 parameters
+func NewNewView(client APIClient, cache *cache.SimpleCache, id string) *NewView {
     return &NewView{
-        client: client,
-        cache:  cache.NewSimpleCache(), // Create cache instance
-        list:   components.NewScrollableList(),
-        form:   components.NewForm(),
+        client:  client,
+        cache:   cache,         // Shared cache instance from App
+        id:      id,
+        loading: true,          // Always start loading
+        list:    components.NewScrollableList(),
+        form:    components.NewForm(),
     }
 }
 
 func (v *NewView) Init() tea.Cmd {
-    return nil
+    // Load view's own data
+    return v.loadData()
+}
+
+func (v *NewView) loadData() tea.Cmd {
+    return func() tea.Msg {
+        // Check cache first
+        if data := v.cache.GetData(v.id); data != nil {
+            return dataLoadedMsg{data: data}
+        }
+        
+        // Load from API
+        data, err := v.client.GetData(v.id)
+        if err != nil {
+            return errMsg{err: err}
+        }
+        
+        // Cache for next time
+        v.cache.SetData(v.id, data)
+        return dataLoadedMsg{data: data}
+    }
 }
 
 func (v *NewView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {

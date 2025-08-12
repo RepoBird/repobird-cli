@@ -26,7 +26,7 @@ func NewApp(client APIClient) *App {
 func (a *App) Init() tea.Cmd {
 	// Initialize shared cache
 	_ = a.cache.LoadFromDisk()
-	
+
 	// Initialize with dashboard view
 	a.current = views.NewDashboardView(a.client)
 	return a.current.Init()
@@ -127,6 +127,20 @@ func (a *App) handleNavigation(msg messages.NavigationMsg) (tea.Model, tea.Cmd) 
 		}
 		// If not the right client type, just return without navigation
 		return a, nil
+
+	case messages.NavigateToFileViewerMsg:
+		a.viewStack = append(a.viewStack, a.current)
+		fileViewer, err := views.NewFileViewerView(a.client)
+		if err != nil {
+			// If file viewer creation fails, navigate to error view
+			return a.handleNavigation(messages.NavigateToErrorMsg{
+				Error:       err,
+				Message:     "Failed to open file viewer",
+				Recoverable: true,
+			})
+		}
+		a.current = fileViewer
+		return a, a.current.Init()
 
 	case messages.NavigateToErrorMsg:
 		if msg.Recoverable {

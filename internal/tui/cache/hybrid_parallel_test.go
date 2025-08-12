@@ -16,22 +16,22 @@ import (
 func TestHybridCacheParallelFetchNoDeadlock(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
-	
+
 	hybrid, err := NewHybridCache("test-user")
 	require.NoError(t, err)
 	defer hybrid.Close()
-	
+
 	// Add runs to both caches
 	for i := 0; i < 50; i++ {
 		status := models.StatusProcessing
 		createdAt := time.Now()
-		
+
 		if i%2 == 0 {
 			status = models.StatusDone // Terminal -> permanent
 		} else if i%3 == 0 {
 			createdAt = time.Now().Add(-3 * time.Hour) // Old -> permanent
 		}
-		
+
 		run := models.RunResponse{
 			ID:        fmt.Sprintf("run-%d", i),
 			Status:    status,
@@ -40,11 +40,11 @@ func TestHybridCacheParallelFetchNoDeadlock(t *testing.T) {
 		}
 		_ = hybrid.SetRun(run)
 	}
-	
+
 	// Launch many concurrent GetRuns
 	var wg sync.WaitGroup
 	successCount := int32(0)
-	
+
 	for i := 0; i < 200; i++ {
 		wg.Add(1)
 		go func() {
@@ -55,13 +55,13 @@ func TestHybridCacheParallelFetchNoDeadlock(t *testing.T) {
 			}
 		}()
 	}
-	
+
 	done := make(chan bool)
 	go func() {
 		wg.Wait()
 		done <- true
 	}()
-	
+
 	select {
 	case <-done:
 		count := atomic.LoadInt32(&successCount)
@@ -75,28 +75,28 @@ func TestHybridCacheParallelFetchNoDeadlock(t *testing.T) {
 func TestHybridCacheRouterStress(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
-	
+
 	hybrid, err := NewHybridCache("test-user")
 	require.NoError(t, err)
 	defer hybrid.Close()
-	
+
 	var wg sync.WaitGroup
 	numGoroutines := 100
 	runsPerGoroutine := 10
-	
+
 	// Track routing decisions
 	var terminalCount int32
 	var activeCount int32
 	var oldCount int32
-	
+
 	for i := 0; i < numGoroutines; i++ {
 		wg.Add(1)
 		go func(gid int) {
 			defer wg.Done()
-			
+
 			for j := 0; j < runsPerGoroutine; j++ {
 				runID := fmt.Sprintf("g%d-r%d", gid, j)
-				
+
 				var run models.RunResponse
 				switch j % 3 {
 				case 0:
@@ -127,10 +127,10 @@ func TestHybridCacheRouterStress(t *testing.T) {
 					}
 					atomic.AddInt32(&oldCount, 1)
 				}
-				
+
 				err := hybrid.SetRun(run)
 				assert.NoError(t, err)
-				
+
 				// Immediately try to get it back
 				retrieved, found := hybrid.GetRun(runID)
 				assert.True(t, found, "Run %s should be found", runID)
@@ -138,12 +138,12 @@ func TestHybridCacheRouterStress(t *testing.T) {
 			}
 		}(i)
 	}
-	
+
 	wg.Wait()
-	
+
 	t.Logf("Routing stats: Terminal=%d, Active=%d, Old=%d",
 		terminalCount, activeCount, oldCount)
-	
+
 	// Verify totals
 	totalExpected := numGoroutines * runsPerGoroutine
 	totalRouted := int(terminalCount + activeCount + oldCount)
@@ -154,17 +154,17 @@ func TestHybridCacheRouterStress(t *testing.T) {
 func TestHybridCacheSetRunsParallelRouting(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
-	
+
 	hybrid, err := NewHybridCache("test-user")
 	require.NoError(t, err)
 	defer hybrid.Close()
-	
+
 	// Create large batch of mixed runs
 	runs := make([]models.RunResponse, 500)
 	for i := 0; i < 500; i++ {
 		status := models.StatusProcessing
 		createdAt := time.Now()
-		
+
 		if i%3 == 0 {
 			status = models.StatusDone
 		} else if i%3 == 1 {
@@ -172,7 +172,7 @@ func TestHybridCacheSetRunsParallelRouting(t *testing.T) {
 		} else if i%5 == 0 {
 			createdAt = time.Now().Add(-3 * time.Hour)
 		}
-		
+
 		runs[i] = models.RunResponse{
 			ID:        fmt.Sprintf("batch-%d", i),
 			Status:    status,
@@ -180,15 +180,15 @@ func TestHybridCacheSetRunsParallelRouting(t *testing.T) {
 			UpdatedAt: createdAt,
 		}
 	}
-	
+
 	// Time the operation
 	start := time.Now()
 	err = hybrid.SetRuns(runs)
 	duration := time.Since(start)
-	
+
 	assert.NoError(t, err)
 	t.Logf("SetRuns with 500 runs took: %v", duration)
-	
+
 	// Verify all runs are accessible
 	for i, run := range runs {
 		retrieved, found := hybrid.GetRun(run.ID)
@@ -201,11 +201,11 @@ func TestHybridCacheSetRunsParallelRouting(t *testing.T) {
 func TestHybridCacheConcurrentInvalidation(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
-	
+
 	hybrid, err := NewHybridCache("test-user")
 	require.NoError(t, err)
 	defer hybrid.Close()
-	
+
 	// Add runs
 	numRuns := 100
 	for i := 0; i < numRuns; i++ {
@@ -213,7 +213,7 @@ func TestHybridCacheConcurrentInvalidation(t *testing.T) {
 		if i%2 == 0 {
 			status = models.StatusDone
 		}
-		
+
 		run := models.RunResponse{
 			ID:        fmt.Sprintf("inv-%d", i),
 			Status:    status,
@@ -222,9 +222,9 @@ func TestHybridCacheConcurrentInvalidation(t *testing.T) {
 		}
 		_ = hybrid.SetRun(run)
 	}
-	
+
 	var wg sync.WaitGroup
-	
+
 	// Concurrent invalidations
 	for i := 0; i < numRuns; i++ {
 		wg.Add(1)
@@ -233,7 +233,7 @@ func TestHybridCacheConcurrentInvalidation(t *testing.T) {
 			_ = hybrid.InvalidateRun(fmt.Sprintf("inv-%d", idx))
 		}(i)
 	}
-	
+
 	// Concurrent reads while invalidating
 	for i := 0; i < numRuns; i++ {
 		wg.Add(1)
@@ -242,9 +242,9 @@ func TestHybridCacheConcurrentInvalidation(t *testing.T) {
 			_, _ = hybrid.GetRun(fmt.Sprintf("inv-%d", idx))
 		}(i)
 	}
-	
+
 	wg.Wait()
-	
+
 	// All runs should be invalidated
 	for i := 0; i < numRuns; i++ {
 		_, found := hybrid.GetRun(fmt.Sprintf("inv-%d", i))
@@ -256,14 +256,14 @@ func TestHybridCacheConcurrentInvalidation(t *testing.T) {
 func TestHybridCacheMixedOperationsStress(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
-	
+
 	hybrid, err := NewHybridCache("test-user")
 	require.NoError(t, err)
 	defer hybrid.Close()
-	
+
 	stopCh := make(chan struct{})
 	var wg sync.WaitGroup
-	
+
 	// Operation counters
 	var setRunOps int32
 	var getRunOps int32
@@ -272,7 +272,7 @@ func TestHybridCacheMixedOperationsStress(t *testing.T) {
 	var invalidateOps int32
 	var userInfoOps int32
 	var fileHashOps int32
-	
+
 	// SetRun worker
 	wg.Add(1)
 	go func() {
@@ -294,7 +294,7 @@ func TestHybridCacheMixedOperationsStress(t *testing.T) {
 			}
 		}
 	}()
-	
+
 	// GetRun worker
 	wg.Add(1)
 	go func() {
@@ -311,7 +311,7 @@ func TestHybridCacheMixedOperationsStress(t *testing.T) {
 			}
 		}
 	}()
-	
+
 	// SetRuns worker
 	wg.Add(1)
 	go func() {
@@ -332,7 +332,7 @@ func TestHybridCacheMixedOperationsStress(t *testing.T) {
 			}
 		}
 	}()
-	
+
 	// GetRuns worker
 	wg.Add(1)
 	go func() {
@@ -347,7 +347,7 @@ func TestHybridCacheMixedOperationsStress(t *testing.T) {
 			}
 		}
 	}()
-	
+
 	// InvalidateRun worker
 	wg.Add(1)
 	go func() {
@@ -364,7 +364,7 @@ func TestHybridCacheMixedOperationsStress(t *testing.T) {
 			}
 		}
 	}()
-	
+
 	// UserInfo worker
 	wg.Add(1)
 	go func() {
@@ -385,7 +385,7 @@ func TestHybridCacheMixedOperationsStress(t *testing.T) {
 			}
 		}
 	}()
-	
+
 	// FileHash worker
 	wg.Add(1)
 	go func() {
@@ -407,12 +407,12 @@ func TestHybridCacheMixedOperationsStress(t *testing.T) {
 			}
 		}
 	}()
-	
+
 	// Run for 2 seconds
 	time.Sleep(2 * time.Second)
 	close(stopCh)
 	wg.Wait()
-	
+
 	// Report statistics
 	t.Logf("Stress test operations in 2 seconds:")
 	t.Logf("  SetRun: %d", atomic.LoadInt32(&setRunOps))
@@ -422,11 +422,11 @@ func TestHybridCacheMixedOperationsStress(t *testing.T) {
 	t.Logf("  Invalidate: %d", atomic.LoadInt32(&invalidateOps))
 	t.Logf("  UserInfo: %d", atomic.LoadInt32(&userInfoOps))
 	t.Logf("  FileHash: %d", atomic.LoadInt32(&fileHashOps))
-	
+
 	totalOps := atomic.LoadInt32(&setRunOps) + atomic.LoadInt32(&getRunOps) +
 		atomic.LoadInt32(&setRunsOps) + atomic.LoadInt32(&getRunsOps) +
 		atomic.LoadInt32(&invalidateOps) + atomic.LoadInt32(&userInfoOps) +
 		atomic.LoadInt32(&fileHashOps)
-	
+
 	assert.Greater(t, totalOps, int32(100), "Should complete many operations")
 }

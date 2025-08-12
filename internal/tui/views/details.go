@@ -82,7 +82,7 @@ func (v *RunDetailsView) Init() tea.Cmd {
 	debug.LogToFilef("DEBUG: Init() - v.loading=%t, runID='%s'\n", v.loading, v.runID)
 	if v.loading {
 		debug.LogToFilef("DEBUG: Need to load data for run '%s'\n", v.runID)
-		
+
 		// Check cache first
 		if v.cache != nil {
 			// Try to get from cache
@@ -107,7 +107,7 @@ func (v *RunDetailsView) Init() tea.Cmd {
 				cmds = append(cmds, v.loadRunDetails())
 				cmds = append(cmds, v.spinner.Tick)
 			}
-			
+
 			// Also save runs to avoid unused variable error
 			_ = runs
 		} else {

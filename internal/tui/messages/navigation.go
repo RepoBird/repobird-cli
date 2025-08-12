@@ -42,11 +42,11 @@ type NavigateToErrorMsg struct {
 }
 
 // Implement NavigationMsg interface for all messages
-func (NavigateToCreateMsg) IsNavigation() bool    { return true }
-func (NavigateToDetailsMsg) IsNavigation() bool   { return true }
-func (NavigateToDashboardMsg) IsNavigation() bool { return true }
-func (NavigateToListMsg) IsNavigation() bool      { return true }
-func (NavigateToBulkMsg) IsNavigation() bool      { return true }
+func (NavigateToCreateMsg) IsNavigation() bool     { return true }
+func (NavigateToDetailsMsg) IsNavigation() bool    { return true }
+func (NavigateToDashboardMsg) IsNavigation() bool  { return true }
+func (NavigateToListMsg) IsNavigation() bool       { return true }
+func (NavigateToBulkMsg) IsNavigation() bool       { return true }
 func (NavigateToFileViewerMsg) IsNavigation() bool { return true }
-func (NavigateBackMsg) IsNavigation() bool        { return true }
-func (NavigateToErrorMsg) IsNavigation() bool     { return true }
+func (NavigateBackMsg) IsNavigation() bool         { return true }
+func (NavigateToErrorMsg) IsNavigation() bool      { return true }

@@ -316,7 +316,7 @@ func TestRunDetailsView_PreventBlackScreen(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			testCache := cache.NewSimpleCache()
-	view := NewRunDetailsView(client, testCache, run.GetIDString())
+			view := NewRunDetailsView(client, testCache, run.GetIDString())
 			view = tt.setupFunc(view)
 
 			viewOutput := view.View()

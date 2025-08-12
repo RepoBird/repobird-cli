@@ -302,10 +302,12 @@ When working on this codebase:
 - **Message-Based Navigation**: Views use navigation messages to transition between views via central App router
 - **App Router**: Central navigation controller in `internal/tui/app.go` handles all view transitions and maintains view history stack
 - **Navigation Messages**: Type-safe navigation messages in `internal/tui/messages/navigation.go` (NavigateToCreateMsg, NavigateBackMsg, etc.)
+- **Minimal Constructors**: Views created with max 3 params: `NewView(client, cache, id)` pattern
+- **Shared Cache**: Single cache instance from app-level passed to all views
+- **Self-Loading Views**: Views load their own data in `Init()` method, no parent state coupling
 - **Shared Components**: Reusable UI components in `internal/tui/components/` (ScrollableList, Form, ErrorView)
 - **Navigation Context**: Temporary state sharing via `cache.SetNavigationContext()` without tight coupling
 - **View History Stack**: Back navigation support with `NavigateBackMsg`, dashboard reset with `NavigateToDashboardMsg`
-- **State Management**: Embed `*cache.SimpleCache` in view structs, never use globals
 - **Debug Logging**: Use `debug.LogToFilef()` from `internal/tui/debug` package (configurable via `REPOBIRD_DEBUG_LOG`)
 
 #### Navigation Architecture

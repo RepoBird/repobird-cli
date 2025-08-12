@@ -5,12 +5,12 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/repobird/repobird-cli/internal/api"
 	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/repobird/repobird-cli/internal/tui/messages"
 	"github.com/repobird/repobird-cli/internal/tui/views"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 // MockAPIClient for testing
@@ -111,7 +111,7 @@ func TestAppInit(t *testing.T) {
 	app := NewApp(mockClient)
 
 	cmd := app.Init()
-	
+
 	// After Init, current should be dashboard
 	assert.NotNil(t, app.current)
 	assert.IsType(t, &views.DashboardView{}, app.current)
@@ -179,7 +179,7 @@ func TestAppNavigationMessages(t *testing.T) {
 
 			// Handle navigation
 			model, cmd := app.handleNavigation(tt.msg)
-			
+
 			assert.IsType(t, app, model)
 			appModel := model.(*App)
 			assert.Len(t, appModel.viewStack, tt.expectStackSize)
@@ -203,7 +203,7 @@ func TestAppNavigateBack(t *testing.T) {
 	// Navigate back
 	model, _ := app.handleNavigation(messages.NavigateBackMsg{})
 	appModel := model.(*App)
-	
+
 	assert.Len(t, appModel.viewStack, 0)
 	assert.Equal(t, initialView, appModel.current)
 }
@@ -216,7 +216,7 @@ func TestAppNavigateBackWithEmptyStack(t *testing.T) {
 	// Navigate back with empty stack should go to dashboard
 	model, _ := app.handleNavigation(messages.NavigateBackMsg{})
 	appModel := model.(*App)
-	
+
 	assert.Len(t, appModel.viewStack, 0)
 	assert.IsType(t, &views.DashboardView{}, appModel.current)
 }
@@ -227,7 +227,7 @@ func TestAppNavigationContext(t *testing.T) {
 
 	// Test setting navigation context
 	app.setNavigationContext("test_key", "test_value")
-	
+
 	// Test getting navigation context
 	value := app.getNavigationContext("test_key")
 	assert.Equal(t, "test_value", value)
@@ -235,7 +235,7 @@ func TestAppNavigationContext(t *testing.T) {
 	// Test clearing all navigation context
 	app.setNavigationContext("another_key", "another_value")
 	app.clearAllNavigationContext()
-	
+
 	value = app.getNavigationContext("test_key")
 	assert.Nil(t, value)
 	value = app.getNavigationContext("another_key")
@@ -251,7 +251,7 @@ func TestAppBulkViewNavigation(t *testing.T) {
 
 		model, cmd := app.handleNavigation(messages.NavigateToBulkMsg{})
 		appModel := model.(*App)
-		
+
 		assert.NotNil(t, appModel.current)
 		assert.IsType(t, &views.BulkView{}, appModel.current)
 		assert.NotNil(t, cmd)
@@ -262,11 +262,11 @@ func TestAppBulkViewNavigation(t *testing.T) {
 		mockClient := &MockAPIClient{}
 		app := NewApp(mockClient)
 		_ = app.Init()
-		
+
 		initialView := app.current
 		model, cmd := app.handleNavigation(messages.NavigateToBulkMsg{})
 		appModel := model.(*App)
-		
+
 		// Should not navigate since client is not *api.Client
 		assert.Equal(t, initialView, appModel.current)
 		assert.Nil(t, cmd)
@@ -281,7 +281,7 @@ func TestAppUpdate(t *testing.T) {
 	t.Run("Handle navigation message", func(t *testing.T) {
 		msg := messages.NavigateToCreateMsg{}
 		model, _ := app.Update(msg)
-		
+
 		assert.IsType(t, app, model)
 		appModel := model.(*App)
 		assert.IsType(t, &views.CreateRunView{}, appModel.current)
@@ -290,7 +290,7 @@ func TestAppUpdate(t *testing.T) {
 	t.Run("Handle quit message", func(t *testing.T) {
 		msg := tea.KeyMsg{Type: tea.KeyCtrlC}
 		_, cmd := app.Update(msg)
-		
+
 		// Should return quit command
 		assert.NotNil(t, cmd)
 	})
@@ -299,7 +299,7 @@ func TestAppUpdate(t *testing.T) {
 		// Regular key message should be delegated to current view
 		msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}}
 		model, _ := app.Update(msg)
-		
+
 		assert.IsType(t, app, model)
 	})
 }
@@ -313,10 +313,10 @@ func TestAppNavigationWithContext(t *testing.T) {
 		msg := messages.NavigateToCreateMsg{
 			SelectedRepository: "org/repo",
 		}
-		
+
 		model, _ := app.handleNavigation(msg)
 		appModel := model.(*App)
-		
+
 		// Check context was set
 		repo := appModel.cache.GetNavigationContext("selected_repo")
 		assert.Equal(t, "org/repo", repo)
@@ -326,10 +326,10 @@ func TestAppNavigationWithContext(t *testing.T) {
 		msg := messages.NavigateToListMsg{
 			SelectedIndex: 10,
 		}
-		
+
 		model, _ := app.handleNavigation(msg)
 		appModel := model.(*App)
-		
+
 		// Check context was set
 		index := appModel.cache.GetNavigationContext("list_selected_index")
 		assert.Equal(t, 10, index)
@@ -338,10 +338,10 @@ func TestAppNavigationWithContext(t *testing.T) {
 	t.Run("Navigate to Dashboard clears context", func(t *testing.T) {
 		// Set some context
 		app.setNavigationContext("test", "value")
-		
+
 		model, _ := app.handleNavigation(messages.NavigateToDashboardMsg{})
 		appModel := model.(*App)
-		
+
 		// Context should be cleared
 		value := appModel.cache.GetNavigationContext("test")
 		assert.Nil(t, value)
@@ -355,15 +355,15 @@ func TestAppErrorNavigation(t *testing.T) {
 
 	t.Run("Recoverable error", func(t *testing.T) {
 		initialView := app.current
-		
+
 		msg := messages.NavigateToErrorMsg{
 			Message:     "Test error",
 			Recoverable: true,
 		}
-		
+
 		model, _ := app.handleNavigation(msg)
 		appModel := model.(*App)
-		
+
 		// Should push current to stack
 		assert.Len(t, appModel.viewStack, 1)
 		assert.Equal(t, initialView, appModel.viewStack[0])
@@ -374,15 +374,15 @@ func TestAppErrorNavigation(t *testing.T) {
 		// First navigate somewhere
 		app.handleNavigation(messages.NavigateToCreateMsg{})
 		assert.Len(t, app.viewStack, 1)
-		
+
 		msg := messages.NavigateToErrorMsg{
 			Message:     "Fatal error",
 			Recoverable: false,
 		}
-		
+
 		model, _ := app.handleNavigation(msg)
 		appModel := model.(*App)
-		
+
 		// Should clear stack
 		assert.Len(t, appModel.viewStack, 0)
 		assert.IsType(t, &views.ErrorView{}, appModel.current)
