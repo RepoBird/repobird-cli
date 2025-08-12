@@ -85,11 +85,13 @@ func TestBulkFileSelector_NoTickLoop(t *testing.T) {
 	updatedSelector, cmd := selector.Update(tickMsg)
 	assert.NotNil(t, updatedSelector)
 
-	// Should return tick command that continues the blink
-	assert.NotNil(t, cmd)
+	// Should NOT return a tick command (we removed tick loops to prevent lag)
+	assert.Nil(t, cmd)
 
 	// But we should be able to stop it with ESC
-	escMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{27}} // ESC key
-	updatedSelector, _ = selector.Update(escMsg)
+	escMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("esc")}
+	updatedSelector, cmd = selector.Update(escMsg)
+	assert.NotNil(t, updatedSelector)
 	assert.False(t, updatedSelector.IsActive())
+	assert.NotNil(t, cmd) // Should return a cancel message
 }

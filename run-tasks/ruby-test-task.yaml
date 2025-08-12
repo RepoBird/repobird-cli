@@ -20,9 +20,3 @@ context: |
   
   Please follow Ruby and RSpec/Minitest conventions and best practices.
   Ensure all tests are properly isolated and don't depend on external services.
-
-files:
-  - spec/
-  - test/
-  - lib/
-  - app/

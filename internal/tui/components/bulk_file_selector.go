@@ -472,14 +472,14 @@ func (b *BulkFileSelector) View(statusLine *StatusLine) string {
 	if availableHeight < 10 {
 		availableHeight = 10
 	}
-	
+
 	// Split width between file list (60%) and preview (40%)
 	fileListWidth := int(float64(b.width) * 0.6)
 	previewWidth := b.width - fileListWidth - 1 // -1 for gap
 
 	boxHeight := availableHeight
-	contentHeight := boxHeight - 2         // Account for borders
-	listContentHeight := contentHeight - 3 // Header + filter + spacing
+	contentHeight := boxHeight - 2            // Account for borders
+	listContentHeight := contentHeight - 3    // Header + filter + spacing
 	previewContentHeight := contentHeight - 2 // Header + spacing
 
 	// Build content
@@ -643,7 +643,7 @@ func (b *BulkFileSelector) View(statusLine *StatusLine) string {
 		} else {
 			leftStatus += fmt.Sprintf(" • ✓ %d selected", selectedCount)
 		}
-		
+
 		statusLine.SetWidth(b.width).
 			SetLeft(leftStatus).
 			SetRight("Space: toggle | a: all | n: none | Enter: submit (2+ files) | Esc: cancel")

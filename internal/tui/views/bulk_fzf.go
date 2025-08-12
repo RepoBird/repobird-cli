@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -81,8 +80,10 @@ type BulkFZFView struct {
 	runs       []BulkRunItem
 
 	// UI components
-	spinner    spinner.Model
-	statusLine *components.StatusLine
+	spinner     spinner.Model
+	statusLine  *components.StatusLine
+	helpView    *components.HelpView
+	showingHelp bool
 
 	// Submission state
 	submitting bool
@@ -108,6 +109,7 @@ func NewBulkFZFView(client *api.Client) *BulkFZFView {
 		mode:          BulkModeFileSelect,
 		fileSelector:  components.NewBulkFileSelector(80, 20),
 		statusLine:    components.NewStatusLine(),
+		helpView:      components.NewHelpView(),
 		spinner:       s,
 		selectedFiles: []string{},
 		runs:          []BulkRunItem{},
@@ -150,6 +152,19 @@ func (v *BulkFZFView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case tea.KeyMsg:
+		// If help is showing, handle help view keys
+		if v.showingHelp {
+			switch msg.String() {
+			case "?", "q", "esc":
+				v.showingHelp = false
+				return v, nil
+			default:
+				// Let help view handle navigation
+				v.helpView.Update(msg)
+				return v, nil
+			}
+		}
+
 		// Handle mode-specific keys
 		switch v.mode {
 		case BulkModeFileSelect:
@@ -213,6 +228,18 @@ func (v *BulkFZFView) View() string {
 	}
 	if v.height <= 0 {
 		v.height = 24
+	}
+
+	// If help is showing, display help view
+	if v.showingHelp {
+		v.statusLine.SetWidth(v.width).
+			SetLeft("[HELP]").
+			SetRight("q/Esc: close help")
+		return lipgloss.JoinVertical(
+			lipgloss.Left,
+			v.helpView.View(),
+			v.statusLine.Render(),
+		)
 	}
 
 	// If file selector is active, show it
@@ -320,7 +347,7 @@ func (v *BulkFZFView) renderFileSelectView() string {
 
 	v.statusLine.SetWidth(v.width).
 		SetLeft(statusText).
-		SetRight("f: select files | Enter: load | q: quit")
+		SetRight("f: select files | Enter: load | ?: help | q: back")
 
 	return lipgloss.JoinVertical(
 		lipgloss.Left,
@@ -392,7 +419,7 @@ func (v *BulkFZFView) renderRunListView() string {
 	// Status line
 	v.statusLine.SetWidth(v.width).
 		SetLeft(fmt.Sprintf("[RUNS] %d selected", countSelected(v.runs))).
-		SetRight("Space: toggle | a: all | n: none | Enter: submit | q: back")
+		SetRight("Space: toggle | a: all | n: none | Enter: submit | ?: help | q: back")
 
 	return lipgloss.JoinVertical(
 		lipgloss.Left,
@@ -493,7 +520,7 @@ func (v *BulkFZFView) renderResultsView() string {
 
 	v.statusLine.SetWidth(v.width).
 		SetLeft("[RESULTS]").
-		SetRight("Enter: new batch | q: quit")
+		SetRight("Enter: new batch | ?: help | q: back")
 
 	resultBox := lipgloss.NewStyle().
 		Width(v.width - 4).
@@ -520,10 +547,18 @@ func (v *BulkFZFView) handleFileSelectKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 
 	// Main file select mode keys
 	switch msg.String() {
+	case "?":
+		// Toggle help view
+		v.showingHelp = !v.showingHelp
+		if v.showingHelp {
+			v.helpView.SetSize(v.width, v.height-1) // -1 for status line
+		}
+		return v, nil
+
 	case "q":
 		// Go back to dashboard
 		return NewDashboardView(v.client), nil
-	
+
 	case "Q":
 		// Quit entire program (capital Q)
 		return v, tea.Quit
@@ -534,12 +569,12 @@ func (v *BulkFZFView) handleFileSelectKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		// Just return the activation command, it handles its own ticking
 		return v, cmd
 
-	case msg.String() == "c":
+	case "c":
 		// Clear selection
 		v.selectedFiles = []string{}
 		return v, nil
 
-	case msg.String() == "enter":
+	case "enter":
 		// Load files if any selected
 		if len(v.selectedFiles) > 0 {
 			return v, v.loadSelectedFiles()
@@ -555,7 +590,7 @@ func (v *BulkFZFView) handleRunListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Go back to file selection
 		v.mode = BulkModeFileSelect
 		return v, nil
-	
+
 	case "Q":
 		// Quit entire program
 		return v, tea.Quit
@@ -570,25 +605,25 @@ func (v *BulkFZFView) handleRunListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			v.selectedRunIdx++
 		}
 
-	case msg.String() == " ":
+	case " ", "space":
 		// Toggle selection
 		if v.selectedRunIdx < len(v.runs) {
 			v.runs[v.selectedRunIdx].Selected = !v.runs[v.selectedRunIdx].Selected
 		}
 
-	case msg.String() == "a":
+	case "a":
 		// Select all
 		for i := range v.runs {
 			v.runs[i].Selected = true
 		}
 
-	case msg.String() == "n":
+	case "n":
 		// Select none
 		for i := range v.runs {
 			v.runs[i].Selected = false
 		}
 
-	case msg.String() == "enter":
+	case "enter":
 		// Submit selected runs
 		return v, v.submitRuns()
 	}
@@ -597,11 +632,16 @@ func (v *BulkFZFView) handleRunListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (v *BulkFZFView) handleResultsKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch {
-	case key.Matches(msg, v.keys.Quit):
+	switch msg.String() {
+	case "q":
+		// Go back to dashboard
+		return NewDashboardView(v.client), nil
+
+	case "Q":
+		// Quit entire program
 		return v, tea.Quit
 
-	case msg.String() == "enter":
+	case "enter":
 		// Start new batch
 		v.mode = BulkModeFileSelect
 		v.selectedFiles = []string{}
