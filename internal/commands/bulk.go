@@ -191,36 +191,33 @@ func runBulk(cmd *cobra.Command, args []string) error {
 	}
 
 	// Display results
-	if len(bulkResp.Errors) > 0 {
+	if len(bulkResp.Data.Failed) > 0 {
 		fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render("\n⚠ Partial success:"))
-		fmt.Printf("Created: %d/%d runs\n", bulkResp.Metadata.TotalCreated, bulkResp.Metadata.TotalRequested)
+		fmt.Printf("Created: %d/%d runs\n", bulkResp.Data.Metadata.TotalSuccessful, bulkResp.Data.Metadata.TotalRequested)
 
-		for _, runErr := range bulkResp.Errors {
-			fmt.Printf("  ✗ Run %d: %s\n", runErr.Index+1, runErr.Error)
+		for _, runErr := range bulkResp.Data.Failed {
+			fmt.Printf("  ✗ Run %d: %s\n", runErr.RequestIndex+1, runErr.Message)
 		}
 	} else {
 		fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Render("\n✓ All runs created successfully"))
 	}
 
 	// Display created runs
-	if len(bulkResp.Runs) > 0 {
+	if len(bulkResp.Data.Successful) > 0 {
 		fmt.Println("\nCreated runs:")
-		for _, run := range bulkResp.Runs {
+		for _, run := range bulkResp.Data.Successful {
 			fmt.Printf("  • %s (ID: %d)\n", run.Title, run.ID)
-			if run.RunURL != "" {
-				fmt.Printf("    URL: %s\n", run.RunURL)
-			}
 		}
 	}
 
 	// Follow progress if requested
-	if bulkFollow && len(bulkResp.Runs) > 0 {
+	if bulkFollow && len(bulkResp.Data.Successful) > 0 {
 		fmt.Println("\nFollowing batch progress...")
-		return followBulkProgress(ctx, client, bulkResp.BatchID)
+		return followBulkProgress(ctx, client, bulkResp.Data.BatchID)
 	}
 
-	fmt.Printf("\nBatch ID: %s\n", bulkResp.BatchID)
-	fmt.Println("Use 'repobird bulk status " + bulkResp.BatchID + "' to check progress")
+	fmt.Printf("\nBatch ID: %s\n", bulkResp.Data.BatchID)
+	fmt.Println("Use 'repobird bulk status " + bulkResp.Data.BatchID + "' to check progress")
 
 	return nil
 }

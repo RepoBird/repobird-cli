@@ -59,6 +59,7 @@ type DashboardView struct {
 	// Cache management
 	lastDataRefresh time.Time
 	refreshInterval time.Duration
+	detailsCache    map[string]*models.RunResponse // Cached run details
 
 	// User info
 	userInfo *models.UserInfo
@@ -117,6 +118,7 @@ type DashboardView struct {
 type dashboardDataLoadedMsg struct {
 	repositories []models.Repository
 	allRuns      []*models.RunResponse
+	detailsCache map[string]*models.RunResponse
 	error        error
 }
 
@@ -224,7 +226,7 @@ func (d *DashboardView) loadUserInfo() tea.Cmd {
 func (d *DashboardView) loadDashboardData() tea.Cmd {
 	return func() tea.Msg {
 		// First try to load from run cache which should always have data
-		runs, cached, _, _, _ := cache.GetCachedList()
+		runs, cached, _, detailsCache, _ := cache.GetCachedList()
 		if cached && len(runs) > 0 {
 			// Convert to pointer slice
 			allRuns := make([]*models.RunResponse, len(runs))
@@ -243,6 +245,7 @@ func (d *DashboardView) loadDashboardData() tea.Cmd {
 			return dashboardDataLoadedMsg{
 				repositories: repositories,
 				allRuns:      allRuns,
+				detailsCache: detailsCache,
 				error:        nil,
 			}
 		}
@@ -283,7 +286,7 @@ func (d *DashboardView) loadDashboardData() tea.Cmd {
 		}
 
 		// Get runs to populate repository statistics
-		runs, cached, _, detailsCache, _ := cache.GetCachedList()
+		runs, cached, _, detailsCache, _ = cache.GetCachedList()
 		if !cached || len(runs) == 0 {
 			// Fetch runs from API (increased limit for mock data)
 			runsResp, err := d.client.ListRunsLegacy(1000, 0)
@@ -293,6 +296,7 @@ func (d *DashboardView) loadDashboardData() tea.Cmd {
 				return dashboardDataLoadedMsg{
 					repositories: repositories,
 					allRuns:      []*models.RunResponse{},
+					detailsCache: detailsCache,
 					error:        nil,
 				}
 			}
@@ -325,6 +329,7 @@ func (d *DashboardView) loadDashboardData() tea.Cmd {
 			return dashboardDataLoadedMsg{
 				repositories: repositories,
 				allRuns:      allRuns,
+				detailsCache: detailsCache,
 				error:        nil,
 			}
 		}
@@ -354,7 +359,10 @@ func (d *DashboardView) loadFromRunsOnly() tea.Msg {
 		// Fetch from API (increased limit for mock data)
 		runsResp, err := d.client.ListRunsLegacy(1000, 0)
 		if err != nil {
-			return dashboardDataLoadedMsg{error: err}
+			return dashboardDataLoadedMsg{
+				detailsCache: make(map[string]*models.RunResponse),
+				error:        err,
+			}
 		}
 
 		// Convert to pointer slice
@@ -402,6 +410,7 @@ func (d *DashboardView) loadFromRunsOnly() tea.Msg {
 	return dashboardDataLoadedMsg{
 		repositories: repositories,
 		allRuns:      allRuns,
+		detailsCache: detailsCache,
 		error:        nil,
 	}
 }
@@ -552,6 +561,7 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			debug.LogToFilef("\n[DASHBOARD DATA LOADED]\n")
 			debug.LogToFilef("  Repositories loaded: %d\n", len(msg.repositories))
 			debug.LogToFilef("  Total runs loaded: %d\n", len(msg.allRuns))
+			debug.LogToFilef("  Details cache loaded: %d\n", len(msg.detailsCache))
 
 			// Debug: Show repository names
 			debug.LogToFilef("  Repository list:\n")
@@ -561,6 +571,7 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			d.repositories = msg.repositories
 			d.allRuns = msg.allRuns
+			d.detailsCache = msg.detailsCache
 			d.lastDataRefresh = time.Now()
 
 			// Update viewport sizes based on window
@@ -823,7 +834,7 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				runs,
 				true, // cached
 				d.lastDataRefresh,
-				nil, // No details cache for now
+				d.detailsCache, // Pass the cached details
 				d.width,
 				d.height,
 				d.selectedRepoIdx,

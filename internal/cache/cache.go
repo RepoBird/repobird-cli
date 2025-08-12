@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/repobird/repobird-cli/internal/models"
+	"github.com/repobird/repobird-cli/internal/tui/debug"
 )
 
 // isTerminalStatus returns true if the run status never changes
@@ -91,6 +92,9 @@ func initializeCacheForUser(userID *int) {
 	if pc != nil {
 		if terminalRuns, err := pc.LoadAllTerminalRuns(); err == nil {
 			globalCache.terminalDetails = terminalRuns
+			debug.LogToFilef("DEBUG: Loaded %d terminal runs from persistent cache\n", len(terminalRuns))
+		} else {
+			debug.LogToFilef("DEBUG: Failed to load terminal runs from persistent cache: %v\n", err)
 		}
 		// Clean up old cache entries (older than 30 days)
 		go func() {
@@ -110,37 +114,41 @@ func GetCachedList() (
 	globalCache.mu.RLock()
 	defer globalCache.mu.RUnlock()
 
-	if globalCache.cached && len(globalCache.runs) > 0 {
-		// Always return cached data if available, regardless of age
-		// Only auto-refresh on explicit refresh action or poll for active runs
-		runsCopy := make([]models.RunResponse, len(globalCache.runs))
-		copy(runsCopy, globalCache.runs)
+	// Always build details cache from terminal and active runs
+	detailsCopy := make(map[string]*models.RunResponse)
+	
+	// First add terminal runs (these never expire)
+	for k, v := range globalCache.terminalDetails {
+		if v != nil {
+			detailsCopy[k] = v
+		}
+	}
 
-		// Merge terminal (permanent) and active (temporary) details caches
-		detailsCopy := make(map[string]*models.RunResponse)
-
-		// First add terminal runs (these never expire)
-		for k, v := range globalCache.terminalDetails {
-			if v != nil {
+	// Then add active runs (with 30-second expiry)
+	now := time.Now()
+	for k, v := range globalCache.details {
+		if v != nil {
+			// Check if this active run detail is still fresh
+			if cachedAt, exists := globalCache.detailsAt[k]; exists && now.Sub(cachedAt) < 30*time.Second {
 				detailsCopy[k] = v
 			}
 		}
+	}
 
-		// Then add active runs (with 30-second expiry)
-		now := time.Now()
-		for k, v := range globalCache.details {
-			if v != nil {
-				// Check if this active run detail is still fresh
-				if cachedAt, exists := globalCache.detailsAt[k]; exists && now.Sub(cachedAt) < 30*time.Second {
-					detailsCopy[k] = v
-				}
-			}
-		}
+	if globalCache.cached && len(globalCache.runs) > 0 {
+		// Return cached runs + details
+		runsCopy := make([]models.RunResponse, len(globalCache.runs))
+		copy(runsCopy, globalCache.runs)
 
+		debug.LogToFilef("DEBUG: GetCachedList returning %d runs, %d cached details (%d terminal + %d active)\n", 
+			len(runsCopy), len(detailsCopy), len(globalCache.terminalDetails), len(globalCache.details))
 		return runsCopy, true, globalCache.cachedAt, detailsCopy, globalCache.selectedIndex
 	}
 
-	return nil, false, time.Time{}, make(map[string]*models.RunResponse), 0
+	// No cached runs, but still return available details cache
+	debug.LogToFilef("DEBUG: GetCachedList - no cached runs but returning %d details (cached=%t, runs=%d, terminalDetails=%d)\n", 
+		len(detailsCopy), globalCache.cached, len(globalCache.runs), len(globalCache.terminalDetails))
+	return nil, false, time.Time{}, detailsCopy, 0
 }
 
 // SetCachedList updates the global run list cache
@@ -274,30 +282,38 @@ func ClearCache() {
 
 // InitializeCacheForUser reinitializes the cache for a specific user
 func InitializeCacheForUser(userID *int) {
-	// Clear current cache first (but preserve user info if same user AND form data)
+	// Clear current cache first (but preserve user info if same user AND form data AND terminal details)
 	var savedUserInfo *models.UserInfo
 	var savedUserInfoTime time.Time
 	var savedFormData *FormData
+	var savedTerminalDetails map[string]*models.RunResponse
 
 	if globalCache != nil {
-		// Always preserve form data
 		globalCache.mu.RLock()
+		// Always preserve form data
 		savedFormData = globalCache.formData
-		globalCache.mu.RUnlock()
-
+		
 		if globalCache.userInfo != nil && userID != nil && globalCache.userInfo.ID == *userID {
-			// Save user info if it's for the same user
+			// Save user info and terminal details if it's the same user
 			savedUserInfo = globalCache.userInfo
 			savedUserInfoTime = globalCache.userInfoTime
+			// Preserve terminal details for the same user
+			if globalCache.terminalDetails != nil {
+				savedTerminalDetails = make(map[string]*models.RunResponse)
+				for k, v := range globalCache.terminalDetails {
+					savedTerminalDetails[k] = v
+				}
+			}
 		}
+		globalCache.mu.RUnlock()
 	}
 
 	ClearCache()
 	// Initialize with user-specific cache
 	initializeCacheForUser(userID)
 
-	// Restore user info and form data
-	if savedUserInfo != nil || savedFormData != nil {
+	// Restore user info, form data, and terminal details
+	if savedUserInfo != nil || savedFormData != nil || savedTerminalDetails != nil {
 		globalCache.mu.Lock()
 		if savedUserInfo != nil {
 			globalCache.userInfo = savedUserInfo
@@ -305,6 +321,16 @@ func InitializeCacheForUser(userID *int) {
 		}
 		if savedFormData != nil {
 			globalCache.formData = savedFormData
+		}
+		if savedTerminalDetails != nil {
+			// Restore terminal details cache for same user
+			if globalCache.terminalDetails == nil {
+				globalCache.terminalDetails = make(map[string]*models.RunResponse)
+			}
+			for k, v := range savedTerminalDetails {
+				globalCache.terminalDetails[k] = v
+			}
+			debug.LogToFilef("DEBUG: Restored %d terminal details from memory for same user\n", len(savedTerminalDetails))
 		}
 		globalCache.mu.Unlock()
 	}

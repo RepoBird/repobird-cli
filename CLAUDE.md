@@ -220,7 +220,7 @@ repobird version
 - Maximum timeout for runs is 45 minutes
 - No offline mode currently
 - Limited to GitHub repositories for auto-detection
-- No support for batch operations yet
+- Dashboard and list views load up to 1000 runs (increased from 100 for better UX)
 
 ## CI/CD Requirements
 - All tests must pass

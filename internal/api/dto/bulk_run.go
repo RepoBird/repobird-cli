@@ -31,33 +31,44 @@ type BulkOptions struct {
 
 // BulkRunResponse represents the response after creating bulk runs
 type BulkRunResponse struct {
-	BatchID  string           `json:"batchId"`
-	Runs     []RunCreatedItem `json:"runs"`
-	Errors   []RunError       `json:"errors,omitempty"`
-	Metadata BulkMetadata     `json:"metadata"`
+	Data BulkRunData `json:"data"`
+}
+
+// BulkRunData contains the actual bulk run response data
+type BulkRunData struct {
+	BatchID    string               `json:"batchId"`
+	BatchTitle string               `json:"batchTitle,omitempty"`
+	Successful []RunCreatedItem     `json:"successful"`
+	Failed     []RunError           `json:"failed,omitempty"`
+	Metadata   BulkResponseMetadata `json:"metadata"`
 }
 
 // RunCreatedItem represents a successfully created run
 type RunCreatedItem struct {
-	ID       int    `json:"id"`
-	Title    string `json:"title"`
-	Target   string `json:"target"`
-	Status   string `json:"status"`
-	URL      string `json:"url,omitempty"`
-	RunURL   string `json:"runUrl,omitempty"`
-	QueuedAt string `json:"queuedAt,omitempty"`
+	ID             int    `json:"id"`
+	Status         string `json:"status"`
+	RepositoryName string `json:"repositoryName"`
+	Title          string `json:"title"`
+	RequestIndex   int    `json:"requestIndex"`
 }
 
 // RunError represents an error creating a specific run
 type RunError struct {
-	Index   int    `json:"index"`
-	Title   string `json:"title,omitempty"`
-	Error   string `json:"error"`
-	Code    string `json:"code,omitempty"`
-	Details string `json:"details,omitempty"`
+	RequestIndex  int    `json:"requestIndex"`
+	Prompt        string `json:"prompt"`
+	Error         string `json:"error"`
+	Message       string `json:"message"`
+	ExistingRunId int    `json:"existingRunId,omitempty"`
 }
 
-// BulkMetadata contains metadata about the bulk operation
+// BulkResponseMetadata contains metadata about the bulk operation response
+type BulkResponseMetadata struct {
+	TotalRequested  int `json:"totalRequested"`
+	TotalSuccessful int `json:"totalSuccessful"`
+	TotalFailed     int `json:"totalFailed"`
+}
+
+// BulkMetadata contains metadata about the bulk operation (keeping for backwards compatibility)
 type BulkMetadata struct {
 	TotalRequested int       `json:"totalRequested"`
 	TotalCreated   int       `json:"totalCreated"`

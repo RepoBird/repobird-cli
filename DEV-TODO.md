@@ -5,7 +5,18 @@
 - Usage progress bar 0.00% always on status page.
 - It doesnt know free/pro tier usage limits lets hard code it and use that
   (allow more than total allowed to exist because admin can credit extra runs.)
-- 
+
+### 0. Enhanced Pagination for 100+ Runs
+**Task File:** `tasks/runs-pagination-autoload.md`
+- [ ] Implement cache infrastructure for run pagination
+- [ ] Add API pagination enhancement with retry logic  
+- [ ] Modify TUI navigation to prevent wrap-around behavior
+- [ ] Add Load More button for manual pagination
+- [ ] Show "X of Y total runs loaded" in status line
+- [ ] Test with users having 1000+ runs
+- [ ] Update documentation
+
+**Current Status:** ✅ Simple fix implemented - increased limit to 1000 runs
 
 ### 1. Add Global Configuration Support
 **Task File:** `tasks/add-global-configs.md`

@@ -14,6 +14,7 @@ import (
 	"github.com/repobird/repobird-cli/internal/bulk"
 	"github.com/repobird/repobird-cli/internal/cache"
 	"github.com/repobird/repobird-cli/internal/tui/components"
+	"github.com/repobird/repobird-cli/internal/tui/debug"
 )
 
 // BulkViewMode represents different modes of the bulk view
@@ -86,9 +87,10 @@ type BulkFZFView struct {
 	showingHelp bool
 
 	// Submission state
-	submitting bool
-	error      error
-	results    []BulkRunResult
+	submitting    bool
+	error         error
+	results       []BulkRunResult
+	confirmSubmit bool // Confirmation state for bulk submission
 
 	// Run list navigation
 	selectedRunIdx int
@@ -165,6 +167,28 @@ func (v *BulkFZFView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
+		// Handle confirmation mode first
+		if v.confirmSubmit {
+			switch msg.String() {
+			case "y", "Y":
+				// User confirmed - submit selected runs
+				debug.LogToFileWithTimestampf("BULK_DEBUG: User confirmed bulk submission\n")
+				v.confirmSubmit = false
+				return v, v.submitRuns()
+			case "n", "N", "esc":
+				// User cancelled - exit confirmation mode
+				debug.LogToFileWithTimestampf("BULK_DEBUG: User cancelled bulk submission\n")
+				v.confirmSubmit = false
+				return v, nil
+			case "q", "Q":
+				// Allow quit during confirmation
+				return v, tea.Quit
+			default:
+				// Ignore all other input during confirmation
+				return v, nil
+			}
+		}
+
 		// Handle mode-specific keys
 		switch v.mode {
 		case BulkModeFileSelect:
@@ -196,8 +220,10 @@ func (v *BulkFZFView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return v, nil
 
 	case bulkFZFSubmittedMsg:
+		debug.LogToFileWithTimestampf("BULK_DEBUG: Received submission result - error: %v, results count: %d\n", msg.err, len(msg.results))
 		v.submitting = false
 		if msg.err != nil {
+			debug.LogToFileWithTimestampf("BULK_DEBUG: Setting error: %v\n", msg.err)
 			v.error = msg.err
 			v.statusLine.SetTemporaryMessageWithType(
 				fmt.Sprintf("Error: %v", msg.err),
@@ -205,9 +231,11 @@ func (v *BulkFZFView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				5*time.Second,
 			)
 		} else {
+			debug.LogToFileWithTimestampf("BULK_DEBUG: Setting results: %+v\n", msg.results)
 			v.results = msg.results
 		}
 		v.mode = BulkModeResults
+		debug.LogToFileWithTimestampf("BULK_DEBUG: Switched to BulkModeResults, results len: %d\n", len(v.results))
 		return v, nil
 	}
 
@@ -251,6 +279,7 @@ func (v *BulkFZFView) View() string {
 	}
 
 	// Regular view modes
+	debug.LogToFileWithTimestampf("BULK_DEBUG: View() called with mode: %d\n", v.mode)
 	switch v.mode {
 	case BulkModeFileSelect:
 		return v.renderFileSelectView()
@@ -259,6 +288,7 @@ func (v *BulkFZFView) View() string {
 	case BulkModeSubmitting:
 		return v.renderSubmittingView()
 	case BulkModeResults:
+		debug.LogToFileWithTimestampf("BULK_DEBUG: About to render results view\n")
 		return v.renderResultsView()
 	default:
 		return "Unknown mode"
@@ -305,7 +335,7 @@ func (v *BulkFZFView) renderFileSelectView() string {
 			"• Supports JSON, YAML, JSONL, and Markdown formats",
 			"• Maximum 10 runs per batch",
 			"",
-			"Press 'f' to begin file selection or 'q' to quit",
+			"Press 'f' to begin file selection or 'b'/'q' to go back",
 		}, "\n")))
 	} else {
 		// Show selected files
@@ -326,7 +356,7 @@ func (v *BulkFZFView) renderFileSelectView() string {
 			"  Enter - Load selected files and proceed",
 			"  f     - Add more files",
 			"  c     - Clear selection",
-			"  q     - Cancel and quit",
+			"  b/q   - Go back to dashboard",
 		}, "\n")))
 	}
 
@@ -352,7 +382,7 @@ func (v *BulkFZFView) renderFileSelectView() string {
 	statusLine := v.statusLine.SetWidth(v.width).
 		SetLeft(statusText).
 		SetRight("").
-		SetHelp("f:files | Enter:load | ?:help | q:back").
+		SetHelp("f:files | Enter:load | ?:help | b/q:back").
 		Render()
 
 	// Join content and status bar
@@ -457,16 +487,30 @@ func (v *BulkFZFView) renderRunListView() string {
 	panel := panelStyle.Render(content.String())
 	panelWithMargin := lipgloss.NewStyle().MarginTop(2).Render(panel)
 
-	// Setup statusline with shorter text
-	selectedCount := countSelected(v.runs)
-	statusText := fmt.Sprintf("[RUNS] %d selected", selectedCount)
+	// Setup statusline - handle confirmation mode with yellow background
+	var statusLine string
+	if v.confirmSubmit {
+		selectedCount := countSelected(v.runs)
+		confirmStyle := lipgloss.NewStyle().
+			Background(lipgloss.Color("226")).
+			Foreground(lipgloss.Color("0")).
+			Width(v.width).
+			Align(lipgloss.Center)
 
-	// Use SetHelp to put commands right after the label instead of far right
-	statusLine := v.statusLine.SetWidth(v.width).
-		SetLeft(statusText).
-		SetRight("").
-		SetHelp("Space:toggle | Ctrl+A:all | Ctrl+D:none | Enter:submit | ?:help | q:back").
-		Render()
+		statusContent := fmt.Sprintf("[CONFIRM] ⚠️  Submit %d selected runs? [y] yes [n] no", selectedCount)
+		statusLine = confirmStyle.Render(statusContent)
+	} else {
+		// Regular status line
+		selectedCount := countSelected(v.runs)
+		statusText := fmt.Sprintf("[RUNS] %d selected", selectedCount)
+
+		// Use SetHelp to put commands right after the label instead of far right
+		statusLine = v.statusLine.SetWidth(v.width).
+			SetLeft(statusText).
+			SetRight("").
+			SetHelp("Space:toggle | Ctrl+A:all | Ctrl+D:none | Enter:confirm | ?:help | b/q:back").
+			Render()
+	}
 
 	// Join content and status bar
 	return lipgloss.JoinVertical(
@@ -531,6 +575,8 @@ func (v *BulkFZFView) renderSubmittingView() string {
 }
 
 func (v *BulkFZFView) renderResultsView() string {
+	debug.LogToFileWithTimestampf("BULK_DEBUG: Rendering results view - results count: %d, error: %v\n", len(v.results), v.error)
+
 	// Calculate available height following create view pattern
 	availableHeight := v.height - 3 // Status bar + margins
 	if availableHeight < 5 {
@@ -558,6 +604,7 @@ func (v *BulkFZFView) renderResultsView() string {
 	content.WriteString("\n\n")
 
 	if v.error != nil {
+		debug.LogToFileWithTimestampf("BULK_DEBUG: Rendering error: %v\n", v.error)
 		errorStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("9"))
 		content.WriteString(errorStyle.Render(fmt.Sprintf("Error: %v", v.error)))
@@ -565,6 +612,7 @@ func (v *BulkFZFView) renderResultsView() string {
 	}
 
 	if len(v.results) > 0 {
+		debug.LogToFileWithTimestampf("BULK_DEBUG: Rendering %d results\n", len(v.results))
 		successCount := 0
 		failCount := 0
 
@@ -607,6 +655,18 @@ func (v *BulkFZFView) renderResultsView() string {
 				content.WriteString(fmt.Sprintf("  Error: %s\n", result.Error))
 			}
 		}
+	} else {
+		debug.LogToFileWithTimestampf("BULK_DEBUG: No results to display - results empty\n")
+		// Display message when no results
+		messageStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("241")).
+			Italic(true)
+		content.WriteString(messageStyle.Render("No results to display"))
+		content.WriteString("\n\n")
+		content.WriteString("This could indicate:")
+		content.WriteString("\n• The submission is still processing")
+		content.WriteString("\n• An error occurred during submission")
+		content.WriteString("\n• The API response was empty")
 	}
 
 	// Create bordered panel following create.go pattern
@@ -625,7 +685,7 @@ func (v *BulkFZFView) renderResultsView() string {
 	statusLine := v.statusLine.SetWidth(v.width).
 		SetLeft("[RESULTS]").
 		SetRight("").
-		SetHelp("Enter:new | ?:help | q:back").
+		SetHelp("Enter:new | ?:help | b:back to runs | q:dashboard").
 		Render()
 
 	// Join content and status bar
@@ -662,6 +722,14 @@ func (v *BulkFZFView) handleFileSelectKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		dashboard.height = v.height
 		return dashboard, dashboard.Init()
 
+	case "b", "backspace":
+		// Also go back to dashboard
+		dashboard := NewDashboardView(v.client)
+		dashboard.width = v.width
+		dashboard.height = v.height
+		debug.LogToFileWithTimestampf("BULK_DEBUG: Going back to dashboard from file selection\n")
+		return dashboard, dashboard.Init()
+
 	case "Q":
 		// Quit entire program (capital Q)
 		return v, tea.Quit
@@ -692,6 +760,12 @@ func (v *BulkFZFView) handleRunListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "q":
 		// Go back to file selection
 		v.mode = BulkModeFileSelect
+		return v, nil
+
+	case "b", "backspace":
+		// Also go back to file selection
+		v.mode = BulkModeFileSelect
+		debug.LogToFileWithTimestampf("BULK_DEBUG: Going back to file selection from run list\n")
 		return v, nil
 
 	case "Q":
@@ -733,8 +807,10 @@ func (v *BulkFZFView) handleRunListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case "enter":
-		// Submit selected runs
-		return v, v.submitRuns()
+		// Enter confirmation mode before submitting
+		v.confirmSubmit = true
+		debug.LogToFileWithTimestampf("BULK_DEBUG: Entering submission confirmation mode\n")
+		return v, nil
 	}
 
 	return v, nil
@@ -748,6 +824,12 @@ func (v *BulkFZFView) handleResultsKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		dashboard.width = v.width
 		dashboard.height = v.height
 		return dashboard, dashboard.Init()
+
+	case "b", "backspace":
+		// Go back to run list view
+		v.mode = BulkModeRunList
+		debug.LogToFileWithTimestampf("BULK_DEBUG: Going back to run list from results\n")
+		return v, nil
 
 	case "Q":
 		// Quit entire program
@@ -801,6 +883,8 @@ func (v *BulkFZFView) submitRuns() tea.Cmd {
 	v.submitting = true
 
 	return func() tea.Msg {
+		debug.LogToFileWithTimestampf("BULK_DEBUG: Starting bulk submission, total runs: %d\n", len(v.runs))
+
 		// Filter selected runs
 		var selectedRuns []BulkRunItem
 		for _, run := range v.runs {
@@ -809,7 +893,10 @@ func (v *BulkFZFView) submitRuns() tea.Cmd {
 			}
 		}
 
+		debug.LogToFileWithTimestampf("BULK_DEBUG: Selected runs count: %d\n", len(selectedRuns))
+
 		if len(selectedRuns) == 0 {
+			debug.LogToFileWithTimestampf("BULK_DEBUG: No runs selected, returning error\n")
 			return bulkFZFSubmittedMsg{err: fmt.Errorf("no runs selected")}
 		}
 
@@ -849,31 +936,38 @@ func (v *BulkFZFView) submitRuns() tea.Cmd {
 		}
 
 		// Submit to API
+		debug.LogToFileWithTimestampf("BULK_DEBUG: Submitting API request: %+v\n", req)
 		ctx := context.Background()
 		resp, err := v.client.CreateBulkRuns(ctx, req)
 		if err != nil {
+			debug.LogToFileWithTimestampf("BULK_DEBUG: API call failed: %v\n", err)
 			return bulkFZFSubmittedMsg{err: err}
 		}
 
+		debug.LogToFileWithTimestampf("BULK_DEBUG: API response: successful runs: %d, failed: %d\n", len(resp.Data.Successful), len(resp.Data.Failed))
+
 		// Convert response to results
 		var results []BulkRunResult
-		for _, run := range resp.Runs {
+		for _, run := range resp.Data.Successful {
+			debug.LogToFileWithTimestampf("BULK_DEBUG: Adding successful run: ID=%d, Title=%s, Status=%s\n", run.ID, run.Title, run.Status)
 			results = append(results, BulkRunResult{
 				ID:     run.ID,
 				Title:  run.Title,
 				Status: run.Status,
-				URL:    run.RunURL,
+				URL:    "", // URL not provided in spec for successful runs
 			})
 		}
 
-		for _, runErr := range resp.Errors {
+		for _, runErr := range resp.Data.Failed {
+			debug.LogToFileWithTimestampf("BULK_DEBUG: Adding failed run: Prompt=%s, Error=%s\n", runErr.Prompt, runErr.Error)
 			results = append(results, BulkRunResult{
-				Title:  runErr.Title,
+				Title:  runErr.Prompt, // Use prompt as title since title might be empty
 				Status: "failed",
-				Error:  runErr.Error,
+				Error:  runErr.Message,
 			})
 		}
 
+		debug.LogToFileWithTimestampf("BULK_DEBUG: Returning results, count: %d\n", len(results))
 		return bulkFZFSubmittedMsg{
 			results: results,
 			err:     nil,

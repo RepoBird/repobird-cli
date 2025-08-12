@@ -44,28 +44,29 @@ func TestClient_CreateBulkRuns(t *testing.T) {
 				},
 			},
 			mockResponse: dto.BulkRunResponse{
-				BatchID: "batch-123",
-				Runs: []dto.RunCreatedItem{
-					{
-						ID:     1,
-						Title:  "Bug Fix",
-						Target: "fix/bug",
-						Status: "queued",
-						RunURL: "https://repobird.ai/runs/1",
+				Data: dto.BulkRunData{
+					BatchID: "batch-123",
+					Successful: []dto.RunCreatedItem{
+						{
+							ID:             1,
+							Title:          "Bug Fix",
+							Status:         "queued",
+							RepositoryName: "org/repo",
+							RequestIndex:   0,
+						},
+						{
+							ID:             2,
+							Title:          "New Feature",
+							Status:         "queued",
+							RepositoryName: "org/repo",
+							RequestIndex:   1,
+						},
 					},
-					{
-						ID:     2,
-						Title:  "New Feature",
-						Target: "feature/new",
-						Status: "queued",
-						RunURL: "https://repobird.ai/runs/2",
+					Metadata: dto.BulkResponseMetadata{
+						TotalRequested:  2,
+						TotalSuccessful: 2,
+						TotalFailed:     0,
 					},
-				},
-				Metadata: dto.BulkMetadata{
-					TotalRequested: 2,
-					TotalCreated:   2,
-					TotalFailed:    0,
-					CreatedAt:      time.Now(),
 				},
 			},
 			mockStatusCode: http.StatusCreated,
@@ -83,33 +84,36 @@ func TestClient_CreateBulkRuns(t *testing.T) {
 				},
 			},
 			mockResponse: dto.BulkRunResponse{
-				BatchID: "batch-456",
-				Runs: []dto.RunCreatedItem{
-					{
-						ID:     3,
-						Title:  "Task 1",
-						Status: "queued",
+				Data: dto.BulkRunData{
+					BatchID: "batch-456",
+					Successful: []dto.RunCreatedItem{
+						{
+							ID:             3,
+							Title:          "Task 1",
+							Status:         "queued",
+							RepositoryName: "org/repo",
+							RequestIndex:   0,
+						},
 					},
-				},
-				Errors: []dto.RunError{
-					{
-						Index: 1,
-						Title: "Task 2",
-						Error: "Duplicate run detected",
-						Code:  "DUPLICATE_RUN",
+					Failed: []dto.RunError{
+						{
+							RequestIndex: 1,
+							Prompt:       "Task 2",
+							Error:        "DUPLICATE_RUN",
+							Message:      "Duplicate run detected",
+						},
+						{
+							RequestIndex: 2,
+							Prompt:       "Task 3",
+							Error:        "INVALID_BRANCH",
+							Message:      "Invalid branch name",
+						},
 					},
-					{
-						Index: 2,
-						Title: "Task 3",
-						Error: "Invalid branch name",
-						Code:  "INVALID_BRANCH",
+					Metadata: dto.BulkResponseMetadata{
+						TotalRequested:  3,
+						TotalSuccessful: 1,
+						TotalFailed:     2,
 					},
-				},
-				Metadata: dto.BulkMetadata{
-					TotalRequested: 3,
-					TotalCreated:   1,
-					TotalFailed:    2,
-					CreatedAt:      time.Now(),
 				},
 			},
 			mockStatusCode: http.StatusCreated,
@@ -161,18 +165,22 @@ func TestClient_CreateBulkRuns(t *testing.T) {
 				},
 			},
 			mockResponse: dto.BulkRunResponse{
-				BatchID: "batch-789",
-				Runs: []dto.RunCreatedItem{
-					{
-						ID:     4,
-						Title:  "Forced task",
-						Status: "queued",
+				Data: dto.BulkRunData{
+					BatchID: "batch-789",
+					Successful: []dto.RunCreatedItem{
+						{
+							ID:             4,
+							Title:          "Forced task",
+							Status:         "queued",
+							RepositoryName: "org/repo",
+							RequestIndex:   0,
+						},
 					},
-				},
-				Metadata: dto.BulkMetadata{
-					TotalRequested: 1,
-					TotalCreated:   1,
-					TotalFailed:    0,
+					Metadata: dto.BulkResponseMetadata{
+						TotalRequested:  1,
+						TotalSuccessful: 1,
+						TotalFailed:     0,
+					},
 				},
 			},
 			mockStatusCode: http.StatusCreated,
@@ -215,9 +223,9 @@ func TestClient_CreateBulkRuns(t *testing.T) {
 				require.NoError(t, err)
 				assert.NotNil(t, result)
 				if response, ok := tt.mockResponse.(dto.BulkRunResponse); ok {
-					assert.Equal(t, response.BatchID, result.BatchID)
-					assert.Equal(t, len(response.Runs), len(result.Runs))
-					assert.Equal(t, len(response.Errors), len(result.Errors))
+					assert.Equal(t, response.Data.BatchID, result.Data.BatchID)
+					assert.Equal(t, len(response.Data.Successful), len(result.Data.Successful))
+					assert.Equal(t, len(response.Data.Failed), len(result.Data.Failed))
 				}
 			}
 		})
@@ -628,7 +636,9 @@ func TestClient_BulkRetryBehavior(t *testing.T) {
 			// Succeed on third attempt
 			w.WriteHeader(http.StatusCreated)
 			json.NewEncoder(w).Encode(dto.BulkRunResponse{
-				BatchID: "batch-retry",
+				Data: dto.BulkRunData{
+					BatchID: "batch-retry",
+				},
 			})
 		}))
 		defer server.Close()
@@ -641,7 +651,7 @@ func TestClient_BulkRetryBehavior(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		assert.Equal(t, "batch-retry", result.BatchID)
+		assert.Equal(t, "batch-retry", result.Data.BatchID)
 		assert.Equal(t, 3, callCount)
 	})
 

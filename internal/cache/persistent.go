@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/repobird/repobird-cli/internal/models"
+	"github.com/repobird/repobird-cli/internal/tui/debug"
 )
 
 // PersistentCache handles file-based caching for terminal status runs
@@ -75,9 +76,11 @@ func getCacheDirForUser(userID *int) (string, error) {
 	if userID != nil {
 		// User-specific cache directory
 		cacheDir = filepath.Join(baseDir, appName, "users", fmt.Sprintf("user-%d", *userID), "runs")
+		debug.LogToFilef("DEBUG: Using user-specific cache directory: %s (userID=%d)\n", cacheDir, *userID)
 	} else {
 		// Fallback to shared cache directory for backward compatibility
 		cacheDir = filepath.Join(baseDir, appName, "shared", "runs")
+		debug.LogToFilef("DEBUG: Using shared cache directory: %s (no userID)\n", cacheDir)
 	}
 
 	// Create directory if it doesn't exist

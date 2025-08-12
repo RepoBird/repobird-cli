@@ -685,25 +685,25 @@ func (v *BulkView) submitBulkRuns() tea.Cmd {
 
 		// Convert response to results
 		var results []BulkRunResult
-		for _, run := range resp.Runs {
+		for _, run := range resp.Data.Successful {
 			results = append(results, BulkRunResult{
 				ID:     run.ID,
 				Title:  run.Title,
 				Status: run.Status,
-				URL:    run.RunURL,
+				URL:    "",
 			})
 		}
 
-		for _, runErr := range resp.Errors {
+		for _, runErr := range resp.Data.Failed {
 			results = append(results, BulkRunResult{
-				Title:  runErr.Title,
+				Title:  runErr.Prompt,
 				Status: "failed",
-				Error:  runErr.Error,
+				Error:  runErr.Message,
 			})
 		}
 
 		return bulkSubmittedMsg{
-			batchID: resp.BatchID,
+			batchID: resp.Data.BatchID,
 			results: results,
 			err:     nil,
 		}

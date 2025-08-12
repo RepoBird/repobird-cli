@@ -689,7 +689,7 @@ func (v *RunListView) renderStatusBar() string {
 
 func (v *RunListView) loadRuns() tea.Cmd {
 	return func() tea.Msg {
-		runPtrs, err := v.client.ListRunsLegacy(100, 0)
+		runPtrs, err := v.client.ListRunsLegacy(1000, 0)
 		if err != nil {
 			return runsLoadedMsg{runs: nil, err: err}
 		}

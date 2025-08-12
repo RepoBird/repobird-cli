@@ -249,7 +249,9 @@ func (v *RunDetailsView) Init() tea.Cmd {
 	}
 
 	// Only load details if not already loaded from cache
+	debug.LogToFilef("DEBUG: Init() - v.loading=%t, status='%s'\n", v.loading, v.run.Status)
 	if v.loading {
+		debug.LogToFilef("DEBUG: Need to load data for run '%s'\n", v.run.GetIDString())
 		// Try cache one more time before making API call
 		if v.parentDetailsCache != nil && v.cacheRetryCount < v.maxCacheRetries {
 			runID := v.run.GetIDString()
@@ -263,18 +265,22 @@ func (v *RunDetailsView) Init() tea.Cmd {
 				v.updateContent()
 			} else {
 				v.cacheRetryCount++
+				debug.LogToFilef("DEBUG: Cache miss on retry %d - making API call for runID='%s'\n", v.cacheRetryCount, runID)
 				// Still no cache hit, load from API
 				cmds = append(cmds, v.loadRunDetails())
 				cmds = append(cmds, v.spinner.Tick)
 			}
 		} else {
+			debug.LogToFilef("DEBUG: No cache available - making API call for runID='%s'\n", v.run.GetIDString())
 			// Load from API
 			cmds = append(cmds, v.loadRunDetails())
 			cmds = append(cmds, v.spinner.Tick)
 		}
+	} else {
+		debug.LogToFilef("DEBUG: Using cached data for run '%s' (status: %s)\n", v.run.GetIDString(), v.run.Status)
 	}
 
-	// Always start polling for active runs
+	// Only start polling for active runs (startPolling checks status internally)
 	cmds = append(cmds, v.startPolling())
 
 	return tea.Batch(cmds...)
@@ -310,7 +316,7 @@ func (v *RunDetailsView) handleKeyInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch {
-	case key.Matches(msg, v.keys.Quit), key.Matches(msg, v.keys.Back), msg.Type == tea.KeyEsc, msg.String() == "b", msg.Type == tea.KeyBackspace:
+	case msg.String() == "q", key.Matches(msg, v.keys.Back), msg.Type == tea.KeyEsc, msg.String() == "b", msg.Type == tea.KeyBackspace:
 		v.stopPolling()
 		// Return to dashboard view with restored state
 		dashboard := NewDashboardViewWithState(
@@ -534,6 +540,9 @@ func (v *RunDetailsView) handleRunDetailsLoaded(msg runDetailsLoadedMsg) {
 	v.error = msg.err
 	if msg.err == nil {
 		v.updateStatusHistory(string(msg.run.Status), false)
+		// Cache the loaded details for future use
+		cache.AddCachedDetail(msg.run.GetIDString(), &msg.run)
+		debug.LogToFilef("DEBUG: Cached run details for ID '%s' (status: %s)\n", msg.run.GetIDString(), msg.run.Status)
 	}
 	v.updateContent()
 
@@ -1139,8 +1148,18 @@ func (v *RunDetailsView) loadRunDetails() tea.Cmd {
 
 func (v *RunDetailsView) startPolling() tea.Cmd {
 	if !models.IsActiveStatus(string(v.run.Status)) {
+		debug.LogToFilef("DEBUG: Not polling - status '%s' is not active\n", v.run.Status)
 		return nil
 	}
+
+	// Don't poll runs older than 3 hours
+	if time.Since(v.run.CreatedAt) > 3*time.Hour {
+		debug.LogToFilef("DEBUG: Not polling - run created %v ago (older than 3h)\n", time.Since(v.run.CreatedAt))
+		return nil
+	}
+
+	debug.LogToFilef("DEBUG: Starting polling for active run '%s' (status: %s, age: %v)\n",
+		v.run.GetIDString(), v.run.Status, time.Since(v.run.CreatedAt))
 
 	v.pollTicker = time.NewTicker(10 * time.Second) // Poll every 10 seconds
 	v.pollStop = make(chan bool)
