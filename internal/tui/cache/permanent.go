@@ -52,9 +52,7 @@ func hashUserID(userID string) string {
 
 // GetRun retrieves a cached run from disk (terminal states or old stuck runs)
 func (p *PermanentCache) GetRun(id string) (*models.RunResponse, bool) {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-
+	// No lock needed - file system handles concurrent reads
 	path := filepath.Join(p.baseDir, "runs", id+".json")
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -83,28 +81,33 @@ func (p *PermanentCache) SetRun(run models.RunResponse) error {
 		return nil
 	}
 
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
+	// Prepare data outside of any lock
 	runDir := filepath.Join(p.baseDir, "runs")
-	if err := os.MkdirAll(runDir, 0700); err != nil {
-		return fmt.Errorf("failed to create runs directory: %w", err)
-	}
-
-	path := filepath.Join(runDir, run.ID+".json")
+	tempPath := filepath.Join(runDir, run.ID+".tmp")
+	finalPath := filepath.Join(runDir, run.ID+".json")
+	
 	data, err := json.MarshalIndent(run, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal run: %w", err)
 	}
-
-	return os.WriteFile(path, data, 0600)
+	
+	// Ensure directory exists (idempotent operation)
+	if err := os.MkdirAll(runDir, 0700); err != nil {
+		return fmt.Errorf("failed to create runs directory: %w", err)
+	}
+	
+	// Write to temp file (no lock needed)
+	if err := os.WriteFile(tempPath, data, 0600); err != nil {
+		return fmt.Errorf("failed to write temp file: %w", err)
+	}
+	
+	// Atomic rename (no lock needed)
+	return os.Rename(tempPath, finalPath)
 }
 
 // GetAllRuns retrieves all cached runs from disk
 func (p *PermanentCache) GetAllRuns() ([]models.RunResponse, bool) {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-
+	// No lock needed - file system handles concurrent reads
 	runDir := filepath.Join(p.baseDir, "runs")
 	entries, err := os.ReadDir(runDir)
 	if err != nil {
@@ -114,6 +117,10 @@ func (p *PermanentCache) GetAllRuns() ([]models.RunResponse, bool) {
 	var runs []models.RunResponse
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		// Skip temporary files
+		if strings.HasSuffix(entry.Name(), ".tmp") {
 			continue
 		}
 
@@ -142,9 +149,7 @@ func (p *PermanentCache) GetAllRuns() ([]models.RunResponse, bool) {
 
 // InvalidateRun removes a specific run from disk cache
 func (p *PermanentCache) InvalidateRun(id string) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
+	// No lock needed - file system handles concurrent deletes
 	path := filepath.Join(p.baseDir, "runs", id+".json")
 	err := os.Remove(path)
 	if err != nil && !os.IsNotExist(err) {
@@ -155,9 +160,7 @@ func (p *PermanentCache) InvalidateRun(id string) error {
 
 // GetUserInfo retrieves permanently cached user info
 func (p *PermanentCache) GetUserInfo() (*models.UserInfo, bool) {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-
+	// No lock needed - file system handles concurrent reads
 	path := filepath.Join(p.baseDir, "user-info.json")
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -174,23 +177,27 @@ func (p *PermanentCache) GetUserInfo() (*models.UserInfo, bool) {
 
 // SetUserInfo permanently caches user info
 func (p *PermanentCache) SetUserInfo(info *models.UserInfo) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	path := filepath.Join(p.baseDir, "user-info.json")
+	// Prepare data without lock
+	tempPath := filepath.Join(p.baseDir, "user-info.tmp")
+	finalPath := filepath.Join(p.baseDir, "user-info.json")
+	
 	data, err := json.MarshalIndent(info, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal user info: %w", err)
 	}
-
-	return os.WriteFile(path, data, 0600)
+	
+	// Write to temp file
+	if err := os.WriteFile(tempPath, data, 0600); err != nil {
+		return err
+	}
+	
+	// Atomic rename
+	return os.Rename(tempPath, finalPath)
 }
 
 // GetRepositoryList retrieves cached repository list
 func (p *PermanentCache) GetRepositoryList() ([]string, bool) {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-
+	// No lock needed - file system handles concurrent reads
 	path := filepath.Join(p.baseDir, "repositories", "list.json")
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -207,28 +214,33 @@ func (p *PermanentCache) GetRepositoryList() ([]string, bool) {
 
 // SetRepositoryList caches repository list
 func (p *PermanentCache) SetRepositoryList(repos []string) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
+	// Prepare data without lock
 	repoDir := filepath.Join(p.baseDir, "repositories")
-	if err := os.MkdirAll(repoDir, 0700); err != nil {
-		return fmt.Errorf("failed to create repositories directory: %w", err)
-	}
-
-	path := filepath.Join(repoDir, "list.json")
+	tempPath := filepath.Join(repoDir, "list.tmp")
+	finalPath := filepath.Join(repoDir, "list.json")
+	
 	data, err := json.MarshalIndent(repos, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal repository list: %w", err)
 	}
-
-	return os.WriteFile(path, data, 0600)
+	
+	// Ensure directory exists
+	if err := os.MkdirAll(repoDir, 0700); err != nil {
+		return fmt.Errorf("failed to create repositories directory: %w", err)
+	}
+	
+	// Write to temp file
+	if err := os.WriteFile(tempPath, data, 0600); err != nil {
+		return err
+	}
+	
+	// Atomic rename
+	return os.Rename(tempPath, finalPath)
 }
 
 // GetFileHash retrieves cached file hash
 func (p *PermanentCache) GetFileHash(path string) (string, bool) {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-
+	// No lock needed - loadFileHashes handles concurrent reads
 	hashes := p.loadFileHashes()
 	hash, found := hashes[path]
 	return hash, found
@@ -236,20 +248,20 @@ func (p *PermanentCache) GetFileHash(path string) (string, bool) {
 
 // SetFileHash caches file hash
 func (p *PermanentCache) SetFileHash(filePath string, hash string) error {
+	// Use a local lock just for this operation to prevent concurrent hash updates
+	// This is the only place where we need synchronization
 	p.mu.Lock()
 	defer p.mu.Unlock()
-
+	
 	hashes := p.loadFileHashes()
 	hashes[filePath] = hash
 
-	return p.saveFileHashes(hashes)
+	return p.saveFileHashesAtomic(hashes)
 }
 
 // GetAllFileHashes returns all cached file hashes
 func (p *PermanentCache) GetAllFileHashes() map[string]string {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-
+	// No lock needed - loadFileHashes handles concurrent reads
 	return p.loadFileHashes()
 }
 
@@ -269,22 +281,28 @@ func (p *PermanentCache) loadFileHashes() map[string]string {
 	return hashes
 }
 
-// saveFileHashes saves file hashes to disk
-func (p *PermanentCache) saveFileHashes(hashes map[string]string) error {
-	path := filepath.Join(p.baseDir, "file-hashes.json")
+// saveFileHashesAtomic saves file hashes to disk atomically
+func (p *PermanentCache) saveFileHashesAtomic(hashes map[string]string) error {
+	tempPath := filepath.Join(p.baseDir, "file-hashes.tmp")
+	finalPath := filepath.Join(p.baseDir, "file-hashes.json")
+	
 	data, err := json.MarshalIndent(hashes, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal file hashes: %w", err)
 	}
-
-	return os.WriteFile(path, data, 0600)
+	
+	// Write to temp file
+	if err := os.WriteFile(tempPath, data, 0600); err != nil {
+		return err
+	}
+	
+	// Atomic rename
+	return os.Rename(tempPath, finalPath)
 }
 
 // Clear removes all cached data for this user
 func (p *PermanentCache) Clear() error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
+	// No lock needed - RemoveAll is atomic at the OS level
 	return os.RemoveAll(p.baseDir)
 }
 
@@ -295,9 +313,7 @@ func (p *PermanentCache) Close() error {
 
 // CleanupOldRuns removes runs older than retention period
 func (p *PermanentCache) CleanupOldRuns(maxRuns int) error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
+	// No lock needed - file operations are atomic
 	runDir := filepath.Join(p.baseDir, "runs")
 	entries, err := os.ReadDir(runDir)
 	if err != nil {

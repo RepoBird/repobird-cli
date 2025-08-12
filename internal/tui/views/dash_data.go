@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -244,20 +245,8 @@ func (d *DashboardView) loadFromRunsOnly() tea.Msg {
 		// Cache the data
 		d.cache.SetRepositoryOverview(repositories)
 
-		// Cache runs by repository
-		for _, repo := range repositories {
-			repoRuns := d.filterRunsByRepository(allRuns, repo.Name)
-			repoDetails := make(map[string]*models.RunResponse)
-
-			// Add any cached details
-			for _, run := range repoRuns {
-				if detail, exists := detailsCache[run.GetIDString()]; exists {
-					repoDetails[run.GetIDString()] = detail
-				}
-			}
-
-			d.cache.SetRepositoryData(repo.Name, repoRuns, repoDetails)
-		}
+		// Batch cache updates using worker pool to avoid lock contention
+		d.batchCacheRepositoryData(repositories, allRuns, detailsCache)
 
 		return dashboardDataLoadedMsg{
 			repositories: repositories,
@@ -381,6 +370,52 @@ func (d *DashboardView) filterRunsByRepository(runs []*models.RunResponse, repoN
 	}
 
 	return filtered
+}
+
+// batchCacheRepositoryData caches repository data in parallel batches
+func (d *DashboardView) batchCacheRepositoryData(repositories []models.Repository, allRuns []*models.RunResponse, detailsCache map[string]*models.RunResponse) {
+	type cacheJob struct {
+		repo    models.Repository
+		runs    []*models.RunResponse
+		details map[string]*models.RunResponse
+	}
+	
+	// Create job queue
+	jobs := make(chan cacheJob, len(repositories))
+	
+	// Queue all jobs
+	for _, repo := range repositories {
+		repoRuns := d.filterRunsByRepository(allRuns, repo.Name)
+		repoDetails := make(map[string]*models.RunResponse)
+		
+		// Add any cached details
+		for _, run := range repoRuns {
+			if detail, exists := detailsCache[run.GetIDString()]; exists {
+				repoDetails[run.GetIDString()] = detail
+			}
+		}
+		
+		jobs <- cacheJob{
+			repo:    repo,
+			runs:    repoRuns,
+			details: repoDetails,
+		}
+	}
+	close(jobs)
+	
+	// Process with limited concurrency (max 3 concurrent cache writes)
+	var wg sync.WaitGroup
+	for i := 0; i < 3; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for job := range jobs {
+				d.cache.SetRepositoryData(job.repo.Name, job.runs, job.details)
+			}
+		}()
+	}
+	
+	wg.Wait()
 }
 
 // selectRepository loads data for a specific repository

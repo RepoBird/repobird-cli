@@ -10,6 +10,7 @@ import (
 	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/repobird/repobird-cli/internal/tui/cache"
 	"github.com/repobird/repobird-cli/internal/tui/debug"
+	"github.com/repobird/repobird-cli/internal/tui/messages"
 	pkgutils "github.com/repobird/repobird-cli/pkg/utils"
 )
 
@@ -272,18 +273,12 @@ func (v *CreateRunView) handleRunCreated(msg runCreatedMsg) (tea.Model, tea.Cmd)
 	debug.LogToFilef("DEBUG: Run created successfully with ID='%s', navigating to details\n", runID)
 
 	// Navigate to details view
-	detailsView := NewRunDetailsViewWithCacheAndDimensions(
-		v.client,
-		msg.run,
-		v.parentRuns,
-		v.parentCached,
-		v.parentCachedAt,
-		v.parentDetailsCache,
-		v.width,
-		v.height,
-	)
-
-	return detailsView, detailsView.Init()
+	return v, func() tea.Msg {
+		return messages.NavigateToDetailsMsg{
+			RunID:      msg.run.GetIDString(),
+			FromCreate: true,
+		}
+	}
 }
 
 // Message for run creation result

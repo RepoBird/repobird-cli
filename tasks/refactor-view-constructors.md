@@ -1,5 +1,11 @@
 # Refactor View Constructors - Clean State Management
 
+## ⚠️ Prerequisites
+**IMPORTANT**: This refactoring depends on completing the cache deadlock fix first (`tasks/fix-cache-deadlock.md`). The cache fix:
+- Resolves deadlock issues with simplified hybrid cache
+- Establishes the shared cache architecture that views will use
+- Must be completed before starting this refactoring
+
 ## Overview
 The TUI views currently have complex constructors that violate clean architecture principles. Views are tightly coupled through parent state passing, leading to constructor proliferation and difficult maintenance. This refactoring will simplify constructors to minimal parameters and use Bubble Tea's native message-based architecture for state management.
 
@@ -42,11 +48,17 @@ Testing requires mocking complex constructor parameters and parent state.
 
 ## Proposed Solution
 
+> **IMPORTANT**: See `tasks/refactor-navigation-pattern.md` for:
+> - Shared ScrollableList component specification
+> - Standard KeyMap definitions
+> - Navigation message patterns
+> - App router implementation
+
 ### Core Principles
 1. **Minimal Constructors**: Only pass essential, immutable dependencies
 2. **Self-Loading Views**: Views load their own data in `Init()`
 3. **Message-Based Navigation**: Use Bubble Tea messages for view transitions
-4. **Cache for Shared State**: Use embedded cache for truly shared data
+4. **Shared Cache Instance**: Pass app-level cache to views for data consistency
 5. **No Parent Coupling**: Views don't know about parent state
 
 ### New Constructor Pattern
@@ -63,12 +75,12 @@ func NewRunDetailsView(
     cache *cache.SimpleCache,
 ) *RunDetailsView
 
-// AFTER: Minimal constructor
-func NewRunDetailsView(client APIClient, runID string) *RunDetailsView {
+// AFTER: Minimal constructor with shared cache
+func NewRunDetailsView(client APIClient, cache *cache.SimpleCache, runID string) *RunDetailsView {
     return &RunDetailsView{
         client: client,
+        cache:  cache,  // Shared app-level cache (simplified hybrid after deadlock fix)
         runID:  runID,
-        cache:  cache.NewSimpleCache(), // Each view has its own cache
         // Everything else loads in Init()
     }
 }
@@ -105,8 +117,8 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
     switch msg := msg.(type) {
     case NavigateToDetailsMsg:
-        // App creates the view with minimal params
-        return NewRunDetailsView(a.client, msg.RunID), nil
+        // App creates the view with minimal params and shared cache
+        return NewRunDetailsView(a.client, a.cache, msg.RunID), nil
     }
 }
 ```
@@ -144,7 +156,13 @@ func (v *RunDetailsView) loadRunDetails() tea.Cmd {
 
 ## Implementation Plan
 
-### Phase 1: Define Navigation Messages (Week 1)
+### Prerequisites
+- [ ] Complete cache deadlock fix from `tasks/fix-cache-deadlock.md` (5.5 hours)
+  - This establishes the simplified hybrid cache architecture
+  - Views will receive the fixed cache instance from app level
+  - Prevents deadlocks and improves performance
+
+### Phase 1: Define Navigation Messages (After cache fix)
 - [ ] Create `internal/tui/messages/navigation.go`
 - [ ] Define standard navigation messages:
   - `NavigateToDetailsMsg{RunID string}`
@@ -153,7 +171,7 @@ func (v *RunDetailsView) loadRunDetails() tea.Cmd {
   - `NavigateBackMsg{}`
 
 ### Phase 2: Refactor RunDetailsView (Week 1)
-- [ ] Simplify constructor to `NewRunDetailsView(client, runID)`
+- [ ] Simplify constructor to `NewRunDetailsView(client, cache, runID)`
 - [ ] Remove all parent-related fields
 - [ ] Implement `loadRunDetails()` in `Init()`
 - [ ] Update tests to use new constructor
@@ -166,7 +184,9 @@ func (v *RunDetailsView) loadRunDetails() tea.Cmd {
 
 ### Phase 4: Update App Router (Week 2)
 - [ ] Implement navigation message handling in app.go
-- [ ] Create views with minimal constructors
+- [ ] Initialize app with shared cache instance
+- [ ] Pass shared cache to all view constructors
+- [ ] Create views with minimal constructors (client, cache, ID)
 - [ ] Manage view stack for back navigation
 
 ### Phase 5: Refactor Other Views (Week 3)
@@ -177,10 +197,11 @@ func (v *RunDetailsView) loadRunDetails() tea.Cmd {
 ## Success Metrics
 
 ### Quantitative
-- [ ] Maximum 2 parameters per constructor (client + ID/config)
+- [ ] Maximum 3 parameters per constructor (client + cache + ID/config)
 - [ ] Zero parent state fields in view structs
 - [ ] 100% of navigation via messages
 - [ ] 50% reduction in constructor test complexity
+- [ ] Single shared cache instance across all views
 
 ### Qualitative
 - [ ] Views are self-contained and reusable
@@ -209,7 +230,7 @@ func (v *RunDetailsView) loadRunDetails() tea.Cmd {
 type RunDetailsView struct {
     client   APIClient
     runID    string
-    cache    *cache.SimpleCache
+    cache    *cache.SimpleCache  // Shared from app
     
     // View's own state only
     run      *models.RunResponse
@@ -218,11 +239,11 @@ type RunDetailsView struct {
     viewport viewport.Model
 }
 
-func NewRunDetailsView(client APIClient, runID string) *RunDetailsView {
+func NewRunDetailsView(client APIClient, cache *cache.SimpleCache, runID string) *RunDetailsView {
     return &RunDetailsView{
         client: client,
+        cache:  cache,  // Received from app router
         runID:  runID,
-        cache:  cache.NewSimpleCache(),
         viewport: viewport.New(80, 20),
     }
 }
@@ -258,7 +279,7 @@ NewView(client, data, parentState, parentCache, parentDimensions, ...)
 
 ### ✅ DO: Pass only essential dependencies
 ```go
-NewView(client, id)
+NewView(client, cache, id)  // cache is shared app-level instance
 ```
 
 ### ❌ DON'T: Create child views directly
@@ -282,9 +303,12 @@ type ChildView struct {
 ### ✅ DO: Load own state from shared cache if needed
 ```go
 func (v *ChildView) Init() tea.Cmd {
-    if ctx := v.cache.GetNavigationContext(); ctx != nil {
+    // Cache is shared, so data is consistent across views
+    if ctx := v.cache.GetContext("navigation"); ctx != nil {
         // Use context if needed
     }
+    // Load view-specific data
+    return v.loadData()
 }
 ```
 

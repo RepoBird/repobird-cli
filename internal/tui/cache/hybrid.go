@@ -56,42 +56,63 @@ func (h *HybridCache) GetRun(id string) (*models.RunResponse, bool) {
 
 // SetRun routes to appropriate cache based on status and age
 func (h *HybridCache) SetRun(run models.RunResponse) error {
+	// Make routing decision once - no state changes after initial decision
 	if shouldPermanentlyCache(run) {
-		// Move to permanent storage (terminal or old runs)
-		_ = h.session.InvalidateRun(run.ID)
+		// Direct to permanent, no session interaction
 		if h.permanent != nil {
+			// Optionally remove from session cache if it exists there
+			// This is safe as it's a separate operation
+			go func() {
+				_ = h.session.InvalidateRun(run.ID)
+			}()
 			return h.permanent.SetRun(run)
 		}
 	}
 
-	// Keep in session cache for active, recent runs
+	// Direct to session, no permanent interaction
 	return h.session.SetRun(run)
 }
 
 // GetRuns returns merged results from both caches
 func (h *HybridCache) GetRuns() ([]models.RunResponse, bool) {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-
+	// No mutex needed - child caches handle their own locking
 	runMap := make(map[string]models.RunResponse)
-
-	// Get permanent runs (terminal states)
+	
+	// Get from caches in parallel to avoid sequential blocking
+	var wg sync.WaitGroup
+	var mapMu sync.Mutex
+	
+	// Permanent cache goroutine
 	if h.permanent != nil {
-		if permanentRuns, found := h.permanent.GetAllRuns(); found {
-			for _, run := range permanentRuns {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if permanentRuns, found := h.permanent.GetAllRuns(); found {
+				mapMu.Lock()
+				for _, run := range permanentRuns {
+					runMap[run.ID] = run
+				}
+				mapMu.Unlock()
+			}
+		}()
+	}
+	
+	// Session cache goroutine  
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if sessionRuns, found := h.session.GetRuns(); found {
+			mapMu.Lock()
+			for _, run := range sessionRuns {
+				// Session cache has priority for active runs
 				runMap[run.ID] = run
 			}
+			mapMu.Unlock()
 		}
-	}
-
-	// Get session runs (active states - may override with fresher data)
-	if sessionRuns, found := h.session.GetRuns(); found {
-		for _, run := range sessionRuns {
-			// Session cache has priority for active runs
-			runMap[run.ID] = run
-		}
-	}
-
+	}()
+	
+	wg.Wait()
+	
 	// Convert map to slice and sort by creation time (newest first)
 	runs := make([]models.RunResponse, 0, len(runMap))
 	for _, run := range runMap {
@@ -108,7 +129,7 @@ func (h *HybridCache) GetRuns() ([]models.RunResponse, bool) {
 
 // SetRuns stores multiple runs, routing each to the appropriate cache
 func (h *HybridCache) SetRuns(runs []models.RunResponse) error {
-	// Separate runs by cache destination
+	// Separate runs by cache destination with single decision
 	var sessionRuns []models.RunResponse
 	var permanentRuns []models.RunResponse
 
@@ -120,22 +141,40 @@ func (h *HybridCache) SetRuns(runs []models.RunResponse) error {
 		}
 	}
 
-	// Store permanent runs (terminal or old) in permanent cache
+	// Store in parallel to avoid sequential blocking
+	var wg sync.WaitGroup
+	var permErr, sessErr error
+
+	// Store permanent runs in background
 	if h.permanent != nil && len(permanentRuns) > 0 {
-		for _, run := range permanentRuns {
-			if err := h.permanent.SetRun(run); err != nil {
-				// Log error but continue
-				_ = err
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for _, run := range permanentRuns {
+				if err := h.permanent.SetRun(run); err != nil {
+					// Log error but continue
+					permErr = err
+				}
 			}
-		}
+		}()
 	}
 
-	// Store active, recent runs in session cache
+	// Store session runs in background
 	if len(sessionRuns) > 0 {
-		return h.session.SetRuns(sessionRuns)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			sessErr = h.session.SetRuns(sessionRuns)
+		}()
 	}
 
-	return nil
+	wg.Wait()
+
+	// Return session error if any (higher priority)
+	if sessErr != nil {
+		return sessErr
+	}
+	return permErr
 }
 
 // InvalidateRun removes a run from both caches

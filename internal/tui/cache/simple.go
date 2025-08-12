@@ -49,26 +49,24 @@ func getCurrentUserID() string {
 
 // GetRuns retrieves cached runs from the hybrid cache
 func (c *SimpleCache) GetRuns() []models.RunResponse {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
+	// No lock needed - HybridCache handles thread safety
 	runs, _ := c.hybrid.GetRuns()
-	return runs
+	
+	// Return copy to avoid mutations
+	result := make([]models.RunResponse, len(runs))
+	copy(result, runs)
+	return result
 }
 
 // SetRuns caches runs using the hybrid cache
 func (c *SimpleCache) SetRuns(runs []models.RunResponse) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
+	// No lock needed - HybridCache handles thread safety
 	_ = c.hybrid.SetRuns(runs)
 }
 
 // GetRun retrieves a single cached run by ID
 func (c *SimpleCache) GetRun(id string) *models.RunResponse {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
+	// No lock needed - HybridCache handles thread safety
 	run, found := c.hybrid.GetRun(id)
 	if !found {
 		return nil
@@ -78,17 +76,13 @@ func (c *SimpleCache) GetRun(id string) *models.RunResponse {
 
 // SetRun caches a single run
 func (c *SimpleCache) SetRun(run models.RunResponse) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
+	// No lock needed - HybridCache handles thread safety
 	_ = c.hybrid.SetRun(run)
 }
 
 // GetUserInfo retrieves cached user info
 func (c *SimpleCache) GetUserInfo() *models.UserInfo {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
+	// No lock needed - HybridCache handles thread safety
 	info, found := c.hybrid.GetUserInfo()
 	if !found {
 		return nil
@@ -98,50 +92,38 @@ func (c *SimpleCache) GetUserInfo() *models.UserInfo {
 
 // SetUserInfo caches user info
 func (c *SimpleCache) SetUserInfo(info *models.UserInfo) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
+	// No lock needed - HybridCache handles thread safety
 	_ = c.hybrid.SetUserInfo(info)
 }
 
 // GetFileHash retrieves cached file hash
 func (c *SimpleCache) GetFileHash(path string) string {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
+	// No lock needed - HybridCache handles thread safety
 	hash, _ := c.hybrid.GetFileHash(path)
 	return hash
 }
 
 // SetFileHash caches file hash
 func (c *SimpleCache) SetFileHash(path string, hash string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
+	// No lock needed - HybridCache handles thread safety
 	_ = c.hybrid.SetFileHash(path, hash)
 }
 
 // GetDashboardCache retrieves cached dashboard data
 func (c *SimpleCache) GetDashboardCache() (*DashboardData, bool) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
+	// No lock needed - HybridCache handles thread safety
 	return c.hybrid.GetDashboardData()
 }
 
 // SetDashboardCache stores dashboard data
 func (c *SimpleCache) SetDashboardCache(data *DashboardData) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
+	// No lock needed - HybridCache handles thread safety
 	_ = c.hybrid.SetDashboardData(data)
 }
 
 // Clear removes all cached items
 func (c *SimpleCache) Clear() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
+	// No lock needed - HybridCache handles thread safety
 	_ = c.hybrid.Clear()
 }
 

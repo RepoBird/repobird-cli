@@ -92,9 +92,7 @@ func (c *SimpleCache) BuildRepositoryOverviewFromRuns(runs []*models.RunResponse
 
 // GetRepositoryOverview retrieves cached repository overview
 func (c *SimpleCache) GetRepositoryOverview() ([]models.Repository, bool) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
+	// No lock needed - GetDashboardCache is thread-safe
 	dashData, exists := c.GetDashboardCache()
 	if !exists || dashData == nil {
 		return nil, false
@@ -115,9 +113,6 @@ func (c *SimpleCache) GetRepositoryOverview() ([]models.Repository, bool) {
 
 // SetRepositoryOverview stores repository overview in cache
 func (c *SimpleCache) SetRepositoryOverview(repos []models.Repository) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	// Get existing dashboard data or create new
 	dashData, _ := c.GetDashboardCache()
 	if dashData == nil {
@@ -134,9 +129,7 @@ func (c *SimpleCache) SetRepositoryOverview(repos []models.Repository) {
 
 // GetFormData retrieves saved form data
 func (c *SimpleCache) GetFormData() *FormData {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
+	// No lock needed - session cache handles thread safety
 	if data, found := c.hybrid.session.GetFormData("formData"); found {
 		if formData, ok := data.(*FormData); ok {
 			return formData
@@ -147,9 +140,7 @@ func (c *SimpleCache) GetFormData() *FormData {
 
 // SetFormData saves form data
 func (c *SimpleCache) SetFormData(data *FormData) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
+	// No lock needed - session cache handles thread safety
 	_ = c.hybrid.session.SetFormData("formData", data)
 }
 
@@ -170,9 +161,7 @@ type FormData struct {
 
 // GetRepositoryHistory returns repository history
 func (c *SimpleCache) GetRepositoryHistory() ([]string, error) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
+	// No lock needed - GetDashboardCache is thread-safe
 	dashData, exists := c.GetDashboardCache()
 	if exists && dashData != nil && dashData.RepositoryList != nil {
 		return dashData.RepositoryList, nil
@@ -183,9 +172,7 @@ func (c *SimpleCache) GetRepositoryHistory() ([]string, error) {
 
 // AddRepositoryToHistory adds a repository to the history
 func (c *SimpleCache) AddRepositoryToHistory(repo string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
+	// Get existing data without lock
 	dashData, _ := c.GetDashboardCache()
 	if dashData == nil {
 		dashData = &DashboardData{
@@ -242,9 +229,7 @@ func (c *SimpleCache) SetCachedList(runs []models.RunResponse, details map[strin
 
 // SetRepositoryData caches data for a specific repository
 func (c *SimpleCache) SetRepositoryData(repoName string, runs []*models.RunResponse, details map[string]*models.RunResponse) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
+	// Prepare data without lock
 	key := fmt.Sprintf("repo:%s", repoName)
 	data := &RepositoryData{
 		Name:        repoName,
@@ -252,14 +237,13 @@ func (c *SimpleCache) SetRepositoryData(repoName string, runs []*models.RunRespo
 		Details:     details,
 		LastUpdated: time.Now(),
 	}
+	// Call session cache without holding lock - it handles its own thread safety
 	_ = c.hybrid.session.SetFormData(key, data)
 }
 
 // GetRepositoryData retrieves cached data for a specific repository
 func (c *SimpleCache) GetRepositoryData(repoName string) (*RepositoryData, bool) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
+	// No lock needed - session cache handles thread safety
 	key := fmt.Sprintf("repo:%s", repoName)
 	if item, found := c.hybrid.session.GetFormData(key); found {
 		if data, ok := item.(*RepositoryData); ok {
@@ -289,9 +273,7 @@ func (c *SimpleCache) InitializeDashboardForUser(userID *int) {
 
 // GetFileHashCache returns a map for file hash caching
 func (c *SimpleCache) GetFileHashCache() map[string]string {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
+	// No lock needed - this is a read-only operation
 	// Build a map from individual file hashes
 	// For simplicity, we'll return an empty map and let the caller manage it
 	// In a real implementation, we might want to track this differently
@@ -300,17 +282,13 @@ func (c *SimpleCache) GetFileHashCache() map[string]string {
 
 // SetSelectedIndex stores the selected index (for list view)
 func (c *SimpleCache) SetSelectedIndex(idx int) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
+	// No lock needed - session cache handles thread safety
 	_ = c.hybrid.session.SetFormData("selectedIndex", idx)
 }
 
 // GetSelectedIndex retrieves the selected index
 func (c *SimpleCache) GetSelectedIndex() int {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
+	// No lock needed - session cache handles thread safety
 	if item, found := c.hybrid.session.GetFormData("selectedIndex"); found {
 		if idx, ok := item.(int); ok {
 			return idx

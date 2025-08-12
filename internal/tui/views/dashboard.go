@@ -16,6 +16,7 @@ import (
 	"github.com/repobird/repobird-cli/internal/tui/cache"
 	"github.com/repobird/repobird-cli/internal/tui/components"
 	"github.com/repobird/repobird-cli/internal/tui/debug"
+	"github.com/repobird/repobird-cli/internal/tui/messages"
 	"github.com/repobird/repobird-cli/internal/utils"
 )
 
@@ -502,19 +503,16 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// Otherwise preserve the existing form data repository
 			}
 
-			createView := NewCreateRunViewWithConfig(config)
-			createView.width = d.width
-			createView.height = d.height
-			return createView, nil
+			// Return navigation message to create view
+			return d, func() tea.Msg {
+				return messages.NavigateToCreateMsg{
+					SelectedRepository: repo,
+				}
+			}
 		case msg.Type == tea.KeyRunes && string(msg.Runes) == "b":
-			// Navigate to bulk runs view with FZF
-			// Type assert the APIClient interface to *api.Client
-			if apiClient, ok := d.client.(*api.Client); ok {
-				bulkView := NewBulkFZFView(apiClient)
-				return bulkView, bulkView.Init()
-			} else {
-				// Fallback: if not a real API client, ignore
-				return d, nil
+			// Navigate to bulk runs view
+			return d, func() tea.Msg {
+				return messages.NavigateToBulkMsg{}
 			}
 		case key.Matches(msg, d.keys.Enter) && d.currentLayout == models.LayoutTripleColumn && d.focusedColumn == 2 && d.selectedRunData != nil:
 			// If we're in the details column (column 2) in the triple column layout, open the full details view
@@ -526,22 +524,12 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 
-			// Open full details view for the selected run with dashboard state
-			detailsView := NewRunDetailsViewWithDashboardState(
-				d.client,
-				*d.selectedRunData,
-				runs,
-				true, // cached
-				d.lastDataRefresh,
-				d.detailsCache, // Pass the cached details
-				d.width,
-				d.height,
-				d.selectedRepoIdx,
-				d.selectedRunIdx,
-				d.selectedDetailLine,
-				d.focusedColumn,
-			)
-			return detailsView, detailsView.Init()
+			// Navigate to details view
+			return d, func() tea.Msg {
+				return messages.NavigateToDetailsMsg{
+					RunID: d.selectedRunData.GetIDString(),
+				}
+			}
 		case key.Matches(msg, d.keys.LayoutSwitch):
 			d.cycleLayout()
 			return d, nil

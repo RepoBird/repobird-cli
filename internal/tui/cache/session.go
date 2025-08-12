@@ -1,7 +1,6 @@
 package cache
 
 import (
-	"sync"
 	"time"
 
 	"github.com/jellydator/ttlcache/v3"
@@ -11,7 +10,7 @@ import (
 // SessionCache provides in-memory caching with TTL for active/changing data
 type SessionCache struct {
 	cache *ttlcache.Cache[string, any]
-	mu    sync.RWMutex
+	// Note: ttlcache is thread-safe, no additional mutex needed
 }
 
 // NewSessionCache creates a new memory-based cache for session data
@@ -29,9 +28,7 @@ func NewSessionCache() *SessionCache {
 
 // GetRun retrieves a cached run from memory (only active states)
 func (s *SessionCache) GetRun(id string) (*models.RunResponse, bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
+	// ttlcache is thread-safe, no mutex needed
 	item := s.cache.Get("run:" + id)
 	if item == nil {
 		return nil, false
@@ -55,9 +52,7 @@ func (s *SessionCache) GetRun(id string) (*models.RunResponse, bool) {
 
 // SetRun stores a run in memory (only active, recent states)
 func (s *SessionCache) SetRun(run models.RunResponse) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
+	// ttlcache is thread-safe, no mutex needed
 	// Only cache active, recent runs
 	// (terminal or old runs should go to permanent cache)
 	if shouldPermanentlyCache(run) {
@@ -72,9 +67,7 @@ func (s *SessionCache) SetRun(run models.RunResponse) error {
 
 // GetRuns retrieves all cached runs from memory
 func (s *SessionCache) GetRuns() ([]models.RunResponse, bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
+	// ttlcache is thread-safe, no mutex needed
 	// Check if we have a cached run list
 	item := s.cache.Get("runs:all")
 	if item != nil {
@@ -108,9 +101,7 @@ func (s *SessionCache) GetRuns() ([]models.RunResponse, bool) {
 
 // SetRuns stores multiple runs in memory
 func (s *SessionCache) SetRuns(runs []models.RunResponse) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
+	// ttlcache is thread-safe, no mutex needed
 	// Cache the full list for quick retrieval
 	s.cache.Set("runs:all", runs, 5*time.Minute)
 
@@ -126,9 +117,7 @@ func (s *SessionCache) SetRuns(runs []models.RunResponse) error {
 
 // InvalidateRun removes a specific run from memory cache
 func (s *SessionCache) InvalidateRun(id string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
+	// ttlcache is thread-safe, no mutex needed
 	s.cache.Delete("run:" + id)
 	// Also invalidate the runs list to force refresh
 	s.cache.Delete("runs:all")
@@ -137,9 +126,7 @@ func (s *SessionCache) InvalidateRun(id string) error {
 
 // InvalidateActiveRuns clears all active runs from memory
 func (s *SessionCache) InvalidateActiveRuns() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
+	// ttlcache is thread-safe, no mutex needed
 	// Remove the cached runs list
 	s.cache.Delete("runs:all")
 
@@ -156,9 +143,7 @@ func (s *SessionCache) InvalidateActiveRuns() error {
 
 // GetFormData retrieves cached form data (for UI state)
 func (s *SessionCache) GetFormData(key string) (any, bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
+	// ttlcache is thread-safe, no mutex needed
 	item := s.cache.Get("form:" + key)
 	if item == nil {
 		return nil, false
@@ -169,18 +154,14 @@ func (s *SessionCache) GetFormData(key string) (any, bool) {
 
 // SetFormData caches form data with longer TTL
 func (s *SessionCache) SetFormData(key string, data any) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
+	// ttlcache is thread-safe, no mutex needed
 	s.cache.Set("form:"+key, data, 30*time.Minute)
 	return nil
 }
 
 // GetDashboardData retrieves cached dashboard data
 func (s *SessionCache) GetDashboardData() (*DashboardData, bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
+	// ttlcache is thread-safe, no mutex needed
 	item := s.cache.Get("dashboard")
 	if item == nil {
 		return nil, false
@@ -192,18 +173,14 @@ func (s *SessionCache) GetDashboardData() (*DashboardData, bool) {
 
 // SetDashboardData caches dashboard data
 func (s *SessionCache) SetDashboardData(data *DashboardData) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
+	// ttlcache is thread-safe, no mutex needed
 	s.cache.Set("dashboard", data, 5*time.Minute)
 	return nil
 }
 
 // Clear removes all cached items from memory
 func (s *SessionCache) Clear() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
+	// ttlcache is thread-safe, no mutex needed
 	s.cache.DeleteAll()
 	return nil
 }
