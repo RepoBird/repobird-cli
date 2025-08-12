@@ -4,6 +4,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/repobird/repobird-cli/internal/api"
 	"github.com/repobird/repobird-cli/internal/tui/cache"
+	"github.com/repobird/repobird-cli/internal/tui/debug"
 	"github.com/repobird/repobird-cli/internal/tui/keymap"
 	"github.com/repobird/repobird-cli/internal/tui/messages"
 	"github.com/repobird/repobird-cli/internal/tui/views"
@@ -73,17 +74,21 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (a *App) handleNavigation(msg messages.NavigationMsg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case messages.NavigateToCreateMsg:
+		debug.LogToFile("DEBUG: App - handling NavigateToCreateMsg\n")
 		// Save current view to stack
 		a.viewStack = append(a.viewStack, a.current)
 
 		// Create new view with minimal params
+		debug.LogToFile("DEBUG: App - creating new CreateRunView\n")
 		a.current = views.NewCreateRunView(a.client)
 
 		// Set navigation context if provided
 		if msg.SelectedRepository != "" {
+			debug.LogToFilef("DEBUG: App - setting navigation context: selected_repo=%s\n", msg.SelectedRepository)
 			a.setNavigationContext("selected_repo", msg.SelectedRepository)
 		}
 
+		debug.LogToFile("DEBUG: App - calling Init() on new CreateRunView\n")
 		return a, a.current.Init()
 
 	case messages.NavigateToDetailsMsg:

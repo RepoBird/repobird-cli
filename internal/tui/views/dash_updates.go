@@ -554,7 +554,7 @@ func (d *DashboardView) updateColumnWidths() {
 		}
 	case models.LayoutRepositoriesOnly:
 		// Repository-only layout uses full width
-		d.repoViewport.Width = d.width - 6  // Account for borders
+		d.repoViewport.Width = d.width - 6   // Account for borders
 		d.repoViewport.Height = d.height - 6 // Account for title and status
 	}
 }

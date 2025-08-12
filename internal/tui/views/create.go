@@ -304,19 +304,24 @@ func NewCreateRunViewWithCache(
 }
 
 func (v *CreateRunView) Init() tea.Cmd {
+	debug.LogToFilef("DEBUG: CreateRunView.Init() called - width=%d, height=%d\n", v.width, v.height)
 	var cmds []tea.Cmd
 
 	// Send a window size message with stored dimensions if we have them
 	if v.width > 0 && v.height > 0 {
+		debug.LogToFilef("DEBUG: CreateRunView.Init() - sending stored window size: %dx%d\n", v.width, v.height)
 		cmds = append(cmds, func() tea.Msg {
 			return tea.WindowSizeMsg{Width: v.width, Height: v.height}
 		})
+	} else {
+		debug.LogToFile("DEBUG: CreateRunView.Init() - no stored dimensions, waiting for WindowSizeMsg\n")
 	}
 
 	// Load file hash cache in the background
 	cmds = append(cmds, v.loadFileHashCache())
 
 	cmds = append(cmds, textinput.Blink)
+	debug.LogToFilef("DEBUG: CreateRunView.Init() - returning %d commands\n", len(cmds))
 	return tea.Batch(cmds...)
 }
 
@@ -742,10 +747,12 @@ func (v *CreateRunView) handleErrorMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	debug.LogToFilef("DEBUG: CreateRunView.Update() received message: %T\n", msg)
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
+		debug.LogToFilef("DEBUG: CreateRunView.Update() - handling WindowSizeMsg: %dx%d\n", msg.Width, msg.Height)
 		v.handleWindowSizeMsg(msg)
 
 	case tea.KeyMsg:

@@ -113,16 +113,19 @@ The TUI includes built-in fuzzy search functionality:
 #### Dashboard View File Organization
 The dashboard view is split across multiple files for maintainability:
 
-- **`dashboard.go`** (2,738 lines) - Core Update/View/Init methods and state management
-- **`dash_rendering.go`** (583 lines) - All layout rendering (columns, layouts, status lines)
+- **`dashboard.go`** (838 lines) - Core Update/View/Init methods only
+- **`dash_navigation.go`** (454 lines) - Navigation logic and keymap handling
+- **`dash_updates.go`** (572 lines) - Viewport and content update methods
+- **`dash_state.go`** (263 lines) - State management and validation helpers
+- **`dash_status_info.go`** (548 lines) - Status overlay + help/docs rendering
+- **`dash_rendering.go`** (584 lines) - All layout rendering (columns, layouts, status lines)
 - **`dash_data.go`** (461 lines) - Data loading, repository operations, and cache management
-- **`dash_status_info.go`** (253 lines) - Status/user info overlay handling
 - **`dash_formatting.go`** (222 lines) - Text formatting, truncation, and icon utilities
 - **`dash_fzf.go`** (124 lines) - FZF overlay positioning and activation logic
 - **`dash_messages.go`** (42 lines) - Custom message types for dashboard operations  
 - **`dash_clipboard.go`** (38 lines) - Clipboard operations and yank animations
 
-**Total**: ~4,460 lines across 8 focused files (reduced from 3,423 lines in single file)
+**Total**: ~4,146 lines across 11 focused files (main file reduced 56% from 1,906 to 838 lines)
 
 #### Dashboard FZF Integration
 - Press `f` on any column to activate FZF mode
