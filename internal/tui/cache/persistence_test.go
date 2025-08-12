@@ -47,7 +47,7 @@ func TestAutomaticPersistence(t *testing.T) {
 	// File hashes should persist
 	loadedHash := cache2.GetFileHash("/test/file.go")
 	assert.Equal(t, "hash123", loadedHash)
-	
+
 	// Note: Dashboard data is session-only and won't persist
 }
 
@@ -106,7 +106,6 @@ func TestSaveToDiskIsNoOp(t *testing.T) {
 	assert.NoFileExists(t, cacheFile)
 }
 
-
 func TestGetCacheFilePath(t *testing.T) {
 	// Save original XDG_CONFIG_HOME
 	oldConfigHome := os.Getenv("XDG_CONFIG_HOME")
@@ -121,4 +120,3 @@ func TestGetCacheFilePath(t *testing.T) {
 	// Restore original
 	os.Setenv("XDG_CONFIG_HOME", oldConfigHome)
 }
-

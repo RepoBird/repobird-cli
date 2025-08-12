@@ -19,9 +19,9 @@ func NewSessionCache() *SessionCache {
 	cache := ttlcache.New[string, any](
 		ttlcache.WithCapacity[string, any](1000),
 	)
-	
+
 	go cache.Start()
-	
+
 	return &SessionCache{
 		cache: cache,
 	}
@@ -31,17 +31,17 @@ func NewSessionCache() *SessionCache {
 func (s *SessionCache) GetRun(id string) (*models.RunResponse, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	
+
 	item := s.cache.Get("run:" + id)
 	if item == nil {
 		return nil, false
 	}
-	
+
 	run, ok := item.Value().(models.RunResponse)
 	if !ok {
 		return nil, false
 	}
-	
+
 	// Only return active runs from session cache
 	// (terminal or old runs should be in permanent cache)
 	if shouldPermanentlyCache(run) {
@@ -49,7 +49,7 @@ func (s *SessionCache) GetRun(id string) (*models.RunResponse, bool) {
 		s.cache.Delete("run:" + id)
 		return nil, false
 	}
-	
+
 	return &run, true
 }
 
@@ -57,7 +57,7 @@ func (s *SessionCache) GetRun(id string) (*models.RunResponse, bool) {
 func (s *SessionCache) SetRun(run models.RunResponse) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	// Only cache active, recent runs
 	// (terminal or old runs should go to permanent cache)
 	if shouldPermanentlyCache(run) {
@@ -65,7 +65,7 @@ func (s *SessionCache) SetRun(run models.RunResponse) error {
 		s.cache.Delete("run:" + run.ID)
 		return nil
 	}
-	
+
 	s.cache.Set("run:"+run.ID, run, 5*time.Minute)
 	return nil
 }
@@ -74,7 +74,7 @@ func (s *SessionCache) SetRun(run models.RunResponse) error {
 func (s *SessionCache) GetRuns() ([]models.RunResponse, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	
+
 	// Check if we have a cached run list
 	item := s.cache.Get("runs:all")
 	if item != nil {
@@ -89,7 +89,7 @@ func (s *SessionCache) GetRuns() ([]models.RunResponse, bool) {
 			return activeRuns, len(activeRuns) > 0
 		}
 	}
-	
+
 	// Alternatively, collect individual cached runs
 	runs := make([]models.RunResponse, 0)
 	items := s.cache.Items()
@@ -102,7 +102,7 @@ func (s *SessionCache) GetRuns() ([]models.RunResponse, bool) {
 			}
 		}
 	}
-	
+
 	return runs, len(runs) > 0
 }
 
@@ -110,17 +110,17 @@ func (s *SessionCache) GetRuns() ([]models.RunResponse, bool) {
 func (s *SessionCache) SetRuns(runs []models.RunResponse) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	// Cache the full list for quick retrieval
 	s.cache.Set("runs:all", runs, 5*time.Minute)
-	
+
 	// Also cache individual active, recent runs
 	for _, run := range runs {
 		if !shouldPermanentlyCache(run) {
 			s.cache.Set("run:"+run.ID, run, 5*time.Minute)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -128,7 +128,7 @@ func (s *SessionCache) SetRuns(runs []models.RunResponse) error {
 func (s *SessionCache) InvalidateRun(id string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	s.cache.Delete("run:" + id)
 	// Also invalidate the runs list to force refresh
 	s.cache.Delete("runs:all")
@@ -139,10 +139,10 @@ func (s *SessionCache) InvalidateRun(id string) error {
 func (s *SessionCache) InvalidateActiveRuns() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	// Remove the cached runs list
 	s.cache.Delete("runs:all")
-	
+
 	// Remove individual run entries
 	items := s.cache.Items()
 	for key := range items {
@@ -150,7 +150,7 @@ func (s *SessionCache) InvalidateActiveRuns() error {
 			s.cache.Delete(key)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -158,12 +158,12 @@ func (s *SessionCache) InvalidateActiveRuns() error {
 func (s *SessionCache) GetFormData(key string) (any, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	
+
 	item := s.cache.Get("form:" + key)
 	if item == nil {
 		return nil, false
 	}
-	
+
 	return item.Value(), true
 }
 
@@ -171,7 +171,7 @@ func (s *SessionCache) GetFormData(key string) (any, bool) {
 func (s *SessionCache) SetFormData(key string, data any) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	s.cache.Set("form:"+key, data, 30*time.Minute)
 	return nil
 }
@@ -180,12 +180,12 @@ func (s *SessionCache) SetFormData(key string, data any) error {
 func (s *SessionCache) GetDashboardData() (*DashboardData, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	
+
 	item := s.cache.Get("dashboard")
 	if item == nil {
 		return nil, false
 	}
-	
+
 	data, ok := item.Value().(*DashboardData)
 	return data, ok
 }
@@ -194,7 +194,7 @@ func (s *SessionCache) GetDashboardData() (*DashboardData, bool) {
 func (s *SessionCache) SetDashboardData(data *DashboardData) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	s.cache.Set("dashboard", data, 5*time.Minute)
 	return nil
 }
@@ -203,7 +203,7 @@ func (s *SessionCache) SetDashboardData(data *DashboardData) error {
 func (s *SessionCache) Clear() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	s.cache.DeleteAll()
 	return nil
 }

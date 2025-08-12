@@ -21,11 +21,11 @@ type RunCache interface {
 	// Single run operations
 	GetRun(id string) (*models.RunResponse, bool)
 	SetRun(run models.RunResponse) error
-	
+
 	// Bulk operations
 	GetRuns() ([]models.RunResponse, bool)
 	SetRuns(runs []models.RunResponse) error
-	
+
 	// Invalidation
 	InvalidateRun(id string) error
 	InvalidateActiveRuns() error

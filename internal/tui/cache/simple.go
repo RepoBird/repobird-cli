@@ -20,7 +20,7 @@ type SimpleCache struct {
 func NewSimpleCache() *SimpleCache {
 	// Get current user ID from auth context or config
 	userID := getCurrentUserID()
-	
+
 	hybrid, err := NewHybridCache(userID)
 	if err != nil {
 		// If hybrid cache creation fails, create session-only cache
@@ -29,7 +29,7 @@ func NewSimpleCache() *SimpleCache {
 			userID:  userID,
 		}
 	}
-	
+
 	return &SimpleCache{
 		hybrid: hybrid,
 	}
@@ -42,7 +42,7 @@ func getCurrentUserID() string {
 	if userIDPtr != nil && *userIDPtr > 0 {
 		return fmt.Sprintf("%d", *userIDPtr)
 	}
-	
+
 	// Fallback to anonymous if no user is authenticated
 	return "anonymous"
 }

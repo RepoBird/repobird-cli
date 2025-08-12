@@ -16,21 +16,22 @@ func TestPermanentCache_OnlyStoresTerminalRuns(t *testing.T) {
 	tmpDir := t.TempDir()
 	os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Unsetenv("XDG_CONFIG_HOME")
-	
+
 	cache, err := NewPermanentCache("test-user-123")
 	require.NoError(t, err)
-	
-	// Should not store active run
+
+	// Should not store recent active run
 	activeRun := models.RunResponse{
-		ID:     "test-1",
-		Status: models.StatusProcessing,
+		ID:        "test-1",
+		Status:    models.StatusProcessing,
+		CreatedAt: time.Now(), // Recent run
 	}
 	err = cache.SetRun(activeRun)
 	assert.NoError(t, err)
-	
+
 	_, found := cache.GetRun("test-1")
-	assert.False(t, found, "active run should not be cached")
-	
+	assert.False(t, found, "recent active run should not be cached")
+
 	// Should store terminal run (DONE)
 	terminalRun := models.RunResponse{
 		ID:        "test-2",
@@ -39,12 +40,12 @@ func TestPermanentCache_OnlyStoresTerminalRuns(t *testing.T) {
 	}
 	err = cache.SetRun(terminalRun)
 	assert.NoError(t, err)
-	
+
 	cached, found := cache.GetRun("test-2")
 	assert.True(t, found, "terminal run should be cached")
 	assert.Equal(t, terminalRun.ID, cached.ID)
 	assert.Equal(t, terminalRun.Status, cached.Status)
-	
+
 	// Should store terminal run (FAILED)
 	failedRun := models.RunResponse{
 		ID:        "test-3",
@@ -53,7 +54,7 @@ func TestPermanentCache_OnlyStoresTerminalRuns(t *testing.T) {
 	}
 	err = cache.SetRun(failedRun)
 	assert.NoError(t, err)
-	
+
 	cached, found = cache.GetRun("test-3")
 	assert.True(t, found, "failed run should be cached")
 	assert.Equal(t, failedRun.Status, cached.Status)
@@ -64,14 +65,14 @@ func TestPermanentCache_UserSeparation(t *testing.T) {
 	tmpDir := t.TempDir()
 	os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Unsetenv("XDG_CONFIG_HOME")
-	
+
 	// Create caches for different users
 	cache1, err := NewPermanentCache("user-1")
 	require.NoError(t, err)
-	
+
 	cache2, err := NewPermanentCache("user-2")
 	require.NoError(t, err)
-	
+
 	// Add run to user 1's cache
 	run1 := models.RunResponse{
 		ID:        "run-1",
@@ -80,11 +81,11 @@ func TestPermanentCache_UserSeparation(t *testing.T) {
 	}
 	err = cache1.SetRun(run1)
 	require.NoError(t, err)
-	
+
 	// User 2 should not see user 1's run
 	_, found := cache2.GetRun("run-1")
 	assert.False(t, found, "user 2 should not see user 1's run")
-	
+
 	// User 1 should see their own run
 	cached, found := cache1.GetRun("run-1")
 	assert.True(t, found, "user 1 should see their own run")
@@ -96,32 +97,32 @@ func TestPermanentCache_FileHashStorage(t *testing.T) {
 	tmpDir := t.TempDir()
 	os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Unsetenv("XDG_CONFIG_HOME")
-	
+
 	cache, err := NewPermanentCache("test-user")
 	require.NoError(t, err)
-	
+
 	// Store file hashes
 	err = cache.SetFileHash("file1.txt", "hash1")
 	assert.NoError(t, err)
-	
+
 	err = cache.SetFileHash("file2.txt", "hash2")
 	assert.NoError(t, err)
-	
+
 	// Retrieve individual hash
 	hash, found := cache.GetFileHash("file1.txt")
 	assert.True(t, found)
 	assert.Equal(t, "hash1", hash)
-	
+
 	// Get all hashes
 	allHashes := cache.GetAllFileHashes()
 	assert.Len(t, allHashes, 2)
 	assert.Equal(t, "hash1", allHashes["file1.txt"])
 	assert.Equal(t, "hash2", allHashes["file2.txt"])
-	
+
 	// Test persistence - create new cache instance
 	cache2, err := NewPermanentCache("test-user")
 	require.NoError(t, err)
-	
+
 	hash, found = cache2.GetFileHash("file1.txt")
 	assert.True(t, found, "hash should persist across cache instances")
 	assert.Equal(t, "hash1", hash)
@@ -132,10 +133,10 @@ func TestPermanentCache_UserInfo(t *testing.T) {
 	tmpDir := t.TempDir()
 	os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Unsetenv("XDG_CONFIG_HOME")
-	
+
 	cache, err := NewPermanentCache("test-user")
 	require.NoError(t, err)
-	
+
 	// Store user info
 	userInfo := &models.UserInfo{
 		ID:    123,
@@ -144,18 +145,18 @@ func TestPermanentCache_UserInfo(t *testing.T) {
 	}
 	err = cache.SetUserInfo(userInfo)
 	assert.NoError(t, err)
-	
+
 	// Retrieve user info
 	cached, found := cache.GetUserInfo()
 	assert.True(t, found)
 	assert.Equal(t, userInfo.ID, cached.ID)
 	assert.Equal(t, userInfo.Email, cached.Email)
 	assert.Equal(t, userInfo.Name, cached.Name)
-	
+
 	// Test persistence
 	cache2, err := NewPermanentCache("test-user")
 	require.NoError(t, err)
-	
+
 	cached, found = cache2.GetUserInfo()
 	assert.True(t, found, "user info should persist")
 	assert.Equal(t, userInfo.ID, cached.ID)
@@ -166,24 +167,24 @@ func TestPermanentCache_RepositoryList(t *testing.T) {
 	tmpDir := t.TempDir()
 	os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Unsetenv("XDG_CONFIG_HOME")
-	
+
 	cache, err := NewPermanentCache("test-user")
 	require.NoError(t, err)
-	
+
 	// Store repository list
 	repos := []string{"repo1", "repo2", "repo3"}
 	err = cache.SetRepositoryList(repos)
 	assert.NoError(t, err)
-	
+
 	// Retrieve repository list
 	cached, found := cache.GetRepositoryList()
 	assert.True(t, found)
 	assert.Equal(t, repos, cached)
-	
+
 	// Test persistence
 	cache2, err := NewPermanentCache("test-user")
 	require.NoError(t, err)
-	
+
 	cached, found = cache2.GetRepositoryList()
 	assert.True(t, found, "repository list should persist")
 	assert.Equal(t, repos, cached)
@@ -194,10 +195,10 @@ func TestPermanentCache_Clear(t *testing.T) {
 	tmpDir := t.TempDir()
 	os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Unsetenv("XDG_CONFIG_HOME")
-	
+
 	cache, err := NewPermanentCache("test-user")
 	require.NoError(t, err)
-	
+
 	// Add some data
 	run := models.RunResponse{
 		ID:     "test-run",
@@ -205,23 +206,23 @@ func TestPermanentCache_Clear(t *testing.T) {
 	}
 	_ = cache.SetRun(run)
 	_ = cache.SetFileHash("file.txt", "hash")
-	
+
 	// Verify data exists
 	_, found := cache.GetRun("test-run")
 	assert.True(t, found)
-	
+
 	// Clear cache
 	err = cache.Clear()
 	assert.NoError(t, err)
-	
+
 	// Create new cache instance
 	cache2, err := NewPermanentCache("test-user")
 	require.NoError(t, err)
-	
+
 	// Verify data is gone
 	_, found = cache2.GetRun("test-run")
 	assert.False(t, found, "run should be cleared")
-	
+
 	hash, found := cache2.GetFileHash("file.txt")
 	assert.False(t, found, "file hash should be cleared")
 	assert.Empty(t, hash)
@@ -232,11 +233,11 @@ func TestPermanentCache_DirectoryStructure(t *testing.T) {
 	tmpDir := t.TempDir()
 	os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Unsetenv("XDG_CONFIG_HOME")
-	
+
 	// Create cache for specific user
 	cache, err := NewPermanentCache("user-123")
 	require.NoError(t, err)
-	
+
 	// Add various data types
 	run := models.RunResponse{
 		ID:     "run-abc",
@@ -245,19 +246,19 @@ func TestPermanentCache_DirectoryStructure(t *testing.T) {
 	_ = cache.SetRun(run)
 	_ = cache.SetRepositoryList([]string{"repo1"})
 	_ = cache.SetFileHash("file.txt", "hash123")
-	
+
 	// Verify directory structure
 	userDir := filepath.Join(tmpDir, "repobird", "cache", "users")
 	entries, err := os.ReadDir(userDir)
 	require.NoError(t, err)
 	assert.Len(t, entries, 1, "should have one user directory")
-	
+
 	// Check runs directory exists
 	userHash := hashUserID("user-123")
 	runFile := filepath.Join(userDir, userHash, "runs", "run-abc.json")
 	_, err = os.Stat(runFile)
 	assert.NoError(t, err, "run file should exist")
-	
+
 	// Check file hashes exist
 	hashFile := filepath.Join(userDir, userHash, "file-hashes.json")
 	_, err = os.Stat(hashFile)
@@ -269,11 +270,11 @@ func TestPermanentCache_AnonymousUser(t *testing.T) {
 	tmpDir := t.TempDir()
 	os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Unsetenv("XDG_CONFIG_HOME")
-	
+
 	// Create cache for anonymous user
 	cache, err := NewPermanentCache("")
 	require.NoError(t, err)
-	
+
 	// Should still work for anonymous users
 	run := models.RunResponse{
 		ID:     "anon-run",
@@ -281,11 +282,11 @@ func TestPermanentCache_AnonymousUser(t *testing.T) {
 	}
 	err = cache.SetRun(run)
 	assert.NoError(t, err)
-	
+
 	cached, found := cache.GetRun("anon-run")
 	assert.True(t, found)
 	assert.Equal(t, run.ID, cached.ID)
-	
+
 	// Check directory is created as "anonymous"
 	anonDir := filepath.Join(tmpDir, "repobird", "cache", "users", "anonymous")
 	_, err = os.Stat(anonDir)
@@ -297,36 +298,36 @@ func TestPermanentCache_OldStuckRuns(t *testing.T) {
 	tmpDir := t.TempDir()
 	os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Unsetenv("XDG_CONFIG_HOME")
-	
+
 	cache, err := NewPermanentCache("test-user")
 	require.NoError(t, err)
-	
+
 	// Create a run that's stuck in PROCESSING for more than 2 hours
 	oldStuckRun := models.RunResponse{
 		ID:        "stuck-run",
 		Status:    models.StatusProcessing,
 		CreatedAt: time.Now().Add(-3 * time.Hour), // 3 hours old
 	}
-	
+
 	// Should be cached even though it's not terminal
 	err = cache.SetRun(oldStuckRun)
 	assert.NoError(t, err)
-	
+
 	cached, found := cache.GetRun("stuck-run")
 	assert.True(t, found, "old stuck run should be cached")
 	assert.Equal(t, oldStuckRun.ID, cached.ID)
 	assert.Equal(t, models.StatusProcessing, cached.Status)
-	
+
 	// Recent active run should NOT be cached
 	recentActiveRun := models.RunResponse{
 		ID:        "recent-active",
 		Status:    models.StatusProcessing,
 		CreatedAt: time.Now().Add(-30 * time.Minute), // Only 30 minutes old
 	}
-	
+
 	err = cache.SetRun(recentActiveRun)
 	assert.NoError(t, err)
-	
+
 	_, found = cache.GetRun("recent-active")
 	assert.False(t, found, "recent active run should not be cached")
 }
@@ -336,10 +337,10 @@ func TestPermanentCache_MixedAgeRuns(t *testing.T) {
 	tmpDir := t.TempDir()
 	os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Unsetenv("XDG_CONFIG_HOME")
-	
+
 	cache, err := NewPermanentCache("test-user")
 	require.NoError(t, err)
-	
+
 	runs := []models.RunResponse{
 		{ID: "terminal-new", Status: models.StatusDone, CreatedAt: time.Now()},
 		{ID: "terminal-old", Status: models.StatusFailed, CreatedAt: time.Now().Add(-5 * time.Hour)},
@@ -347,12 +348,12 @@ func TestPermanentCache_MixedAgeRuns(t *testing.T) {
 		{ID: "active-new", Status: models.StatusProcessing, CreatedAt: time.Now().Add(-30 * time.Minute)},
 		{ID: "stuck-queued", Status: models.StatusQueued, CreatedAt: time.Now().Add(-4 * time.Hour)},
 	}
-	
+
 	// Set all runs
 	for _, run := range runs {
 		_ = cache.SetRun(run)
 	}
-	
+
 	// Verify which ones were cached
 	expectedCached := map[string]bool{
 		"terminal-new": true,  // Terminal state
@@ -361,7 +362,7 @@ func TestPermanentCache_MixedAgeRuns(t *testing.T) {
 		"active-new":   false, // Recent active run
 		"stuck-queued": true,  // Old stuck run (>2 hours)
 	}
-	
+
 	for id, shouldBeCached := range expectedCached {
 		_, found := cache.GetRun(id)
 		assert.Equal(t, shouldBeCached, found, "run %s cache status incorrect", id)

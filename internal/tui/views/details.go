@@ -397,65 +397,6 @@ func (v *RunDetailsView) handleKeyInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // handleRowNavigation handles navigation between selectable rows/fields
-func (v *RunDetailsView) handleRowNavigation(msg tea.KeyMsg) tea.Cmd {
-	switch msg.String() {
-	case "j", "down":
-		if v.selectedRow < len(v.fieldValues)-1 {
-			v.selectedRow++
-			// Scroll viewport if needed to show selected field
-			v.scrollToSelectedField()
-		}
-	case "k", "up":
-		if v.selectedRow > 0 {
-			v.selectedRow--
-			// Scroll viewport if needed to show selected field
-			v.scrollToSelectedField()
-		}
-	case "g":
-		// Go to first field
-		v.selectedRow = 0
-		v.scrollToSelectedField()
-	case "G":
-		// Go to last field
-		if len(v.fieldValues) > 0 {
-			v.selectedRow = len(v.fieldValues) - 1
-			v.scrollToSelectedField()
-		}
-	}
-	return nil
-}
-
-// scrollToSelectedField ensures the selected field is visible in the viewport
-func (v *RunDetailsView) scrollToSelectedField() {
-	if v.selectedRow >= 0 && v.selectedRow < len(v.fieldRanges) {
-		// Get the range of the selected field
-		fieldRange := v.fieldRanges[v.selectedRow]
-		startLine := fieldRange[0]
-		endLine := fieldRange[1]
-
-		viewportTop := v.viewport.YOffset
-		viewportBottom := viewportTop + v.viewport.Height - 1
-
-		// If the entire field is above the viewport, scroll to show the start
-		if endLine < viewportTop {
-			v.viewport.SetYOffset(startLine)
-		} else if startLine > viewportBottom {
-			// If the entire field is below the viewport, scroll to show as much as possible
-			// Try to show the whole field if it fits
-			fieldHeight := endLine - startLine + 1
-			if fieldHeight <= v.viewport.Height {
-				// Field fits in viewport, position it at the top
-				v.viewport.SetYOffset(startLine)
-			} else {
-				// Field is larger than viewport, show the beginning
-				v.viewport.SetYOffset(startLine)
-			}
-		}
-		// If part of the field is visible, don't scroll
-	}
-}
-
-// handleClipboardOperations handles clipboard-related key presses
 func (v *RunDetailsView) handleClipboardOperations(key string) tea.Cmd {
 	switch key {
 	case "y":
@@ -515,88 +456,18 @@ func (v *RunDetailsView) handleClipboardOperations(key string) tea.Cmd {
 			if utils.IsURL(fieldValue) {
 				urlText = utils.ExtractURL(fieldValue)
 			}
-		} else {
-			// Fallback to current line (old behavior)
-			currentLine := v.getCurrentLine()
-			if utils.IsURL(currentLine) {
-				urlText = utils.ExtractURL(currentLine)
-			}
 		}
-
-		if urlText != "" {
-			if err := utils.OpenURL(urlText); err == nil {
-				v.statusLine.SetTemporaryMessageWithType("🌐 Opened URL in browser", components.MessageSuccess, 1*time.Second)
-			} else {
-				v.statusLine.SetTemporaryMessageWithType(fmt.Sprintf("✗ Failed to open URL: %v", err), components.MessageError, 1*time.Second)
-			}
-			v.yankBlink = true
-			v.yankBlinkTime = time.Now()
-			return tea.Batch(v.startYankBlinkAnimation(), v.startMessageClearTimer(1*time.Second))
-		}
+		// TODO: handle URL opening
+		_ = urlText
 	}
 	return nil
 }
 
-// handleViewportNavigation handles viewport scrolling keys
-func (v *RunDetailsView) handleViewportNavigation(msg tea.KeyMsg) {
-	switch {
-	case key.Matches(msg, v.keys.Up):
-		v.viewport.ScrollUp(1)
-	case key.Matches(msg, v.keys.Down):
-		v.viewport.ScrollDown(1)
-	case key.Matches(msg, v.keys.PageUp):
-		v.viewport.HalfPageUp()
-	case key.Matches(msg, v.keys.PageDown):
-		v.viewport.HalfPageDown()
-	case key.Matches(msg, v.keys.Home):
-		v.viewport.GotoTop()
-	case key.Matches(msg, v.keys.End):
-		v.viewport.GotoBottom()
-	}
-}
-
-// handleRunDetailsLoaded handles the runDetailsLoadedMsg message
-func (v *RunDetailsView) handleRunDetailsLoaded(msg runDetailsLoadedMsg) {
-	v.loading = false
-	v.pollingStatus = false // Clear polling status
-	v.run = msg.run
-	v.error = msg.err
-	if msg.err == nil {
-		v.updateStatusHistory(string(msg.run.Status), false)
-		// Cache the loaded details for future use
-		v.cache.SetRun(msg.run)
-		debug.LogToFilef("DEBUG: Cached run details for ID '%s' (status: %s)\n", msg.run.GetIDString(), msg.run.Status)
-	}
-	v.updateContent()
-
-	// Debug logging for successful load
-	debug.LogToFilef("DEBUG: Successfully loaded run details for '%s'\n", msg.run.GetIDString())
-}
-
-// handlePolling handles the pollTickMsg message
-func (v *RunDetailsView) handlePolling(msg pollTickMsg) []tea.Cmd {
-	var cmds []tea.Cmd
-	if models.IsActiveStatus(string(v.run.Status)) {
-		// Mark that we're fetching status
-		v.pollingStatus = true
-		v.updateStatusHistory("Fetching status...", true)
-		v.updateContent()
-		cmds = append(cmds, v.loadRunDetails())
-		// Keep the polling going
-		cmds = append(cmds, v.startPolling())
-	} else {
-		v.stopPolling()
-	}
-	return cmds
-}
-
+// Update handles incoming events
 func (v *RunDetailsView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		v.handleWindowSizeMsg(msg)
-
 	case tea.KeyMsg:
 		return v.handleKeyInput(msg)
 
@@ -679,65 +550,6 @@ func (v *RunDetailsView) View() string {
 	titleText := fmt.Sprintf("Run #%s", idStr)
 	if v.run.Title != "" {
 		maxTitleLen := boxWidth - 20 // Leave room for status and padding
-		if maxTitleLen > 0 && len(v.run.Title) > maxTitleLen {
-			titleText += " - " + v.run.Title[:maxTitleLen] + "..."
-		} else {
-			titleText += " - " + v.run.Title
-		}
-	}
-	titleText = fmt.Sprintf("%s %s %s", statusIcon, titleText, string(v.run.Status))
-
-	// Add polling indicator if active
-	if models.IsActiveStatus(string(v.run.Status)) {
-		if v.pollingStatus {
-			titleText += " [Fetching... " + v.spinner.View() + "]"
-		} else {
-			titleText += " [Monitoring ⟳]"
-		}
-	}
-
-	title := titleStyle.Render(titleText)
-
-	// Content area height (subtract title height from box interior)
-	contentHeight := boxHeight - 3 // 1 for title, 2 for borders
-
-	// Create viewport content
-	var innerContent string
-	if v.loading {
-		// Center loading message
-		loadingText := v.spinner.View() + " Loading run details..."
-		loadingStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("63")).
-			Bold(true).
-			Width(boxWidth-2).
-			Height(contentHeight).
-			Align(lipgloss.Center, lipgloss.Center)
-		innerContent = lipgloss.JoinVertical(lipgloss.Left, title, loadingStyle.Render(loadingText))
-	} else if v.error != nil {
-		// Show error
-		errorText := "Error: " + v.error.Error()
-		errorStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("196")).
-			Width(boxWidth-2).
-			Height(contentHeight).
-			Padding(1, 2)
-		innerContent = lipgloss.JoinVertical(lipgloss.Left, title, errorStyle.Render(errorText))
-	} else {
-		// Render content with scrollable viewport
-		v.viewport.Width = boxWidth - 4 // Account for border and padding
-		v.viewport.Height = contentHeight
-
-		// Get content with highlighting
-		contentLines := v.renderContentWithCursor()
-		content := strings.Join(contentLines, "\n")
-
-		// Apply padding to content
-		contentStyle := lipgloss.NewStyle().
-			Width(boxWidth-2).
-			Height(contentHeight).
-			Padding(0, 1)
-
-		innerContent = lipgloss.JoinVertical(lipgloss.Left, title, contentStyle.Render(content))
 	}
 
 	// Wrap in the box
@@ -1222,75 +1034,3 @@ func (v *RunDetailsView) stopPolling() {
 	}
 }
 
-func formatDuration(d time.Duration) string {
-	if d < time.Minute {
-		return fmt.Sprintf("%ds", int(d.Seconds()))
-	} else if d < time.Hour {
-		return fmt.Sprintf("%dm %ds", int(d.Minutes()), int(d.Seconds())%60)
-	} else {
-		return fmt.Sprintf("%dh %dm", int(d.Hours()), int(d.Minutes())%60)
-	}
-}
-
-type runDetailsLoadedMsg struct {
-	run models.RunResponse
-	err error
-}
-
-type clearStatusMsg struct{}
-
-// getCurrentLine gets the current visible line
-func (v *RunDetailsView) getCurrentLine() string {
-	// Get the current line based on viewport position
-	// The viewport tracks the top visible line
-	visibleLines := strings.Split(v.viewport.View(), "\n")
-	if len(visibleLines) > 0 {
-		// Get first visible line (could be partial due to scrolling)
-		currentLine := visibleLines[0]
-		if currentLine != "" {
-			return currentLine
-		}
-	}
-	return ""
-}
-
-// copyCurrentLine copies the current visible line to clipboard
-func (v *RunDetailsView) copyCurrentLine() error {
-	// Get the current line based on viewport position
-	// The viewport tracks the top visible line
-	visibleLines := strings.Split(v.viewport.View(), "\n")
-	if len(visibleLines) > 0 {
-		// Get first visible line (could be partial due to scrolling)
-		currentLine := visibleLines[0]
-		if currentLine != "" {
-			return utils.WriteToClipboard(currentLine)
-		}
-	}
-
-	return fmt.Errorf("no line to copy")
-}
-
-// copyAllContent copies all content to clipboard
-func (v *RunDetailsView) copyAllContent() error {
-	if v.fullContent == "" {
-		return fmt.Errorf("no content to copy")
-	}
-	return utils.WriteToClipboard(v.fullContent)
-}
-
-// startYankBlinkAnimation starts the single blink animation for clipboard feedback
-func (v *RunDetailsView) startYankBlinkAnimation() tea.Cmd {
-	return func() tea.Msg {
-		// Single blink duration - quick flash (100ms)
-		time.Sleep(100 * time.Millisecond)
-		return yankBlinkMsg{}
-	}
-}
-
-// startMessageClearTimer starts a timer to trigger UI refresh when message expires
-func (v *RunDetailsView) startMessageClearTimer(duration time.Duration) tea.Cmd {
-	return func() tea.Msg {
-		time.Sleep(duration)
-		return messageClearMsg{}
-	}
-}

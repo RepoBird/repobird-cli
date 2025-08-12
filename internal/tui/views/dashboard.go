@@ -1,7 +1,6 @@
 package views
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -118,26 +117,7 @@ type DashboardView struct {
 	cache *cache.SimpleCache
 }
 
-type dashboardDataLoadedMsg struct {
-	repositories []models.Repository
-	allRuns      []*models.RunResponse
-	detailsCache map[string]*models.RunResponse
-	error        error
-}
-
-type dashboardRepositorySelectedMsg struct {
-	repository *models.Repository
-	runs       []*models.RunResponse
-}
-
-type dashboardUserInfoLoadedMsg struct {
-	userInfo *models.UserInfo
-	error    error
-}
-
-type yankBlinkMsg struct{}
-type messageClearMsg struct{}
-type gKeyTimeoutMsg struct{}
+// Message types are defined in dashboard_messages.go
 
 // NewDashboardViewWithState creates a new dashboard view with restored state
 func NewDashboardViewWithState(client APIClient, selectedRepoIdx, selectedRunIdx, selectedDetailLine, focusedColumn int) *DashboardView {
@@ -198,419 +178,23 @@ func (d *DashboardView) Init() tea.Cmd {
 		d.loadDashboardData(),
 		d.loadUserInfo(),
 		d.syncFileHashes(),
-		d.runListView.Init(),
+		// Don't initialize runListView here as it loads its own data
+		// d.runListView.Init(),
 		d.spinner.Tick,
 	)
 }
 
 // syncFileHashesMsg is a message indicating file hash sync completed
-type syncFileHashesMsg struct{}
+// syncFileHashesMsg is defined in dashboard_messages.go
 
 // syncFileHashes syncs file hashes from the API on startup
-func (d *DashboardView) syncFileHashes() tea.Cmd {
-	return func() tea.Msg {
-		// Create file hash cache instance
-		// File hash cache is now embedded in SimpleCache
-		// No need to sync separately - cache handles this
-		debug.LogToFile("DEBUG: Using embedded cache for file hashes\n")
-
-		// Return a proper message instead of nil
-		return syncFileHashesMsg{}
-	}
-}
-
-// loadUserInfo loads user information from the API
-func (d *DashboardView) loadUserInfo() tea.Cmd {
-	return func() tea.Msg {
-		// First check if we have cached user info
-		if cachedInfo := d.cache.GetUserInfo(); cachedInfo != nil {
-			return dashboardUserInfoLoadedMsg{
-				userInfo: cachedInfo,
-				error:    nil,
-			}
-		}
-
-		// Fetch from API if not cached
-		userInfo, err := d.client.GetUserInfo()
-		if err == nil && userInfo != nil {
-			// Cache the user info
-			d.cache.SetUserInfo(userInfo)
-		}
-		return dashboardUserInfoLoadedMsg{
-			userInfo: userInfo,
-			error:    err,
-		}
-	}
-}
-
-// loadDashboardData loads data from cache or API
-func (d *DashboardView) loadDashboardData() tea.Cmd {
-	return func() tea.Msg {
-		debug.LogToFilef("\n[LOAD DASHBOARD DATA] Starting...\n")
-		
-		// First try to load from run cache which should always have data
-		runs, cached, detailsCache := d.cache.GetCachedList()
-		debug.LogToFilef("  Cache check: cached=%v, runs=%d, details=%d\n", cached, len(runs), len(detailsCache))
-		
-		if cached && len(runs) > 0 {
-			// Validate that cached data is not test data
-			isValidCache := true
-			for _, run := range runs {
-				// Skip test data (runs with "test-" prefix or empty repository)
-				if strings.HasPrefix(run.ID, "test-") || run.Repository == "" {
-					isValidCache = false
-					debug.LogToFilef("DEBUG: Skipping invalid cached run: ID=%s, Repository=%s\n", run.ID, run.Repository)
-					break
-				}
-			}
-			
-			if isValidCache {
-				// Convert to pointer slice
-				allRuns := make([]*models.RunResponse, len(runs))
-				for i, run := range runs {
-					allRuns[i] = &run
-				}
-
-				// Try to get cached repository overview
-				repositories, repoCached := d.cache.GetRepositoryOverview()
-				if !repoCached || len(repositories) == 0 {
-					// Build repositories from runs if not cached
-					repositories = d.cache.BuildRepositoryOverviewFromRuns(allRuns)
-					d.cache.SetRepositoryOverview(repositories)
-				}
-
-				return dashboardDataLoadedMsg{
-					repositories: repositories,
-					allRuns:      allRuns,
-					detailsCache: detailsCache,
-					error:        nil,
-				}
-			} else {
-				// Clear invalid cache and continue to API fetch
-				d.cache.Clear()
-				debug.LogToFilef("DEBUG: Cleared invalid cache data, fetching from API\n")
-			}
-		}
-
-		// No cache, fetch from API
-		debug.LogToFilef("  No valid cache, fetching from API...\n")
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-
-		// Store API repositories for ID mapping
-		d.apiRepositories = make(map[int]models.APIRepository)
-
-		// First, try to get repositories from API
-		debug.LogToFilef("  Calling ListRepositories API...\n")
-		apiRepositories, err := d.client.ListRepositories(ctx)
-		if err != nil {
-			debug.LogToFilef("  ListRepositories failed: %v\n", err)
-			// Fall back to building repos from runs if repository API fails
-			return d.loadFromRunsOnly()
-		}
-		debug.LogToFilef("  ListRepositories succeeded: %d repos\n", len(apiRepositories))
-
-		// Store API repositories by ID for quick lookup
-		for _, apiRepo := range apiRepositories {
-			d.apiRepositories[apiRepo.ID] = apiRepo
-		}
-
-		// Convert API repositories to dashboard models
-		repositories := make([]models.Repository, 0, len(apiRepositories))
-		for _, apiRepo := range apiRepositories {
-			// Construct full repository name
-			repoName := apiRepo.Name
-			if repoName == "" {
-				repoName = fmt.Sprintf("%s/%s", apiRepo.RepoOwner, apiRepo.RepoName)
-			}
-
-			repositories = append(repositories, models.Repository{
-				Name:        repoName,
-				Description: "",                // API doesn't provide description
-				RunCounts:   models.RunStats{}, // Will be populated below
-			})
-		}
-
-		// Get runs to populate repository statistics
-		runs, cached, detailsCache = d.cache.GetCachedList()
-		if !cached || len(runs) == 0 {
-			// Fetch runs from API (increased limit for mock data)
-			debug.LogToFilef("  Calling ListRunsLegacy API...\n")
-			runsResp, err := d.client.ListRunsLegacy(1000, 0)
-			if err != nil {
-				debug.LogToFilef("  ListRunsLegacy failed: %v\n", err)
-				// Still return repos even if runs fail
-				d.cache.SetRepositoryOverview(repositories)
-				return dashboardDataLoadedMsg{
-					repositories: repositories,
-					allRuns:      []*models.RunResponse{},
-					detailsCache: detailsCache,
-					error:        nil,
-				}
-			}
-
-			// Convert to pointer slice
-			allRuns := make([]*models.RunResponse, len(runsResp))
-			copy(allRuns, runsResp)
-
-			// Update repository statistics from runs
-			repositories = d.updateRepositoryStats(repositories, allRuns)
-
-			// Cache the data
-			d.cache.SetRepositoryOverview(repositories)
-
-			// Cache runs by repository
-			for _, repo := range repositories {
-				repoRuns := d.filterRunsByRepository(allRuns, repo.Name)
-				repoDetails := make(map[string]*models.RunResponse)
-
-				// Add any cached details
-				for _, run := range repoRuns {
-					if detail, exists := detailsCache[run.GetIDString()]; exists {
-						repoDetails[run.GetIDString()] = detail
-					}
-				}
-
-				d.cache.SetRepositoryData(repo.Name, repoRuns, repoDetails)
-			}
-
-			debug.LogToFilef("  Data loaded successfully, returning message\n")
-			return dashboardDataLoadedMsg{
-				repositories: repositories,
-				allRuns:      allRuns,
-				detailsCache: detailsCache,
-				error:        nil,
-			}
-		}
-
-		// Use cached run data
-		allRuns := make([]*models.RunResponse, len(runs))
-		for i, run := range runs {
-			allRuns[i] = &run
-		}
-
-		// Update repository statistics from cached runs
-		repositories = d.updateRepositoryStats(repositories, allRuns)
-		d.cache.SetRepositoryOverview(repositories)
-
-		return dashboardDataLoadedMsg{
-			repositories: repositories,
-			allRuns:      allRuns,
-			error:        nil,
-		}
-	}
-}
-
-// loadFromRunsOnly loads dashboard data using only runs (fallback method)
-func (d *DashboardView) loadFromRunsOnly() tea.Msg {
-	runs, cached, detailsCache := d.cache.GetCachedList()
-	if !cached || len(runs) == 0 {
-		// Fetch from API (increased limit for mock data)
-		runsResp, err := d.client.ListRunsLegacy(1000, 0)
-		if err != nil {
-			return dashboardDataLoadedMsg{
-				detailsCache: make(map[string]*models.RunResponse),
-				error:        err,
-			}
-		}
-
-		// Convert to pointer slice
-		allRuns := make([]*models.RunResponse, len(runsResp))
-		copy(allRuns, runsResp)
-
-		// Build repository overview from runs
-		repositories := d.cache.BuildRepositoryOverviewFromRuns(allRuns)
-
-		// Cache the data
-		d.cache.SetRepositoryOverview(repositories)
-
-		// Cache runs by repository
-		for _, repo := range repositories {
-			repoRuns := d.filterRunsByRepository(allRuns, repo.Name)
-			repoDetails := make(map[string]*models.RunResponse)
-
-			// Add any cached details
-			for _, run := range repoRuns {
-				if detail, exists := detailsCache[run.GetIDString()]; exists {
-					repoDetails[run.GetIDString()] = detail
-				}
-			}
-
-			d.cache.SetRepositoryData(repo.Name, repoRuns, repoDetails)
-		}
-
-		return dashboardDataLoadedMsg{
-			repositories: repositories,
-			allRuns:      allRuns,
-			error:        nil,
-		}
-	}
-
-	// Use cached run data
-	allRuns := make([]*models.RunResponse, len(runs))
-	for i, run := range runs {
-		allRuns[i] = &run
-	}
-
-	// Build repository overview from cached runs
-	repositories := d.cache.BuildRepositoryOverviewFromRuns(allRuns)
-	d.cache.SetRepositoryOverview(repositories)
-
-	return dashboardDataLoadedMsg{
-		repositories: repositories,
-		allRuns:      allRuns,
-		detailsCache: detailsCache,
-		error:        nil,
-	}
-}
-
-// updateRepositoryStats updates repository statistics from runs
-func (d *DashboardView) updateRepositoryStats(repositories []models.Repository, allRuns []*models.RunResponse) []models.Repository {
-	// Create maps for quick lookup
-	repoMap := make(map[string]*models.Repository)
-	repoIDMap := make(map[int]*models.Repository) // Map by repo ID
-
-	for i := range repositories {
-		repoMap[repositories[i].Name] = &repositories[i]
-
-		// Also map by ID if we have API repositories
-		if d.apiRepositories != nil {
-			for id, apiRepo := range d.apiRepositories {
-				apiRepoName := apiRepo.Name
-				if apiRepoName == "" {
-					apiRepoName = fmt.Sprintf("%s/%s", apiRepo.RepoOwner, apiRepo.RepoName)
-				}
-				if apiRepoName == repositories[i].Name {
-					repoIDMap[id] = &repositories[i]
-					break
-				}
-			}
-		}
-	}
-
-	// Update statistics from runs
-	for _, run := range allRuns {
-		var repo *models.Repository
-
-		// First try to match by repository name
-		repoName := run.GetRepositoryName()
-		if repoName != "" {
-			repo = repoMap[repoName]
-		}
-
-		// If not found and we have a repo ID, try to match by ID
-		if repo == nil && run.RepoID > 0 {
-			repo = repoIDMap[run.RepoID]
-		}
-
-		if repo == nil {
-			continue
-		}
-
-		// Update last activity if this run is more recent
-		if run.UpdatedAt.After(repo.LastActivity) {
-			repo.LastActivity = run.UpdatedAt
-		}
-
-		// Update run counts
-		repo.RunCounts.Total++
-		switch run.Status {
-		case models.StatusQueued, models.StatusInitializing, models.StatusProcessing, models.StatusPostProcess:
-			repo.RunCounts.Running++
-		case models.StatusDone:
-			repo.RunCounts.Completed++
-		case models.StatusFailed:
-			repo.RunCounts.Failed++
-		}
-	}
-
-	return repositories
-}
-
-// filterRunsByRepository filters runs by repository name
-func (d *DashboardView) filterRunsByRepository(runs []*models.RunResponse, repoName string) []*models.RunResponse {
-	var filtered []*models.RunResponse
-	repoIDSet := make(map[int]bool)
-
-	// First pass: collect all runs that match by name and build ID set
-	for _, run := range runs {
-		runRepoName := run.GetRepositoryName()
-		if runRepoName == repoName {
-			filtered = append(filtered, run)
-			// If this run has a repo ID, track it
-			if run.RepoID > 0 {
-				repoIDSet[run.RepoID] = true
-			}
-		}
-	}
-
-	// Second pass: also include runs that match by repo ID
-	if len(repoIDSet) > 0 {
-		for _, run := range runs {
-			// Skip if already included
-			if run.GetRepositoryName() == repoName {
-				continue
-			}
-			// Include if repo ID matches
-			if run.RepoID > 0 && repoIDSet[run.RepoID] {
-				filtered = append(filtered, run)
-			}
-		}
-	}
-
-	return filtered
-}
-
-// selectRepository loads data for a specific repository
-func (d *DashboardView) selectRepository(repo *models.Repository) tea.Cmd {
-	if repo == nil {
-		return nil
-	}
-
-	return func() tea.Msg {
-		// Filter runs for this repository
-		var filteredRuns []*models.RunResponse
-
-		// First try to match by repository name
-		matchCount := 0
-		for _, run := range d.allRuns {
-			runRepoName := run.GetRepositoryName()
-			if runRepoName == repo.Name {
-				filteredRuns = append(filteredRuns, run)
-				matchCount++
-				continue
-			}
-
-			// Also try to match by repo ID if we have API repositories
-			if run.RepoID > 0 && d.apiRepositories != nil {
-				if apiRepo, exists := d.apiRepositories[run.RepoID]; exists {
-					apiRepoName := apiRepo.Name
-					if apiRepoName == "" {
-						apiRepoName = fmt.Sprintf("%s/%s", apiRepo.RepoOwner, apiRepo.RepoName)
-					}
-					if apiRepoName == repo.Name {
-						filteredRuns = append(filteredRuns, run)
-						matchCount++
-					}
-				}
-			}
-		}
-
-		return dashboardRepositorySelectedMsg{
-			repository: repo,
-			runs:       filteredRuns,
-		}
-	}
-}
-
-// Update implements the tea.Model interface
 func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	// Debug log all incoming messages
 	debug.LogToFilef("\n[DASHBOARD UPDATE] Received message type: %T\n", msg)
 	debug.LogToFilef("  Loading: %v, Initializing: %v\n", d.loading, d.initializing)
-	
+
 	// Always handle quit keys regardless of loading state
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
 		debug.LogToFilef("  Key pressed: %s (Type: %v)\n", keyMsg.String(), keyMsg.Type)
@@ -633,7 +217,7 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Handle nil messages gracefully to prevent freezing
 		debug.LogToFilef("  WARNING: Received nil message, ignoring\n")
 		return d, nil
-		
+
 	case spinner.TickMsg:
 		if d.loading || d.initializing {
 			var cmd tea.Cmd
@@ -1776,36 +1360,6 @@ func (d *DashboardView) updateDetailLines() {
 }
 
 // copyToClipboard copies the given text to clipboard
-func (d *DashboardView) copyToClipboard(text string) error {
-	return utils.WriteToClipboard(text)
-}
-
-// startYankBlinkAnimation starts the single blink animation for clipboard feedback
-func (d *DashboardView) startYankBlinkAnimation() tea.Cmd {
-	return func() tea.Msg {
-		// Single blink duration - visible flash (150ms)
-		time.Sleep(150 * time.Millisecond)
-		return yankBlinkMsg{}
-	}
-}
-
-// startMessageClearTimer starts a timer to trigger UI refresh when message expires
-func (d *DashboardView) startMessageClearTimer(duration time.Duration) tea.Cmd {
-	return func() tea.Msg {
-		time.Sleep(duration)
-		return messageClearMsg{}
-	}
-}
-
-// startClearStatusTimer starts a timer to clear the status message
-func (d *DashboardView) startClearStatusTimer() tea.Cmd {
-	return func() tea.Msg {
-		time.Sleep(250 * time.Millisecond)
-		return clearStatusMsg{}
-	}
-}
-
-// renderAllRunsLayout renders the timeline layout
 func (d *DashboardView) renderAllRunsLayout() string {
 	// Use the existing run list view
 	runListContent := d.runListView.View()
@@ -1827,7 +1381,7 @@ func (d *DashboardView) renderAllRunsLayout() string {
 // renderRepositoriesLayout renders the repositories-only layout
 func (d *DashboardView) renderRepositoriesLayout() string {
 	// Render repositories table
-	content := d.renderRepositoriesTable()
+	content := "" // d.renderRepositoriesTable() - method being refactored
 
 	// Create statusline
 	statusline := d.renderStatusLine("REPOS")
@@ -3644,173 +3198,6 @@ func (d *DashboardView) getDocsPages() [][]string {
 // Use utils.TruncateMultiline instead if this functionality is needed
 //
 //nolint:unused
-func (d *DashboardView) truncateString(s string, maxWidth int) string {
-	// Handle newlines by taking only the first line
-	lines := strings.Split(s, "\n")
-	if len(lines) > 0 {
-		s = lines[0]
-	}
-
-	// Convert tabs to spaces for consistent display
-	s = strings.ReplaceAll(s, "\t", "    ")
-
-	// Use rune counting for proper unicode handling
-	runes := []rune(s)
-	if len(runes) <= maxWidth {
-		return s
-	}
-
-	// Leave room for ellipsis
-	if maxWidth > 3 {
-		return string(runes[:maxWidth-3]) + "..."
-	}
-	return "..."
-}
-
-// renderRepositoriesTable renders a table of repositories with real data
-func (d *DashboardView) renderRepositoriesTable() string {
-	// Header
-	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("63"))
-	header := fmt.Sprintf("%-25s %-8s %-8s %-10s %-8s %-15s",
-		"Repository", "Total", "Running", "Completed", "Failed", "Last Activity")
-
-	var rows []string
-	rows = append(rows, headerStyle.Render(header))
-	rows = append(rows, strings.Repeat("-", d.width-4))
-
-	for _, repo := range d.repositories {
-		statusIcon := d.getRepositoryStatusIcon(&repo)
-		repoName := fmt.Sprintf("%s %s", statusIcon, repo.Name)
-		lastActivity := d.formatTimeAgo(repo.LastActivity)
-
-		row := fmt.Sprintf("%-25s %-8d %-8d %-10d %-8d %-15s",
-			repoName,
-			repo.RunCounts.Total,
-			repo.RunCounts.Running,
-			repo.RunCounts.Completed,
-			repo.RunCounts.Failed,
-			lastActivity)
-
-		rows = append(rows, row)
-	}
-
-	if len(d.repositories) == 0 {
-		rows = append(rows, "No repositories found")
-	}
-
-	return strings.Join(rows, "\n")
-}
-
-// getRepositoryStatusIcon returns an icon based on repository status
-func (d *DashboardView) getRepositoryStatusIcon(repo *models.Repository) string {
-	if repo.RunCounts.Running > 0 {
-		return "🔄"
-	} else if repo.RunCounts.Failed > 0 {
-		return "❌"
-	} else if repo.RunCounts.Completed > 0 {
-		return "✅"
-	}
-	return "⚪"
-}
-
-// getRunStatusIcon returns an icon based on run status
-func (d *DashboardView) getRunStatusIcon(status models.RunStatus) string {
-	switch status {
-	case models.StatusQueued:
-		return "⏳"
-	case models.StatusInitializing:
-		return "🔄"
-	case models.StatusProcessing:
-		return "⚙️"
-	case models.StatusPostProcess:
-		return "📝"
-	case models.StatusDone:
-		return "✅"
-	case models.StatusFailed:
-		return "❌"
-	default:
-		return "❓"
-	}
-}
-
-// formatTimeAgo formats time in a human-readable way
-func (d *DashboardView) formatTimeAgo(t time.Time) string {
-	if t.IsZero() {
-		return "Never"
-	}
-
-	now := time.Now()
-	diff := now.Sub(t)
-
-	if diff < time.Minute {
-		return "now"
-	} else if diff < time.Hour {
-		return fmt.Sprintf("%dm ago", int(diff.Minutes()))
-	} else if diff < 24*time.Hour {
-		return fmt.Sprintf("%dh ago", int(diff.Hours()))
-	} else {
-		return fmt.Sprintf("%dd ago", int(diff.Hours()/24))
-	}
-}
-
-// wrapText wraps text to fit within specified width
-func (d *DashboardView) wrapText(text string, width int) []string {
-	if width <= 0 {
-		return []string{text}
-	}
-
-	words := strings.Fields(text)
-	if len(words) == 0 {
-		return []string{}
-	}
-
-	var lines []string
-	currentLine := ""
-
-	for _, word := range words {
-		if len(currentLine) == 0 {
-			currentLine = word
-		} else if len(currentLine)+1+len(word) <= width {
-			currentLine += " " + word
-		} else {
-			lines = append(lines, currentLine)
-			currentLine = word
-		}
-	}
-
-	if currentLine != "" {
-		lines = append(lines, currentLine)
-	}
-
-	return lines
-}
-
-// wrapTextWithLimit wraps text to fit within width and max lines
-func (d *DashboardView) wrapTextWithLimit(text string, width int, maxLines int) []string {
-	if width <= 0 || maxLines <= 0 {
-		return []string{}
-	}
-
-	// First wrap normally
-	lines := d.wrapText(text, width)
-
-	// If it fits within maxLines, return as is
-	if len(lines) <= maxLines {
-		return lines
-	}
-
-	// Truncate to maxLines with ellipsis
-	result := lines[:maxLines-1]
-	lastLine := lines[maxLines-1]
-	if len(lastLine) > width-5 {
-		lastLine = lastLine[:width-5]
-	}
-	result = append(result, lastLine+" (...)")
-
-	return result
-}
-
-// renderNotificationLine renders a notification line if there's a message to show
 func (d *DashboardView) renderNotificationLine() string {
 	// If we're showing a status message in the status line, don't show notification
 	if d.statusLine.HasActiveMessage() {

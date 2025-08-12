@@ -1,6 +1,7 @@
 package views
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -55,7 +56,7 @@ func NewRunListView(client APIClient) *RunListView {
 
 	// Try to get cached data
 	runs, cached, detailsCache := cache.GetCachedList()
-	
+
 	// Validate cached data is not test data
 	if cached && len(runs) > 0 {
 		for _, run := range runs {
@@ -70,7 +71,7 @@ func NewRunListView(client APIClient) *RunListView {
 			}
 		}
 	}
-	
+
 	selectedIndex := cache.GetSelectedIndex()
 	var cachedAt time.Time
 	if cached {
@@ -733,15 +734,27 @@ func (v *RunListView) renderStatusBar() string {
 
 func (v *RunListView) loadRuns() tea.Cmd {
 	return func() tea.Msg {
-		runPtrs, err := v.client.ListRunsLegacy(1000, 0)
+		// Create context with 10-second timeout for list view
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		
+		// Use the context-aware ListRuns method
+		listResp, err := v.client.ListRuns(ctx, 1, 1000) // page 1, limit 1000
 		if err != nil {
 			return runsLoadedMsg{runs: nil, err: err}
 		}
 
-		runs := make([]models.RunResponse, len(runPtrs))
-		for i, r := range runPtrs {
-			runs[i] = *r
+		// Convert pointer slice to value slice
+		var runs []models.RunResponse
+		if listResp != nil && listResp.Data != nil {
+			runs = make([]models.RunResponse, len(listResp.Data))
+			for i, r := range listResp.Data {
+				if r != nil {
+					runs[i] = *r
+				}
+			}
 		}
+		
 		return runsLoadedMsg{runs: runs, err: nil}
 	}
 }

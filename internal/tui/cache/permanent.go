@@ -27,14 +27,14 @@ func NewPermanentCache(userID string) (*PermanentCache, error) {
 	if configDir == "" {
 		configDir = xdg.ConfigHome
 	}
-	
+
 	// User-specific cache directory
 	userHash := hashUserID(userID)
 	baseDir := filepath.Join(configDir, "repobird", "cache", "users", userHash)
 	if err := os.MkdirAll(baseDir, 0700); err != nil {
 		return nil, fmt.Errorf("failed to create cache directory: %w", err)
 	}
-	
+
 	return &PermanentCache{
 		baseDir: baseDir,
 		userID:  userID,
@@ -54,25 +54,25 @@ func hashUserID(userID string) string {
 func (p *PermanentCache) GetRun(id string) (*models.RunResponse, bool) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	
+
 	path := filepath.Join(p.baseDir, "runs", id+".json")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, false
 	}
-	
+
 	var run models.RunResponse
 	if err := json.Unmarshal(data, &run); err != nil {
 		return nil, false
 	}
-	
+
 	// Only return if run should be permanently cached
 	if !shouldPermanentlyCache(run) {
 		// Clean up runs that shouldn't be cached
 		_ = os.Remove(path)
 		return nil, false
 	}
-	
+
 	return &run, true
 }
 
@@ -82,21 +82,21 @@ func (p *PermanentCache) SetRun(run models.RunResponse) error {
 	if !shouldPermanentlyCache(run) {
 		return nil
 	}
-	
+
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	
+
 	runDir := filepath.Join(p.baseDir, "runs")
 	if err := os.MkdirAll(runDir, 0700); err != nil {
 		return fmt.Errorf("failed to create runs directory: %w", err)
 	}
-	
+
 	path := filepath.Join(runDir, run.ID+".json")
 	data, err := json.MarshalIndent(run, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal run: %w", err)
 	}
-	
+
 	return os.WriteFile(path, data, 0600)
 }
 
@@ -104,30 +104,30 @@ func (p *PermanentCache) SetRun(run models.RunResponse) error {
 func (p *PermanentCache) GetAllRuns() ([]models.RunResponse, bool) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	
+
 	runDir := filepath.Join(p.baseDir, "runs")
 	entries, err := os.ReadDir(runDir)
 	if err != nil {
 		return nil, false
 	}
-	
+
 	var runs []models.RunResponse
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
 			continue
 		}
-		
+
 		path := filepath.Join(runDir, entry.Name())
 		data, err := os.ReadFile(path)
 		if err != nil {
 			continue
 		}
-		
+
 		var run models.RunResponse
 		if err := json.Unmarshal(data, &run); err != nil {
 			continue
 		}
-		
+
 		// Only include runs that should be permanently cached
 		if shouldPermanentlyCache(run) {
 			runs = append(runs, run)
@@ -136,7 +136,7 @@ func (p *PermanentCache) GetAllRuns() ([]models.RunResponse, bool) {
 			_ = os.Remove(path)
 		}
 	}
-	
+
 	return runs, len(runs) > 0
 }
 
@@ -144,7 +144,7 @@ func (p *PermanentCache) GetAllRuns() ([]models.RunResponse, bool) {
 func (p *PermanentCache) InvalidateRun(id string) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	
+
 	path := filepath.Join(p.baseDir, "runs", id+".json")
 	err := os.Remove(path)
 	if err != nil && !os.IsNotExist(err) {
@@ -157,18 +157,18 @@ func (p *PermanentCache) InvalidateRun(id string) error {
 func (p *PermanentCache) GetUserInfo() (*models.UserInfo, bool) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	
+
 	path := filepath.Join(p.baseDir, "user-info.json")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, false
 	}
-	
+
 	var info models.UserInfo
 	if err := json.Unmarshal(data, &info); err != nil {
 		return nil, false
 	}
-	
+
 	return &info, true
 }
 
@@ -176,13 +176,13 @@ func (p *PermanentCache) GetUserInfo() (*models.UserInfo, bool) {
 func (p *PermanentCache) SetUserInfo(info *models.UserInfo) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	
+
 	path := filepath.Join(p.baseDir, "user-info.json")
 	data, err := json.MarshalIndent(info, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal user info: %w", err)
 	}
-	
+
 	return os.WriteFile(path, data, 0600)
 }
 
@@ -190,18 +190,18 @@ func (p *PermanentCache) SetUserInfo(info *models.UserInfo) error {
 func (p *PermanentCache) GetRepositoryList() ([]string, bool) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	
+
 	path := filepath.Join(p.baseDir, "repositories", "list.json")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, false
 	}
-	
+
 	var repos []string
 	if err := json.Unmarshal(data, &repos); err != nil {
 		return nil, false
 	}
-	
+
 	return repos, true
 }
 
@@ -209,18 +209,18 @@ func (p *PermanentCache) GetRepositoryList() ([]string, bool) {
 func (p *PermanentCache) SetRepositoryList(repos []string) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	
+
 	repoDir := filepath.Join(p.baseDir, "repositories")
 	if err := os.MkdirAll(repoDir, 0700); err != nil {
 		return fmt.Errorf("failed to create repositories directory: %w", err)
 	}
-	
+
 	path := filepath.Join(repoDir, "list.json")
 	data, err := json.MarshalIndent(repos, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal repository list: %w", err)
 	}
-	
+
 	return os.WriteFile(path, data, 0600)
 }
 
@@ -228,7 +228,7 @@ func (p *PermanentCache) SetRepositoryList(repos []string) error {
 func (p *PermanentCache) GetFileHash(path string) (string, bool) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	
+
 	hashes := p.loadFileHashes()
 	hash, found := hashes[path]
 	return hash, found
@@ -238,10 +238,10 @@ func (p *PermanentCache) GetFileHash(path string) (string, bool) {
 func (p *PermanentCache) SetFileHash(filePath string, hash string) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	
+
 	hashes := p.loadFileHashes()
 	hashes[filePath] = hash
-	
+
 	return p.saveFileHashes(hashes)
 }
 
@@ -249,7 +249,7 @@ func (p *PermanentCache) SetFileHash(filePath string, hash string) error {
 func (p *PermanentCache) GetAllFileHashes() map[string]string {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	
+
 	return p.loadFileHashes()
 }
 
@@ -260,12 +260,12 @@ func (p *PermanentCache) loadFileHashes() map[string]string {
 	if err != nil {
 		return make(map[string]string)
 	}
-	
+
 	var hashes map[string]string
 	if err := json.Unmarshal(data, &hashes); err != nil {
 		return make(map[string]string)
 	}
-	
+
 	return hashes
 }
 
@@ -276,7 +276,7 @@ func (p *PermanentCache) saveFileHashes(hashes map[string]string) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal file hashes: %w", err)
 	}
-	
+
 	return os.WriteFile(path, data, 0600)
 }
 
@@ -284,7 +284,7 @@ func (p *PermanentCache) saveFileHashes(hashes map[string]string) error {
 func (p *PermanentCache) Clear() error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	
+
 	return os.RemoveAll(p.baseDir)
 }
 
@@ -297,7 +297,7 @@ func (p *PermanentCache) Close() error {
 func (p *PermanentCache) CleanupOldRuns(maxRuns int) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	
+
 	runDir := filepath.Join(p.baseDir, "runs")
 	entries, err := os.ReadDir(runDir)
 	if err != nil {
@@ -306,7 +306,7 @@ func (p *PermanentCache) CleanupOldRuns(maxRuns int) error {
 		}
 		return err
 	}
-	
+
 	// Keep only the most recent maxRuns
 	if len(entries) > maxRuns {
 		// Sort by modification time and remove oldest
@@ -317,7 +317,7 @@ func (p *PermanentCache) CleanupOldRuns(maxRuns int) error {
 			_ = os.Remove(path)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -325,8 +325,8 @@ func (p *PermanentCache) CleanupOldRuns(maxRuns int) error {
 func isTerminalState(status models.RunStatus) bool {
 	statusStr := string(status)
 	// Check using the models package terminal statuses
-	return models.IsTerminalStatus(statusStr) || 
-		status == models.StatusDone || 
+	return models.IsTerminalStatus(statusStr) ||
+		status == models.StatusDone ||
 		status == models.StatusFailed ||
 		statusStr == "COMPLETED" ||
 		statusStr == "CANCELLED" ||
@@ -340,12 +340,12 @@ func shouldPermanentlyCache(run models.RunResponse) bool {
 	if isTerminalState(run.Status) {
 		return true
 	}
-	
+
 	// Runs older than 2 hours should be cached permanently
 	// (they're likely stuck in an invalid state)
 	if time.Since(run.CreatedAt) > 2*time.Hour {
 		return true
 	}
-	
+
 	return false
 }

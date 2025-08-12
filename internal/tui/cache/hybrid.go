@@ -21,15 +21,15 @@ func NewHybridCache(userID string) (*HybridCache, error) {
 	if userID == "" {
 		userID = "anonymous"
 	}
-	
+
 	permanent, err := NewPermanentCache(userID)
 	if err != nil {
 		// If permanent cache fails, continue with session-only
 		permanent = nil
 	}
-	
+
 	session := NewSessionCache()
-	
+
 	return &HybridCache{
 		permanent: permanent,
 		session:   session,
@@ -45,12 +45,12 @@ func (h *HybridCache) GetRun(id string) (*models.RunResponse, bool) {
 			return run, true
 		}
 	}
-	
+
 	// Check session cache for active runs
 	if run, found := h.session.GetRun(id); found {
 		return run, true
 	}
-	
+
 	return nil, false
 }
 
@@ -63,7 +63,7 @@ func (h *HybridCache) SetRun(run models.RunResponse) error {
 			return h.permanent.SetRun(run)
 		}
 	}
-	
+
 	// Keep in session cache for active, recent runs
 	return h.session.SetRun(run)
 }
@@ -72,9 +72,9 @@ func (h *HybridCache) SetRun(run models.RunResponse) error {
 func (h *HybridCache) GetRuns() ([]models.RunResponse, bool) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-	
+
 	runMap := make(map[string]models.RunResponse)
-	
+
 	// Get permanent runs (terminal states)
 	if h.permanent != nil {
 		if permanentRuns, found := h.permanent.GetAllRuns(); found {
@@ -83,7 +83,7 @@ func (h *HybridCache) GetRuns() ([]models.RunResponse, bool) {
 			}
 		}
 	}
-	
+
 	// Get session runs (active states - may override with fresher data)
 	if sessionRuns, found := h.session.GetRuns(); found {
 		for _, run := range sessionRuns {
@@ -91,18 +91,18 @@ func (h *HybridCache) GetRuns() ([]models.RunResponse, bool) {
 			runMap[run.ID] = run
 		}
 	}
-	
+
 	// Convert map to slice and sort by creation time (newest first)
 	runs := make([]models.RunResponse, 0, len(runMap))
 	for _, run := range runMap {
 		runs = append(runs, run)
 	}
-	
+
 	// Sort runs by creation time (newest first)
 	sort.Slice(runs, func(i, j int) bool {
 		return runs[i].CreatedAt.After(runs[j].CreatedAt)
 	})
-	
+
 	return runs, len(runs) > 0
 }
 
@@ -111,7 +111,7 @@ func (h *HybridCache) SetRuns(runs []models.RunResponse) error {
 	// Separate runs by cache destination
 	var sessionRuns []models.RunResponse
 	var permanentRuns []models.RunResponse
-	
+
 	for _, run := range runs {
 		if shouldPermanentlyCache(run) {
 			permanentRuns = append(permanentRuns, run)
@@ -119,7 +119,7 @@ func (h *HybridCache) SetRuns(runs []models.RunResponse) error {
 			sessionRuns = append(sessionRuns, run)
 		}
 	}
-	
+
 	// Store permanent runs (terminal or old) in permanent cache
 	if h.permanent != nil && len(permanentRuns) > 0 {
 		for _, run := range permanentRuns {
@@ -129,12 +129,12 @@ func (h *HybridCache) SetRuns(runs []models.RunResponse) error {
 			}
 		}
 	}
-	
+
 	// Store active, recent runs in session cache
 	if len(sessionRuns) > 0 {
 		return h.session.SetRuns(sessionRuns)
 	}
-	
+
 	return nil
 }
 
@@ -142,12 +142,12 @@ func (h *HybridCache) SetRuns(runs []models.RunResponse) error {
 func (h *HybridCache) InvalidateRun(id string) error {
 	// Remove from session cache
 	_ = h.session.InvalidateRun(id)
-	
+
 	// Remove from permanent cache
 	if h.permanent != nil {
 		_ = h.permanent.InvalidateRun(id)
 	}
-	
+
 	return nil
 }
 
@@ -250,12 +250,12 @@ func (h *HybridCache) SetDashboardData(data *DashboardData) error {
 func (h *HybridCache) Clear() error {
 	// Clear session cache
 	_ = h.session.Clear()
-	
+
 	// Clear permanent cache
 	if h.permanent != nil {
 		_ = h.permanent.Clear()
 	}
-	
+
 	return nil
 }
 
@@ -263,40 +263,40 @@ func (h *HybridCache) Clear() error {
 func (h *HybridCache) Close() error {
 	// Close session cache
 	_ = h.session.Close()
-	
+
 	// Close permanent cache (no-op currently)
 	if h.permanent != nil {
 		_ = h.permanent.Close()
 	}
-	
+
 	return nil
 }
 
 // GetStats returns cache statistics
 func (h *HybridCache) GetStats() CacheStats {
 	stats := CacheStats{}
-	
+
 	// Count permanent runs
 	if h.permanent != nil {
 		if runs, found := h.permanent.GetAllRuns(); found {
 			stats.PermanentRuns = len(runs)
 		}
 	}
-	
+
 	// Count active runs in session
 	if runs, found := h.session.GetRuns(); found {
 		stats.ActiveRuns = len(runs)
 	}
-	
+
 	// Count repositories
 	if h.permanent != nil {
 		if repos, found := h.permanent.GetRepositoryList(); found {
 			stats.Repositories = len(repos)
 		}
 	}
-	
+
 	// Note: Disk and memory usage calculation would require more sophisticated tracking
-	
+
 	return stats
 }
 

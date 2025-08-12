@@ -352,6 +352,36 @@ type ConfigService interface {
 - `/internal/tui/views/details.go:68,90,149,190,214` - Five constructors
 - `/internal/tui/views/create.go:103,118,300` - Three constructors
 
+## Large Files (>500 lines)
+The following Go files exceed 500 lines and may benefit from refactoring:
+
+### Extremely Large (>1000 lines)
+1. `/internal/tui/views/dashboard.go` - **4130 lines** - Main dashboard view, handles repos/runs/details columns
+2. `/internal/tui/views/create.go` - **2477 lines** - Create run view with form handling
+3. `/internal/tui/views/bulk.go` - **1300 lines** - Bulk operations view
+4. `/internal/tui/views/details.go` - **1296 lines** - Run details view
+5. `/internal/tui/views/bulk_fzf.go` - **1177 lines** - Bulk operations with FZF
+
+### Large Files (500-1000 lines)
+6. `/internal/tui/views/list.go` - **918 lines** - Run list view
+7. `/internal/bulk/config_test.go` - **813 lines** - Bulk config tests
+8. `/internal/api/client.go` - **696 lines** - API client implementation
+9. `/internal/api/client_bulk_test.go` - **685 lines** - Bulk API client tests
+10. `/internal/tui/components/bulk_file_selector.go` - **675 lines** - Bulk file selector component
+11. `/internal/tui/components/help_view.go` - **548 lines** - Help view component
+12. `/internal/cache/filehash_cache_test.go` - **548 lines** - File hash cache tests
+13. `/internal/commands/commands_test.go` - **534 lines** - Command tests
+14. `/internal/cache/cache_test.go` - **528 lines** - Cache tests
+15. `/internal/tui/components/config_file_selector.go` - **524 lines** - Config file selector
+16. `/internal/api/client_enhanced_test.go` - **523 lines** - Enhanced client tests
+
+**Refactoring Recommendations**:
+- **Dashboard (4130 lines)**: Split into separate column components (RepoColumn, RunColumn, DetailsColumn)
+- **Create View (2477 lines)**: Extract form validation, field handlers, and repository selection logic
+- **Bulk Views (1300/1177 lines)**: Share common bulk operation logic, extract FZF components
+- **API Client (696 lines)**: Separate concerns - authentication, retry logic, different endpoint groups
+- **Test Files**: Consider table-driven tests to reduce duplication
+
 ## Notes
 - Priority based on: impact to code quality, ease of testing, and user experience
 - Each refactoring should be done in a separate PR with tests
