@@ -126,14 +126,18 @@ func (a *App) handleNavigation(msg messages.NavigationMsg) (tea.Model, tea.Cmd) 
 		return a, a.current.Init()
 
 	case messages.NavigateToBulkMsg:
+		debug.LogToFilef("🏗️ BULK NAV: Attempting to navigate to bulk view 🏗️\n")
+		debug.LogToFilef("🔍 BULK NAV: Client type: %T 🔍\n", a.client)
 		a.viewStack = append(a.viewStack, a.current)
 		// BulkView requires a concrete *api.Client, not the interface
 		// For now, we'll skip bulk view if client is not the right type
 		// This should be refactored to accept the interface
 		if apiClient, ok := a.client.(*api.Client); ok {
+			debug.LogToFilef("✅ BULK NAV: Client type is correct, creating BulkView ✅\n")
 			a.current = views.NewBulkView(apiClient)
 			return a, a.current.Init()
 		}
+		debug.LogToFilef("❌ BULK NAV: Client type is WRONG - cannot create BulkView! ❌\n")
 		// If not the right client type, just return without navigation
 		return a, nil
 
@@ -263,35 +267,45 @@ func (a *App) handleGlobalAction(action keymap.KeyAction, keyMsg tea.KeyMsg) (ha
 
 // handleNavigationAction processes navigation actions like back, new, etc.
 func (a *App) handleNavigationAction(action keymap.KeyAction, keyMsg tea.KeyMsg) (handled bool, model tea.Model, cmd tea.Cmd) {
+	debug.LogToFilef("🎯 NAV ACTION: Processing action %v for key '%s' 🎯\n", action, keyMsg.String())
 	var navMsg messages.NavigationMsg
 
 	switch action {
 	case keymap.ActionNavigateBack:
+		debug.LogToFilef("⬅️ NAV ACTION: Creating NavigateBackMsg ⬅️\n")
 		navMsg = messages.NavigateBackMsg{}
 	case keymap.ActionNavigateBulk:
+		debug.LogToFilef("📦 NAV ACTION: Creating NavigateToBulkMsg 📦\n")
 		navMsg = messages.NavigateToBulkMsg{}
 	case keymap.ActionNavigateNew:
+		debug.LogToFilef("➕ NAV ACTION: Ignoring ActionNavigateNew (let view handle) ➕\n")
 		// For 'n' key, only handle if we're not in an input field or specific context
 		// This could be enhanced with more context awareness
 		navMsg = nil // Let view handle 'n' for now
 	case keymap.ActionNavigateRefresh:
+		debug.LogToFilef("🔄 NAV ACTION: Ignoring ActionNavigateRefresh (let view handle) 🔄\n")
 		// Let view handle refresh for now
 		navMsg = nil
 	case keymap.ActionNavigateQuit:
+		debug.LogToFilef("🚪 NAV ACTION: Quitting application 🚪\n")
 		// Regular quit - save and quit
 		a.cache.SaveToDisk()
 		return true, a, tea.Quit
 	case keymap.ActionNavigateHelp:
+		debug.LogToFilef("❓ NAV ACTION: Ignoring ActionNavigateHelp (let view handle) ❓\n")
 		// Let view handle help for now
 		navMsg = nil
 	default:
+		debug.LogToFilef("❓ NAV ACTION: Unknown action %v ❓\n", action)
 		return false, a, nil
 	}
 
 	if navMsg != nil {
+		debug.LogToFilef("📨 NAV ACTION: Calling handleNavigation with %T 📨\n", navMsg)
 		model, cmd := a.handleNavigation(navMsg)
 		return true, model, cmd
 	}
 
+	debug.LogToFilef("🔄 NAV ACTION: No message to send, returning false 🔄\n")
 	return false, a, nil
 }

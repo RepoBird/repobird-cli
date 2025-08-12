@@ -727,7 +727,7 @@ func (v *CreateRunView) handleErrorMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			v.restorePreviousFocus()
 			return v, nil
 		}
-	case "escape", "q", "b":
+	case "escape", "q":
 		// ESC, q, b - go back to form (clear error)
 		v.error = nil
 		v.restorePreviousFocus()
