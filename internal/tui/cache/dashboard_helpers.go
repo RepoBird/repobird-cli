@@ -155,14 +155,17 @@ func (c *SimpleCache) SetFormData(data *FormData) {
 
 // FormData represents the saved form state
 type FormData struct {
-	Title      string
-	Repository string
-	Source     string
-	Target     string
-	Issue      string
-	Prompt     string
-	Context    string
-	RunType    string
+	Title          string
+	Repository     string
+	Source         string
+	Target         string
+	Issue          string
+	Prompt         string
+	Context        string
+	RunType        string
+	Fields         map[string]string // Additional form fields
+	ShowContext    bool
+	LastLoadedFile string
 }
 
 // GetRepositoryHistory returns repository history

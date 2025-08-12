@@ -12,7 +12,16 @@ func getDebugLogPath() string {
 	if path := os.Getenv("REPOBIRD_DEBUG_LOG"); path != "" {
 		return path
 	}
-	return filepath.Join(os.TempDir(), "repobird_debug.log")
+	// Get the working directory
+	wd, err := os.Getwd()
+	if err != nil {
+		return filepath.Join(os.TempDir(), "repobird_debug.log")
+	}
+	// Use logs directory in the project
+	logsDir := filepath.Join(wd, "logs")
+	// Create logs directory if it doesn't exist
+	_ = os.MkdirAll(logsDir, 0755)
+	return filepath.Join(logsDir, "repobird_debug.log")
 }
 
 // LogToFile writes a debug message to the debug log file

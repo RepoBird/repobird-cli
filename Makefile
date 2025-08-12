@@ -112,8 +112,8 @@ run:
 	$(DEV_ENV) $(GOCMD) run $(LDFLAGS) $(MAIN_PATH)
 
 ## tui: Build and run the TUI interface (development, portable build)
-tui: build
-	$(DEV_ENV) ./$(BUILD_DIR)/$(BINARY_NAME) tui
+tui:
+	@./scripts/debug-tui.sh
 
 ## tui-cgo: Build and run the TUI interface with CGO (development, better clipboard support)
 tui-cgo: build-cgo

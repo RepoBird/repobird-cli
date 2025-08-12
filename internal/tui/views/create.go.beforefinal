@@ -1,9 +1,6 @@
 package views
 
 import (
-	"fmt"
-	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/help"
@@ -136,8 +133,9 @@ func NewCreateRunViewWithConfig(cfg CreateRunViewConfig) *CreateRunView {
 	}
 
 	// Initialize components
-	view.initializeInputFields()
-	view.loadFormData()
+	// TODO: These functions are in create_input.go and create_config.go
+	// view.initializeInputFields()
+	// view.loadFormData()
 
 	// Auto-fill repository if selected from dashboard
 	if cfg.SelectedRepository != "" && len(view.fields) >= 1 && view.fields[0].Value() == "" {
@@ -149,7 +147,7 @@ func NewCreateRunViewWithConfig(cfg CreateRunViewConfig) *CreateRunView {
 	view.configLoader = config.NewConfigLoader()
 	view.repoSelector = components.NewRepositorySelector()
 	view.configFileSelector = components.NewConfigFileSelector(80, 24)
-
+	
 	return view
 }
 
@@ -178,9 +176,11 @@ func NewCreateRunViewWithCache(
 	}
 
 	// Initialize components
-	view.initializeInputFields()
-	view.loadFormData()
-	view.autofillRepository()
+	// TODO: These functions are in create_input.go and create_config.go
+	// view.initializeInputFields()
+	// view.loadFormData()
+	// TODO: This function is in create_repository.go
+	// view.autofillRepository()
 
 	// Initialize other components
 	view.configLoader = config.NewConfigLoader()
@@ -192,15 +192,16 @@ func NewCreateRunViewWithCache(
 
 func (v *CreateRunView) Init() tea.Cmd {
 	debug.LogToFile("DEBUG: CreateRunView.Init() called\n")
-
+	
 	// Ensure form data is loaded and fields are properly focused
 	if v.inputMode == components.NormalMode && v.focusIndex < len(v.fields) {
 		v.fields[v.focusIndex].Focus()
 	}
 
 	// Load file hash cache
+	// TODO: This function is in create_submission.go
 	return tea.Batch(
-		v.loadFileHashCache(),
+		// v.loadFileHashCache(),
 		textinput.Blink,
 		textarea.Blink,
 	)
@@ -212,203 +213,58 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		return v, v.handleWindowSizeMsg(msg)
-
+		
 	case tea.KeyMsg:
-		// If submitting, only allow ESC and 'q' to quit
-		if v.isSubmitting {
-			switch msg.String() {
-			case "esc":
-				// Allow ESC to handle long running submit API
-				debug.LogToFilef("DEBUG: ESC pressed during submission - cancelling\n")
-				v.isSubmitting = false
-				return v, nil
-			case "q", "Q":
-				// Allow quit during submission
-				return v, tea.Quit
-			default:
-				// Ignore all other input during submission
-				return v, nil
-			}
-		}
-
-		// If in duplicate confirmation mode, only handle y/n
-		if v.isDuplicateConfirm {
-			switch msg.String() {
-			case "y", "Y":
-				// User confirmed - retry with force flag
-				debug.LogToFilef("DEBUG: User confirmed duplicate override - retrying with force\n")
-				v.isDuplicateConfirm = false
-				return v, v.submitWithForce()
-			case "n", "N", "esc":
-				// User cancelled - exit confirmation mode
-				debug.LogToFilef("DEBUG: User cancelled duplicate override\n")
-				v.isDuplicateConfirm = false
-				return v, nil
-			case "q", "Q":
-				// Allow quit during confirmation
-				return v, tea.Quit
-			default:
-				// Ignore all other input during duplicate confirmation
-				return v, nil
-			}
-		}
-
-		// If enhanced config file selector is active, handle input there first
-		if v.configFileSelector != nil && v.configFileSelector.IsActive() {
-			newConfigFileSelector, cmd := v.configFileSelector.Update(msg)
-			v.configFileSelector = newConfigFileSelector
-			return v, cmd
-		}
-
-		// If old file selector is active, handle input there first (fallback)
-		if v.fileSelector != nil && v.fileSelector.IsActive() {
-			newFileSelector, cmd := v.fileSelector.Update(msg)
-			v.fileSelector = newFileSelector
-			return v, cmd
-		}
-
-		// If FZF mode is active, handle input there first
-		if v.fzfMode != nil && v.fzfMode.IsActive() {
-			newFzf, cmd := v.fzfMode.Update(msg)
-			v.fzfMode = newFzf
-			return v, cmd
-		}
-
 		// Handle keyboard input based on current mode
-		switch v.inputMode {
-		case components.InsertMode:
-			return v.handleInsertMode(msg)
-		case components.NormalMode:
-			return v.handleNormalMode(msg)
-		default:
-			// Handle error state if needed
-			if v.error != nil {
-				return v.handleErrorMode(msg)
-			}
-		}
+		// TODO: These functions are in create_input.go
+		// switch v.inputMode {
+		// case components.InsertMode:
+			// return v.handleInsertMode(msg)
+		// case components.NormalMode:
+			// return v.handleNormalMode(msg)
+		// case components.ErrorMode:
+			// return v.handleErrorMode(msg)
+		// }
 
-	case runCreatedMsg:
-		return v.handleRunCreated(msg)
-
-	case repositorySelectedMsg:
-		return v.handleRepositorySelected(msg)
-
-	case components.FZFSelectedMsg:
-		// Handle FZF selection result
-		if v.configFileSelectorActive {
-			// Handle file selector result
-			v.configFileSelectorActive = false
-			if !msg.Result.Canceled && msg.Result.Selected != "" {
-				// Clean the selected file path (remove any icon prefixes)
-				filePath := msg.Result.Selected
-				if idx := strings.Index(filePath, " "); idx > 0 {
-					filePath = filePath[idx+1:] // Skip icon
-				}
-
-				// Clean up any remaining emoji or prefixes
-				filePath = strings.TrimSpace(strings.TrimLeft(filePath, "📁📝🔍"))
-
-				debug.LogToFilef("DEBUG: File selected from FZF: %s\n", filePath)
-				return v, v.loadConfigFromFile(filePath)
-			}
-		} else if !msg.Result.Canceled && v.focusIndex == 2 {
-			// Handle repository field selection (focusIndex 2 is repository now)
-			if msg.Result.Selected != "" {
-				// Extract just the repository name (remove any icons)
-				repoName := msg.Result.Selected
-				if idx := strings.Index(repoName, " "); idx > 0 {
-					repoName = repoName[idx+1:] // Skip icon
-				}
-				v.fields[0].SetValue(repoName)
-				v.cache.AddRepositoryToHistory(repoName)
-			}
-		}
-		// Deactivate FZF mode
-		v.fzfActive = false
-		v.fzfMode = nil
-		return v, nil
-
-	case configLoadedMsg:
-		// Handle successful config loading
-		if config, ok := msg.config.(*models.RunRequest); ok {
-			v.populateFormFromConfig(config, msg.path)
-		}
-
-		// IMPORTANT: Save the loaded config data to cache immediately
-		// so it persists when navigating away
-		v.saveFormData()
-
-		if v.statusLine != nil {
-			v.statusLine.SetTemporaryMessageWithType(
-				fmt.Sprintf("✅ Config loaded from %s", filepath.Base(msg.path)),
-				components.MessageSuccess,
-				500*time.Millisecond, // Show for only 500ms
-			)
-		}
-		return v, nil
-
-	case configLoadErrorMsg:
-		// Handle config loading error
-		v.fileSelectorLoading = false
-		v.error = msg.err
-		v.initErrorFocus()
-		debug.LogToFilef("DEBUG: Config loading failed: %v\n", msg.err)
-		return v, nil
-
-	case fileSelectorActivatedMsg:
-		// File selector is now active, clear loading state
-		v.fileSelectorLoading = false
-		v.configFileSelectorActive = true
-		// Start the cursor blink animation
-		return v, tickCmd()
-
-	case configSelectorTickMsg:
-		// Forward tick to config file selector if it's active
-		if v.configFileSelector != nil && v.configFileSelector.IsActive() {
-			// Convert to the config file selector's tick message type
-			newSelector, cmd := v.configFileSelector.Update(components.TickMsg(time.Time(msg)))
-			v.configFileSelector = newSelector
-			cmds = append(cmds, cmd)
-			// Continue ticking
-			cmds = append(cmds, tickCmd())
-		}
-		return v, tea.Batch(cmds...)
-
-	case clipboardResultMsg:
-		if msg.success {
-			v.yankBlink = true
-			v.yankBlinkTime = time.Now()
-			return v, tea.Batch(v.startYankBlinkAnimation(), v.startClearStatusTimer())
-		}
-		return v, nil
-
-	case yankBlinkMsg:
+	// TODO: Message handlers moved to other files
+	// case runCreatedMsg:
+		// TODO: This function is in create_submission.go
+		// return v.handleRunCreated(msg)
+		
+	// case repositorySelectedMsg:
+		// TODO: This function is in create_repository.go
+		// return v.handleRepositorySelected(msg)
+		
+	// case configLoadedMsg:
+		// TODO: This function is in create_config.go
+		// v.populateFormFromConfig(msg.config, msg.filePath)
+		// v.currentFileHash = msg.fileHash
+		// return v, nil
+		
+	// case configLoadErrorMsg:
+		// v.error = msg.err
+		// v.initErrorFocus()
+		// return v, nil
+		
+	// case clipboardResultMsg:
+		// if msg.success {
+			// v.yankBlink = true
+			// v.yankBlinkTime = time.Now()
+			// TODO: These functions are in create_messages.go
+			// return v, tea.Batch(v.startYankBlinkAnimation(), v.startClearStatusTimer())
+		// }
+		// return v, nil
+		
+	// case yankBlinkMsg:
 		// Single blink: toggle off after being on
-		if v.yankBlink {
-			v.yankBlink = false // Turn off after being on - completes the single blink
-		}
-		return v, nil
-
-	case clearStatusMsg:
-		v.yankBlink = false
-		return v, nil
-
-	case gKeyTimeoutMsg:
-		// Cancel waiting for second 'g' after timeout
-		v.waitingForG = false
-		return v, nil
-
-	case fileHashCacheLoadedMsg:
-		// File hash cache loaded - check if current file is a duplicate
-		if v.currentFileHash != "" && msg.cache != nil {
-			for _, hash := range msg.cache {
-				if hash == v.currentFileHash {
-					v.isDuplicateRun = true
-					break
-				}
-			}
-		}
-		return v, nil
+		// if v.yankBlink {
+			// v.yankBlink = false // Turn off after being on - completes the single blink
+		// }
+		// return v, nil
+		
+	// case clearStatusMsg:
+		// v.yankBlink = false
+		// return v, nil
 	}
 
 	return v, tea.Batch(cmds...)
@@ -417,12 +273,12 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (v *CreateRunView) handleWindowSizeMsg(msg tea.WindowSizeMsg) tea.Cmd {
 	v.width = msg.Width
 	v.height = msg.Height
-
+	
 	// Update component dimensions
 	if v.configFileSelector != nil {
 		v.configFileSelector.SetDimensions(v.width, v.height)
 	}
-
+	
 	return nil
 }
 

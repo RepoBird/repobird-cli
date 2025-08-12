@@ -41,3 +41,7 @@ man/
 # Ignore repobird binary in any folder
 **/repobird
 repobird
+
+# Debug logs
+logs/
+*.log

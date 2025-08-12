@@ -174,25 +174,15 @@ func (d *DashboardView) loadDashboardData() tea.Cmd {
 			copy(allRuns, runsResp)
 
 			// Update repository statistics from runs
+			debug.LogToFilef("  About to call updateRepositoryStats with %d repos and %d runs\n", len(repositories), len(allRuns))
 			repositories = d.updateRepositoryStats(repositories, allRuns)
+			debug.LogToFilef("  updateRepositoryStats completed, got %d repos back\n", len(repositories))
 
-			// Cache the data
-			d.cache.SetRepositoryOverview(repositories)
+			// Skip caching for now to avoid deadlock - TEMPORARY FIX
+			debug.LogToFilef("  SKIPPING cache operations (temporary fix for deadlock)\n")
 
-			// Cache runs by repository
-			for _, repo := range repositories {
-				repoRuns := d.filterRunsByRepository(allRuns, repo.Name)
-				repoDetails := make(map[string]*models.RunResponse)
-
-				// Add any cached details
-				for _, run := range repoRuns {
-					if detail, exists := detailsCache[run.GetIDString()]; exists {
-						repoDetails[run.GetIDString()] = detail
-					}
-				}
-
-				d.cache.SetRepositoryData(repo.Name, repoRuns, repoDetails)
-			}
+			// Just set overview without individual repo caching
+			// d.cache.SetRepositoryOverview(repositories)
 
 			debug.LogToFilef("  Data loaded successfully, returning message\n")
 			return dashboardDataLoadedMsg{
@@ -296,6 +286,7 @@ func (d *DashboardView) loadFromRunsOnly() tea.Msg {
 
 // updateRepositoryStats updates repository statistics from runs
 func (d *DashboardView) updateRepositoryStats(repositories []models.Repository, allRuns []*models.RunResponse) []models.Repository {
+	debug.LogToFilef("    [updateRepositoryStats] Starting with %d repos and %d runs\n", len(repositories), len(allRuns))
 	// Create maps for quick lookup
 	repoMap := make(map[string]*models.Repository)
 	repoIDMap := make(map[int]*models.Repository) // Map by repo ID
@@ -354,6 +345,7 @@ func (d *DashboardView) updateRepositoryStats(repositories []models.Repository, 
 		}
 	}
 
+	debug.LogToFilef("    [updateRepositoryStats] Completed, returning %d repos\n", len(repositories))
 	return repositories
 }
 

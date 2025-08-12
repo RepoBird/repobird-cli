@@ -1,6 +1,8 @@
 package views
 
 import (
+	"time"
+
 	"github.com/repobird/repobird-cli/internal/models"
 )
 
@@ -24,17 +26,17 @@ type dashboardUserInfoLoadedMsg struct {
 	error    error
 }
 
-// yankBlinkMsg is sent to trigger yank blink animation
-type yankBlinkMsg struct{}
-
 // messageClearMsg is sent to clear status messages
 type messageClearMsg struct{}
-
-// gKeyTimeoutMsg is sent when the 'g' key timeout expires
-type gKeyTimeoutMsg struct{}
 
 // syncFileHashesMsg is sent when file hash sync is completed
 type syncFileHashesMsg struct{}
 
-// clearStatusMsg is sent to clear status message
-type clearStatusMsg struct{}
+// yankBlinkMsg triggers yank blink animation
+type yankBlinkMsg struct{}
+
+// clearStatusMsg clears the status message
+type clearStatusMsg time.Time
+
+// gKeyTimeoutMsg handles g key timeout
+type gKeyTimeoutMsg struct{}

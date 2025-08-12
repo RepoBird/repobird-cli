@@ -378,7 +378,7 @@ func (v *BulkView) handleResultsKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // Rendering methods
 func (v *BulkView) renderFileSelect() string {
-	return v.fileSelector.View(nil)  // Pass nil for StatusLine - will need to be fixed
+	return v.fileSelector.View(nil) // Pass nil for StatusLine - will need to be fixed
 }
 
 func (v *BulkView) renderRunList() string {
