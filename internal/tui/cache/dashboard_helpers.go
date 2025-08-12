@@ -137,9 +137,9 @@ func (c *SimpleCache) GetFormData() *FormData {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	if item := c.cache.Get("formData"); item != nil {
-		if data, ok := item.Value().(*FormData); ok {
-			return data
+	if data, found := c.hybrid.session.GetFormData("formData"); found {
+		if formData, ok := data.(*FormData); ok {
+			return formData
 		}
 	}
 	return nil
@@ -150,7 +150,7 @@ func (c *SimpleCache) SetFormData(data *FormData) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.cache.Set("formData", data, 30*time.Minute)
+	_ = c.hybrid.session.SetFormData("formData", data)
 }
 
 // FormData represents the saved form state
@@ -249,7 +249,7 @@ func (c *SimpleCache) SetRepositoryData(repoName string, runs []*models.RunRespo
 		Details:     details,
 		LastUpdated: time.Now(),
 	}
-	c.cache.Set(key, data, 10*time.Minute)
+	_ = c.hybrid.session.SetFormData(key, data)
 }
 
 // GetRepositoryData retrieves cached data for a specific repository
@@ -258,8 +258,8 @@ func (c *SimpleCache) GetRepositoryData(repoName string) (*RepositoryData, bool)
 	defer c.mu.RUnlock()
 
 	key := fmt.Sprintf("repo:%s", repoName)
-	if item := c.cache.Get(key); item != nil {
-		if data, ok := item.Value().(*RepositoryData); ok {
+	if item, found := c.hybrid.session.GetFormData(key); found {
+		if data, ok := item.(*RepositoryData); ok {
 			return data, true
 		}
 	}
@@ -300,7 +300,7 @@ func (c *SimpleCache) SetSelectedIndex(idx int) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.cache.Set("selectedIndex", idx, 30*time.Minute)
+	_ = c.hybrid.session.SetFormData("selectedIndex", idx)
 }
 
 // GetSelectedIndex retrieves the selected index
@@ -308,8 +308,8 @@ func (c *SimpleCache) GetSelectedIndex() int {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	if item := c.cache.Get("selectedIndex"); item != nil {
-		if idx, ok := item.Value().(int); ok {
+	if item, found := c.hybrid.session.GetFormData("selectedIndex"); found {
+		if idx, ok := item.(int); ok {
 			return idx
 		}
 	}

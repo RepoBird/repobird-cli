@@ -10,19 +10,27 @@ import (
 )
 
 func TestNewSimpleCache(t *testing.T) {
+	// Set test environment to use temp directory
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	
 	cache := NewSimpleCache()
 	assert.NotNil(t, cache)
-	assert.NotNil(t, cache.cache)
+	assert.NotNil(t, cache.hybrid)
 	defer cache.Stop()
 }
 
 func TestCacheRuns(t *testing.T) {
+	// Set test environment to use temp directory
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	
 	cache := NewSimpleCache()
 	defer cache.Stop()
 
 	// Test empty cache
 	runs := cache.GetRuns()
-	assert.Nil(t, runs)
+	assert.Empty(t, runs)
 
 	// Test setting and getting runs
 	testRuns := []models.RunResponse{
@@ -37,6 +45,10 @@ func TestCacheRuns(t *testing.T) {
 }
 
 func TestCacheSingleRun(t *testing.T) {
+	// Set test environment to use temp directory
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	
 	cache := NewSimpleCache()
 	defer cache.Stop()
 
@@ -62,6 +74,10 @@ func TestCacheSingleRun(t *testing.T) {
 }
 
 func TestCacheUserInfo(t *testing.T) {
+	// Set test environment to use temp directory
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	
 	cache := NewSimpleCache()
 	defer cache.Stop()
 
@@ -83,6 +99,10 @@ func TestCacheUserInfo(t *testing.T) {
 }
 
 func TestCacheFileHash(t *testing.T) {
+	// Set test environment to use temp directory
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	
 	cache := NewSimpleCache()
 	defer cache.Stop()
 
@@ -104,6 +124,10 @@ func TestCacheFileHash(t *testing.T) {
 }
 
 func TestCacheDashboardData(t *testing.T) {
+	// Set test environment to use temp directory
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	
 	cache := NewSimpleCache()
 	defer cache.Stop()
 
@@ -135,6 +159,10 @@ func TestCacheDashboardData(t *testing.T) {
 }
 
 func TestCacheClear(t *testing.T) {
+	// Set test environment to use temp directory
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	
 	cache := NewSimpleCache()
 	defer cache.Stop()
 
@@ -152,12 +180,16 @@ func TestCacheClear(t *testing.T) {
 	cache.Clear()
 
 	// Verify data is gone
-	assert.Nil(t, cache.GetRuns())
+	assert.Empty(t, cache.GetRuns())
 	assert.Nil(t, cache.GetUserInfo())
 	assert.Empty(t, cache.GetFileHash("/test/path"))
 }
 
 func TestCacheConcurrency(t *testing.T) {
+	// Set test environment to use temp directory
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	
 	cache := NewSimpleCache()
 	defer cache.Stop()
 
@@ -198,6 +230,10 @@ func TestCacheExpiration(t *testing.T) {
 		t.Skip("Skipping expiration test in short mode")
 	}
 
+	// Set test environment to use temp directory
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	
 	// Create cache with very short TTL for testing
 	cache := NewSimpleCache()
 	defer cache.Stop()
@@ -215,6 +251,10 @@ func TestCacheExpiration(t *testing.T) {
 
 // Benchmark tests
 func BenchmarkCacheSetRuns(b *testing.B) {
+	// Set test environment to use temp directory
+	tmpDir := b.TempDir()
+	b.Setenv("XDG_CONFIG_HOME", tmpDir)
+	
 	cache := NewSimpleCache()
 	defer cache.Stop()
 
@@ -230,6 +270,10 @@ func BenchmarkCacheSetRuns(b *testing.B) {
 }
 
 func BenchmarkCacheGetRuns(b *testing.B) {
+	// Set test environment to use temp directory
+	tmpDir := b.TempDir()
+	b.Setenv("XDG_CONFIG_HOME", tmpDir)
+	
 	cache := NewSimpleCache()
 	defer cache.Stop()
 
@@ -246,6 +290,10 @@ func BenchmarkCacheGetRuns(b *testing.B) {
 }
 
 func BenchmarkCacheConcurrentAccess(b *testing.B) {
+	// Set test environment to use temp directory
+	tmpDir := b.TempDir()
+	b.Setenv("XDG_CONFIG_HOME", tmpDir)
+	
 	cache := NewSimpleCache()
 	defer cache.Stop()
 

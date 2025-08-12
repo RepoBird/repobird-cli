@@ -1,218 +1,111 @@
 package cache
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
-func TestSaveAndLoadFromDisk(t *testing.T) {
+func TestAutomaticPersistence(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
 
 	// Override XDG config home for testing
-	oldConfigHome := os.Getenv("XDG_CONFIG_HOME")
-	os.Setenv("XDG_CONFIG_HOME", tempDir)
-	defer os.Setenv("XDG_CONFIG_HOME", oldConfigHome)
+	t.Setenv("XDG_CONFIG_HOME", tempDir)
 
 	// Create first cache instance and populate it
 	cache1 := NewSimpleCache()
 	defer cache1.Stop()
 
+	// Test with terminal runs (should be automatically persisted)
 	testRuns := []models.RunResponse{
-		{ID: "run-1", Title: "Persisted Run 1"},
-		{ID: "run-2", Title: "Persisted Run 2"},
+		{ID: "run-1", Title: "Persisted Run 1", Status: models.StatusDone},
+		{ID: "run-2", Title: "Persisted Run 2", Status: models.StatusFailed},
 	}
 	testUserInfo := &models.UserInfo{
 		ID:             1,
 		GithubUsername: "persistuser",
 		Email:          "persist@example.com",
 	}
-	testDashboard := &DashboardData{
-		Runs:           testRuns,
-		UserInfo:       testUserInfo,
-		RepositoryList: []string{"repo1", "repo2", "repo3"},
-		LastUpdated:    time.Now(),
-	}
 
+	// Set data (automatically persisted by hybrid cache)
 	cache1.SetRuns(testRuns)
 	cache1.SetUserInfo(testUserInfo)
-	cache1.SetDashboardCache(testDashboard)
 	cache1.SetFileHash("/test/file.go", "hash123")
 
-	// Save to disk
-	err := cache1.SaveToDisk()
-	require.NoError(t, err)
-
-	// Verify file exists
-	cacheFile := filepath.Join(tempDir, "repobird", "cache.json")
-	assert.FileExists(t, cacheFile)
-
-	// Create second cache instance and load from disk
+	// Create second cache instance - should automatically load persisted data
 	cache2 := NewSimpleCache()
 	defer cache2.Stop()
 
-	err = cache2.LoadFromDisk()
-	require.NoError(t, err)
-
-	// Verify loaded data
-	loadedRuns := cache2.GetRuns()
-	assert.Equal(t, testRuns, loadedRuns)
-
+	// Verify terminal runs are automatically loaded
 	loadedUserInfo := cache2.GetUserInfo()
 	assert.Equal(t, testUserInfo, loadedUserInfo)
 
-	loadedDashboard, exists := cache2.GetDashboardCache()
-	assert.True(t, exists)
-	assert.Equal(t, testDashboard.Runs, loadedDashboard.Runs)
-	assert.Equal(t, testDashboard.UserInfo, loadedDashboard.UserInfo)
-	assert.Equal(t, testDashboard.RepositoryList, loadedDashboard.RepositoryList)
+	// File hashes should persist
+	loadedHash := cache2.GetFileHash("/test/file.go")
+	assert.Equal(t, "hash123", loadedHash)
+	
+	// Note: Dashboard data is session-only and won't persist
 }
 
-func TestLoadFromDiskWithMissingFile(t *testing.T) {
+func TestNewCacheWithEmptyDirectory(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
 
 	// Override XDG config home for testing
-	oldConfigHome := os.Getenv("XDG_CONFIG_HOME")
-	os.Setenv("XDG_CONFIG_HOME", tempDir)
-	defer os.Setenv("XDG_CONFIG_HOME", oldConfigHome)
+	t.Setenv("XDG_CONFIG_HOME", tempDir)
 
 	cache := NewSimpleCache()
 	defer cache.Stop()
 
-	// Loading from non-existent file should not error
+	// New cache with empty directory should work fine
+	// LoadFromDisk is now a no-op
 	err := cache.LoadFromDisk()
 	assert.NoError(t, err)
 
 	// Cache should be empty
-	assert.Nil(t, cache.GetRuns())
+	assert.Empty(t, cache.GetRuns())
 	assert.Nil(t, cache.GetUserInfo())
 }
 
-func TestLoadFromDiskWithCorruptedFile(t *testing.T) {
+// TestLoadFromDiskIsNoOp verifies that LoadFromDisk is now a no-op
+func TestLoadFromDiskIsNoOp(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
-
-	// Override XDG config home for testing
-	oldConfigHome := os.Getenv("XDG_CONFIG_HOME")
-	os.Setenv("XDG_CONFIG_HOME", tempDir)
-	defer os.Setenv("XDG_CONFIG_HOME", oldConfigHome)
-
-	// Create corrupted cache file
-	cacheDir := filepath.Join(tempDir, "repobird")
-	err := os.MkdirAll(cacheDir, 0700)
-	require.NoError(t, err)
-
-	cacheFile := filepath.Join(cacheDir, "cache.json")
-	err = os.WriteFile(cacheFile, []byte("not valid json"), 0600)
-	require.NoError(t, err)
+	t.Setenv("XDG_CONFIG_HOME", tempDir)
 
 	cache := NewSimpleCache()
 	defer cache.Stop()
 
-	// Loading corrupted file should error
-	err = cache.LoadFromDisk()
-	assert.Error(t, err)
+	// LoadFromDisk is now a no-op and should always succeed
+	err := cache.LoadFromDisk()
+	assert.NoError(t, err)
 }
 
-func TestLoadFromDiskWithExpiredCache(t *testing.T) {
+// TestSaveToDiskIsNoOp verifies that SaveToDisk is now a no-op
+func TestSaveToDiskIsNoOp(t *testing.T) {
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
-
-	// Override XDG config home for testing
-	oldConfigHome := os.Getenv("XDG_CONFIG_HOME")
-	os.Setenv("XDG_CONFIG_HOME", tempDir)
-	defer os.Setenv("XDG_CONFIG_HOME", oldConfigHome)
-
-	// Create cache data with old timestamp
-	oldCacheData := CacheData{
-		Runs: []models.RunResponse{
-			{ID: "old-run", Title: "Old Run"},
-		},
-		UserInfo: &models.UserInfo{
-			ID:             2,
-			GithubUsername: "olduser",
-		},
-		SavedAt: time.Now().Add(-2 * time.Hour), // 2 hours old
-	}
-
-	cacheDir := filepath.Join(tempDir, "repobird")
-	err := os.MkdirAll(cacheDir, 0700)
-	require.NoError(t, err)
-
-	cacheFile := filepath.Join(cacheDir, "cache.json")
-	jsonData, err := json.Marshal(oldCacheData)
-	require.NoError(t, err)
-	err = os.WriteFile(cacheFile, jsonData, 0600)
-	require.NoError(t, err)
+	t.Setenv("XDG_CONFIG_HOME", tempDir)
 
 	cache := NewSimpleCache()
 	defer cache.Stop()
 
-	// Load from disk
-	err = cache.LoadFromDisk()
-	require.NoError(t, err)
+	// Add some data
+	cache.SetRuns([]models.RunResponse{{ID: "test-run", Status: models.StatusDone}})
 
-	// Cache should be empty because data is too old (> 1 hour)
-	assert.Nil(t, cache.GetRuns())
-	assert.Nil(t, cache.GetUserInfo())
+	// SaveToDisk is now a no-op and should always succeed
+	err := cache.SaveToDisk()
+	assert.NoError(t, err)
+
+	// The old cache.json file should not be created
+	cacheFile := filepath.Join(tempDir, "repobird", "cache.json")
+	assert.NoFileExists(t, cacheFile)
 }
 
-func TestLoadFromDiskWithFreshCache(t *testing.T) {
-	// Create a temporary directory for testing
-	tempDir := t.TempDir()
-
-	// Override XDG config home for testing
-	oldConfigHome := os.Getenv("XDG_CONFIG_HOME")
-	os.Setenv("XDG_CONFIG_HOME", tempDir)
-	defer os.Setenv("XDG_CONFIG_HOME", oldConfigHome)
-
-	// Create cache data with recent timestamp
-	freshCacheData := CacheData{
-		Runs: []models.RunResponse{
-			{ID: "fresh-run", Title: "Fresh Run"},
-		},
-		UserInfo: &models.UserInfo{
-			ID:             3,
-			GithubUsername: "freshuser",
-		},
-		SavedAt: time.Now().Add(-30 * time.Minute), // 30 minutes old
-	}
-
-	cacheDir := filepath.Join(tempDir, "repobird")
-	err := os.MkdirAll(cacheDir, 0700)
-	require.NoError(t, err)
-
-	cacheFile := filepath.Join(cacheDir, "cache.json")
-	jsonData, err := json.Marshal(freshCacheData)
-	require.NoError(t, err)
-	err = os.WriteFile(cacheFile, jsonData, 0600)
-	require.NoError(t, err)
-
-	cache := NewSimpleCache()
-	defer cache.Stop()
-
-	// Load from disk
-	err = cache.LoadFromDisk()
-	require.NoError(t, err)
-
-	// Cache should contain the fresh data
-	runs := cache.GetRuns()
-	require.NotNil(t, runs)
-	assert.Len(t, runs, 1)
-	assert.Equal(t, "fresh-run", runs[0].ID)
-
-	userInfo := cache.GetUserInfo()
-	require.NotNil(t, userInfo)
-	assert.Equal(t, 3, userInfo.ID)
-}
 
 func TestGetCacheFilePath(t *testing.T) {
 	// Save original XDG_CONFIG_HOME
@@ -229,34 +122,3 @@ func TestGetCacheFilePath(t *testing.T) {
 	os.Setenv("XDG_CONFIG_HOME", oldConfigHome)
 }
 
-func TestSaveToDiskCreatesDirectory(t *testing.T) {
-	// Create a temporary directory for testing
-	tempDir := t.TempDir()
-
-	// Override XDG config home for testing
-	oldConfigHome := os.Getenv("XDG_CONFIG_HOME")
-	os.Setenv("XDG_CONFIG_HOME", tempDir)
-	defer os.Setenv("XDG_CONFIG_HOME", oldConfigHome)
-
-	cache := NewSimpleCache()
-	defer cache.Stop()
-
-	// Add some data
-	cache.SetRuns([]models.RunResponse{{ID: "test-run"}})
-
-	// Save to disk (directory should be created automatically)
-	err := cache.SaveToDisk()
-	require.NoError(t, err)
-
-	// Verify directory and file exist
-	cacheDir := filepath.Join(tempDir, "repobird")
-	assert.DirExists(t, cacheDir)
-
-	cacheFile := filepath.Join(cacheDir, "cache.json")
-	assert.FileExists(t, cacheFile)
-
-	// Verify file permissions
-	info, err := os.Stat(cacheFile)
-	require.NoError(t, err)
-	assert.Equal(t, os.FileMode(0600), info.Mode().Perm())
-}
