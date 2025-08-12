@@ -25,7 +25,7 @@ type DashboardView struct {
 	client APIClient
 	keys   components.KeyMap
 	help   help.Model
-	keymap keymap.ViewKeymap // Navigation keys available for this view
+	disabledKeys map[string]bool // Keys that are disabled for this view
 
 	// Dashboard state
 	currentLayout      models.LayoutType
@@ -143,7 +143,7 @@ func NewDashboardView(client APIClient) *DashboardView {
 		client:          client,
 		keys:            components.DefaultKeyMap,
 		help:            help.New(),
-		keymap:          keymap.NewKeymapWithDisabled(keymap.NavigationKeyBack), // Disable 'b' key on dashboard
+		disabledKeys:    map[string]bool{"b": true, "esc": true}, // Disable back navigation keys on dashboard
 		currentLayout:   models.LayoutTripleColumn,
 		loading:         true,
 		initializing:    true,
@@ -172,9 +172,15 @@ func NewDashboardView(client APIClient) *DashboardView {
 	return dashboard
 }
 
-// IsNavigationKeyEnabled implements the ViewKeymap interface
-func (d *DashboardView) IsNavigationKeyEnabled(key keymap.NavigationKey) bool {
-	return d.keymap.IsNavigationKeyEnabled(key)
+// IsKeyDisabled implements the CoreViewKeymap interface
+func (d *DashboardView) IsKeyDisabled(keyString string) bool {
+	return d.disabledKeys[keyString]
+}
+
+// HandleKey implements the CoreViewKeymap interface
+func (d *DashboardView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Model, cmd tea.Cmd) {
+	// Dashboard doesn't need custom key handling - let the centralized system handle everything
+	return false, d, nil
 }
 
 // Init implements the tea.Model interface
@@ -401,23 +407,6 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			newFzf, cmd := d.fzfMode.Update(msg)
 			d.fzfMode = newFzf
 			return d, cmd
-		}
-
-		// Check keymap to see if this key is disabled for this view
-		if keyStr := msg.String(); keyStr != "" {
-			switch keyStr {
-			case "b":
-				if !d.keymap.IsNavigationKeyEnabled(keymap.NavigationKeyBack) {
-					// Back key is disabled for dashboard - ignore it
-					return d, nil
-				}
-			case "B":
-				if !d.keymap.IsNavigationKeyEnabled(keymap.NavigationKeyBulk) {
-					// Bulk key is disabled for this view - ignore it
-					return d, nil
-				}
-				// Add other navigation keys as needed
-			}
 		}
 
 		// Handle dashboard-specific keys

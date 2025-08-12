@@ -10,16 +10,18 @@ import (
 )
 
 type App struct {
-	client    APIClient
-	viewStack []tea.Model // Navigation history
-	current   tea.Model
-	cache     *cache.SimpleCache
+	client      APIClient
+	viewStack   []tea.Model // Navigation history
+	current     tea.Model
+	cache       *cache.SimpleCache
+	keyRegistry *keymap.CoreKeyRegistry // Central key processing
 }
 
 func NewApp(client APIClient) *App {
 	return &App{
-		client: client,
-		cache:  cache.NewSimpleCache(),
+		client:      client,
+		cache:       cache.NewSimpleCache(),
+		keyRegistry: keymap.NewCoreKeyRegistry(),
 	}
 }
 
@@ -40,25 +42,10 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a.handleNavigation(navMsg)
 	}
 
-	// Handle quit message at app level
+	// Centralized key processing
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
-		if keyMsg.String() == "ctrl+c" {
-			return a, tea.Quit
-		}
-
-		// Check if current view implements ViewKeymap and if navigation keys should be intercepted
-		if viewWithKeymap, hasKeymap := a.current.(keymap.ViewKeymap); hasKeymap {
-			// Convert key press to NavigationKey and check if it's enabled
-			if navKey := a.keyMsgToNavigationKey(keyMsg); navKey != "" {
-				if !viewWithKeymap.IsNavigationKeyEnabled(navKey) {
-					// Key is disabled for this view - ignore it
-					return a, nil
-				}
-				// Key is enabled - convert to navigation message if appropriate
-				if navMsg := a.navigationKeyToMessage(navKey); navMsg != nil {
-					return a.handleNavigation(navMsg)
-				}
-			}
+		if handled, model, cmd := a.processKeyWithFiltering(keyMsg); handled {
+			return model, cmd
 		}
 	}
 
@@ -204,38 +191,88 @@ func (a *App) getNavigationContext(key string) interface{} {
 	return a.cache.GetNavigationContext(key)
 }
 
-// keyMsgToNavigationKey converts a tea.KeyMsg to a NavigationKey if it matches
-func (a *App) keyMsgToNavigationKey(keyMsg tea.KeyMsg) keymap.NavigationKey {
-	switch keyMsg.String() {
-	case "b":
-		return keymap.NavigationKeyBack
-	case "B":
-		return keymap.NavigationKeyBulk
-	case "n":
-		return keymap.NavigationKeyNew
-	case "r":
-		return keymap.NavigationKeyRefresh
-	case "s":
-		return keymap.NavigationKeyStatus
-	case "?":
-		return keymap.NavigationKeyHelp
-	case "q":
-		return keymap.NavigationKeyQuit
+// processKeyWithFiltering is the centralized key processor that handles all key filtering and routing
+func (a *App) processKeyWithFiltering(keyMsg tea.KeyMsg) (handled bool, model tea.Model, cmd tea.Cmd) {
+	keyString := keyMsg.String()
+	
+	// Check if current view implements CoreViewKeymap
+	if viewKeymap, hasKeymap := a.current.(keymap.CoreViewKeymap); hasKeymap {
+		// First check if view wants to disable this key entirely
+		if viewKeymap.IsKeyDisabled(keyString) {
+			// Key is disabled - ignore it completely
+			return true, a, nil
+		}
+		
+		// Check if view wants to handle this key with custom logic
+		if handled, model, cmd := viewKeymap.HandleKey(keyMsg); handled {
+			// View provided custom handling
+			return true, model, cmd
+		}
+	}
+	
+	// Get the default action for this key from registry
+	action := a.keyRegistry.GetAction(keyString)
+	
+	// Handle global actions that should always work regardless of view state
+	if keymap.IsGlobalAction(action) {
+		return a.handleGlobalAction(action, keyMsg)
+	}
+	
+	// Handle navigation actions
+	if keymap.IsNavigationAction(action) {
+		return a.handleNavigationAction(action, keyMsg)
+	}
+	
+	// For ActionViewSpecific or unknown keys, let the view handle them
+	return false, a, nil
+}
+
+// handleGlobalAction processes global actions like force quit
+func (a *App) handleGlobalAction(action keymap.KeyAction, keyMsg tea.KeyMsg) (handled bool, model tea.Model, cmd tea.Cmd) {
+	switch action {
+	case keymap.ActionGlobalQuit:
+		// Force quit - always works
+		a.cache.SaveToDisk()
+		return true, a, tea.Quit
+	case keymap.ActionGlobalHelp:
+		// Global help - could be implemented later
+		return false, a, nil
 	default:
-		return ""
+		return false, a, nil
 	}
 }
 
-// navigationKeyToMessage converts a NavigationKey to the appropriate navigation message
-func (a *App) navigationKeyToMessage(navKey keymap.NavigationKey) messages.NavigationMsg {
-	switch navKey {
-	case keymap.NavigationKeyBack:
-		return messages.NavigateBackMsg{}
-	case keymap.NavigationKeyBulk:
-		return messages.NavigateToBulkMsg{}
+// handleNavigationAction processes navigation actions like back, new, etc.
+func (a *App) handleNavigationAction(action keymap.KeyAction, keyMsg tea.KeyMsg) (handled bool, model tea.Model, cmd tea.Cmd) {
+	var navMsg messages.NavigationMsg
+	
+	switch action {
+	case keymap.ActionNavigateBack:
+		navMsg = messages.NavigateBackMsg{}
+	case keymap.ActionNavigateBulk:
+		navMsg = messages.NavigateToBulkMsg{}
+	case keymap.ActionNavigateNew:
+		// For 'n' key, only handle if we're not in an input field or specific context
+		// This could be enhanced with more context awareness
+		navMsg = nil // Let view handle 'n' for now
+	case keymap.ActionNavigateRefresh:
+		// Let view handle refresh for now
+		navMsg = nil
+	case keymap.ActionNavigateQuit:
+		// Regular quit - save and quit
+		a.cache.SaveToDisk()
+		return true, a, tea.Quit
+	case keymap.ActionNavigateHelp:
+		// Let view handle help for now
+		navMsg = nil
 	default:
-		// For other keys (n, r, s, ?, q), let the view handle them
-		// These are not global navigation keys that should be intercepted
-		return nil
+		return false, a, nil
 	}
+	
+	if navMsg != nil {
+		model, cmd := a.handleNavigation(navMsg)
+		return true, model, cmd
+	}
+	
+	return false, a, nil
 }
