@@ -13,6 +13,7 @@ repository: support-rb/test-ruby
 source: main
 target: feature/improve-test-coverage
 runType: run
+wallaby: run
 title: Add comprehensive test coverage
 context: |
   This is a Ruby application that needs better test coverage.
