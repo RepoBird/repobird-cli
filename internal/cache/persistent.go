@@ -74,9 +74,15 @@ func getCacheDirForUser(userID *int) (string, error) {
 
 	var cacheDir string
 	if userID != nil {
-		// User-specific cache directory
-		cacheDir = filepath.Join(baseDir, appName, "users", fmt.Sprintf("user-%d", *userID), "runs")
-		debug.LogToFilef("DEBUG: Using user-specific cache directory: %s (userID=%d)\n", cacheDir, *userID)
+		// Special handling for debug/test mode (negative user IDs)
+		if *userID < 0 {
+			cacheDir = filepath.Join(baseDir, appName, "debug", fmt.Sprintf("user-%d", *userID), "runs")
+			debug.LogToFilef("DEBUG: Using debug cache directory: %s (userID=%d)\n", cacheDir, *userID)
+		} else {
+			// User-specific cache directory for real users
+			cacheDir = filepath.Join(baseDir, appName, "users", fmt.Sprintf("user-%d", *userID), "runs")
+			debug.LogToFilef("DEBUG: Using user-specific cache directory: %s (userID=%d)\n", cacheDir, *userID)
+		}
 	} else {
 		// Fallback to shared cache directory for backward compatibility
 		cacheDir = filepath.Join(baseDir, appName, "shared", "runs")

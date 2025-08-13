@@ -1,10 +1,14 @@
 package tui
 
 import (
+	"context"
 	"strings"
+	"time"
 	
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/repobird/repobird-cli/internal/api"
+	"github.com/repobird/repobird-cli/internal/models"
+	"github.com/repobird/repobird-cli/internal/services"
 	"github.com/repobird/repobird-cli/internal/tui/cache"
 	"github.com/repobird/repobird-cli/internal/tui/debug"
 	"github.com/repobird/repobird-cli/internal/tui/keymap"
@@ -13,35 +17,74 @@ import (
 )
 
 type App struct {
-	client      APIClient
-	viewStack   []tea.Model // Navigation history
-	current     tea.Model
-	cache       *cache.SimpleCache
-	keyRegistry *keymap.CoreKeyRegistry // Central key processing
-	width       int                      // Current window width
-	height      int                      // Current window height
+	client         APIClient
+	viewStack      []tea.Model // Navigation history
+	current        tea.Model
+	cache          *cache.SimpleCache
+	keyRegistry    *keymap.CoreKeyRegistry // Central key processing
+	width          int                      // Current window width
+	height         int                      // Current window height
+	authenticated  bool                     // Whether initial auth is complete
+}
+
+// authCompleteMsg is sent when authentication and cache initialization is complete
+type authCompleteMsg struct {
+	userInfo *models.UserInfo
+	err      error
 }
 
 func NewApp(client APIClient) *App {
+	// Don't create cache yet - wait until we authenticate
 	return &App{
 		client:      client,
-		cache:       cache.NewSimpleCache(),
+		cache:       nil, // Will be initialized after authentication
 		keyRegistry: keymap.NewCoreKeyRegistry(),
 	}
 }
 
 // Init implements tea.Model interface - initializes with dashboard view
 func (a *App) Init() tea.Cmd {
-	// Initialize shared cache
-	_ = a.cache.LoadFromDisk()
-
-	// Initialize with dashboard view
-	a.current = views.NewDashboardView(a.client)
-	return a.current.Init()
+	// First authenticate to get the real user ID
+	return tea.Batch(
+		a.authenticateAndInitCache(),
+		func() tea.Msg {
+			// Send initial window size request
+			return tea.WindowSizeMsg{}
+		},
+	)
 }
 
 // Update implements tea.Model interface - handles navigation and delegates to current view
 func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// Handle authentication completion first
+	if authMsg, ok := msg.(authCompleteMsg); ok {
+		debug.LogToFile("🔐 APP: Authentication complete, initializing dashboard 🔐\n")
+		a.authenticated = true
+		
+		// Initialize dashboard view now that we have user context
+		a.current = views.NewDashboardView(a.client)
+		
+		// Initialize the view with current window size if available
+		var cmds []tea.Cmd
+		cmds = append(cmds, a.current.Init())
+		if a.width > 0 && a.height > 0 {
+			cmds = append(cmds, func() tea.Msg {
+				return tea.WindowSizeMsg{Width: a.width, Height: a.height}
+			})
+		}
+		return a, tea.Batch(cmds...)
+	}
+	
+	// Don't process other messages until authenticated
+	if !a.authenticated {
+		// Still handle window size to store dimensions
+		if wsMsg, ok := msg.(tea.WindowSizeMsg); ok {
+			a.width = wsMsg.Width
+			a.height = wsMsg.Height
+		}
+		return a, nil
+	}
+	
 	// Handle navigation messages first
 	if navMsg, ok := msg.(messages.NavigationMsg); ok {
 		debug.LogToFilef("🚀 APP: Received NavigationMsg: %T 🚀\n", navMsg)

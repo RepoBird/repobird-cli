@@ -50,8 +50,14 @@ func NewFileHashCacheForUser(userID *int) *FileHashCache {
 	}
 
 	if userID != nil {
-		// User-specific cache directory
-		cacheDir := filepath.Join(baseDir, "repobird", "users", fmt.Sprintf("user-%d", *userID))
+		// Special handling for debug/test mode (negative user IDs)
+		var cacheDir string
+		if *userID < 0 {
+			cacheDir = filepath.Join(baseDir, "repobird", "debug", fmt.Sprintf("user-%d", *userID))
+		} else {
+			// User-specific cache directory for real users
+			cacheDir = filepath.Join(baseDir, "repobird", "users", fmt.Sprintf("user-%d", *userID))
+		}
 		_ = os.MkdirAll(cacheDir, 0755)
 		cacheFile = filepath.Join(cacheDir, "file_hashes.json")
 	} else {
@@ -84,7 +90,14 @@ func (c *FileHashCache) SetUserID(userID *int) {
 		baseDir = filepath.Join(homeDir, ".cache")
 	}
 
-	cacheDir := filepath.Join(baseDir, "repobird", "users", fmt.Sprintf("user-%d", *userID))
+	// Special handling for debug/test mode (negative user IDs)
+	var cacheDir string
+	if *userID < 0 {
+		cacheDir = filepath.Join(baseDir, "repobird", "debug", fmt.Sprintf("user-%d", *userID))
+	} else {
+		// User-specific cache directory for real users
+		cacheDir = filepath.Join(baseDir, "repobird", "users", fmt.Sprintf("user-%d", *userID))
+	}
 	_ = os.MkdirAll(cacheDir, 0755)
 	c.cacheFile = filepath.Join(cacheDir, "file_hashes.json")
 	c.userID = userID

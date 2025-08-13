@@ -164,20 +164,22 @@ func (v *CreateRunView) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	keyString := msg.String()
 	debug.LogToFilef("🎹 CREATE VIEW handleKeyMsg: key='%s', insertMode=%v", keyString, v.form.IsInsertMode())
 	
+	// Note: Most key handling is done in HandleKey() via CoreViewKeymap
+	// This just delegates to the form for form-specific updates
+	
 	// Handle force quit
 	if keyString == "ctrl+c" {
 		debug.LogToFilef("⛔ CREATE VIEW: Force quit requested")
 		return v, tea.Quit
 	}
 	
-	// Delegate all other keys to the form
-	// The form will send back a CustomFormNavigateBackMsg if needed
+	// Delegate to the form for updating its internal state
 	newForm, cmd := v.form.Update(msg)
 	v.form = newForm.(*CustomCreateForm)
 	
 	// Auto-save form data when values change
-	if v.form.IsInsertMode() || keyString == "d" || keyString == "c" {
-		// Save when typing, deleting, or changing
+	if v.form.IsInsertMode() || keyString == "d" || keyString == "c" || keyString == "i" {
+		// Save when typing, deleting, changing, or entering insert mode
 		v.saveFormData()
 	}
 	

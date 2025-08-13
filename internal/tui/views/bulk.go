@@ -491,17 +491,13 @@ func (v *BulkView) View() string {
 
 // renderInstructions renders the initial instructions screen
 func (v *BulkView) renderInstructions() string {
-	// Don't use WindowLayout here - it's designed for single full-screen views
-	// We need to manually handle the layout to ensure status line is at bottom
-	
-	// Calculate available space
-	availableHeight := v.height - 1 // Reserve 1 line for status line
-	if availableHeight < 5 {
-		availableHeight = 5
+	// Initialize layout if not done yet
+	if v.layout == nil {
+		v.layout = components.NewWindowLayout(v.width, v.height)
 	}
 	
 	// Instructions content
-	var instructions []string
+	var instructionLines []string
 	
 	// Show error if there is one
 	if v.error != nil {
@@ -509,7 +505,7 @@ func (v *BulkView) renderInstructions() string {
 			Foreground(lipgloss.Color("196")).
 			Bold(true)
 		
-		instructions = append(instructions, 
+		instructionLines = append(instructionLines, 
 			errorStyle.Render("❌ Error loading configuration files:"),
 			"",
 			fmt.Sprintf("%v", v.error),
@@ -521,7 +517,7 @@ func (v *BulkView) renderInstructions() string {
 		)
 	}
 	
-	instructions = append(instructions,
+	instructionLines = append(instructionLines,
 		"Welcome to the Bulk Operations interface.",
 		"",
 		"This tool allows you to:",
@@ -538,45 +534,29 @@ func (v *BulkView) renderInstructions() string {
 		"• Markdown (.md) - Documentation with task blocks",
 	)
 
-	content := strings.Join(instructions, "\n")
+	content := strings.Join(instructionLines, "\n")
 
-	// Create styles
-	boxStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("62"))
-	
-	titleStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("205"))
-	
-	contentStyle := lipgloss.NewStyle().
-		Padding(1, 2)
+	// Use WindowLayout system for consistent styling
+	boxStyle := v.layout.CreateStandardBox()
+	titleStyle := v.layout.CreateTitleStyle()
+	contentStyle := v.layout.CreateContentStyle()
 
 	title := titleStyle.Render("Bulk Operations")
 	styledContent := contentStyle.Render(content)
 	
-	// Create the main container that fills available height
-	// Account for border (2 chars) when setting dimensions
-	boxWidth := v.width - 4
-	boxHeight := availableHeight - 2
+	// Get proper dimensions from layout
+	boxWidth, boxHeight := v.layout.GetBoxDimensions()
 	
-	if boxWidth < 10 {
-		boxWidth = 10
-	}
-	if boxHeight < 3 {
-		boxHeight = 3
-	}
-	
+	// Create the main container with proper dimensions
 	mainContainer := boxStyle.
 		Width(boxWidth).
 		Height(boxHeight).
-		MaxHeight(boxHeight).
 		Render(lipgloss.JoinVertical(lipgloss.Left, title, "", styledContent))
 
 	// Status line
 	statusLine := v.renderStatusLine("BULK")
 
-	// Ensure status line is at the bottom
+	// Join with status line
 	return lipgloss.JoinVertical(lipgloss.Left, mainContainer, statusLine)
 }
 

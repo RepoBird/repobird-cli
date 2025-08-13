@@ -178,9 +178,9 @@ func (f *CustomCreateForm) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		debug.LogToFilef("📝 CUSTOM FORM: Processing key '%s' in INSERT mode", keyString)
 		switch keyString {
 		case "esc":
-			f.insertMode = false
-			f.blurCurrentField()
-			debug.LogToFilef("⬅️ CUSTOM FORM: Exited insert mode")
+			// ESC is now handled by CreateRunView's HandleKey
+			// Just pass it through
+			debug.LogToFilef("⬅️ CUSTOM FORM: ESC in insert mode - passing through to parent")
 			return f, nil
 			
 		case "tab":
@@ -231,11 +231,10 @@ func (f *CustomCreateForm) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		
 		switch msg.String() {
 		case "q", "b":
-			// Send a navigation message instead of trying to bubble up the key
-			debug.LogToFilef("🔙 CUSTOM FORM: Navigation key '%s' detected, sending navigation message", msg.String())
-			return f, func() tea.Msg {
-				return CustomFormNavigateBackMsg{}
-			}
+			// These are now handled by CreateRunView's HandleKey
+			// Just pass them through
+			debug.LogToFilef("🔙 CUSTOM FORM: Navigation key '%s' detected, passing through to parent", msg.String())
+			return f, nil
 			
 		case "i":
 			// Enter insert mode for text fields

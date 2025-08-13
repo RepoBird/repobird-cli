@@ -298,7 +298,7 @@ func (m *MockClient) GetUserInfoWithContext(ctx context.Context) (*models.UserIn
 	return &models.UserInfo{
 		Email:          "debug-user@repobird.ai",
 		Name:           "Debug User",
-		ID:             1001,
+		ID:             -1, // Use negative ID to ensure separate cache directory
 		GithubUsername: "debug-user",
 		RemainingRuns:  100,
 		TotalRuns:      500,
