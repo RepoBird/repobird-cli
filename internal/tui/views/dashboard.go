@@ -179,7 +179,14 @@ func (d *DashboardView) IsKeyDisabled(keyString string) bool {
 
 // HandleKey implements the CoreViewKeymap interface
 func (d *DashboardView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Model, cmd tea.Cmd) {
-	// Dashboard doesn't need custom key handling - let the centralized system handle everything
+	// Dashboard handles 'b' specially for bulk view navigation (overrides back navigation)
+	if keyMsg.String() == "b" {
+		// Navigate to bulk view
+		return true, d, func() tea.Msg {
+			return messages.NavigateToBulkMsg{}
+		}
+	}
+	// Let the centralized system handle everything else
 	return false, d, nil
 }
 

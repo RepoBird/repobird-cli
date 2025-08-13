@@ -13,12 +13,13 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-// MockAPIClient for testing
-type MockAPIClient struct {
+// MockBulkAPIClient for testing bulk operations
+type MockBulkAPIClient struct {
 	mock.Mock
+	*api.Client
 }
 
-func (m *MockAPIClient) CreateBulkRuns(ctx context.Context, req *dto.BulkRunRequest) (*dto.BulkRunResponse, error) {
+func (m *MockBulkAPIClient) CreateBulkRuns(ctx context.Context, req *dto.BulkRunRequest) (*dto.BulkRunResponse, error) {
 	args := m.Called(ctx, req)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -26,27 +27,28 @@ func (m *MockAPIClient) CreateBulkRuns(ctx context.Context, req *dto.BulkRunRequ
 	return args.Get(0).(*dto.BulkRunResponse), args.Error(1)
 }
 
-func (m *MockAPIClient) PollBulkStatus(ctx context.Context, batchID string, interval any) (<-chan dto.BulkStatus, error) {
+func (m *MockBulkAPIClient) PollBulkStatus(ctx context.Context, batchID string, interval any) (<-chan *dto.BulkStatusResponse, error) {
 	args := m.Called(ctx, batchID, interval)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(<-chan dto.BulkStatus), args.Error(1)
+	return args.Get(0).(<-chan *dto.BulkStatusResponse), args.Error(1)
 }
 
-func (m *MockAPIClient) CancelBulkRuns(ctx context.Context, batchID string) error {
+func (m *MockBulkAPIClient) CancelBulkRuns(ctx context.Context, batchID string) error {
 	args := m.Called(ctx, batchID)
 	return args.Error(0)
 }
 
 func TestNewBulkView(t *testing.T) {
-	client := &MockAPIClient{}
+	// Create a real API client for now since BulkView requires *api.Client
+	client := &api.Client{}
 	view := NewBulkView(client)
 
 	assert.NotNil(t, view)
 	assert.Equal(t, client, view.client)
-	assert.Equal(t, ModeFileSelect, view.mode)
-	assert.NotNil(t, view.fileSelector)
+	assert.Equal(t, ModeInstructions, view.mode) // Now starts with instructions
+	assert.Nil(t, view.fileSelector) // File selector not created until user presses 'f'
 	assert.NotNil(t, view.help)
 	assert.NotNil(t, view.keys)
 	assert.NotNil(t, view.spinner)
@@ -58,7 +60,7 @@ func TestNewBulkView(t *testing.T) {
 }
 
 func TestBulkViewInit(t *testing.T) {
-	client := &MockAPIClient{}
+	client := &api.Client{}
 	view := NewBulkView(client)
 
 	cmd := view.Init()
@@ -70,11 +72,12 @@ func TestBulkViewInit(t *testing.T) {
 
 func TestBulkViewModeConstants(t *testing.T) {
 	// Verify mode constants are correctly defined
-	assert.Equal(t, BulkMode(0), ModeFileSelect)
-	assert.Equal(t, BulkMode(1), ModeRunList)
-	assert.Equal(t, BulkMode(2), ModeRunEdit)
-	assert.Equal(t, BulkMode(3), ModeProgress)
-	assert.Equal(t, BulkMode(4), ModeResults)
+	assert.Equal(t, BulkMode(0), ModeInstructions)
+	assert.Equal(t, BulkMode(1), ModeFileBrowser)
+	assert.Equal(t, BulkMode(2), ModeRunList)
+	assert.Equal(t, BulkMode(3), ModeRunEdit)
+	assert.Equal(t, BulkMode(4), ModeProgress)
+	assert.Equal(t, BulkMode(5), ModeResults)
 }
 
 func TestBulkViewStatusConstants(t *testing.T) {
@@ -88,7 +91,7 @@ func TestBulkViewStatusConstants(t *testing.T) {
 }
 
 func TestBulkViewWindowSizeMsg(t *testing.T) {
-	client := &MockAPIClient{}
+	client := &api.Client{}
 	view := NewBulkView(client)
 
 	msg := tea.WindowSizeMsg{
@@ -104,12 +107,12 @@ func TestBulkViewWindowSizeMsg(t *testing.T) {
 	assert.NotNil(t, updatedView.layout)
 	assert.Nil(t, cmd)
 
-	// File selector should be updated with dimensions
-	assert.NotNil(t, updatedView.fileSelector)
+	// File selector should not be created yet (only created when pressing 'f')
+	assert.Nil(t, updatedView.fileSelector)
 }
 
 func TestBulkViewGlobalQuitKeys(t *testing.T) {
-	client := &MockAPIClient{}
+	client := &api.Client{}
 	view := NewBulkView(client)
 	view.width = 80
 	view.height = 24
@@ -127,11 +130,12 @@ func TestBulkViewGlobalQuitKeys(t *testing.T) {
 }
 
 func TestBulkViewFileSelectKeys(t *testing.T) {
-	client := &MockAPIClient{}
+	client := &api.Client{}
 	view := NewBulkView(client)
 	view.width = 80
 	view.height = 24
-	view.mode = ModeFileSelect
+	view.mode = ModeFileBrowser
+	view.fileSelector = components.NewBulkFileSelector(80, 24)
 
 	t.Run("Quit key returns NavigateBackMsg", func(t *testing.T) {
 		keyMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}}
@@ -166,13 +170,13 @@ func TestBulkViewFileSelectKeys(t *testing.T) {
 		model, cmd := view.Update(keyMsg)
 		updatedView := model.(*BulkView)
 
-		assert.Equal(t, ModeFileSelect, updatedView.mode)
+		assert.Equal(t, ModeFileBrowser, updatedView.mode)
 		assert.Nil(t, cmd)
 	})
 }
 
 func TestBulkViewRunListKeys(t *testing.T) {
-	client := &MockAPIClient{}
+	client := &api.Client{}
 	view := NewBulkView(client)
 	view.width = 80
 	view.height = 24
@@ -252,7 +256,7 @@ func TestBulkViewRunListKeys(t *testing.T) {
 		model, cmd := view.Update(keyMsg)
 		updatedView := model.(*BulkView)
 
-		assert.Equal(t, ModeFileSelect, updatedView.mode)
+		assert.Equal(t, ModeFileBrowser, updatedView.mode)
 		assert.Nil(t, cmd)
 	})
 
@@ -267,7 +271,7 @@ func TestBulkViewRunListKeys(t *testing.T) {
 }
 
 func TestBulkViewBulkFileSelectedMsg(t *testing.T) {
-	client := &MockAPIClient{}
+	client := &api.Client{}
 	view := NewBulkView(client)
 
 	t.Run("Canceled selection does nothing", func(t *testing.T) {
@@ -306,7 +310,7 @@ func TestBulkViewBulkFileSelectedMsg(t *testing.T) {
 }
 
 func TestBulkViewBulkRunsLoadedMsg(t *testing.T) {
-	client := &MockAPIClient{}
+	client := &api.Client{}
 	view := NewBulkView(client)
 
 	runs := []BulkRunItem{
@@ -338,7 +342,7 @@ func TestBulkViewBulkRunsLoadedMsg(t *testing.T) {
 }
 
 func TestBulkViewBulkSubmittedMsg(t *testing.T) {
-	client := &MockAPIClient{}
+	client := &api.Client{}
 	view := NewBulkView(client)
 	view.submitting = true
 
@@ -386,7 +390,7 @@ func TestBulkViewBulkSubmittedMsg(t *testing.T) {
 }
 
 func TestBulkViewBulkProgressMsg(t *testing.T) {
-	client := &MockAPIClient{}
+	client := &api.Client{}
 	view := NewBulkView(client)
 
 	t.Run("Progress update incomplete", func(t *testing.T) {
@@ -415,7 +419,7 @@ func TestBulkViewBulkProgressMsg(t *testing.T) {
 }
 
 func TestBulkViewBulkCancelledMsg(t *testing.T) {
-	client := &MockAPIClient{}
+	client := &api.Client{}
 	view := NewBulkView(client)
 
 	msg := bulkCancelledMsg{}
@@ -427,7 +431,7 @@ func TestBulkViewBulkCancelledMsg(t *testing.T) {
 }
 
 func TestBulkViewErrMsg(t *testing.T) {
-	client := &MockAPIClient{}
+	client := &api.Client{}
 	view := NewBulkView(client)
 
 	testError := assert.AnError
@@ -441,7 +445,7 @@ func TestBulkViewErrMsg(t *testing.T) {
 }
 
 func TestBulkViewRendering(t *testing.T) {
-	client := &MockAPIClient{}
+	client := &api.Client{}
 	view := NewBulkView(client)
 
 	t.Run("Before window size is set", func(t *testing.T) {
@@ -452,7 +456,7 @@ func TestBulkViewRendering(t *testing.T) {
 	t.Run("File select mode rendering", func(t *testing.T) {
 		view.width = 80
 		view.height = 24
-		view.mode = ModeFileSelect
+		view.mode = ModeFileBrowser
 
 		output := view.View()
 
@@ -535,7 +539,7 @@ func TestBulkViewRendering(t *testing.T) {
 }
 
 func TestBulkViewStatusLineHelp(t *testing.T) {
-	client := &MockAPIClient{}
+	client := &api.Client{}
 	view := NewBulkView(client)
 	view.width = 80
 	view.height = 24
@@ -544,7 +548,7 @@ func TestBulkViewStatusLineHelp(t *testing.T) {
 		mode     BulkMode
 		expected string
 	}{
-		{ModeFileSelect, "↑↓:navigate space:select enter:confirm F:files q:quit"},
+		{ModeFileBrowser, "↑↓:navigate space:select enter:confirm F:files q:quit"},
 		{ModeRunList, "↑↓:navigate space:toggle F:files ctrl+s:submit q:quit"},
 		{ModeRunEdit, "q:quit ?:help"},
 		{ModeProgress, "q:quit ?:help"},
@@ -559,7 +563,7 @@ func TestBulkViewStatusLineHelp(t *testing.T) {
 }
 
 func TestBulkViewLayoutSystem(t *testing.T) {
-	client := &MockAPIClient{}
+	client := &api.Client{}
 	view := NewBulkView(client)
 
 	// Simulate window size update
@@ -570,8 +574,8 @@ func TestBulkViewLayoutSystem(t *testing.T) {
 	assert.NotNil(t, view.layout)
 
 	// Test that rendering methods use the layout
-	view.mode = ModeFileSelect
-	output := view.renderFileSelect()
+	view.mode = ModeFileBrowser
+	output := view.renderFileBrowser()
 	assert.NotEmpty(t, output)
 
 	view.mode = ModeRunList
@@ -592,7 +596,7 @@ func TestBulkViewLayoutSystem(t *testing.T) {
 }
 
 func TestBulkViewModelInterface(t *testing.T) {
-	client := &MockAPIClient{}
+	client := &api.Client{}
 	view := NewBulkView(client)
 
 	// Verify it implements tea.Model interface
@@ -607,13 +611,13 @@ func TestBulkViewModelInterface(t *testing.T) {
 }
 
 func TestBulkViewNavigationMessages(t *testing.T) {
-	client := &MockAPIClient{}
+	client := &api.Client{}
 	view := NewBulkView(client)
 	view.width = 80
 	view.height = 24
 
 	t.Run("File select quit returns NavigateBackMsg", func(t *testing.T) {
-		view.mode = ModeFileSelect
+		view.mode = ModeFileBrowser
 		keyMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}}
 		
 		_, cmd := view.Update(keyMsg)
@@ -638,7 +642,7 @@ func TestBulkViewNavigationMessages(t *testing.T) {
 }
 
 func TestBulkViewDimensions(t *testing.T) {
-	client := &MockAPIClient{}
+	client := &api.Client{}
 	view := NewBulkView(client)
 
 	tests := []struct {

@@ -449,32 +449,23 @@ func (v *CreateRunView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Mo
 		}
 	}
 	
-	// Handle 'q' specially - in normal mode it should navigate back
-	if keyString == "q" && !v.form.IsInsertMode() {
-		debug.LogToFilef("🔙 CREATE VIEW HandleKey: 'q' in normal mode - navigating back")
-		v.saveFormData()
-		return true, v, func() tea.Msg {
-			return messages.NavigateBackMsg{}
-		}
+	// In insert mode, we need to allow 'q' and 'b' to be typed
+	if v.form.IsInsertMode() && (keyString == "q" || keyString == "b") {
+		debug.LogToFilef("✏️ CREATE VIEW HandleKey: '%s' in insert mode - allowing typing", keyString)
+		return false, v, nil // Let it go through to form for typing
 	}
 	
-	// Handle 'b' specially - in normal mode it should navigate back  
-	if keyString == "b" && !v.form.IsInsertMode() {
-		debug.LogToFilef("🔙 CREATE VIEW HandleKey: 'b' in normal mode - navigating back")
-		v.saveFormData()
-		return true, v, func() tea.Msg {
-			return messages.NavigateBackMsg{}
-		}
-	}
+	// In normal mode, 'q' and 'b' are handled by the keymap registry for back navigation
+	// We don't need to handle them here anymore since the registry maps them to ActionNavigateBack
 	
-	// Block backspace navigation in normal mode
+	// Block backspace navigation in normal mode (allow typing in insert mode)
 	if keyString == "backspace" && !v.form.IsInsertMode() {
 		debug.LogToFilef("🚫 CREATE VIEW HandleKey: Blocking backspace navigation in normal mode")
 		return true, v, nil
 	}
 	
-	// Let everything else go through to the form's Update method
-	debug.LogToFilef("➡️ CREATE VIEW HandleKey: Passing '%s' through to form Update", keyString)
+	// Let everything else go through - the keymap registry will handle navigation keys
+	debug.LogToFilef("➡️ CREATE VIEW HandleKey: Not handling '%s', letting keymap registry decide", keyString)
 	return false, v, nil
 }
 

@@ -234,10 +234,10 @@ func (f *CustomCreateForm) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		
 		switch msg.String() {
 		case "q", "b":
-			// These should be handled by CreateRunView's HandleKey
-			// If they reach here, just ignore them
-			debug.LogToFilef("⚠️ CUSTOM FORM: Navigation key '%s' in normal mode reached form (should have been handled by HandleKey)", msg.String())
-			// Don't process - let parent handle
+			// These should be handled by the keymap registry for navigation
+			// If they reach here, just pass them through
+			debug.LogToFilef("🔑 CUSTOM FORM: Navigation key '%s' in normal mode - passing through", msg.String())
+			// Don't process - let keymap registry handle navigation
 			return f, nil
 			
 		case "i":

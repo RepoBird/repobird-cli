@@ -1,9 +1,11 @@
 package views
 
 import (
+	"context"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/repobird/repobird-cli/internal/tui/cache"
 	"github.com/repobird/repobird-cli/internal/tui/messages"
 	"github.com/stretchr/testify/assert"
@@ -15,28 +17,81 @@ type MockCreateAPIClient struct {
 	mock.Mock
 }
 
-func (m *MockCreateAPIClient) CreateRunAPI(request interface{}) (interface{}, error) {
-	args := m.Called(request)
+func (m *MockCreateAPIClient) ListRuns(ctx context.Context, page, limit int) (*models.ListRunsResponse, error) {
+	args := m.Called(ctx, page, limit)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0), args.Error(1)
+	return args.Get(0).(*models.ListRunsResponse), args.Error(1)
 }
 
-func (m *MockCreateAPIClient) GetRunAPI(id string) (interface{}, error) {
+func (m *MockCreateAPIClient) ListRunsLegacy(limit, offset int) ([]*models.RunResponse, error) {
+	args := m.Called(limit, offset)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*models.RunResponse), args.Error(1)
+}
+
+func (m *MockCreateAPIClient) GetRun(id string) (*models.RunResponse, error) {
 	args := m.Called(id)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0), args.Error(1)
+	return args.Get(0).(*models.RunResponse), args.Error(1)
 }
 
-func (m *MockCreateAPIClient) ListRunsAPI() ([]interface{}, error) {
+func (m *MockCreateAPIClient) GetUserInfo() (*models.UserInfo, error) {
 	args := m.Called()
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]interface{}), args.Error(1)
+	return args.Get(0).(*models.UserInfo), args.Error(1)
+}
+
+func (m *MockCreateAPIClient) GetUserInfoWithContext(ctx context.Context) (*models.UserInfo, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.UserInfo), args.Error(1)
+}
+
+func (m *MockCreateAPIClient) ListRepositories(ctx context.Context) ([]models.APIRepository, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]models.APIRepository), args.Error(1)
+}
+
+func (m *MockCreateAPIClient) GetAPIEndpoint() string {
+	args := m.Called()
+	return args.String(0)
+}
+
+func (m *MockCreateAPIClient) VerifyAuth() (*models.UserInfo, error) {
+	args := m.Called()
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.UserInfo), args.Error(1)
+}
+
+func (m *MockCreateAPIClient) CreateRunAPI(request *models.APIRunRequest) (*models.RunResponse, error) {
+	args := m.Called(request)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.RunResponse), args.Error(1)
+}
+
+func (m *MockCreateAPIClient) GetFileHashes(ctx context.Context) ([]models.FileHashEntry, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]models.FileHashEntry), args.Error(1)
 }
 
 func TestCreateRunView_HandleKey_ESC(t *testing.T) {

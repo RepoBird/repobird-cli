@@ -54,10 +54,11 @@ func NewCoreKeyRegistry() *CoreKeyRegistry {
 	// Register default key mappings
 	// NOTE: 'b' is handled specially by dashboard to go to bulk view
 	// Other views should use 'q' or backspace for back navigation
+	registry.Register("b", ActionNavigateBack, "go back")
 	registry.Register("B", ActionNavigateBulk, "bulk operations")
 	registry.Register("n", ActionNavigateNew, "new run")
 	registry.Register("r", ActionNavigateRefresh, "refresh")
-	registry.Register("q", ActionNavigateQuit, "quit")
+	registry.Register("q", ActionNavigateBack, "go back")  // Changed to back navigation
 	registry.Register("Q", ActionGlobalQuit, "force quit")
 	registry.Register("?", ActionNavigateHelp, "help")
 	registry.Register("ctrl+c", ActionGlobalQuit, "force quit")

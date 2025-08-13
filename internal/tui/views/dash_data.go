@@ -54,11 +54,16 @@ func (d *DashboardView) loadDashboardData() tea.Cmd {
 	return func() tea.Msg {
 		debug.LogToFilef("\n[LOAD DASHBOARD DATA] Starting...\n")
 
+		// Check if we're in debug mode (check for negative user ID)
+		userInfo := d.cache.GetUserInfo()
+		isDebugMode := userInfo != nil && userInfo.ID < 0
+		
 		// First try to load from run cache which should always have data
 		runs, cached, detailsCache := d.cache.GetCachedList()
-		debug.LogToFilef("  Cache check: cached=%v, runs=%d, details=%d\n", cached, len(runs), len(detailsCache))
+		debug.LogToFilef("  Cache check: cached=%v, runs=%d, details=%d, isDebugMode=%v\n", cached, len(runs), len(detailsCache), isDebugMode)
 
-		if cached && len(runs) > 0 {
+		// In debug mode, always fetch fresh data
+		if cached && len(runs) > 0 && !isDebugMode {
 			// Validate that cached data is not test data
 			isValidCache := true
 			for _, run := range runs {

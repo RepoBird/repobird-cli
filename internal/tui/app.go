@@ -110,6 +110,13 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		debug.LogToFilef("⌨️ APP: Received KeyMsg: '%s' ⌨️\n", keyMsg.String())
 		if handled, model, cmd := a.processKeyWithFiltering(keyMsg); handled {
 			debug.LogToFilef("✋ APP: Key '%s' was HANDLED by centralized processor ✋\n", keyMsg.String())
+			debug.LogToFilef("🔍 APP: After processKey - model type=%T, cmd is nil=%v\n", model, cmd == nil)
+			
+			// If the model is the app itself and we have a command, execute it
+			if appModel, isApp := model.(*App); isApp && cmd != nil {
+				debug.LogToFilef("📦 APP: Model is App, executing command\n")
+				return appModel, cmd
+			}
 			return model, cmd
 		}
 		debug.LogToFilef("➡️ APP: Key '%s' NOT handled by centralized processor, delegating to view ➡️\n", keyMsg.String())
@@ -190,15 +197,20 @@ func (a *App) handleNavigation(msg messages.NavigationMsg) (tea.Model, tea.Cmd) 
 		return a, a.current.Init()
 
 	case messages.NavigateBackMsg:
+		debug.LogToFilef("🔙 HANDLE NAV: NavigateBackMsg - stack length=%d\n", len(a.viewStack))
 		if len(a.viewStack) > 0 {
 			// Pop from stack
-			a.current = a.viewStack[len(a.viewStack)-1]
+			previousView := a.viewStack[len(a.viewStack)-1]
+			debug.LogToFilef("🔙 HANDLE NAV: Popping from stack, going back to %T\n", previousView)
+			a.current = previousView
 			a.viewStack = a.viewStack[:len(a.viewStack)-1]
 
 			// Refresh the view
+			debug.LogToFilef("🔄 HANDLE NAV: Initializing previous view %T\n", a.current)
 			return a, a.current.Init()
 		}
 		// No history - go to dashboard
+		debug.LogToFilef("🏠 HANDLE NAV: No history, going to dashboard\n")
 		return a.handleNavigation(messages.NavigateToDashboardMsg{})
 
 	case messages.NavigateToListMsg:
@@ -353,8 +365,17 @@ func (a *App) processKeyWithFiltering(keyMsg tea.KeyMsg) (handled bool, model te
 		// Check if view wants to handle this key with custom logic
 		if handled, model, cmd := viewKeymap.HandleKey(keyMsg); handled {
 			debug.LogToFilef("🎯 PROCESSOR: Key '%s' handled by view's custom handler 🎯\n", keyString)
-			// View provided custom handling
-			return true, model, cmd
+			debug.LogToFilef("🔍 PROCESSOR: handled=%v, model type=%T, cmd is nil=%v\n", handled, model, cmd == nil)
+			
+			// IMPORTANT: If the view returns itself as the model, we need to update a.current
+			// This ensures the view's state changes are preserved
+			if model != nil && model != a {
+				debug.LogToFilef("📝 PROCESSOR: Updating a.current from %T to %T\n", a.current, model)
+				a.current = model
+			}
+			
+			// View provided custom handling - return the app as the model so commands work
+			return true, a, cmd
 		}
 		debug.LogToFilef("➡️ PROCESSOR: Key '%s' not handled by view's custom handler ➡️\n", keyString)
 	} else {
@@ -400,6 +421,7 @@ func (a *App) handleGlobalAction(action keymap.KeyAction, keyMsg tea.KeyMsg) (ha
 // handleNavigationAction processes navigation actions like back, new, etc.
 func (a *App) handleNavigationAction(action keymap.KeyAction, keyMsg tea.KeyMsg) (handled bool, model tea.Model, cmd tea.Cmd) {
 	debug.LogToFilef("🎯 NAV ACTION: Processing action %v for key '%s' 🎯\n", action, keyMsg.String())
+	debug.LogToFilef("🔍 NAV ACTION: Current view type: %T\n", a.current)
 	var navMsg messages.NavigationMsg
 
 	switch action {
@@ -434,7 +456,9 @@ func (a *App) handleNavigationAction(action keymap.KeyAction, keyMsg tea.KeyMsg)
 
 	if navMsg != nil {
 		debug.LogToFilef("📨 NAV ACTION: Calling handleNavigation with %T 📨\n", navMsg)
+		debug.LogToFilef("🔍 NAV ACTION: ViewStack length: %d\n", len(a.viewStack))
 		model, cmd := a.handleNavigation(navMsg)
+		debug.LogToFilef("✅ NAV ACTION: handleNavigation returned model type=%T, cmd nil=%v\n", model, cmd == nil)
 		return true, model, cmd
 	}
 

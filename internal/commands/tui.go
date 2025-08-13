@@ -6,7 +6,10 @@ import (
 	"github.com/repobird/repobird-cli/internal/api"
 	"github.com/repobird/repobird-cli/internal/config"
 	"github.com/repobird/repobird-cli/internal/mock"
+	"github.com/repobird/repobird-cli/internal/models"
+	"github.com/repobird/repobird-cli/internal/services"
 	"github.com/repobird/repobird-cli/internal/tui"
+	tuiDebug "github.com/repobird/repobird-cli/internal/tui/debug"
 	"github.com/spf13/cobra"
 )
 
@@ -33,6 +36,22 @@ func runTUI(cmd *cobra.Command, args []string) error {
 		// Use mock client for testing
 		client := api.NewClient("mock-api-key", api.DefaultAPIURL, debug)
 		mockClient := mock.NewMockClient(client)
+		
+		// Set the debug user immediately for cache initialization
+		debugUserInfo := &models.UserInfo{
+			Email:          "debug-user@repobird.ai",
+			Name:           "Debug User",
+			ID:             -1, // Negative ID for debug mode
+			GithubUsername: "debug-user",
+			RemainingRuns:  100,
+			TotalRuns:      500,
+			Tier:           "premium",
+		}
+		services.SetCurrentUser(debugUserInfo)
+		
+		// Log debug mode activation
+		tuiDebug.LogToFilef("🎮 DEBUG MODE: Activated with mock client and debug user ID=%d 🎮\n", debugUserInfo.ID)
+		
 		app := tui.NewApp(mockClient)
 		return app.Run()
 	}

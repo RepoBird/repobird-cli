@@ -26,6 +26,13 @@ if [ -d "$HOME/.cache/repobird/debug" ]; then
     rm -rf "$HOME/.cache/repobird/debug"
 fi
 
+# Also clear the debug user cache for negative IDs
+if [ -d "$HOME/.cache/repobird/users/user--1" ]; then
+    echo "Removing debug user cache: user--1"
+    rm -rf "$HOME/.cache/repobird/users/user--1"
+fi
+
 echo "Test cache cleared. Your real user cache is preserved."
 echo ""
 echo "You can now run 'make tui' to test with your real account."
+echo "Or run 'make tui-debug' to test with mock data."

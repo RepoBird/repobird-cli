@@ -601,11 +601,17 @@ func (v *BulkView) renderFileBrowser() string {
 
 // renderRunList renders the run list view
 func (v *BulkView) renderRunList() string {
+	// Initialize layout if not done yet
 	if v.layout == nil {
 		v.layout = components.NewWindowLayout(v.width, v.height)
 	}
 
-	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("205"))
+	// Use WindowLayout system for consistent styling
+	boxStyle := v.layout.CreateStandardBox()
+	titleStyle := v.layout.CreateTitleStyle()
+	contentStyle := v.layout.CreateContentStyle()
+
+	// Title with count
 	title := titleStyle.Render(fmt.Sprintf("Bulk Runs (%d)", len(v.runs)))
 
 	// Repository info
@@ -623,9 +629,9 @@ func (v *BulkView) renderRunList() string {
 			prefix = "> "
 		}
 
-		title := run.Title
-		if title == "" {
-			title = fmt.Sprintf("Run %d", i+1)
+		runTitle := run.Title
+		if runTitle == "" {
+			runTitle = fmt.Sprintf("Run %d", i+1)
 		}
 
 		statusIcon := ""
@@ -635,24 +641,38 @@ func (v *BulkView) renderRunList() string {
 			statusIcon = "[ ] "
 		}
 
-		line := fmt.Sprintf("%s%s%s", prefix, statusIcon, title)
+		line := fmt.Sprintf("%s%s%s", prefix, statusIcon, runTitle)
 		if i == v.selectedRun {
 			line = selectedStyle.Render(line)
 		}
 		runsList.WriteString(line + "\n")
 	}
 
-	// Render status line
-	statusLine := v.renderStatusLine("BULK")
-
-	return lipgloss.JoinVertical(
+	// Combine content
+	content := lipgloss.JoinVertical(
 		lipgloss.Left,
-		title,
 		repoStyle.Render(repoInfo),
 		"",
 		runsList.String(),
-		statusLine,
 	)
+
+	// Style and size the content
+	styledContent := contentStyle.Render(content)
+
+	// Get proper dimensions from layout
+	boxWidth, boxHeight := v.layout.GetBoxDimensions()
+
+	// Create the main container with proper dimensions
+	mainContainer := boxStyle.
+		Width(boxWidth).
+		Height(boxHeight).
+		Render(lipgloss.JoinVertical(lipgloss.Left, title, "", styledContent))
+
+	// Status line
+	statusLine := v.renderStatusLine("BULK")
+
+	// Join with status line
+	return lipgloss.JoinVertical(lipgloss.Left, mainContainer, statusLine)
 }
 
 // renderStatusLine renders the status line
@@ -691,43 +711,118 @@ func (v *BulkView) renderStatusLine(layoutName string) string {
 		Render()
 }
 
-// renderRunEdit renders the run editing view (placeholder)
+// renderRunEdit renders the run editing view
 func (v *BulkView) renderRunEdit() string {
+	// Initialize layout if not done yet
 	if v.layout == nil {
 		v.layout = components.NewWindowLayout(v.width, v.height)
 	}
 
-	content := "Run Edit Mode - Implementation in bulk_run_editor.go"
-	statusLine := v.renderStatusLine("BULK")
-	
-	return lipgloss.JoinVertical(lipgloss.Left, content, statusLine)
-}
+	// Use WindowLayout system for consistent styling
+	boxStyle := v.layout.CreateStandardBox()
+	titleStyle := v.layout.CreateTitleStyle()
+	contentStyle := v.layout.CreateContentStyle()
 
-// renderProgress renders the progress view (placeholder)
-func (v *BulkView) renderProgress() string {
-	if v.layout == nil {
-		v.layout = components.NewWindowLayout(v.width, v.height)
-	}
+	title := titleStyle.Render("Edit Run")
 
-	var content string
-	if v.submitting {
-		content = fmt.Sprintf("%s Submitting bulk runs...", v.spinner.View())
+	var contentLines []string
+	if v.selectedRun < len(v.runs) {
+		run := v.runs[v.selectedRun]
+		contentLines = append(contentLines,
+			fmt.Sprintf("Title: %s", run.Title),
+			fmt.Sprintf("Target: %s", run.Target),
+			fmt.Sprintf("Prompt: %s", run.Prompt),
+			"",
+			"Edit mode not yet implemented.",
+			"Press ESC to return to list.",
+		)
 	} else {
-		content = "Progress Mode - Implementation in bulk_progress_view.go"
+		contentLines = append(contentLines, "No run selected for editing.")
 	}
-	
+
+	content := strings.Join(contentLines, "\n")
+	styledContent := contentStyle.Render(content)
+
+	// Get proper dimensions from layout
+	boxWidth, boxHeight := v.layout.GetBoxDimensions()
+
+	// Create the main container with proper dimensions
+	mainContainer := boxStyle.
+		Width(boxWidth).
+		Height(boxHeight).
+		Render(lipgloss.JoinVertical(lipgloss.Left, title, "", styledContent))
+
+	// Status line
 	statusLine := v.renderStatusLine("BULK")
-	
-	return lipgloss.JoinVertical(lipgloss.Left, content, statusLine)
+
+	// Join with status line
+	return lipgloss.JoinVertical(lipgloss.Left, mainContainer, statusLine)
 }
 
-// renderResults renders the results view (placeholder)
-func (v *BulkView) renderResults() string {
+// renderProgress renders the progress view
+func (v *BulkView) renderProgress() string {
+	// Initialize layout if not done yet
 	if v.layout == nil {
 		v.layout = components.NewWindowLayout(v.width, v.height)
 	}
 
-	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("205"))
+	// Use WindowLayout system for consistent styling
+	boxStyle := v.layout.CreateStandardBox()
+	titleStyle := v.layout.CreateTitleStyle()
+	contentStyle := v.layout.CreateContentStyle()
+
+	title := titleStyle.Render("Bulk Run Progress")
+
+	var contentLines []string
+	if v.submitting {
+		contentLines = append(contentLines,
+			fmt.Sprintf("%s Submitting bulk runs...", v.spinner.View()),
+			"",
+			fmt.Sprintf("Batch: %s", v.batchTitle),
+		)
+	} else if v.batchID != "" {
+		contentLines = append(contentLines,
+			fmt.Sprintf("Batch ID: %s", v.batchID),
+			"",
+			"Monitoring progress...",
+		)
+	} else {
+		contentLines = append(contentLines,
+			"Initializing batch submission...",
+		)
+	}
+
+	content := strings.Join(contentLines, "\n")
+	styledContent := contentStyle.Render(content)
+
+	// Get proper dimensions from layout
+	boxWidth, boxHeight := v.layout.GetBoxDimensions()
+
+	// Create the main container with proper dimensions
+	mainContainer := boxStyle.
+		Width(boxWidth).
+		Height(boxHeight).
+		Render(lipgloss.JoinVertical(lipgloss.Left, title, "", styledContent))
+
+	// Status line
+	statusLine := v.renderStatusLine("BULK")
+
+	// Join with status line
+	return lipgloss.JoinVertical(lipgloss.Left, mainContainer, statusLine)
+}
+
+// renderResults renders the results view
+func (v *BulkView) renderResults() string {
+	// Initialize layout if not done yet
+	if v.layout == nil {
+		v.layout = components.NewWindowLayout(v.width, v.height)
+	}
+
+	// Use WindowLayout system for consistent styling
+	boxStyle := v.layout.CreateStandardBox()
+	titleStyle := v.layout.CreateTitleStyle()
+	contentStyle := v.layout.CreateContentStyle()
+
 	title := titleStyle.Render("Bulk Run Results")
 
 	var content strings.Builder
@@ -762,20 +857,31 @@ func (v *BulkView) renderResults() string {
 				content.WriteString(fmt.Sprintf("    URL: %s\n", result.URL))
 			}
 		}
+	} else if v.error == nil {
+		content.WriteString("\nNo results to display.\n")
 	}
 
 	if v.batchID != "" {
 		content.WriteString(fmt.Sprintf("\nBatch ID: %s\n", v.batchID))
 	}
 
+	// Style the content
+	styledContent := contentStyle.Render(content.String())
+
+	// Get proper dimensions from layout
+	boxWidth, boxHeight := v.layout.GetBoxDimensions()
+
+	// Create the main container with proper dimensions
+	mainContainer := boxStyle.
+		Width(boxWidth).
+		Height(boxHeight).
+		Render(lipgloss.JoinVertical(lipgloss.Left, title, "", styledContent))
+
+	// Status line
 	statusLine := v.renderStatusLine("BULK")
 
-	return lipgloss.JoinVertical(
-		lipgloss.Left,
-		title,
-		content.String(),
-		statusLine,
-	)
+	// Join with status line
+	return lipgloss.JoinVertical(lipgloss.Left, mainContainer, statusLine)
 }
 
 // Implement CoreViewKeymap interface to control key behavior
