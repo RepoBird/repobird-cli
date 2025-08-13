@@ -42,6 +42,7 @@ func NewRunDetailsView(client APIClient, cache *cache.SimpleCache, runID string)
 		width:           80,    // default width
 		height:          24,    // default height
 		navigationMode:  true,  // Start in navigation mode
+		layout:          components.NewWindowLayout(80, 24), // Initialize global layout
 	}
 
 	return v

@@ -43,6 +43,8 @@ type RunDetailsView struct {
 	maxCacheRetries int
 	// Unified status line component
 	statusLine *components.StatusLine
+	// Global window layout for consistent sizing
+	layout *components.WindowLayout
 	// Clipboard feedback (still need blink timing)
 	yankBlink     bool
 	yankBlinkTime time.Time
@@ -131,28 +133,21 @@ func (v *RunDetailsView) handleWindowSizeMsg(msg tea.WindowSizeMsg) {
 	v.width = msg.Width
 	v.height = msg.Height
 
+	// Update global layout with new dimensions
+	v.layout.Update(msg.Width, msg.Height)
+
 	// Debug: Log window size changes
-	debug.LogToFilef("DEBUG: Details view handleWindowSizeMsg - width=%d, height=%d\n", msg.Width, msg.Height)
+	debug.LogToFilef("📐 DETAILS RESIZE: Window resize %dx%d 📐\n", msg.Width, msg.Height)
 
-	// Calculate actual height for viewport:
-	// - Title: 2 lines (title + blank line)
-	// - Header info: 2-3 lines (status, repo, etc.)
-	// - Status bar: 1 line
-	// - Help (when shown): estimate 3-4 lines
-	nonViewportHeight := 6 // Base: title(2) + header(2) + separator(1) + status bar(1)
-
-	viewportHeight := msg.Height - nonViewportHeight
-	if viewportHeight < 3 {
-		viewportHeight = 3 // Minimum usable height
-	}
-
-	v.viewport.Width = msg.Width - 4 // Account for border (2) + padding (2)
+	// Get viewport dimensions from global layout
+	viewportWidth, viewportHeight := v.layout.GetViewportDimensions()
+	v.viewport.Width = viewportWidth
 	v.viewport.Height = viewportHeight
 	v.help.Width = msg.Width
 
-	// Debug: Log viewport dimensions
-	debug.LogToFilef("DEBUG: Details viewport - width=%d, height=%d (non-viewport=%d)\n", 
-		msg.Width, viewportHeight, nonViewportHeight)
+	// Debug: Log viewport dimensions from layout
+	debug.LogToFilef("📐 DETAILS VIEWPORT: Layout-calculated %dx%d 📐\n", 
+		viewportWidth, viewportHeight)
 
 	// Update content to reflow for new width
 	v.updateContent()
@@ -273,42 +268,30 @@ func (v *RunDetailsView) View() string {
 		return ""
 	}
 
+	// Initialize layout if not done yet
+	if v.layout == nil {
+		v.layout = components.NewWindowLayout(v.width, v.height)
+	}
+
 	// Debug: Log rendering dimensions
 	debug.LogToFilef("🎨 DETAILS RENDER: Terminal dimensions - width=%d, height=%d 🎨\n", v.width, v.height)
 
 	// For very small terminals, render minimal content
-	if v.height < 5 || v.width < 20 {
-		return "Run ID: " + v.run.GetIDString()
+	if !v.layout.IsValidDimensions() {
+		return v.layout.GetMinimalView("Run ID: " + v.run.GetIDString())
 	}
 
-	// Calculate box dimensions - leave margins to prevent border cutoff
-	boxWidth := v.width - 1   // Leave 1 pixel to prevent right border cutoff
-	boxHeight := v.height - 2 // Reserve 1 line for statusline + 1 for top margin
+	// Get dimensions from global layout
+	boxWidth, boxHeight := v.layout.GetBoxDimensions()
 
-	if boxWidth < 10 {
-		boxWidth = 10
-	}
-	if boxHeight < 3 {
-		boxHeight = 3
-	}
+	// Debug: Log box dimensions from layout
+	debug.LogToFilef("📦 DETAILS BOX: Layout-calculated dimensions - width=%d, height=%d 📦\n", boxWidth, boxHeight)
 
-	// Debug: Log box dimensions
-	debug.LogToFilef("📦 DETAILS BOX: Box dimensions - width=%d, height=%d 📦\n", boxWidth, boxHeight)
+	// Create standard box using global layout
+	boxStyle := v.layout.CreateStandardBox()
 
-	// Box style with rounded border
-	boxStyle := lipgloss.NewStyle().
-		Width(boxWidth).
-		Height(boxHeight).
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("63"))
-
-	// Title bar (inside the box) - no background to avoid conflict with cursor
-	titleStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("63")). // Use cyan color for text instead of background
-		Width(boxWidth-2).                // Account for border
-		Align(lipgloss.Center).
-		Padding(0, 1)
+	// Create standard title using global layout
+	titleStyle := v.layout.CreateTitleStyle()
 
 	// Create title with status
 	statusIcon := styles.GetStatusIcon(string(v.run.Status))
@@ -338,8 +321,8 @@ func (v *RunDetailsView) View() string {
 
 	title := titleStyle.Render(titleText)
 
-	// Content area height (subtract title height from box interior)
-	contentHeight := boxHeight - 3 // 1 for title, 2 for borders
+	// Get content height from global layout
+	_, contentHeight := v.layout.GetContentDimensions()
 
 	// Create viewport content
 	var innerContent string
@@ -363,23 +346,21 @@ func (v *RunDetailsView) View() string {
 			Padding(1, 2)
 		innerContent = lipgloss.JoinVertical(lipgloss.Left, title, errorStyle.Render(errorText))
 	} else {
-		// Render content with scrollable viewport - use full available space
-		v.viewport.Width = boxWidth - 4 // Account for border (2) + padding (2)
-		v.viewport.Height = contentHeight
+		// Set viewport dimensions from global layout
+		viewportWidth, viewportHeight := v.layout.GetViewportDimensions()
+		v.viewport.Width = viewportWidth
+		v.viewport.Height = viewportHeight
 
 		// Debug: Log viewport dimensions during rendering
 		debug.LogToFilef("🔍 DETAILS VIEWPORT: During render - width=%d, height=%d 🔍\n", 
-			v.viewport.Width, v.viewport.Height)
+			viewportWidth, viewportHeight)
 
 		// Get content with highlighting
 		contentLines := v.renderContentWithCursor()
 		content := strings.Join(contentLines, "\n")
 
-		// Apply padding to content
-		contentStyle := lipgloss.NewStyle().
-			Width(boxWidth-2).
-			Height(contentHeight).
-			Padding(0, 1)
+		// Create standard content style using global layout
+		contentStyle := v.layout.CreateContentStyle()
 
 		innerContent = lipgloss.JoinVertical(lipgloss.Left, title, contentStyle.Render(content))
 	}

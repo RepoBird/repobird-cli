@@ -44,6 +44,7 @@ The Terminal User Interface provides rich, interactive experiences using Bubble 
 │     Self-loading, minimal constructors, no coupling     │
 ├──────────────────────────────────────────────────────────┤
 │  Shared Components: ScrollableList │ Form │ StatusLine   │
+│                   WindowLayout (Global Sizing)           │
 ├──────────────────────────────────────────────────────────┤
 │    Cache (SharedState) │ Messages │ Debug │ Styles       │
 └──────────────────────────────────────────────────────────┘

@@ -77,6 +77,7 @@ The TUI uses reusable components across views:
 - `Form` - Input forms with validation and navigation  
 - `StatusLine` - Unified status bar with loading and data info
 - `KeyMap` - Standard keybindings for consistent behavior
+- `WindowLayout` - Global layout system for consistent sizing and borders
 
 #### View History
 - **Back navigation** - Press `q`, `ESC`, or `b` to go back
@@ -319,6 +320,50 @@ Switch layouts using:
 ## Shared Components
 
 The TUI uses reusable components for consistency across views:
+
+### WindowLayout Component
+**Global layout system for consistent sizing and borders across all views.**
+
+#### Purpose
+Eliminates inconsistent view sizing by providing centralized layout calculations. All views except the Dashboard (which uses multi-column layout) should use WindowLayout for consistent borders and dimensions.
+
+#### Key Features
+- **Automatic Border Calculations**: Accounts for lipgloss border expansion (2px wider than set width)
+- **Consistent Margins**: Proper top/bottom spacing to prevent border cutoffs
+- **Viewport Sizing**: Calculates content area dimensions for bubble tea viewports
+- **Standard Styling**: Provides consistent box, title, and content styles
+- **Responsive Design**: Handles terminal resizing and small screen fallbacks
+
+#### Usage Pattern
+```go
+// In view constructor
+layout: components.NewWindowLayout(width, height)
+
+// In View() method
+boxStyle := v.layout.CreateStandardBox()
+titleStyle := v.layout.CreateTitleStyle()
+contentStyle := v.layout.CreateContentStyle()
+
+// For viewports
+viewportWidth, viewportHeight := v.layout.GetViewportDimensions()
+```
+
+#### Methods
+- `GetBoxDimensions()` - Returns width/height for lipgloss containers
+- `GetViewportDimensions()` - Returns content area for bubble tea viewports
+- `CreateStandardBox()` - Standard box style with borders
+- `CreateTitleStyle()` - Consistent title formatting
+- `CreateContentStyle()` - Content area styling
+- `IsValidDimensions()` - Checks if terminal is large enough
+- `Update(width, height)` - Recalculates on terminal resize
+
+#### When to Use
+- ✅ **Details View**: Single-box layout with content
+- ✅ **Status View**: Single-box info display
+- ✅ **Create Run View**: Form-based views
+- ✅ **Error View**: Error display views
+- ✅ **List View**: Single-column list views
+- ❌ **Dashboard**: Uses custom multi-column layout
 
 ### ScrollableList Component
 - Multi-column scrollable lists with keyboard navigation

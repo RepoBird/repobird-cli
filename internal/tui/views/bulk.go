@@ -1,6 +1,8 @@
 package views
 
 import (
+	"strings"
+	
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
@@ -125,7 +127,7 @@ func NewBulkView(client *api.Client) *BulkView {
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
 	fileSelector := components.NewBulkFileSelector(80, 24)
-	fileSelector.SetActive(true) // Activate the file selector
+	// Don't activate immediately - show instructions first
 	
 	return &BulkView{
 		client:       client,
@@ -328,6 +330,11 @@ func (v *BulkView) handleFileSelectKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			v.mode = ModeRunList
 		}
 		return v, nil
+	case key.Matches(msg, v.keys.FileMode):
+		// 'F' key pressed - activate file selector and start loading files
+		debug.LogToFilef("DEBUG: BulkView.handleFileSelectKeys() - 'F' key pressed, activating file selector\n")
+		cmd := v.fileSelector.Activate()
+		return v, cmd
 	default:
 		// File selector doesn't need standard Bubble Tea updates
 		debug.LogToFilef("DEBUG: BulkView.handleFileSelectKeys() - unhandled key: '%s'\n", msg.String())
@@ -399,6 +406,13 @@ func (v *BulkView) renderFileSelect() string {
 		debug.LogToFile("DEBUG: BulkView.renderFileSelect() - fileSelector is nil!\n")
 		return "File selector not initialized"
 	}
+	
+	// Check if file selector is active
+	if !v.fileSelector.IsActive() {
+		debug.LogToFile("DEBUG: BulkView.renderFileSelect() - showing instructions (selector not active)\n")
+		return v.renderBulkInstructions()
+	}
+	
 	debug.LogToFile("DEBUG: BulkView.renderFileSelect() - calling fileSelector.View()\n")
 	result := v.fileSelector.View(nil) // Pass nil for StatusLine - will need to be fixed
 	debug.LogToFilef("DEBUG: BulkView.renderFileSelect() - result length: %d\n", len(result))
@@ -419,6 +433,56 @@ func (v *BulkView) renderProgress() string {
 
 func (v *BulkView) renderResults() string {
 	return "Results Mode - Implementation in separate files"
+}
+
+// renderBulkInstructions renders the initial instruction screen for bulk operations
+func (v *BulkView) renderBulkInstructions() string {
+	debug.LogToFile("DEBUG: BulkView.renderBulkInstructions() called\n")
+	
+	if v.width <= 0 || v.height <= 0 {
+		return "⟳ Initializing Bulk Instructions..."
+	}
+
+	// Calculate available space
+	availableHeight := v.height - 3 // Reserve space for title and status
+	availableWidth := v.width - 4   // Account for padding
+
+	// Create instruction text
+	instructions := []string{
+		"📦 Bulk Run Operations",
+		"",
+		"This view allows you to run multiple AI tasks from configuration files.",
+		"",
+		"Instructions:",
+		"• Press 'F' to browse and select configuration files",
+		"• Supported formats: JSON, YAML, JSONL, Markdown",
+		"• You can select multiple files to process together",
+		"• Each file can contain one or more run configurations",
+		"",
+		"Key Bindings:",
+		"• F     - Browse files (Fuzzy finder)",
+		"• L     - View run list (if runs are loaded)",
+		"• q     - Quit to dashboard",
+		"• ?     - Show help",
+		"",
+		"Ready to get started? Press 'F' to browse files!",
+	}
+
+	// Style for the instructions
+	instructionStyle := lipgloss.NewStyle().
+		Width(availableWidth).
+		Height(availableHeight).
+		Padding(2).
+		Margin(1).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("62")).
+		Align(lipgloss.Center, lipgloss.Center)
+
+	// Join instructions and apply styling
+	content := strings.Join(instructions, "\n")
+	styledContent := instructionStyle.Render(content)
+
+	return styledContent
 }
 
 // View renders the bulk view
