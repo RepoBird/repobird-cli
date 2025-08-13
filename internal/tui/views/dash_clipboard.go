@@ -4,7 +4,6 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/repobird/repobird-cli/internal/tui/components"
 )
 
 // copyToClipboard copies the given text to clipboard using ClipboardManager

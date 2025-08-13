@@ -180,8 +180,8 @@ func (d *DashboardView) renderRepositoriesTable() string {
 func (d *DashboardView) applyItemHighlight(item string, isSelected bool, isFocused bool, maxWidth int) string {
 	if isSelected {
 		if isFocused {
-			// Single blink: bright green briefly when yankBlink is true
-			if d.yankBlink && time.Since(d.yankBlinkTime) < 250*time.Millisecond {
+			// Single blink: bright green briefly when clipboard manager is highlighting
+			if d.clipboardManager.ShouldHighlight() {
 				// Bright green flash
 				return lipgloss.NewStyle().
 					Width(maxWidth). // Use Width to ensure exact width

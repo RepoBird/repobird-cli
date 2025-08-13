@@ -199,11 +199,15 @@ func (d *DashboardView) handleStatusInfoNavigation(msg tea.KeyMsg) (tea.Model, t
 					}
 					d.copiedMessageTime = time.Now()
 
-					// Start the blink animation
-					return d, tea.Batch(
-						d.startYankBlinkAnimation(),
-						d.startMessageClearTimer(2*time.Second),
-					)
+					// Start the blink animation using clipboard manager
+					cmd := d.copyToClipboard(textToCopy)
+					if cmd != nil {
+						return d, tea.Batch(
+							cmd,
+							d.startMessageClearTimer(2*time.Second),
+						)
+					}
+					return d, d.startMessageClearTimer(2*time.Second)
 				}
 			}
 		}

@@ -481,21 +481,13 @@ func (d *DashboardView) renderNotificationLine() string {
 	}
 
 	var notificationStyle lipgloss.Style
-	if time.Since(d.copiedMessageTime) < 250*time.Millisecond {
-		if d.yankBlink {
-			// Bright and bold when visible
-			notificationStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("82")).
-				Background(lipgloss.Color("235")).
-				Bold(true).
-				Width(d.width)
-		} else {
-			// Dimmer when "off" for blinking effect
-			notificationStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("240")).
-				Background(lipgloss.Color("235")).
-				Width(d.width)
-		}
+	if d.clipboardManager.ShouldHighlight() {
+		// Bright and bold when visible
+		notificationStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("82")).
+			Background(lipgloss.Color("235")).
+			Bold(true).
+			Width(d.width)
 	} else {
 		// After blinking period, show normally
 		notificationStyle = lipgloss.NewStyle().

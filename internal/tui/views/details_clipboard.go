@@ -16,7 +16,8 @@ func (v *RunDetailsView) copyWithFeedback(text, description string) tea.Cmd {
 		return nil
 	}
 
-	if err := utils.WriteToClipboard(text); err != nil {
+	cmd, err := v.clipboardManager.CopyWithBlink(text, description)
+	if err != nil {
 		v.statusLine.SetTemporaryMessageWithType("✗ Failed to copy", components.MessageError, 100*time.Millisecond)
 		return nil
 	}
@@ -29,9 +30,7 @@ func (v *RunDetailsView) copyWithFeedback(text, description string) tea.Cmd {
 	}
 
 	v.statusLine.SetTemporaryMessageWithType(message, components.MessageSuccess, 100*time.Millisecond)
-	v.yankBlink = true
-	v.yankBlinkTime = time.Now()
-	return v.startYankBlinkAnimation()
+	return cmd
 }
 
 // truncateForDisplay truncates text for display in status messages
@@ -60,14 +59,13 @@ func (v *RunDetailsView) handleClipboardOperations(key string) tea.Cmd {
 
 	case "Y":
 		// Copy all content to clipboard
-		if err := v.copyAllContent(); err == nil {
-			v.statusLine.SetTemporaryMessageWithType("📋 Copied all content", components.MessageSuccess, 100*time.Millisecond)
-		} else {
+		cmd, err := v.clipboardManager.CopyWithBlink(v.fullContent, "all content")
+		if err != nil {
 			v.statusLine.SetTemporaryMessageWithType("✗ Failed to copy", components.MessageError, 100*time.Millisecond)
+			return nil
 		}
-		v.yankBlink = true
-		v.yankBlinkTime = time.Now()
-		return v.startYankBlinkAnimation()
+		v.statusLine.SetTemporaryMessageWithType("📋 Copied all content", components.MessageSuccess, 100*time.Millisecond)
+		return cmd
 
 	case "o":
 		// Open URL in browser if current selection contains a URL
@@ -92,9 +90,8 @@ func (v *RunDetailsView) handleClipboardOperations(key string) tea.Cmd {
 			} else {
 				v.statusLine.SetTemporaryMessageWithType(fmt.Sprintf("✗ Failed to open URL: %v", err), components.MessageError, 1*time.Second)
 			}
-			v.yankBlink = true
-			v.yankBlinkTime = time.Now()
-			return tea.Batch(v.startYankBlinkAnimation(), v.startMessageClearTimer(1*time.Second))
+			// No blink for URL opening, just message clear timer
+			return v.startMessageClearTimer(1*time.Second)
 		}
 	}
 	return nil
@@ -112,29 +109,7 @@ func (v *RunDetailsView) getCurrentLine() string {
 	return ""
 }
 
-// copyCurrentLine copies the current line to clipboard
-func (v *RunDetailsView) copyCurrentLine() error {
-	currentLine := v.getCurrentLine()
-	if currentLine == "" {
-		return fmt.Errorf("no line to copy")
-	}
-	return utils.WriteToClipboard(currentLine)
-}
 
-// copyAllContent copies all content to clipboard
-func (v *RunDetailsView) copyAllContent() error {
-	if v.fullContent == "" {
-		return fmt.Errorf("no content to copy")
-	}
-	return utils.WriteToClipboard(v.fullContent)
-}
-
-// startYankBlinkAnimation starts the clipboard visual feedback animation
-func (v *RunDetailsView) startYankBlinkAnimation() tea.Cmd {
-	return tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
-		return yankBlinkMsg{}
-	})
-}
 
 // startMessageClearTimer starts a timer to clear temporary messages
 func (v *RunDetailsView) startMessageClearTimer(duration time.Duration) tea.Cmd {

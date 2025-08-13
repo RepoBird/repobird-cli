@@ -3,7 +3,6 @@ package views
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/repobird/repobird-cli/internal/models"
@@ -478,29 +477,18 @@ func (d *DashboardView) updateDetailsViewportContent() {
 
 			if d.focusedColumn == 2 && i == d.selectedDetailLine {
 				// Custom blinking: toggle between bright and normal colors
-				if d.copiedMessage != "" && time.Since(d.copiedMessageTime) < 250*time.Millisecond {
-					if d.yankBlink {
-						// Bright green when visible
-						styledLine = lipgloss.NewStyle().
-							Width(contentWidth). // Use Width to ensure exact width
-							MaxWidth(contentWidth).
-							Inline(true).
-							Background(lipgloss.Color("82")). // Bright green
-							Foreground(lipgloss.Color("0")).  // Black text
-							Bold(true).
-							Render(displayLine)
-					} else {
-						// Normal highlight when "off"
-						styledLine = lipgloss.NewStyle().
-							Width(contentWidth). // Use Width to ensure exact width
-							MaxWidth(contentWidth).
-							Inline(true).
-							Background(lipgloss.Color("63")).
-							Foreground(lipgloss.Color("255")).
-							Render(displayLine)
-					}
+				if d.clipboardManager.ShouldHighlight() {
+					// Bright green when visible
+					styledLine = lipgloss.NewStyle().
+						Width(contentWidth). // Use Width to ensure exact width
+						MaxWidth(contentWidth).
+						Inline(true).
+						Background(lipgloss.Color("82")). // Bright green
+						Foreground(lipgloss.Color("0")).  // Black text
+						Bold(true).
+						Render(displayLine)
 				} else {
-					// Regular highlight
+					// Normal highlight when not blinking
 					styledLine = lipgloss.NewStyle().
 						Width(contentWidth). // Use Width to ensure exact width
 						MaxWidth(contentWidth).

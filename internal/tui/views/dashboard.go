@@ -354,8 +354,9 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case components.ClipboardBlinkMsg:
 		// Handle clipboard blink animation
-		d.clipboardManager, cmd = d.clipboardManager.Update(msg)
-		return d, cmd
+		var clipCmd tea.Cmd
+		d.clipboardManager, clipCmd = d.clipboardManager.Update(msg)
+		return d, clipCmd
 
 	case messageClearMsg:
 		// Trigger UI refresh when message expires (no action needed - just refresh)

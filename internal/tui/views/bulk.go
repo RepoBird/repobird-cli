@@ -252,6 +252,27 @@ func (v *BulkView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return v, tea.Quit
 		}
 		
+		// FIRST: Handle components that need raw key input (like FZF)
+		switch v.mode {
+		case ModeFileBrowser:
+			if v.fileSelector != nil {
+				// Check if this is a navigation key that we should handle
+				if msg.Type == tea.KeyEsc || msg.String() == "q" {
+					// Handle navigation keys
+					debug.LogToFile("DEBUG: BulkView - handling navigation key in FileBrowser\n")
+					return v.handleFileBrowserKeys(msg)
+				} else {
+					// Pass all other keys directly to file selector for typing/search
+					debug.LogToFilef("DEBUG: BulkView - passing key '%s' to file selector\n", msg.String())
+					newFileSelector, cmd := v.fileSelector.Update(msg)
+					v.fileSelector = newFileSelector
+					cmds = append(cmds, cmd)
+					return v, tea.Batch(cmds...)
+				}
+			}
+		}
+		
+		// SECOND: Handle view-specific navigation keys
 		switch v.mode {
 		case ModeInstructions:
 			debug.LogToFile("DEBUG: BulkView - delegating to handleInstructionsKeys\n")
@@ -323,15 +344,7 @@ func (v *BulkView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, cmd)
 	}
 
-	// Update sub-components based on mode
-	switch v.mode {
-	case ModeFileBrowser:
-		if v.fileSelector != nil {
-			newFileSelector, cmd := v.fileSelector.Update(msg)
-			v.fileSelector = newFileSelector
-			cmds = append(cmds, cmd)
-		}
-	}
+	// Component updates are now handled directly in key processing above
 
 	debug.LogToFilef("DEBUG: BulkView.Update() - returning with %d commands\n", len(cmds))
 	return v, tea.Batch(cmds...)
@@ -365,9 +378,9 @@ func (v *BulkView) handleInstructionsKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 }
 
-// handleFileBrowserKeys handles keys in the file browser mode
+// handleFileBrowserKeys handles navigation keys in the file browser mode
 func (v *BulkView) handleFileBrowserKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	debug.LogToFilef("DEBUG: BulkView.handleFileBrowserKeys() - key='%s'\n", msg.String())
+	debug.LogToFilef("DEBUG: BulkView.handleFileBrowserKeys() - navigation key='%s'\n", msg.String())
 	switch {
 	case key.Matches(msg, v.keys.Quit) || msg.Type == tea.KeyEsc:
 		// Go back to instructions mode
@@ -375,9 +388,8 @@ func (v *BulkView) handleFileBrowserKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		v.fileSelector = nil // Clear file selector
 		return v, nil
 	default:
-		// Let file selector handle ALL other keys (including typing for search)
-		debug.LogToFilef("DEBUG: BulkView.handleFileBrowserKeys() - passing to file selector: '%s'\n", msg.String())
-		// File selector handles the key through Update in the main Update method
+		// This should only be called for navigation keys now
+		debug.LogToFilef("DEBUG: BulkView.handleFileBrowserKeys() - unhandled navigation key: '%s'\n", msg.String())
 		return v, nil
 	}
 }

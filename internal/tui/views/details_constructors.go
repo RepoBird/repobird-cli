@@ -25,24 +25,25 @@ func NewRunDetailsView(client APIClient, cache *cache.SimpleCache, runID string)
 
 	// Create the view with minimal state
 	v := &RunDetailsView{
-		client:          client,
-		runID:           runID,
-		run:             models.RunResponse{ID: runID}, // Minimal run object for loading
-		keys:            components.DefaultKeyMap,
-		help:            help.New(),
-		viewport:        vp,
-		spinner:         s,
-		loading:         true, // Always start loading
-		showLogs:        false,
-		statusHistory:   make([]string, 0),
-		cacheRetryCount: 0,
-		maxCacheRetries: 3,
-		statusLine:      components.NewStatusLine(),
-		cache:           cache, // Shared cache from app level
-		width:           80,    // default width
-		height:          24,    // default height
-		navigationMode:  true,  // Start in navigation mode
-		layout:          components.NewWindowLayout(80, 24), // Initialize global layout
+		client:           client,
+		runID:            runID,
+		run:              models.RunResponse{ID: runID}, // Minimal run object for loading
+		keys:             components.DefaultKeyMap,
+		help:             help.New(),
+		viewport:         vp,
+		spinner:          s,
+		loading:          true, // Always start loading
+		showLogs:         false,
+		statusHistory:    make([]string, 0),
+		cacheRetryCount:  0,
+		maxCacheRetries:  3,
+		statusLine:       components.NewStatusLine(),
+		clipboardManager: components.NewClipboardManager(),
+		cache:            cache, // Shared cache from app level
+		width:            80,    // default width
+		height:           24,    // default height
+		navigationMode:   true,  // Start in navigation mode
+		layout:           components.NewWindowLayout(80, 24), // Initialize global layout
 	}
 
 	return v

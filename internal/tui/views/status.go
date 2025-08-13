@@ -42,8 +42,7 @@ type StatusView struct {
 	// Copy feedback
 	copiedMessage     string
 	copiedMessageTime time.Time
-	yankBlinking      bool
-	yankBlinkCount    int
+	clipboardManager  components.ClipboardManager
 }
 
 // StatusSystemInfo contains system-level information for display
@@ -61,11 +60,12 @@ type StatusSystemInfo struct {
 // NewStatusView creates a new status view instance
 func NewStatusView(client APIClient) *StatusView {
 	return &StatusView{
-		client:      client,
-		layout:      components.NewWindowLayout(80, 24), // Default dimensions
-		keys:        components.DefaultKeyMap,
-		selectedRow: 0,
-		focusColumn: 0,
+		client:           client,
+		layout:           components.NewWindowLayout(80, 24), // Default dimensions
+		keys:             components.DefaultKeyMap,
+		selectedRow:      0,
+		focusColumn:      0,
+		clipboardManager: components.NewClipboardManager(),
 	}
 }
 
@@ -100,8 +100,11 @@ func (s *StatusView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case copySuccessMsg:
 		return s.handleCopySuccess(msg)
 		
-	case statusYankBlinkMsg:
-		return s.handleYankBlink()
+	case components.ClipboardBlinkMsg:
+		// Handle clipboard blink animation
+		var clipCmd tea.Cmd
+		s.clipboardManager, clipCmd = s.clipboardManager.Update(msg)
+		return s, clipCmd
 		
 	case clearMessageMsg:
 		s.copiedMessage = ""
@@ -397,7 +400,7 @@ func (s *StatusView) renderFieldLine(index int, key, value string, maxWidth int)
 		}
 		
 		// Add yank blink effect
-		if s.yankBlinking {
+		if s.clipboardManager.ShouldHighlight() {
 			if s.focusColumn == 0 {
 				keyStyle = keyStyle.Background(lipgloss.Color("10")) // Green flash
 			} else {
@@ -624,7 +627,6 @@ type copySuccessMsg struct {
 	text string
 }
 
-type statusYankBlinkMsg struct{}
 
 type clearMessageMsg struct{}
 
@@ -767,37 +769,20 @@ func (s *StatusView) handleCopySuccess(msg copySuccessMsg) (tea.Model, tea.Cmd) 
 	}
 	s.copiedMessageTime = time.Now()
 	
+	// Start blink animation using clipboard manager
+	cmd, err := s.clipboardManager.CopyWithBlink(msg.text, "")
+	if err != nil {
+		// Error already handled by clipboard operation, just show message
+		return s, s.startMessageClearTimer(2*time.Second)
+	}
+	
 	// Start blink animation and clear timer
 	return s, tea.Batch(
-		s.startYankBlinkAnimation(),
+		cmd,
 		s.startMessageClearTimer(2*time.Second),
 	)
 }
 
-// startYankBlinkAnimation starts the yank blink animation
-func (s *StatusView) startYankBlinkAnimation() tea.Cmd {
-	s.yankBlinking = true
-	s.yankBlinkCount = 0
-	
-	return tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
-		return statusYankBlinkMsg{}
-	})
-}
-
-// handleYankBlink handles yank blink animation frames
-func (s *StatusView) handleYankBlink() (tea.Model, tea.Cmd) {
-	s.yankBlinkCount++
-	
-	if s.yankBlinkCount >= 6 { // Blink 3 times (on/off = 2 per blink)
-		s.yankBlinking = false
-		return s, nil
-	}
-	
-	s.yankBlinking = !s.yankBlinking
-	return s, tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg {
-		return statusYankBlinkMsg{}
-	})
-}
 
 // startMessageClearTimer starts a timer to clear the copied message
 func (s *StatusView) startMessageClearTimer(duration time.Duration) tea.Cmd {

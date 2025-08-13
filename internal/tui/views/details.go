@@ -45,9 +45,8 @@ type RunDetailsView struct {
 	statusLine *components.StatusLine
 	// Global window layout for consistent sizing
 	layout *components.WindowLayout
-	// Clipboard feedback (still need blink timing)
-	yankBlink     bool
-	yankBlinkTime time.Time
+	// Clipboard manager for consistent feedback
+	clipboardManager components.ClipboardManager
 	// Store full content for clipboard operations
 	fullContent string
 	// Row navigation
@@ -234,12 +233,11 @@ func (v *RunDetailsView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case pollTickMsg:
 		cmds = append(cmds, v.handlePolling(msg)...)
 
-	case yankBlinkMsg:
-		// Single blink: toggle off after being on
-		if v.yankBlink {
-			v.yankBlink = false // Turn off after being on - completes the single blink
-		}
-		// No more blinking after the single on-off cycle
+	case components.ClipboardBlinkMsg:
+		// Handle clipboard blink animation
+		var clipCmd tea.Cmd
+		v.clipboardManager, clipCmd = v.clipboardManager.Update(msg)
+		return v, clipCmd
 
 	case messageClearMsg:
 		// Trigger UI refresh when message expires (no action needed - just refresh)

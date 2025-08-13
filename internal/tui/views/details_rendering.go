@@ -146,7 +146,7 @@ func (v *RunDetailsView) renderContentWithCursor() []string {
 
 		if shouldHighlight {
 			// Apply highlight style using full available width
-			highlightedLine := applyHighlightStyle(line, contentWidth, v.yankBlink, v.yankBlinkTime)
+			highlightedLine := applyHighlightStyle(line, contentWidth, v.clipboardManager.ShouldHighlight())
 			visibleLines = append(visibleLines, highlightedLine)
 		} else {
 			// Non-selected lines - use full available width
@@ -162,8 +162,8 @@ func (v *RunDetailsView) renderContentWithCursor() []string {
 }
 
 // applyHighlightStyle applies highlighting to a line
-func applyHighlightStyle(line string, width int, yankBlink bool, yankBlinkTime time.Time) string {
-	if yankBlink && !yankBlinkTime.IsZero() && time.Since(yankBlinkTime) < 250*time.Millisecond {
+func applyHighlightStyle(line string, width int, shouldBlink bool) string {
+	if shouldBlink {
 		// Bright green flash for copy feedback
 		highlightStyle := lipgloss.NewStyle().
 			Background(lipgloss.Color("82")). // Bright green
