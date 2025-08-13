@@ -183,3 +183,18 @@ func (c *SimpleCache) ClearAllNavigationContext() {
 		return true
 	})
 }
+
+// GetAuthCache retrieves cached authentication info with timestamp
+func (c *SimpleCache) GetAuthCache() (*AuthCache, bool) {
+	return c.hybrid.GetAuthCache()
+}
+
+// SetAuthCache stores authentication info with timestamp
+func (c *SimpleCache) SetAuthCache(userInfo *models.UserInfo) error {
+	return c.hybrid.SetAuthCache(userInfo)
+}
+
+// IsAuthCacheValid checks if cached authentication is still valid
+func (c *SimpleCache) IsAuthCacheValid() bool {
+	return c.hybrid.IsAuthCacheValid()
+}

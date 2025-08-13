@@ -72,12 +72,7 @@ func (v *RunDetailsView) Init() tea.Cmd {
 
 	var cmds []tea.Cmd
 
-	// Send a window size message with stored dimensions if we have them
-	if v.width > 0 && v.height > 0 {
-		cmds = append(cmds, func() tea.Msg {
-			return tea.WindowSizeMsg{Width: v.width, Height: v.height}
-		})
-	}
+	// Don't send WindowSizeMsg here - wait for the app to send it with correct dimensions
 
 	// Load run details if needed
 	debug.LogToFilef("DEBUG: Init() - v.loading=%t, runID='%s'\n", v.loading, v.runID)
@@ -132,8 +127,14 @@ func (v *RunDetailsView) handleWindowSizeMsg(msg tea.WindowSizeMsg) {
 	v.width = msg.Width
 	v.height = msg.Height
 
-	// Update global layout with new dimensions
-	v.layout.Update(msg.Width, msg.Height)
+	// Initialize layout if not already done
+	if v.layout == nil {
+		v.layout = components.NewWindowLayout(msg.Width, msg.Height)
+		debug.LogToFilef("📐 DETAILS INIT: Created new layout with %dx%d 📐\n", msg.Width, msg.Height)
+	} else {
+		// Update global layout with new dimensions
+		v.layout.Update(msg.Width, msg.Height)
+	}
 
 	// Debug: Log window size changes
 	debug.LogToFilef("📐 DETAILS RESIZE: Window resize %dx%d 📐\n", msg.Width, msg.Height)
@@ -266,9 +267,10 @@ func (v *RunDetailsView) View() string {
 		return ""
 	}
 
-	// Initialize layout if not done yet
+	// Initialize layout if not done yet (this should have been done in handleWindowSizeMsg)
 	if v.layout == nil {
 		v.layout = components.NewWindowLayout(v.width, v.height)
+		debug.LogToFilef("📐 DETAILS VIEW: Late layout init with %dx%d 📐\n", v.width, v.height)
 	}
 
 	// Debug: Log rendering dimensions

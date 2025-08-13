@@ -40,10 +40,10 @@ func NewRunDetailsView(client APIClient, cache *cache.SimpleCache, runID string)
 		statusLine:       components.NewStatusLine(),
 		clipboardManager: components.NewClipboardManager(),
 		cache:            cache, // Shared cache from app level
-		width:            80,    // default width
-		height:           24,    // default height
+		width:            0,     // Don't set default width - wait for WindowSizeMsg
+		height:           0,     // Don't set default height - wait for WindowSizeMsg
 		navigationMode:   true,  // Start in navigation mode
-		layout:           components.NewWindowLayout(80, 24), // Initialize global layout
+		layout:           nil,    // Don't initialize layout until we have dimensions
 	}
 
 	return v
