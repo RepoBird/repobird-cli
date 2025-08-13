@@ -20,7 +20,7 @@ type CreateRunView struct {
 	client APIClient
 	cache  *tuicache.SimpleCache
 	layout *components.WindowLayout
-	form   *components.FormComponent
+	form   *CustomCreateForm // Using custom form now
 	width  int
 	height int
 
@@ -37,64 +37,10 @@ func NewCreateRunView(client APIClient, cache *tuicache.SimpleCache) *CreateRunV
 		client: client,
 		cache:  cache,
 		layout: components.NewWindowLayout(80, 24), // Default dimensions
-		form:   createForm(),
+		form:   NewCustomCreateForm(),               // Use custom form
 	}
 
 	return v
-}
-
-// createForm initializes the form component with all required fields
-func createForm() *components.FormComponent {
-	fields := []components.FormField{
-		{
-			Name:        "title",
-			Label:       "Title",
-			Type:        components.TextInput,
-			Placeholder: "Brief description of the task",
-			Required:    true,
-		},
-		{
-			Name:        "repository",
-			Label:       "Repository",
-			Type:        components.TextInput,
-			Placeholder: "org/repo",
-			Required:    true,
-		},
-		{
-			Name:        "source",
-			Label:       "Source Branch",
-			Type:        components.TextInput,
-			Placeholder: "main",
-			Value:       "main", // Default value
-			Required:    true,
-		},
-		{
-			Name:        "target",
-			Label:       "Target Branch",
-			Type:        components.TextInput,
-			Placeholder: "feature/new-feature",
-			Required:    false,
-		},
-		{
-			Name:        "prompt",
-			Label:       "Prompt",
-			Type:        components.TextArea,
-			Placeholder: "Describe what you want the AI to do...",
-			Required:    true,
-		},
-		{
-			Name:        "context",
-			Label:       "Additional Context",
-			Type:        components.TextArea,
-			Placeholder: "Any additional context or requirements...",
-			Required:    false,
-		},
-	}
-
-	return components.NewForm(
-		components.WithFields(fields),
-		components.WithFormKeymaps(components.DefaultFormKeyMap()),
-	)
 }
 
 // Init initializes the create view and loads navigation context
@@ -135,6 +81,12 @@ func (v *CreateRunView) Init() tea.Cmd {
 		v.form.SetValue("prompt", savedFormData.Prompt)
 		v.form.SetValue("context", savedFormData.Context)
 		
+		// Restore the runtype
+		if savedFormData.RunType != "" {
+			v.form.SetValue("runtype", savedFormData.RunType)
+			debug.LogToFilef("⚙️ CREATE VIEW: Restored runtype: %s", savedFormData.RunType)
+		}
+		
 		// Restore the focus index if available in Fields map
 		if savedFormData.Fields != nil {
 			if focusIndexStr, ok := savedFormData.Fields["_focusIndex"]; ok {
@@ -161,6 +113,9 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case components.FormSubmitMsg:
 		return v.handleFormSubmit(msg)
+		
+	case CustomFormSubmitMsg:
+		return v.handleCustomFormSubmit(msg)
 
 	case runCreatedMsg:
 		return v.handleRunCreated(msg)
@@ -168,7 +123,7 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	default:
 		// Delegate to form component
 		newForm, cmd := v.form.Update(msg)
-		v.form = newForm.(*components.FormComponent)
+		v.form = newForm.(*CustomCreateForm)
 		return v, cmd
 	}
 }
@@ -185,7 +140,7 @@ func (v *CreateRunView) handleWindowSizeMsg(msg tea.WindowSizeMsg) (tea.Model, t
 		Width:  contentWidth,
 		Height: contentHeight,
 	})
-	v.form = newForm.(*components.FormComponent)
+	v.form = newForm.(*CustomCreateForm)
 
 	debug.LogToFilef("📐 CREATE VIEW: Updated dimensions: terminal=%dx%d, content=%dx%d", 
 		msg.Width, msg.Height, contentWidth, contentHeight)
@@ -217,7 +172,7 @@ func (v *CreateRunView) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// Delegate to form component for any remaining keys
 	newForm, cmd := v.form.Update(msg)
-	v.form = newForm.(*components.FormComponent)
+	v.form = newForm.(*CustomCreateForm)
 	
 	// Auto-save form data when values change
 	v.saveFormData()
@@ -225,7 +180,7 @@ func (v *CreateRunView) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return v, cmd
 }
 
-// handleFormSubmit processes form submission
+// handleFormSubmit processes form submission (legacy compatibility)
 func (v *CreateRunView) handleFormSubmit(msg components.FormSubmitMsg) (tea.Model, tea.Cmd) {
 	if v.submitting {
 		return v, nil // Prevent double submission
@@ -244,7 +199,39 @@ func (v *CreateRunView) handleFormSubmit(msg components.FormSubmitMsg) (tea.Mode
 		TargetBranch:   msg.Values["target"],
 		Prompt:         msg.Values["prompt"],
 		Context:        msg.Values["context"],
-		RunType:        "run", // Default to run type
+		RunType:        models.RunType("run"), // Default to run type
+	}
+
+	// Submit asynchronously
+	return v, v.submitRunCmd(request)
+}
+
+// handleCustomFormSubmit processes custom form submission
+func (v *CreateRunView) handleCustomFormSubmit(msg CustomFormSubmitMsg) (tea.Model, tea.Cmd) {
+	if v.submitting {
+		return v, nil // Prevent double submission
+	}
+
+	v.submitting = true
+	v.error = nil
+
+	debug.LogToFilef("📝 CREATE VIEW: Custom form submitted with values: %+v", msg.Values)
+
+	// Get runtype from form values, default to "run" if not specified
+	runType := msg.Values["runtype"]
+	if runType == "" {
+		runType = "run"
+	}
+
+	// Create run request from form values
+	request := &models.APIRunRequest{
+		Title:          msg.Values["title"],
+		RepositoryName: msg.Values["repository"],
+		SourceBranch:   msg.Values["source"],
+		TargetBranch:   msg.Values["target"],
+		Prompt:         msg.Values["prompt"],
+		Context:        msg.Values["context"],
+		RunType:        models.RunType(runType), // Use the selected run type
 	}
 
 	// Submit asynchronously
@@ -358,6 +345,12 @@ func (v *CreateRunView) saveFormData() {
 	fields := make(map[string]string)
 	fields["_focusIndex"] = fmt.Sprintf("%d", v.form.GetFocusIndex())
 	
+	// Get runtype from form values
+	runType := values["runtype"]
+	if runType == "" {
+		runType = "run" // Default
+	}
+	
 	formData := &tuicache.FormData{
 		Title:      values["title"],
 		Repository: values["repository"],
@@ -365,12 +358,12 @@ func (v *CreateRunView) saveFormData() {
 		Target:     values["target"],
 		Prompt:     values["prompt"],
 		Context:    values["context"],
-		RunType:    "run", // Default run type
+		RunType:    runType, // Save the selected run type
 		Fields:     fields, // Store focus index and other metadata
 	}
 	
 	v.cache.SetFormData(formData)
-	debug.LogToFilef("💾 CREATE VIEW: Form data saved to cache (focus: %d)", v.form.GetFocusIndex())
+	debug.LogToFilef("💾 CREATE VIEW: Form data saved to cache (focus: %d, runtype: %s)", v.form.GetFocusIndex(), runType)
 }
 
 // submitRunCmd creates a command to submit the run asynchronously
@@ -434,7 +427,7 @@ func (v *CreateRunView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Mo
 			// Pass backspace to form for text deletion
 			debug.LogToFilef("⌫ CREATE VIEW: Backspace in insert mode - passing to form")
 			newForm, cmd := v.form.Update(keyMsg)
-			v.form = newForm.(*components.FormComponent)
+			v.form = newForm.(*CustomCreateForm)
 			v.saveFormData() // Auto-save on change
 			return true, v, cmd
 			
@@ -442,7 +435,7 @@ func (v *CreateRunView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Mo
 			// In insert mode, these are just characters to type
 			debug.LogToFilef("⌨️ CREATE VIEW: Typing '%s' in insert mode", keyString)
 			newForm, cmd := v.form.Update(keyMsg)
-			v.form = newForm.(*components.FormComponent)
+			v.form = newForm.(*CustomCreateForm)
 			v.saveFormData() // Auto-save on change
 			return true, v, cmd
 			
@@ -476,7 +469,7 @@ func (v *CreateRunView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Mo
 			
 			// Let form handle the converted key
 			newForm, cmd := v.form.Update(newKeyMsg)
-			v.form = newForm.(*components.FormComponent)
+			v.form = newForm.(*CustomCreateForm)
 			return true, v, cmd
 			
 		case "d":

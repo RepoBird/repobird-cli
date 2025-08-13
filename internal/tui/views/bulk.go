@@ -247,6 +247,15 @@ func (v *BulkView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			v.fileSelector.SetDimensions(msg.Width, msg.Height)
 		}
 
+	case components.FilesLoadedMsg:
+		// Forward file loading message to file selector if it exists
+		debug.LogToFilef("DEBUG: BulkView - received FilesLoadedMsg, forwarding to file selector\n")
+		if v.fileSelector != nil {
+			newFileSelector, cmd := v.fileSelector.Update(msg)
+			v.fileSelector = newFileSelector
+			cmds = append(cmds, cmd)
+		}
+
 	case tea.KeyMsg:
 		debug.LogToFilef("DEBUG: BulkView - handling KeyMsg: '%s', mode=%d\n", msg.String(), v.mode)
 		
@@ -754,6 +763,29 @@ func (v *BulkView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Model, 
 	keyString := keyMsg.String()
 	debug.LogToFilef("DEBUG: BulkView.HandleKey - received key '%s', mode=%d\n", keyString, v.mode)
 	
+	// Handle 'q' key for all modes - should go back, not quit app
+	if keyString == "q" {
+		debug.LogToFilef("DEBUG: BulkView.HandleKey - handling 'q' key for navigation\n")
+		
+		// In ModeInstructions, 'q' goes back to dashboard
+		if v.mode == ModeInstructions {
+			debug.LogToFilef("DEBUG: BulkView.HandleKey - 'q' in instructions mode, going back to dashboard\n")
+			return true, v, func() tea.Msg {
+				return messages.NavigateBackMsg{}
+			}
+		}
+		
+		// In ModeFileBrowser with INPUT mode, 'q' is text input
+		if v.mode == ModeFileBrowser && v.fileSelector != nil && v.fileSelector.GetInputMode() {
+			debug.LogToFilef("DEBUG: BulkView.HandleKey - passing 'q' to file selector as text input\n")
+			newFileSelector, cmd := v.fileSelector.Update(keyMsg)
+			v.fileSelector = newFileSelector
+			return true, v, cmd
+		}
+		
+		// In other modes, delegate to mode-specific handlers
+	}
+	
 	// When in ModeFileBrowser with FZF INPUT mode, handle keys specially
 	if v.mode == ModeFileBrowser && v.fileSelector != nil && v.fileSelector.GetInputMode() {
 		debug.LogToFilef("DEBUG: BulkView.HandleKey - in FZF INPUT mode, handling key '%s'\n", keyString)
@@ -763,13 +795,6 @@ func (v *BulkView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Model, 
 		case "backspace":
 			debug.LogToFilef("DEBUG: BulkView.HandleKey - passing backspace to file selector for deletion\n")
 			// Pass backspace to file selector for text deletion
-			newFileSelector, cmd := v.fileSelector.Update(keyMsg)
-			v.fileSelector = newFileSelector
-			return true, v, cmd
-			
-		case "q":
-			debug.LogToFilef("DEBUG: BulkView.HandleKey - passing 'q' to file selector as text input\n")
-			// In INPUT mode, 'q' is just a character to type, not quit!
 			newFileSelector, cmd := v.fileSelector.Update(keyMsg)
 			v.fileSelector = newFileSelector
 			return true, v, cmd
