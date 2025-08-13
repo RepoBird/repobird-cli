@@ -98,7 +98,7 @@ func (a *App) handleNavigation(msg messages.NavigationMsg) (tea.Model, tea.Cmd) 
 
 		// Create new view with minimal params
 		debug.LogToFile("DEBUG: App - creating new CreateRunView\n")
-		a.current = views.NewCreateRunView(a.client)
+		a.current = views.NewCreateRunView(a.client, a.cache)
 
 		// Set navigation context if provided
 		if msg.SelectedRepository != "" {

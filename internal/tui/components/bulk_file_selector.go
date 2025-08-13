@@ -28,6 +28,9 @@ type BulkFileSelector struct {
 	previewContent string
 	previewOffset  int
 
+	// Input mode state (NEW)
+	inputMode bool // true = INPUT mode (typing), false = NAVIGATION mode
+
 	// Dimensions
 	width  int
 	height int
@@ -121,6 +124,7 @@ func (b *BulkFileSelector) Activate() tea.Cmd {
 	b.active = true
 	b.loading = true
 	b.loadError = nil
+	b.inputMode = true // Start in INPUT mode by default
 	// Return command to load files progressively
 	return b.LoadFilesProgressiveCmd()
 }
@@ -259,124 +263,26 @@ func (b *BulkFileSelector) Update(msg tea.Msg) (*BulkFileSelector, tea.Cmd) {
 		return b, nil
 
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "esc", "ctrl+c", "ctrl+[":
-			b.active = false
-			return b, func() tea.Msg {
-				return BulkFileSelectedMsg{Canceled: true}
-			}
-
-		case "enter":
-			// Collect all selected files
-			var selected []string
-			for _, file := range b.files {
-				if file.Selected {
-					selected = append(selected, file.Path)
-				}
-			}
-
-			// Allow 1 or more files (single config file can contain multiple runs)
-			if len(selected) >= 1 {
+		// Handle ESC key based on current mode
+		if msg.String() == "esc" {
+			if b.inputMode {
+				// First ESC: exit INPUT mode to NAVIGATION mode
+				b.inputMode = false
+				return b, nil
+			} else {
+				// Second ESC: go back to BULK
 				b.active = false
 				return b, func() tea.Msg {
-					return BulkFileSelectedMsg{
-						Files:    selected,
-						Canceled: false,
-					}
+					return BulkFileSelectedMsg{Canceled: true}
 				}
 			}
+		}
 
-		case " ", "space":
-			// Toggle selection for current item
-			if b.cursor < len(b.filteredFiles) {
-				item := &b.filteredFiles[b.cursor]
-				item.Selected = !item.Selected
-				b.selectedFiles[item.Path] = item.Selected
-
-				// Update the original item too
-				for i := range b.files {
-					if b.files[i].Path == item.Path {
-						b.files[i].Selected = item.Selected
-						break
-					}
-				}
-
-				// Move to next item after selection
-				if b.cursor < len(b.filteredFiles)-1 {
-					b.cursor++
-				}
-			}
-
-		case "ctrl+a":
-			// Select all visible items
-			for i := range b.filteredFiles {
-				b.filteredFiles[i].Selected = true
-				b.selectedFiles[b.filteredFiles[i].Path] = true
-
-				// Update original items
-				for j := range b.files {
-					if b.files[j].Path == b.filteredFiles[i].Path {
-						b.files[j].Selected = true
-						break
-					}
-				}
-			}
-
-		case "ctrl+d":
-			// Deselect all (ctrl+d for deselect)
-			for i := range b.filteredFiles {
-				b.filteredFiles[i].Selected = false
-				b.selectedFiles[b.filteredFiles[i].Path] = false
-
-				// Update original items
-				for j := range b.files {
-					if b.files[j].Path == b.filteredFiles[i].Path {
-						b.files[j].Selected = false
-						break
-					}
-				}
-			}
-
-		case "up", "ctrl+p", "ctrl+k":
-			if b.cursor > 0 {
-				b.cursor--
-			} else if len(b.filteredFiles) > 0 {
-				// Wraparound to bottom
-				b.cursor = len(b.filteredFiles) - 1
-			}
-			b.updatePreview()
-
-		case "down", "ctrl+n", "ctrl+j":
-			if b.cursor < len(b.filteredFiles)-1 {
-				b.cursor++
-			} else if len(b.filteredFiles) > 0 {
-				// Wraparound to top
-				b.cursor = 0
-			}
-			b.updatePreview()
-
-		case "pgup":
-			b.cursor = max(0, b.cursor-10)
-
-		case "pgdown":
-			b.cursor = min(len(b.filteredFiles)-1, b.cursor+10)
-
-		case "backspace":
-			if len(b.filterInput) > 0 {
-				b.filterInput = b.filterInput[:len(b.filterInput)-1]
-				b.applyFilter()
-			}
-
-		case "ctrl+w":
-			b.filterInput = ""
-			b.applyFilter()
-
-		default:
-			// Handle single character input for filtering
-			if len(msg.String()) == 1 {
-				b.filterInput += msg.String()
-				b.applyFilter()
-			}
+		// Handle other keys based on mode
+		if b.inputMode {
+			return b.handleInputModeKeys(msg)
+		} else {
+			return b.handleNavigationModeKeys(msg)
 		}
 
 	case tea.WindowSizeMsg:
@@ -389,6 +295,218 @@ func (b *BulkFileSelector) Update(msg tea.Msg) (*BulkFileSelector, tea.Cmd) {
 	}
 
 	return b, nil
+}
+
+// handleInputModeKeys handles keys when in INPUT mode (typing/filtering)
+func (b *BulkFileSelector) handleInputModeKeys(msg tea.KeyMsg) (*BulkFileSelector, tea.Cmd) {
+	switch msg.String() {
+	case "ctrl+c", "ctrl+[":
+		b.active = false
+		return b, func() tea.Msg {
+			return BulkFileSelectedMsg{Canceled: true}
+		}
+
+	case "enter":
+		// Collect all selected files
+		var selected []string
+		for _, file := range b.files {
+			if file.Selected {
+				selected = append(selected, file.Path)
+			}
+		}
+
+		// Allow 1 or more files (single config file can contain multiple runs)
+		if len(selected) >= 1 {
+			b.active = false
+			return b, func() tea.Msg {
+				return BulkFileSelectedMsg{
+					Files:    selected,
+					Canceled: false,
+				}
+			}
+		}
+
+	case "backspace":
+		// In INPUT mode, backspace deletes from filter
+		if len(b.filterInput) > 0 {
+			b.filterInput = b.filterInput[:len(b.filterInput)-1]
+			b.applyFilter()
+		}
+
+	case "ctrl+w":
+		b.filterInput = ""
+		b.applyFilter()
+
+	case "ctrl+a":
+		// Select all visible items (allowed in INPUT mode)
+		for i := range b.filteredFiles {
+			b.filteredFiles[i].Selected = true
+			b.selectedFiles[b.filteredFiles[i].Path] = true
+
+			// Update original items
+			for j := range b.files {
+				if b.files[j].Path == b.filteredFiles[i].Path {
+					b.files[j].Selected = true
+					break
+				}
+			}
+		}
+
+	case "ctrl+d":
+		// Deselect all (allowed in INPUT mode)
+		for i := range b.filteredFiles {
+			b.filteredFiles[i].Selected = false
+			b.selectedFiles[b.filteredFiles[i].Path] = false
+
+			// Update original items
+			for j := range b.files {
+				if b.files[j].Path == b.filteredFiles[i].Path {
+					b.files[j].Selected = false
+					break
+				}
+			}
+		}
+
+	default:
+		// Handle single character input for filtering
+		if len(msg.String()) == 1 {
+			b.filterInput += msg.String()
+			b.applyFilter()
+		}
+	}
+
+	return b, nil
+}
+
+// handleNavigationModeKeys handles keys when in NAVIGATION mode (arrows, space, etc.)
+func (b *BulkFileSelector) handleNavigationModeKeys(msg tea.KeyMsg) (*BulkFileSelector, tea.Cmd) {
+	switch msg.String() {
+	case "ctrl+c", "ctrl+[":
+		b.active = false
+		return b, func() tea.Msg {
+			return BulkFileSelectedMsg{Canceled: true}
+		}
+
+	case "enter":
+		// Collect all selected files
+		var selected []string
+		for _, file := range b.files {
+			if file.Selected {
+				selected = append(selected, file.Path)
+			}
+		}
+
+		// Allow 1 or more files (single config file can contain multiple runs)
+		if len(selected) >= 1 {
+			b.active = false
+			return b, func() tea.Msg {
+				return BulkFileSelectedMsg{
+					Files:    selected,
+					Canceled: false,
+				}
+			}
+		}
+
+	case " ", "space":
+		// Toggle selection for current item
+		if b.cursor < len(b.filteredFiles) {
+			item := &b.filteredFiles[b.cursor]
+			item.Selected = !item.Selected
+			b.selectedFiles[item.Path] = item.Selected
+
+			// Update the original item too
+			for i := range b.files {
+				if b.files[i].Path == item.Path {
+					b.files[i].Selected = item.Selected
+					break
+				}
+			}
+
+			// Move to next item after selection
+			if b.cursor < len(b.filteredFiles)-1 {
+				b.cursor++
+			}
+		}
+
+	case "up", "ctrl+p", "ctrl+k", "k":
+		if b.cursor > 0 {
+			b.cursor--
+		} else if len(b.filteredFiles) > 0 {
+			// Wraparound to bottom
+			b.cursor = len(b.filteredFiles) - 1
+		}
+		b.updatePreview()
+
+	case "down", "ctrl+n", "ctrl+j", "j":
+		if b.cursor < len(b.filteredFiles)-1 {
+			b.cursor++
+		} else if len(b.filteredFiles) > 0 {
+			// Wraparound to top
+			b.cursor = 0
+		}
+		b.updatePreview()
+
+	case "pgup":
+		b.cursor = max(0, b.cursor-10)
+		b.updatePreview()
+
+	case "pgdown":
+		b.cursor = min(len(b.filteredFiles)-1, b.cursor+10)
+		b.updatePreview()
+
+	case "backspace", "b":
+		// In NAVIGATION mode, backspace/b goes back
+		b.active = false
+		return b, func() tea.Msg {
+			return BulkFileSelectedMsg{Canceled: true}
+		}
+
+	case "i":
+		// Switch to INPUT mode
+		b.inputMode = true
+
+	case "ctrl+a":
+		// Select all visible items
+		for i := range b.filteredFiles {
+			b.filteredFiles[i].Selected = true
+			b.selectedFiles[b.filteredFiles[i].Path] = true
+
+			// Update original items
+			for j := range b.files {
+				if b.files[j].Path == b.filteredFiles[i].Path {
+					b.files[j].Selected = true
+					break
+				}
+			}
+		}
+
+	case "ctrl+d":
+		// Deselect all
+		for i := range b.filteredFiles {
+			b.filteredFiles[i].Selected = false
+			b.selectedFiles[b.filteredFiles[i].Path] = false
+
+			// Update original items
+			for j := range b.files {
+				if b.files[j].Path == b.filteredFiles[i].Path {
+					b.files[j].Selected = false
+					break
+				}
+			}
+		}
+	}
+
+	return b, nil
+}
+
+// GetInputMode returns whether the selector is in input mode
+func (b *BulkFileSelector) GetInputMode() bool {
+	return b.inputMode
+}
+
+// GetFilterInput returns the current filter input string
+func (b *BulkFileSelector) GetFilterInput() string {
+	return b.filterInput
 }
 
 // applyFilter applies the fuzzy filter to files
@@ -672,4 +790,132 @@ func (b *BulkFileSelector) GetSelectedFiles() []string {
 		}
 	}
 	return selected
+}
+
+// GetFileListContent returns the left column content (file list with filter)
+func (b *BulkFileSelector) GetFileListContent(width, height int) string {
+	if !b.active {
+		return "Inactive"
+	}
+
+	var content []string
+
+	// Filter line with cursor
+	cursor := "█"
+	filterLine := fmt.Sprintf("Filter: %s%s", b.filterInput, cursor)
+	filterStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true)
+	content = append(content, filterStyle.Render(filterLine))
+	content = append(content, "") // Empty line
+
+	// Count selected files
+	selectedCount := len(b.GetSelectedFiles())
+	headerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("86")).Bold(true)
+	header := fmt.Sprintf("Files (%d/%d selected):", selectedCount, len(b.filteredFiles))
+	content = append(content, headerStyle.Render(header))
+
+	// File list
+	visibleFiles := height - 4 // Account for filter, spacing, and header
+	if visibleFiles < 1 {
+		visibleFiles = 1
+	}
+
+	start := 0
+	if b.cursor >= visibleFiles {
+		start = b.cursor - visibleFiles + 1
+	}
+
+	checkboxStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
+	selectedStyle := lipgloss.NewStyle().
+		Background(lipgloss.Color("62")).
+		Foreground(lipgloss.Color("230"))
+
+	for i := 0; i < visibleFiles && start+i < len(b.filteredFiles); i++ {
+		fileIdx := start + i
+		file := b.filteredFiles[fileIdx]
+
+		// Checkbox
+		checkbox := "[ ]"
+		if file.Selected {
+			checkbox = "[✓]"
+		}
+
+		// File type indicator
+		var typeIcon string
+		switch {
+		case strings.HasSuffix(strings.ToLower(file.Path), ".json"):
+			typeIcon = "📄"
+		case strings.HasSuffix(strings.ToLower(file.Path), ".yaml") || strings.HasSuffix(strings.ToLower(file.Path), ".yml"):
+			typeIcon = "📝"
+		case strings.HasSuffix(strings.ToLower(file.Path), ".md"):
+			typeIcon = "📖"
+		default:
+			typeIcon = "📁"
+		}
+
+		// Truncate filename to fit width
+		displayName := file.Display
+		maxNameWidth := width - 10 // Account for checkbox, icon, and spacing
+		if len(displayName) > maxNameWidth {
+			displayName = displayName[:maxNameWidth-3] + "..."
+		}
+
+		line := fmt.Sprintf("%s %s %s", 
+			checkboxStyle.Render(checkbox), 
+			typeIcon, 
+			displayName)
+
+		// Highlight current cursor position
+		if fileIdx == b.cursor {
+			line = selectedStyle.Render(line)
+		}
+
+		content = append(content, line)
+	}
+
+	return strings.Join(content, "\n")
+}
+
+// GetPreviewContent returns the right column content (file preview)
+func (b *BulkFileSelector) GetPreviewContent(width, height int) string {
+	if !b.active || b.cursor >= len(b.filteredFiles) {
+		return "No preview available"
+	}
+
+	// Preview header
+	headerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("86")).Bold(true)
+	file := b.filteredFiles[b.cursor]
+	header := fmt.Sprintf("Preview: %s", file.Display)
+
+	// Truncate header if too long
+	if len(header) > width {
+		header = header[:width-3] + "..."
+	}
+
+	var content []string
+	content = append(content, headerStyle.Render(header))
+	content = append(content, "") // Empty line
+
+	// Preview content
+	previewLines := height - 3 // Account for header and spacing
+	if previewLines < 1 {
+		previewLines = 1
+	}
+
+	if b.previewContent != "" {
+		lines := strings.Split(b.previewContent, "\n")
+		start := b.previewOffset
+		
+		for i := 0; i < previewLines && start+i < len(lines); i++ {
+			line := lines[start+i]
+			// Truncate long lines
+			if len(line) > width {
+				line = line[:width-3] + "..."
+			}
+			content = append(content, line)
+		}
+	} else {
+		content = append(content, "Loading preview...")
+	}
+
+	return strings.Join(content, "\n")
 }

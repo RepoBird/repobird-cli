@@ -77,6 +77,9 @@ type BulkView struct {
 	width        int
 	height       int
 
+	// Layout systems
+	doubleColumnLayout *components.DoubleColumnLayout // For FZF file browser
+
 	// Submission state
 	submitting bool
 	batchID    string
@@ -256,18 +259,34 @@ func (v *BulkView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch v.mode {
 		case ModeFileBrowser:
 			if v.fileSelector != nil {
-				// Check if this is a navigation key that we should handle
-				if msg.Type == tea.KeyEsc || msg.String() == "q" {
-					// Handle navigation keys
-					debug.LogToFile("DEBUG: BulkView - handling navigation key in FileBrowser\n")
-					return v.handleFileBrowserKeys(msg)
-				} else {
-					// Pass all other keys directly to file selector for typing/search
-					debug.LogToFilef("DEBUG: BulkView - passing key '%s' to file selector\n", msg.String())
+				// When in INPUT mode, pass all keys except 'q' to the file selector
+				if v.fileSelector.GetInputMode() {
+					// Only intercept 'q' for quit in INPUT mode
+					if msg.String() == "q" && len(v.fileSelector.GetFilterInput()) == 0 {
+						// Only quit if filter is empty
+						debug.LogToFile("DEBUG: BulkView - handling 'q' for quit in FileBrowser\n")
+						return v.handleFileBrowserKeys(msg)
+					}
+					// Pass everything else to file selector (including backspace!)
+					debug.LogToFilef("DEBUG: BulkView - passing key '%s' to file selector (INPUT mode)\n", msg.String())
 					newFileSelector, cmd := v.fileSelector.Update(msg)
 					v.fileSelector = newFileSelector
 					cmds = append(cmds, cmd)
 					return v, tea.Batch(cmds...)
+				} else {
+					// In NAV mode, check if this is a navigation key we should handle
+					if msg.Type == tea.KeyEsc || msg.String() == "q" {
+						// Handle navigation keys
+						debug.LogToFile("DEBUG: BulkView - handling navigation key in FileBrowser (NAV mode)\n")
+						return v.handleFileBrowserKeys(msg)
+					} else {
+						// Pass other keys to file selector
+						debug.LogToFilef("DEBUG: BulkView - passing key '%s' to file selector (NAV mode)\n", msg.String())
+						newFileSelector, cmd := v.fileSelector.Update(msg)
+						v.fileSelector = newFileSelector
+						cmds = append(cmds, cmd)
+						return v, tea.Batch(cmds...)
+					}
 				}
 			}
 		}
@@ -360,7 +379,7 @@ func (v *BulkView) handleInstructionsKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return v, func() tea.Msg {
 			return messages.NavigateBackMsg{}
 		}
-	case key.Matches(msg, v.keys.FileMode) || msg.String() == "F":
+	case key.Matches(msg, v.keys.FZF) || msg.String() == "f":
 		// Switch to file browser mode and initialize file selector
 		v.mode = ModeFileBrowser
 		if v.fileSelector == nil {
@@ -413,7 +432,7 @@ func (v *BulkView) handleRunListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if v.selectedRun < len(v.runs) {
 			v.runs[v.selectedRun].Selected = !v.runs[v.selectedRun].Selected
 		}
-	case key.Matches(msg, v.keys.FileMode):
+	case key.Matches(msg, v.keys.FZF):
 		// Switch back to file browser mode
 		v.mode = ModeFileBrowser
 		if v.fileSelector == nil {
@@ -475,7 +494,7 @@ func (v *BulkView) renderInstructions() string {
 		"• Submit batch runs with different parameters",
 		"• Track progress across multiple operations",
 		"",
-		"Press F to browse and select configuration files to get started.",
+		"Press f to browse and select configuration files to get started.",
 		"",
 		"Supported file formats:",
 		"• JSON (.json) - Task configuration files",
@@ -507,40 +526,51 @@ func (v *BulkView) renderInstructions() string {
 	return lipgloss.JoinVertical(lipgloss.Left, mainContainer, statusLine)
 }
 
-// renderFileBrowser renders the dedicated file browser page
+// renderFileBrowser renders the dedicated file browser page with proper double-column layout
 func (v *BulkView) renderFileBrowser() string {
-	if v.layout == nil {
-		v.layout = components.NewWindowLayout(v.width, v.height)
-	}
-
-	// Get file selector content
-	var content string
-	if v.fileSelector != nil {
-		// Render file selector WITHOUT the original status line
-		content = v.fileSelector.View(nil) // Pass nil to avoid double status line
+	// Initialize double column layout for FZF + preview
+	if v.doubleColumnLayout == nil {
+		v.doubleColumnLayout = components.NewDoubleColumnLayout(v.width, v.height, &components.DoubleColumnConfig{
+			LeftRatio:  0.6, // 60% for file list
+			RightRatio: 0.4, // 40% for preview
+			Gap:        1,
+		})
 	} else {
-		content = "File selector not initialized"
+		v.doubleColumnLayout.Update(v.width, v.height)
 	}
 
-	// Use WindowLayout system for consistent styling
-	boxStyle := v.layout.CreateStandardBox()
-	titleStyle := v.layout.CreateTitleStyle()
-	contentStyle := v.layout.CreateContentStyle()
+	// Get content from file selector using the new double-column methods
+	var leftContent, rightContent string
+	if v.fileSelector != nil {
+		// Get content dimensions for each column
+		leftWidth, leftHeight, rightWidth, rightHeight := v.doubleColumnLayout.GetContentDimensions()
+		
+		// Get file list and preview content from selector
+		leftContent = v.fileSelector.GetFileListContent(leftWidth, leftHeight)
+		rightContent = v.fileSelector.GetPreviewContent(rightWidth, rightHeight)
+	} else {
+		leftContent = "File selector not initialized"
+		rightContent = "No preview available"
+	}
 
-	title := titleStyle.Render("Select Configuration Files")
-	styledContent := contentStyle.Render(content)
-	
-	// Create the main container with proper dimensions
-	boxWidth, boxHeight := v.layout.GetBoxDimensions()
-	mainContainer := boxStyle.
-		Width(boxWidth).
-		Height(boxHeight).
-		Render(lipgloss.JoinVertical(lipgloss.Left, title, "", styledContent))
+	// Status line with mode indicator
+	modeText := "FZF-BULK"
+	if v.fileSelector != nil {
+		if v.fileSelector.GetInputMode() {
+			modeText = "FZF-BULK [INPUT]"
+		} else {
+			modeText = "FZF-BULK [NAV]"
+		}
+	}
+	statusLine := v.renderStatusLine(modeText)
 
-	// Status line - this is the ONLY status line for this mode
-	statusLine := v.renderStatusLine("FZF-BULK")
-
-	return lipgloss.JoinVertical(lipgloss.Left, mainContainer, statusLine)
+	// Use double column layout to render everything
+	return v.doubleColumnLayout.RenderWithTitle(
+		"Select Configuration Files",
+		leftContent,
+		rightContent,
+		statusLine,
+	)
 }
 
 // renderRunList renders the run list view
@@ -605,11 +635,15 @@ func (v *BulkView) renderStatusLine(layoutName string) string {
 	var helpText string
 	switch v.mode {
 	case ModeInstructions:
-		helpText = "F:browse files q:quit ?:help"
+		helpText = "f:browse files q:quit ?:help"
 	case ModeFileBrowser:
-		helpText = "↑↓:navigate space:select enter:confirm esc:back q:quit"
+		if v.fileSelector != nil && v.fileSelector.GetInputMode() {
+			helpText = "type:filter esc:nav mode enter:confirm ctrl+a:all ctrl+d:none"
+		} else {
+			helpText = "↑↓/j/k:nav space:select i:input mode b/esc:back enter:confirm"
+		}
 	case ModeRunList:
-		helpText = "↑↓:navigate space:toggle F:files ctrl+s:submit q:quit"
+		helpText = "↑↓:navigate space:toggle f:files ctrl+s:submit q:quit"
 	default:
 		helpText = "q:quit ?:help"
 	}
@@ -709,4 +743,25 @@ func (v *BulkView) renderResults() string {
 		content.String(),
 		statusLine,
 	)
+}
+
+// Implement CoreViewKeymap interface to control key behavior
+
+// IsKeyDisabled returns true if the given key should be ignored for this view
+func (v *BulkView) IsKeyDisabled(keyString string) bool {
+	// When in ModeFileBrowser with FZF INPUT mode active, disable backspace navigation
+	if v.mode == ModeFileBrowser && v.fileSelector != nil && v.fileSelector.GetInputMode() {
+		// Disable backspace from being handled as navigation
+		if keyString == "backspace" {
+			debug.LogToFilef("DEBUG: BulkView.IsKeyDisabled - disabling backspace in FZF INPUT mode\n")
+			return true
+		}
+	}
+	return false
+}
+
+// HandleKey allows views to provide custom handling for specific keys
+func (v *BulkView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Model, cmd tea.Cmd) {
+	// Let the default Update method handle everything
+	return false, v, nil
 }

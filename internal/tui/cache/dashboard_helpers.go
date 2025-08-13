@@ -144,6 +144,12 @@ func (c *SimpleCache) SetFormData(data *FormData) {
 	_ = c.hybrid.session.SetFormData("formData", data)
 }
 
+// ClearFormData clears saved form data
+func (c *SimpleCache) ClearFormData() {
+	// No lock needed - session cache handles thread safety
+	c.hybrid.session.cache.Delete("form:formData")
+}
+
 // FormData represents the saved form state
 type FormData struct {
 	Title          string
