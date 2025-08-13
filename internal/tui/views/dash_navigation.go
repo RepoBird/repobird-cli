@@ -214,16 +214,22 @@ func (d *DashboardView) handleMillerColumnsNavigation(msg tea.KeyMsg) tea.Cmd {
 
 		if textToCopy != "" {
 			cmd := d.copyToClipboard(textToCopy)
+			// Show what's actually on the clipboard, truncated for display if needed
+			displayText := textToCopy
+			maxLen := 30
+			if len(displayText) > maxLen {
+				displayText = displayText[:maxLen-3] + "..."
+			}
+			
 			if cmd != nil {
-				// Show what's actually on the clipboard, truncated for display if needed
-				displayText := textToCopy
-				maxLen := 30
-				if len(displayText) > maxLen {
-					displayText = displayText[:maxLen-3] + "..."
-				}
-				d.statusLine.SetTemporaryMessageWithType(fmt.Sprintf("📋 Copied \"%s\"", displayText), components.MessageSuccess, 150*time.Millisecond)
+				message := fmt.Sprintf("📋 Copied \"%s\"", displayText)
+				d.copiedMessage = message  // Set for backward compatibility with tests
+				d.copiedMessageTime = time.Now()
+				d.statusLine.SetTemporaryMessageWithType(message, components.MessageSuccess, 150*time.Millisecond)
 				return cmd
 			} else {
+				d.copiedMessage = "✗ Failed to copy"  // Set for backward compatibility with tests
+				d.copiedMessageTime = time.Now()
 				d.statusLine.SetTemporaryMessageWithType("✗ Failed to copy", components.MessageError, 150*time.Millisecond)
 			}
 		}
