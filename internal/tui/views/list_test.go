@@ -76,6 +76,10 @@ func TestNewRunListViewWithCache_LoadsWhenCacheExpired(t *testing.T) {
 }
 
 func TestFilterRuns_PreservesRunIDs(t *testing.T) {
+	// Use temp directory to avoid cache pollution
+	tempDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tempDir)
+	
 	// Arrange
 	client := api.NewClient("test-key", "http://localhost:8080", false)
 

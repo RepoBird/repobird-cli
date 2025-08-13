@@ -83,12 +83,15 @@ func TestDashboardViewStatusLineShowsActualCopiedText(t *testing.T) {
 
 		quotedText := view.copiedMessage[start+1 : end]
 
-		// The quoted text should be from the ORIGINAL (what's on clipboard), not the display version
-		// It should start with the full repository text (up to truncation point)
-		expectedPrefix := "Repository: " + longRepoName[:20] // At least first 20 chars of the actual repo name
-		if !strings.HasPrefix(quotedText, expectedPrefix) {
-			t.Errorf("Expected status line to show actual copied text starting with '%s', but got: %s",
-				expectedPrefix, quotedText)
+		// The quoted text should be truncated to maxLen-3 chars + "..."
+		// maxLen is 30, so we get 27 chars + "..."
+		expectedText := originalLine
+		if len(expectedText) > 27 {
+			expectedText = expectedText[:27] + "..."
+		}
+		if quotedText != expectedText {
+			t.Errorf("Expected status line to show truncated text '%s', but got: %s",
+				expectedText, quotedText)
 		}
 
 		// If truncated in status line, should have ellipsis

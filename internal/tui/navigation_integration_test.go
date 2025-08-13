@@ -351,10 +351,15 @@ func TestNavigationMessageDelegation(t *testing.T) {
 		mockClient := &MockAPIClient{}
 		app := NewApp(mockClient)
 		_ = app.Init()
+		
+		// Simulate authentication completion and create cache
+		app.cache = cache.NewSimpleCache()
+		model, _ := app.Update(authCompleteMsg{})
+		app = model.(*App)
 
 		// Regular key press
 		msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}}
-		model, _ := app.Update(msg)
+		model, _ = app.Update(msg)
 		appModel := model.(*App)
 
 		// Should still be at dashboard, message was delegated
@@ -374,9 +379,14 @@ func TestListWithSelectedIndex(t *testing.T) {
 	mockClient := &MockAPIClient{}
 	app := NewApp(mockClient)
 	_ = app.Init()
+	
+	// Simulate authentication completion and create cache
+	app.cache = cache.NewSimpleCache()
+	model, _ := app.Update(authCompleteMsg{})
+	app = model.(*App)
 
 	// Navigate to list with selected index
-	model, _ := app.Update(messages.NavigateToListMsg{
+	model, _ = app.Update(messages.NavigateToListMsg{
 		SelectedIndex: 10,
 	})
 	appModel := model.(*App)
@@ -392,9 +402,14 @@ func TestDetailsViewCreation(t *testing.T) {
 	mockClient := &MockAPIClient{}
 	app := NewApp(mockClient)
 	_ = app.Init()
+	
+	// Simulate authentication completion and create cache
+	app.cache = cache.NewSimpleCache()
+	model, _ := app.Update(authCompleteMsg{})
+	app = model.(*App)
 
 	// Navigate to details
-	model, _ := app.Update(messages.NavigateToDetailsMsg{
+	model, _ = app.Update(messages.NavigateToDetailsMsg{
 		RunID:      "test-run-id",
 		FromCreate: true,
 	})
@@ -412,21 +427,27 @@ func TestNavigationMemoryManagement(t *testing.T) {
 		mockClient := &MockAPIClient{}
 		app := NewApp(mockClient)
 		_ = app.Init()
+		
+		// Simulate authentication completion and create cache
+		app.cache = cache.NewSimpleCache()
+		model, _ := app.Update(authCompleteMsg{})
+		app = model.(*App)
 
 		// Build large navigation stack
 		for i := 0; i < 100; i++ {
 			if i%2 == 0 {
-				app.Update(messages.NavigateToListMsg{SelectedIndex: i})
+				model, _ = app.Update(messages.NavigateToListMsg{SelectedIndex: i})
 			} else {
-				app.Update(messages.NavigateToCreateMsg{})
+				model, _ = app.Update(messages.NavigateToCreateMsg{})
 			}
+			app = model.(*App)
 		}
 
 		// Should handle large stack
 		assert.Len(t, app.viewStack, 100)
 
 		// Navigate to dashboard clears it all
-		model, _ := app.Update(messages.NavigateToDashboardMsg{})
+		model, _ = app.Update(messages.NavigateToDashboardMsg{})
 		appModel := model.(*App)
 
 		assert.Len(t, appModel.viewStack, 0)
