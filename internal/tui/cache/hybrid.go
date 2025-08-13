@@ -251,6 +251,30 @@ func (h *HybridCache) InvalidateUserInfo() error {
 	return nil
 }
 
+// GetAuthCache retrieves cached authentication info with timestamp
+func (h *HybridCache) GetAuthCache() (*AuthCache, bool) {
+	if h.permanent != nil {
+		return h.permanent.GetAuthCache()
+	}
+	return nil, false
+}
+
+// SetAuthCache stores authentication info with timestamp
+func (h *HybridCache) SetAuthCache(userInfo *models.UserInfo) error {
+	if h.permanent != nil {
+		return h.permanent.SetAuthCache(userInfo)
+	}
+	return fmt.Errorf("permanent cache not available")
+}
+
+// IsAuthCacheValid checks if cached authentication is still valid
+func (h *HybridCache) IsAuthCacheValid() bool {
+	if h.permanent != nil {
+		return h.permanent.IsAuthCacheValid()
+	}
+	return false
+}
+
 // GetFileHash retrieves cached file hash from permanent storage
 func (h *HybridCache) GetFileHash(path string) (string, bool) {
 	if h.permanent != nil {

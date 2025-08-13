@@ -158,6 +158,13 @@ func (p *PermanentCache) InvalidateRun(id string) error {
 	return nil
 }
 
+// AuthCache stores authentication info with timestamp
+type AuthCache struct {
+	UserInfo      *models.UserInfo `json:"userInfo"`
+	LastAuthTime  time.Time        `json:"lastAuthTime"`
+	CacheDuration time.Duration    `json:"cacheDuration"`
+}
+
 // GetUserInfo retrieves permanently cached user info
 func (p *PermanentCache) GetUserInfo() (*models.UserInfo, bool) {
 	// No lock needed - file system handles concurrent reads
@@ -193,6 +200,62 @@ func (p *PermanentCache) SetUserInfo(info *models.UserInfo) error {
 
 	// Atomic rename
 	return os.Rename(tempPath, finalPath)
+}
+
+// GetAuthCache retrieves cached authentication info with timestamp
+func (p *PermanentCache) GetAuthCache() (*AuthCache, bool) {
+	// No lock needed - file system handles concurrent reads
+	path := filepath.Join(p.baseDir, "auth-cache.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, false
+	}
+
+	var auth AuthCache
+	if err := json.Unmarshal(data, &auth); err != nil {
+		return nil, false
+	}
+
+	return &auth, true
+}
+
+// SetAuthCache stores authentication info with timestamp
+func (p *PermanentCache) SetAuthCache(userInfo *models.UserInfo) error {
+	// Prepare auth cache with 2-week duration
+	auth := AuthCache{
+		UserInfo:      userInfo,
+		LastAuthTime:  time.Now(),
+		CacheDuration: 14 * 24 * time.Hour, // 2 weeks
+	}
+
+	// Prepare data without lock
+	tempPath := filepath.Join(p.baseDir, "auth-cache.tmp")
+	finalPath := filepath.Join(p.baseDir, "auth-cache.json")
+
+	data, err := json.MarshalIndent(auth, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal auth cache: %w", err)
+	}
+
+	// Write to temp file
+	if err := os.WriteFile(tempPath, data, 0600); err != nil {
+		return err
+	}
+
+	// Atomic rename
+	return os.Rename(tempPath, finalPath)
+}
+
+// IsAuthCacheValid checks if cached authentication is still valid
+func (p *PermanentCache) IsAuthCacheValid() bool {
+	auth, found := p.GetAuthCache()
+	if !found {
+		return false
+	}
+
+	// Check if auth is within the cache duration
+	elapsed := time.Since(auth.LastAuthTime)
+	return elapsed < auth.CacheDuration
 }
 
 // GetRepositoryList retrieves cached repository list
