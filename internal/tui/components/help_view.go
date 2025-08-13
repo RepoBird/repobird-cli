@@ -56,6 +56,8 @@ func getDefaultHelpSections() []HelpSection {
 				"",
 				"This CLI triggers single runs or parallel batch operations,",
 				"managing AI agent execution with real-time progress tracking.",
+				"",
+				"🌐 Get started at https://repobird.ai",
 			},
 		},
 		{
