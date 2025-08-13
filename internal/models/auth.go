@@ -41,6 +41,7 @@ func (a *AuthVerifyResponse) ToUserInfo() *UserInfo {
 
 	return &UserInfo{
 		ID:             userID,
+		StringID:       a.Data.User.ID, // Preserve original string ID
 		Email:          a.Data.User.Email,
 		Name:           a.Data.User.Name,
 		GithubUsername: a.Data.User.GithubUsername,

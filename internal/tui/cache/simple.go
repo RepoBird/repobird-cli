@@ -39,7 +39,13 @@ func NewSimpleCache() *SimpleCache {
 
 // getCurrentUserID retrieves the current user ID from context
 func getCurrentUserID() string {
-	// Get user ID from the global user service
+	// Get string user ID from the global user service (use original ID, not hash)
+	stringID := services.GetCurrentUserStringID()
+	if stringID != "" {
+		return stringID
+	}
+	
+	// Fallback to integer ID if string ID not available (backward compatibility)
 	userIDPtr := services.GetCurrentUserID()
 	if userIDPtr != nil && *userIDPtr > 0 {
 		return fmt.Sprintf("%d", *userIDPtr)

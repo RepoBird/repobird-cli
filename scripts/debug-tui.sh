@@ -22,6 +22,16 @@ echo ""
 
 # Build and run the TUI
 cd "$PROJECT_DIR"
+
+# Load .env file if it exists
+if [ -f "$PROJECT_DIR/.env" ]; then
+    echo "Loading environment from .env file..."
+    set -a  # Mark all new variables for export
+    source "$PROJECT_DIR/.env"
+    set +a  # Stop marking for export
+    echo "  Loaded REPOBIRD_API_URL: ${REPOBIRD_API_URL:-not set}"
+fi
+
 if ! make build; then
     echo "Build failed. Cannot run TUI."
     exit 1

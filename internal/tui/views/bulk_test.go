@@ -272,6 +272,15 @@ func TestBulkViewRunListKeys(t *testing.T) {
 	})
 
 	t.Run("Submit key calls submitBulkRuns", func(t *testing.T) {
+		// Reset state for this test
+		view.mode = ModeRunList
+		view.runs = []BulkRunItem{
+			{Title: "Run 1", Selected: true},
+			{Title: "Run 2", Selected: false},
+			{Title: "Run 3", Selected: true},
+		}
+		view.selectedRun = 1
+		
 		keyMsg := tea.KeyMsg{Type: tea.KeyCtrlS}
 		model, cmd := view.Update(keyMsg)
 

@@ -219,9 +219,11 @@ func (d *DashboardView) Init() tea.Cmd {
 func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
-	// Debug log all incoming messages
-	debug.LogToFilef("\n[DASHBOARD UPDATE] Received message type: %T\n", msg)
-	debug.LogToFilef("  Loading: %v, Initializing: %v\n", d.loading, d.initializing)
+	// Debug log all incoming messages except spinner ticks (too spammy)
+	if _, isSpinner := msg.(spinner.TickMsg); !isSpinner {
+		debug.LogToFilef("\n[DASHBOARD UPDATE] Received message type: %T\n", msg)
+		debug.LogToFilef("  Loading: %v, Initializing: %v\n", d.loading, d.initializing)
+	}
 
 	// Always handle quit keys regardless of loading state
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
@@ -726,9 +728,13 @@ func (d *DashboardView) View() string {
 		// Create status line separately (outside the box)
 		statusLine := d.renderStatusLine("ERROR")
 		
+		// Add empty line between box and status line for spacing
+		emptyLine := lipgloss.NewStyle().Height(1).Render("")
+		
 		// Follow StatusView pattern: render box content separately, then join with status line outside
 		return lipgloss.JoinVertical(lipgloss.Left, 
-			boxStyle.Render(centeredContent), 
+			boxStyle.Render(centeredContent),
+			emptyLine,
 			statusLine)
 	}
 

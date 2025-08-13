@@ -40,7 +40,7 @@ func NewWindowLayout(terminalWidth, terminalHeight int) *WindowLayout {
 func (w *WindowLayout) calculateDimensions() {
 	// Box dimensions account for lipgloss border expansion
 	w.boxWidth = w.terminalWidth - w.borderMargin
-	w.boxHeight = w.terminalHeight - w.statusLineHeight - w.topMargin - 1 // Extra space for border
+	w.boxHeight = w.terminalHeight - w.statusLineHeight - w.topMargin // Removed extra -1 to use more vertical space
 	
 	// Content dimensions are inside the box (account for borders + padding)
 	w.contentWidth = w.boxWidth - 4  // Border (2) + padding (2)
@@ -117,6 +117,9 @@ func (w *WindowLayout) IsValidDimensions() bool {
 
 // GetMinimalView returns a minimal view for very small terminals
 func (w *WindowLayout) GetMinimalView(message string) string {
+	if w.terminalWidth <= 2 {
+		return "" // Terminal too small to display anything
+	}
 	if len(message) > w.terminalWidth-2 {
 		message = message[:w.terminalWidth-2]
 	}

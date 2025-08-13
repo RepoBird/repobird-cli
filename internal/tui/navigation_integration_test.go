@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/repobird/repobird-cli/internal/tui/cache"
 	"github.com/repobird/repobird-cli/internal/tui/messages"
 	"github.com/repobird/repobird-cli/internal/tui/views"
 	"github.com/stretchr/testify/assert"
@@ -15,17 +16,23 @@ func TestCompleteNavigationFlow(t *testing.T) {
 	t.Run("Dashboard -> Create -> Details -> Back to Dashboard", func(t *testing.T) {
 		mockClient := &MockAPIClient{}
 		app := NewApp(mockClient)
+		
+		// Initialize cache
+		tempDir := t.TempDir()
+		t.Setenv("XDG_CONFIG_HOME", tempDir)
+		app.cache = cache.NewSimpleCache()
 
-		// Initialize app (starts with dashboard)
-		_ = app.Init()
-		assert.IsType(t, &views.DashboardView{}, app.current)
-		assert.Len(t, app.viewStack, 0)
+		// Simulate authentication completion to initialize dashboard
+		model, _ := app.Update(authCompleteMsg{})
+		appModel := model.(*App)
+		assert.IsType(t, &views.DashboardView{}, appModel.current)
+		assert.Len(t, appModel.viewStack, 0)
 
 		// Navigate to Create view
-		model, _ := app.Update(messages.NavigateToCreateMsg{
+		model, _ = appModel.Update(messages.NavigateToCreateMsg{
 			SelectedRepository: "test/repo",
 		})
-		appModel := model.(*App)
+		appModel = model.(*App)
 		assert.IsType(t, &views.CreateRunView{}, appModel.current)
 		assert.Len(t, appModel.viewStack, 1)
 
@@ -58,16 +65,24 @@ func TestCompleteNavigationFlow(t *testing.T) {
 	t.Run("Deep navigation stack", func(t *testing.T) {
 		mockClient := &MockAPIClient{}
 		app := NewApp(mockClient)
-		_ = app.Init()
+		
+		// Initialize cache
+		tempDir := t.TempDir()
+		t.Setenv("XDG_CONFIG_HOME", tempDir)
+		app.cache = cache.NewSimpleCache()
+
+		// Simulate authentication completion to initialize dashboard
+		model, _ := app.Update(authCompleteMsg{})
+		appModel := model.(*App)
 
 		// Build deep navigation stack
 		// Dashboard -> List -> Details -> Error
 
 		// Go to List
-		model, _ := app.Update(messages.NavigateToListMsg{
+		model, _ = appModel.Update(messages.NavigateToListMsg{
 			SelectedIndex: 5,
 		})
-		appModel := model.(*App)
+		appModel = model.(*App)
 		assert.IsType(t, &views.RunListView{}, appModel.current)
 		assert.Len(t, appModel.viewStack, 1)
 
@@ -104,13 +119,23 @@ func TestCompleteNavigationFlow(t *testing.T) {
 	t.Run("Navigate to Dashboard clears stack", func(t *testing.T) {
 		mockClient := &MockAPIClient{}
 		app := NewApp(mockClient)
-		_ = app.Init()
+		
+		// Initialize cache
+		tempDir := t.TempDir()
+		t.Setenv("XDG_CONFIG_HOME", tempDir)
+		app.cache = cache.NewSimpleCache()
+
+		// Simulate authentication completion to initialize dashboard
+		model, _ := app.Update(authCompleteMsg{})
+		appModel := model.(*App)
 
 		// Build navigation stack
-		app.Update(messages.NavigateToListMsg{})
-		app.Update(messages.NavigateToDetailsMsg{RunID: "123"})
-		model, _ := app.Update(messages.NavigateToCreateMsg{})
-		appModel := model.(*App)
+		model, _ = appModel.Update(messages.NavigateToListMsg{})
+		appModel = model.(*App)
+		model, _ = appModel.Update(messages.NavigateToDetailsMsg{RunID: "123"})
+		appModel = model.(*App)
+		model, _ = appModel.Update(messages.NavigateToCreateMsg{})
+		appModel = model.(*App)
 		assert.Len(t, appModel.viewStack, 3)
 
 		// Navigate directly to dashboard
@@ -129,17 +154,25 @@ func TestNavigationWithContext(t *testing.T) {
 	t.Run("Context persists during navigation", func(t *testing.T) {
 		mockClient := &MockAPIClient{}
 		app := NewApp(mockClient)
-		_ = app.Init()
+		
+		// Initialize cache
+		tempDir := t.TempDir()
+		t.Setenv("XDG_CONFIG_HOME", tempDir)
+		app.cache = cache.NewSimpleCache()
+
+		// Simulate authentication completion to initialize dashboard
+		model, _ := app.Update(authCompleteMsg{})
+		appModel := model.(*App)
 
 		// Set some context
-		app.cache.SetNavigationContext("user_selection", "option1")
-		app.cache.SetContext("persistent_data", "value1")
+		appModel.cache.SetNavigationContext("user_selection", "option1")
+		appModel.cache.SetContext("persistent_data", "value1")
 
 		// Navigate to Create
-		model, _ := app.Update(messages.NavigateToCreateMsg{
+		model, _ = appModel.Update(messages.NavigateToCreateMsg{
 			SelectedRepository: "org/repo",
 		})
-		appModel := model.(*App)
+		appModel = model.(*App)
 
 		// Both contexts should persist
 		assert.Equal(t, "option1", appModel.cache.GetNavigationContext("user_selection"))

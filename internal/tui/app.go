@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 	
+	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/repobird/repobird-cli/internal/api"
@@ -130,7 +131,10 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	// Otherwise delegate to current view
-	debug.LogToFilef("📤 APP: Delegating to current view: %T 📤\n", a.current)
+	// Skip debug logging for spinner messages (too spammy)
+	if _, isSpinner := msg.(spinner.TickMsg); !isSpinner {
+		debug.LogToFilef("📤 APP: Delegating to current view: %T 📤\n", a.current)
+	}
 	newModel, cmd := a.current.Update(msg)
 
 	// Check if the model changed (old pattern - view created child)

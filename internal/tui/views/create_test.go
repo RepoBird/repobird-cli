@@ -163,15 +163,15 @@ func TestCreateRunView_HandleKey_Navigation(t *testing.T) {
 			name:        "q in normal mode navigates back",
 			insertMode:  false,
 			key:         "q",
-			wantHandled: true,
-			wantNavMsg:  true,
+			wantHandled: false, // Navigation keys are now handled by App, not the view
+			wantNavMsg:  false,
 		},
 		{
 			name:        "b in normal mode navigates back",
 			insertMode:  false,
 			key:         "b",
-			wantHandled: true,
-			wantNavMsg:  true,
+			wantHandled: false, // Navigation keys are now handled by App, not the view
+			wantNavMsg:  false,
 		},
 		{
 			name:        "q in insert mode is not handled (types q)",

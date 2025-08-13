@@ -56,6 +56,15 @@ func (us *UserService) GetCurrentUserID() *int {
 	return nil
 }
 
+// GetCurrentUserStringID returns the current user's string ID, or empty string if not available
+func (us *UserService) GetCurrentUserStringID() string {
+	user := us.GetCurrentUser()
+	if user != nil && user.StringID != "" {
+		return user.StringID
+	}
+	return ""
+}
+
 // ClearCurrentUser clears the cached user information
 func (us *UserService) ClearCurrentUser() {
 	us.mu.Lock()
@@ -103,6 +112,11 @@ func GetCurrentUser() *models.UserInfo {
 // GetCurrentUserID is a convenience function to get the current user ID globally
 func GetCurrentUserID() *int {
 	return globalUserService.GetCurrentUserID()
+}
+
+// GetCurrentUserStringID is a convenience function to get the current user's string ID globally
+func GetCurrentUserStringID() string {
+	return globalUserService.GetCurrentUserStringID()
 }
 
 // ClearCurrentUser is a convenience function to clear the current user globally

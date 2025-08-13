@@ -4,32 +4,67 @@
 
 echo "Clearing test/debug cache files..."
 
-# Remove test user directories (these are fake)
-if [ -d "$HOME/.cache/repobird/users/user-123" ]; then
-    echo "Removing test cache: user-123"
-    rm -rf "$HOME/.cache/repobird/users/user-123"
+# Support both old and new cache locations
+OLD_CACHE="$HOME/.cache/repobird"
+NEW_CACHE="$HOME/.config/repobird/cache"
+
+# Clear old cache location test directories
+if [ -d "$OLD_CACHE/users/user-123" ]; then
+    echo "Removing old test cache: user-123"
+    rm -rf "$OLD_CACHE/users/user-123"
 fi
 
-if [ -d "$HOME/.cache/repobird/users/user-456" ]; then
-    echo "Removing test cache: user-456"
-    rm -rf "$HOME/.cache/repobird/users/user-456"
+if [ -d "$OLD_CACHE/users/user-456" ]; then
+    echo "Removing old test cache: user-456"
+    rm -rf "$OLD_CACHE/users/user-456"
 fi
 
-if [ -d "$HOME/.cache/repobird/users/user-789" ]; then
-    echo "Removing test cache: user-789"
-    rm -rf "$HOME/.cache/repobird/users/user-789"
+if [ -d "$OLD_CACHE/users/user-789" ]; then
+    echo "Removing old test cache: user-789"
+    rm -rf "$OLD_CACHE/users/user-789"
 fi
 
-# Remove any debug cache directories (negative user IDs)
-if [ -d "$HOME/.cache/repobird/debug" ]; then
-    echo "Removing debug cache directory"
-    rm -rf "$HOME/.cache/repobird/debug"
+if [ -d "$OLD_CACHE/users/user--1" ]; then
+    echo "Removing old debug user cache: user--1"
+    rm -rf "$OLD_CACHE/users/user--1"
 fi
 
-# Also clear the debug user cache for negative IDs
-if [ -d "$HOME/.cache/repobird/users/user--1" ]; then
-    echo "Removing debug user cache: user--1"
-    rm -rf "$HOME/.cache/repobird/users/user--1"
+if [ -d "$OLD_CACHE/debug" ]; then
+    echo "Removing old debug cache directory"
+    rm -rf "$OLD_CACHE/debug"
+fi
+
+# Clear new cache location test directories (without 'user-' prefix)
+if [ -d "$NEW_CACHE/users/123" ]; then
+    echo "Removing test cache: 123"
+    rm -rf "$NEW_CACHE/users/123"
+fi
+
+if [ -d "$NEW_CACHE/users/456" ]; then
+    echo "Removing test cache: 456"
+    rm -rf "$NEW_CACHE/users/456"
+fi
+
+if [ -d "$NEW_CACHE/users/789" ]; then
+    echo "Removing test cache: 789"
+    rm -rf "$NEW_CACHE/users/789"
+fi
+
+# Remove negative user IDs (debug mode)
+if [ -d "$NEW_CACHE/users/-1" ]; then
+    echo "Removing debug user cache: -1"
+    rm -rf "$NEW_CACHE/users/-1"
+fi
+
+# Remove anonymous cache directories
+if [ -d "$NEW_CACHE/anonymous" ]; then
+    echo "Removing anonymous cache"
+    rm -rf "$NEW_CACHE/anonymous"
+fi
+
+if [ -d "$NEW_CACHE/users/anonymous" ]; then
+    echo "Removing anonymous user cache"
+    rm -rf "$NEW_CACHE/users/anonymous"
 fi
 
 echo "Test cache cleared. Your real user cache is preserved."

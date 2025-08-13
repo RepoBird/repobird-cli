@@ -273,7 +273,7 @@ func (v *BulkView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				
 				// In NAV mode, check if this is a navigation key we should handle
 				if !v.fileSelector.GetInputMode() {
-					if msg.Type == tea.KeyEsc || msg.String() == "q" {
+					if msg.Type == tea.KeyEsc || msg.String() == "q" || msg.String() == "L" {
 						// Handle navigation keys in NAV mode
 						debug.LogToFile("DEBUG: BulkView.Update - handling navigation key in FileBrowser (NAV mode)\n")
 						return v.handleFileBrowserKeys(msg)
@@ -415,6 +415,12 @@ func (v *BulkView) handleFileBrowserKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Go back to instructions mode
 		v.mode = ModeInstructions
 		v.fileSelector = nil // Clear file selector
+		return v, nil
+	case key.Matches(msg, v.keys.ListMode):
+		// Switch to run list mode if runs exist
+		if len(v.runs) > 0 {
+			v.mode = ModeRunList
+		}
 		return v, nil
 	default:
 		// This should only be called for navigation keys now

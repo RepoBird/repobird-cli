@@ -254,13 +254,13 @@ func TestPermanentCache_DirectoryStructure(t *testing.T) {
 	assert.Len(t, entries, 1, "should have one user directory")
 
 	// Check runs directory exists
-	userHash := hashUserID("user-123")
-	runFile := filepath.Join(userDir, userHash, "runs", "run-abc.json")
+	// PermanentCache uses userID directly in path, not a hash
+	runFile := filepath.Join(userDir, "user-123", "runs", "run-abc.json")
 	_, err = os.Stat(runFile)
 	assert.NoError(t, err, "run file should exist")
 
 	// Check file hashes exist
-	hashFile := filepath.Join(userDir, userHash, "file-hashes.json")
+	hashFile := filepath.Join(userDir, "user-123", "file-hashes.json")
 	_, err = os.Stat(hashFile)
 	assert.NoError(t, err, "file hashes should exist")
 }
@@ -287,8 +287,8 @@ func TestPermanentCache_AnonymousUser(t *testing.T) {
 	assert.True(t, found)
 	assert.Equal(t, run.ID, cached.ID)
 
-	// Check directory is created as "anonymous"
-	anonDir := filepath.Join(tmpDir, "repobird", "cache", "users", "anonymous")
+	// Check directory is created as "anonymous" (not under users/)
+	anonDir := filepath.Join(tmpDir, "repobird", "cache", "anonymous")
 	_, err = os.Stat(anonDir)
 	assert.NoError(t, err, "anonymous directory should exist")
 }

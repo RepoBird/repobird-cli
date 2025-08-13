@@ -152,6 +152,7 @@ func (r *RunResponse) UnmarshalJSON(data []byte) error {
 
 type UserInfo struct {
 	ID             int    `json:"id,omitempty"`
+	StringID       string `json:"stringId,omitempty"` // Original string ID from API
 	Email          string `json:"email"`
 	Name           string `json:"name,omitempty"`
 	GithubUsername string `json:"githubUsername,omitempty"`
