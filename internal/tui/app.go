@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"strings"
+	
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/repobird/repobird-cli/internal/api"
 	"github.com/repobird/repobird-cli/internal/tui/cache"
@@ -16,6 +18,8 @@ type App struct {
 	current     tea.Model
 	cache       *cache.SimpleCache
 	keyRegistry *keymap.CoreKeyRegistry // Central key processing
+	width       int                      // Current window width
+	height      int                      // Current window height
 }
 
 func NewApp(client APIClient) *App {
@@ -47,6 +51,9 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Handle window size messages centrally
 	if wsMsg, ok := msg.(tea.WindowSizeMsg); ok {
 		debug.LogToFilef("📐 APP: Received WindowSizeMsg: width=%d, height=%d 📐\n", wsMsg.Width, wsMsg.Height)
+		// Store current dimensions
+		a.width = wsMsg.Width
+		a.height = wsMsg.Height
 		// Delegate to current view - all views should handle this
 		newModel, cmd := a.current.Update(msg)
 		if newModel != a.current {
@@ -99,8 +106,18 @@ func (a *App) handleNavigation(msg messages.NavigationMsg) (tea.Model, tea.Cmd) 
 			a.setNavigationContext("selected_repo", msg.SelectedRepository)
 		}
 
-		debug.LogToFile("DEBUG: App - calling Init() on new CreateRunView\n")
-		return a, a.current.Init()
+		// Send current window dimensions to the new view if we have them
+		var cmds []tea.Cmd
+		cmds = append(cmds, a.current.Init())
+		if a.width > 0 && a.height > 0 {
+			debug.LogToFilef("📐 CREATE NAV: Sending WindowSizeMsg to new CreateRunView: %dx%d 📐\n", a.width, a.height)
+			cmds = append(cmds, func() tea.Msg {
+				return tea.WindowSizeMsg{Width: a.width, Height: a.height}
+			})
+		} else {
+			debug.LogToFile("⚠️ CREATE NAV: No stored dimensions to send to CreateRunView ⚠️\n")
+		}
+		return a, tea.Batch(cmds...)
 
 	case messages.NavigateToDetailsMsg:
 		a.viewStack = append(a.viewStack, a.current)
@@ -108,7 +125,18 @@ func (a *App) handleNavigation(msg messages.NavigationMsg) (tea.Model, tea.Cmd) 
 		// Create with new minimal constructor pattern
 		a.current = views.NewRunDetailsView(a.client, a.cache, msg.RunID)
 
-		return a, a.current.Init()
+		// Send current window dimensions to the new view if we have them
+		var cmds []tea.Cmd
+		cmds = append(cmds, a.current.Init())
+		if a.width > 0 && a.height > 0 {
+			debug.LogToFilef("📐 DETAILS NAV: Sending WindowSizeMsg to new DetailsView: %dx%d 📐\n", a.width, a.height)
+			cmds = append(cmds, func() tea.Msg {
+				return tea.WindowSizeMsg{Width: a.width, Height: a.height}
+			})
+		} else {
+			debug.LogToFile("⚠️ DETAILS NAV: No stored dimensions to send to DetailsView ⚠️\n")
+		}
+		return a, tea.Batch(cmds...)
 
 	case messages.NavigateToDashboardMsg:
 		// Clear stack - dashboard is home
@@ -151,7 +179,19 @@ func (a *App) handleNavigation(msg messages.NavigationMsg) (tea.Model, tea.Cmd) 
 		if apiClient, ok := a.client.(*api.Client); ok {
 			debug.LogToFilef("✅ BULK NAV: Client type is correct, creating BulkView ✅\n")
 			a.current = views.NewBulkView(apiClient)
-			return a, a.current.Init()
+			
+			// Send current window dimensions to the new view if we have them
+			var cmds []tea.Cmd
+			cmds = append(cmds, a.current.Init())
+			if a.width > 0 && a.height > 0 {
+				debug.LogToFilef("📐 BULK NAV: Sending WindowSizeMsg to new BulkView: %dx%d 📐\n", a.width, a.height)
+				cmds = append(cmds, func() tea.Msg {
+					return tea.WindowSizeMsg{Width: a.width, Height: a.height}
+				})
+			} else {
+				debug.LogToFile("⚠️ BULK NAV: No stored dimensions to send to BulkView ⚠️\n")
+			}
+			return a, tea.Batch(cmds...)
 		}
 		debug.LogToFilef("❌ BULK NAV: Client type is WRONG - cannot create BulkView! ❌\n")
 		// If not the right client type, just return without navigation
@@ -192,7 +232,18 @@ func (a *App) View() string {
 	if a.current == nil {
 		return "Initializing..."
 	}
-	return a.current.View()
+	
+	// Debug: Log app view rendering
+	debug.LogToFilef("🎭 APP VIEW: Rendering view %T with app dimensions w=%d h=%d 🎭\n", 
+		a.current, a.width, a.height)
+	
+	view := a.current.View()
+	
+	// Debug: Log the length of the returned view string
+	lines := strings.Count(view, "\n") + 1
+	debug.LogToFilef("🎭 APP VIEW: Returned view has %d lines 🎭\n", lines)
+	
+	return view
 }
 
 // Run starts the TUI application

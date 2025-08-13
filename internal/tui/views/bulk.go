@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/repobird/repobird-cli/internal/api"
 	"github.com/repobird/repobird-cli/internal/tui/components"
+	"github.com/repobird/repobird-cli/internal/tui/debug"
 )
 
 // BulkMode represents the current mode of the bulk view
@@ -123,10 +124,13 @@ func NewBulkView(client *api.Client) *BulkView {
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
+	fileSelector := components.NewBulkFileSelector(80, 24)
+	fileSelector.SetActive(true) // Activate the file selector
+	
 	return &BulkView{
 		client:       client,
 		mode:         ModeFileSelect,
-		fileSelector: components.NewBulkFileSelector(80, 24),
+		fileSelector: fileSelector,
 		runEditor:    NewRunEditor(),
 		progressView: NewBulkProgressView(),
 		help:         help.New(),
@@ -220,30 +224,39 @@ func defaultBulkKeyMap() bulkKeyMap {
 
 // Init initializes the bulk view
 func (v *BulkView) Init() tea.Cmd {
+	debug.LogToFile("DEBUG: BulkView.Init() called\n")
 	return v.spinner.Tick
 }
 
 // Update handles messages for the bulk view
 func (v *BulkView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	debug.LogToFilef("DEBUG: BulkView.Update() received message: %T\n", msg)
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
+		debug.LogToFilef("DEBUG: BulkView - handling WindowSizeMsg: %dx%d\n", msg.Width, msg.Height)
 		v.width = msg.Width
 		v.height = msg.Height
 		v.help.Width = msg.Width
 
 	case tea.KeyMsg:
+		debug.LogToFilef("DEBUG: BulkView - handling KeyMsg: '%s', mode=%d\n", msg.String(), v.mode)
 		switch v.mode {
 		case ModeFileSelect:
+			debug.LogToFile("DEBUG: BulkView - delegating to handleFileSelectKeys\n")
 			return v.handleFileSelectKeys(msg)
 		case ModeRunList:
+			debug.LogToFile("DEBUG: BulkView - delegating to handleRunListKeys\n")
 			return v.handleRunListKeys(msg)
 		case ModeRunEdit:
+			debug.LogToFile("DEBUG: BulkView - delegating to handleRunEditKeys\n")
 			return v.handleRunEditKeys(msg)
 		case ModeProgress:
+			debug.LogToFile("DEBUG: BulkView - delegating to handleProgressKeys\n")
 			return v.handleProgressKeys(msg)
 		case ModeResults:
+			debug.LogToFile("DEBUG: BulkView - delegating to handleResultsKeys\n")
 			return v.handleResultsKeys(msg)
 		}
 
@@ -300,11 +313,13 @@ func (v *BulkView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, cmd)
 	}
 
+	debug.LogToFilef("DEBUG: BulkView.Update() - returning with %d commands\n", len(cmds))
 	return v, tea.Batch(cmds...)
 }
 
 // Event handlers for different modes
 func (v *BulkView) handleFileSelectKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	debug.LogToFilef("DEBUG: BulkView.handleFileSelectKeys() - key='%s'\n", msg.String())
 	switch {
 	case key.Matches(msg, v.keys.Quit):
 		return v, tea.Quit
@@ -315,6 +330,7 @@ func (v *BulkView) handleFileSelectKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return v, nil
 	default:
 		// File selector doesn't need standard Bubble Tea updates
+		debug.LogToFilef("DEBUG: BulkView.handleFileSelectKeys() - unhandled key: '%s'\n", msg.String())
 		return v, nil
 	}
 }
@@ -378,7 +394,15 @@ func (v *BulkView) handleResultsKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // Rendering methods
 func (v *BulkView) renderFileSelect() string {
-	return v.fileSelector.View(nil) // Pass nil for StatusLine - will need to be fixed
+	debug.LogToFile("DEBUG: BulkView.renderFileSelect() called\n")
+	if v.fileSelector == nil {
+		debug.LogToFile("DEBUG: BulkView.renderFileSelect() - fileSelector is nil!\n")
+		return "File selector not initialized"
+	}
+	debug.LogToFile("DEBUG: BulkView.renderFileSelect() - calling fileSelector.View()\n")
+	result := v.fileSelector.View(nil) // Pass nil for StatusLine - will need to be fixed
+	debug.LogToFilef("DEBUG: BulkView.renderFileSelect() - result length: %d\n", len(result))
+	return result
 }
 
 func (v *BulkView) renderRunList() string {
@@ -399,18 +423,31 @@ func (v *BulkView) renderResults() string {
 
 // View renders the bulk view
 func (v *BulkView) View() string {
+	debug.LogToFilef("DEBUG: BulkView.View() called - mode=%d, width=%d, height=%d\n", v.mode, v.width, v.height)
+	
+	if v.width <= 0 || v.height <= 0 {
+		debug.LogToFile("DEBUG: BulkView - no dimensions, returning initializing message\n")
+		return "⟳ Initializing Bulk View..."
+	}
+	
 	switch v.mode {
 	case ModeFileSelect:
+		debug.LogToFile("DEBUG: BulkView - rendering file select\n")
 		return v.renderFileSelect()
 	case ModeRunList:
+		debug.LogToFile("DEBUG: BulkView - rendering run list\n")
 		return v.renderRunList()
 	case ModeRunEdit:
+		debug.LogToFile("DEBUG: BulkView - rendering run edit\n")
 		return v.renderRunEdit()
 	case ModeProgress:
+		debug.LogToFile("DEBUG: BulkView - rendering progress\n")
 		return v.renderProgress()
 	case ModeResults:
+		debug.LogToFile("DEBUG: BulkView - rendering results\n")
 		return v.renderResults()
 	default:
+		debug.LogToFilef("DEBUG: BulkView - unknown mode: %d\n", v.mode)
 		return "Unknown mode"
 	}
 }

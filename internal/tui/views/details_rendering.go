@@ -119,7 +119,7 @@ func (v *RunDetailsView) renderContentWithCursor() []string {
 	visibleLines := []string{}
 	contentWidth := v.viewport.Width
 	if contentWidth <= 0 {
-		contentWidth = v.width - 4 // Account for minimal box borders only
+		contentWidth = v.width - 6 // Account for border (2) + padding (4)
 	}
 
 	// Debug: Log viewport rendering details
