@@ -165,12 +165,28 @@ func (v *CreateRunView) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	debug.LogToFilef("🎹 CREATE VIEW handleKeyMsg: key='%s', insertMode=%v", keyString, v.form.IsInsertMode())
 	
 	// Note: Most key handling is done in HandleKey() via CoreViewKeymap
-	// This just delegates to the form for form-specific updates
+	// HandleKey returns handled=true for keys it processes
+	// Those keys should NOT reach here, but if they do, we handle them
 	
 	// Handle force quit
 	if keyString == "ctrl+c" {
 		debug.LogToFilef("⛔ CREATE VIEW: Force quit requested")
 		return v, tea.Quit
+	}
+	
+	// Skip keys that should have been handled by HandleKey
+	// This prevents double processing
+	switch keyString {
+	case "esc":
+		debug.LogToFilef("⚠️ CREATE VIEW handleKeyMsg: ESC reached handleKeyMsg (should have been handled by HandleKey)")
+		// Don't process it again
+		return v, nil
+	case "q", "b":
+		if !v.form.IsInsertMode() {
+			debug.LogToFilef("⚠️ CREATE VIEW handleKeyMsg: '%s' in normal mode reached handleKeyMsg (should have been handled by HandleKey)", keyString)
+			// Don't process it again
+			return v, nil
+		}
 	}
 	
 	// Delegate to the form for updating its internal state
@@ -442,7 +458,7 @@ func (v *CreateRunView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Mo
 		}
 	}
 	
-	// Handle 'b' specially - in normal mode it should navigate back
+	// Handle 'b' specially - in normal mode it should navigate back  
 	if keyString == "b" && !v.form.IsInsertMode() {
 		debug.LogToFilef("🔙 CREATE VIEW HandleKey: 'b' in normal mode - navigating back")
 		v.saveFormData()

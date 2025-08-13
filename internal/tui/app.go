@@ -57,7 +57,7 @@ func (a *App) Init() tea.Cmd {
 // Update implements tea.Model interface - handles navigation and delegates to current view
 func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Handle authentication completion first
-	if authMsg, ok := msg.(authCompleteMsg); ok {
+	if _, ok := msg.(authCompleteMsg); ok {
 		debug.LogToFile("🔐 APP: Authentication complete, initializing dashboard 🔐\n")
 		a.authenticated = true
 		
@@ -290,6 +290,10 @@ func (a *App) handleNavigation(msg messages.NavigationMsg) (tea.Model, tea.Cmd) 
 
 // View implements tea.Model interface - delegates rendering to current view
 func (a *App) View() string {
+	if !a.authenticated {
+		return "\n  🔐 Authenticating and initializing cache...\n"
+	}
+	
 	if a.current == nil {
 		return "Initializing..."
 	}
@@ -436,4 +440,42 @@ func (a *App) handleNavigationAction(action keymap.KeyAction, keyMsg tea.KeyMsg)
 
 	debug.LogToFilef("🔄 NAV ACTION: No message to send, returning false 🔄\n")
 	return false, a, nil
+}
+
+// authenticateAndInitCache authenticates with the API and initializes the cache with user context
+func (a *App) authenticateAndInitCache() tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		
+		// Check if we have a method to get user info
+		type userInfoGetter interface {
+			GetUserInfoWithContext(ctx context.Context) (*models.UserInfo, error)
+		}
+		
+		var userInfo *models.UserInfo
+		var err error
+		
+		if getter, ok := a.client.(userInfoGetter); ok {
+			userInfo, err = getter.GetUserInfoWithContext(ctx)
+			if err == nil && userInfo != nil {
+				// Set the current user globally for cache operations
+				services.SetCurrentUser(userInfo)
+				debug.LogToFilef("🔐 AUTH: Successfully authenticated user ID=%d, email=%s 🔐\n", userInfo.ID, userInfo.Email)
+			} else {
+				debug.LogToFilef("⚠️ AUTH: Failed to authenticate: %v ⚠️\n", err)
+			}
+		} else {
+			debug.LogToFile("⚠️ AUTH: Client doesn't support GetUserInfoWithContext, using anonymous cache ⚠️\n")
+		}
+		
+		// Now create the cache with proper user context
+		a.cache = cache.NewSimpleCache()
+		_ = a.cache.LoadFromDisk()
+		
+		return authCompleteMsg{
+			userInfo: userInfo,
+			err:      err,
+		}
+	}
 }
