@@ -326,6 +326,47 @@ func (b *BulkFileSelector) handleInputModeKeys(msg tea.KeyMsg) (*BulkFileSelecto
 			}
 		}
 
+	case "up", "ctrl+p", "ctrl+k":
+		// Allow navigation in INPUT mode too
+		if b.cursor > 0 {
+			b.cursor--
+		} else if len(b.filteredFiles) > 0 {
+			// Wraparound to bottom
+			b.cursor = len(b.filteredFiles) - 1
+		}
+		b.updatePreview()
+
+	case "down", "ctrl+n", "ctrl+j":
+		// Allow navigation in INPUT mode too
+		if b.cursor < len(b.filteredFiles)-1 {
+			b.cursor++
+		} else if len(b.filteredFiles) > 0 {
+			// Wraparound to top
+			b.cursor = 0
+		}
+		b.updatePreview()
+
+	case " ", "space":
+		// Space should toggle selection, not add space to filter
+		if b.cursor < len(b.filteredFiles) {
+			item := &b.filteredFiles[b.cursor]
+			item.Selected = !item.Selected
+			b.selectedFiles[item.Path] = item.Selected
+
+			// Update the original item too
+			for i := range b.files {
+				if b.files[i].Path == item.Path {
+					b.files[i].Selected = item.Selected
+					break
+				}
+			}
+
+			// Move to next item after selection
+			if b.cursor < len(b.filteredFiles)-1 {
+				b.cursor++
+			}
+		}
+
 	case "backspace":
 		// In INPUT mode, backspace deletes from filter
 		if len(b.filterInput) > 0 {
@@ -368,8 +409,8 @@ func (b *BulkFileSelector) handleInputModeKeys(msg tea.KeyMsg) (*BulkFileSelecto
 		}
 
 	default:
-		// Handle single character input for filtering
-		if len(msg.String()) == 1 {
+		// Handle single character input for filtering (but NOT space)
+		if len(msg.String()) == 1 && msg.String() != " " {
 			b.filterInput += msg.String()
 			b.applyFilter()
 		}

@@ -104,6 +104,9 @@ func (v *CreateRunView) Init() tea.Cmd {
 
 // Update handles all messages and form interactions
 func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// Log message type for debugging
+	debug.LogToFilef("📨 CREATE VIEW Update: received %T", msg)
+	
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		return v.handleWindowSizeMsg(msg)
@@ -116,6 +119,14 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		
 	case CustomFormSubmitMsg:
 		return v.handleCustomFormSubmit(msg)
+	
+	case CustomFormNavigateBackMsg:
+		debug.LogToFilef("🔙 CREATE VIEW: Received navigation back message from form")
+		// Save form data before navigating away
+		v.saveFormData()
+		return v, func() tea.Msg {
+			return messages.NavigateBackMsg{}
+		}
 
 	case runCreatedMsg:
 		return v.handleRunCreated(msg)
@@ -153,33 +164,22 @@ func (v *CreateRunView) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	keyString := msg.String()
 	debug.LogToFilef("🎹 CREATE VIEW handleKeyMsg: key='%s', insertMode=%v", keyString, v.form.IsInsertMode())
 	
-	// Most key handling is done in HandleKey() via CoreViewKeymap
-	// Here we only handle keys that HandleKey doesn't process
+	// Handle force quit
+	if keyString == "ctrl+c" {
+		debug.LogToFilef("⛔ CREATE VIEW: Force quit requested")
+		return v, tea.Quit
+	}
 	
-	// First delegate to form to see if it handles the key
+	// Delegate all other keys to the form
+	// The form will send back a CustomFormNavigateBackMsg if needed
 	newForm, cmd := v.form.Update(msg)
 	v.form = newForm.(*CustomCreateForm)
 	
-	// If we're in normal mode and the form didn't handle navigation keys, handle them here
-	if !v.form.IsInsertMode() {
-		switch keyString {
-		case "q", "b":
-			debug.LogToFilef("🔙 CREATE VIEW: User requested back navigation with '%s' key", keyString)
-			// Save form data before navigating away
-			v.saveFormData()
-			return v, func() tea.Msg {
-				return messages.NavigateBackMsg{}
-			}
-
-		case "ctrl+c":
-			debug.LogToFilef("⛔ CREATE VIEW: Force quit requested")
-			// Force quit - handled by app layer
-			return v, tea.Quit
-		}
-	}
-	
 	// Auto-save form data when values change
-	v.saveFormData()
+	if v.form.IsInsertMode() || keyString == "d" || keyString == "c" {
+		// Save when typing, deleting, or changing
+		v.saveFormData()
+	}
 	
 	return v, cmd
 }
@@ -416,87 +416,42 @@ func (v *CreateRunView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Mo
 	keyString := keyMsg.String()
 	debug.LogToFilef("🔑 CREATE VIEW HandleKey: key='%s', insertMode=%v", keyString, v.form.IsInsertMode())
 	
-	// Handle keys differently based on mode
+	// In the new architecture, we let the form handle most keys via Update()
+	// We only need to handle a few special cases here
+	
 	if v.form.IsInsertMode() {
-		// In INSERT mode, we need to handle special keys but pass through typing
+		// In INSERT mode, handle special navigation keys that shouldn't type
 		switch keyString {
 		case "esc":
-			// ESC exits insert mode
-			debug.LogToFilef("⬅️ CREATE VIEW: ESC pressed - exiting insert mode")
-			v.form.SetInsertMode(false)
-			v.saveFormData() // Save when exiting insert mode
-			return true, v, nil
+			// ESC is handled by the form itself now
+			debug.LogToFilef("⬅️ CREATE VIEW HandleKey: ESC in insert mode - let form handle it")
+			return false, v, nil
 			
 		case "backspace":
-			// Pass backspace to form for text deletion
-			debug.LogToFilef("⌫ CREATE VIEW: Backspace in insert mode - passing to form")
-			newForm, cmd := v.form.Update(keyMsg)
-			v.form = newForm.(*CustomCreateForm)
-			v.saveFormData() // Auto-save on change
-			return true, v, cmd
-			
-		case "q", "b":
-			// In insert mode, these are just characters to type
-			debug.LogToFilef("⌨️ CREATE VIEW: Typing '%s' in insert mode", keyString)
-			newForm, cmd := v.form.Update(keyMsg)
-			v.form = newForm.(*CustomCreateForm)
-			v.saveFormData() // Auto-save on change
-			return true, v, cmd
+			// Backspace should be handled by form for text deletion
+			debug.LogToFilef("⌫ CREATE VIEW HandleKey: Backspace in insert mode - let form handle it")
+			return false, v, nil
 			
 		default:
-			// For all other keys in insert mode, let the form handle them
-			// This includes regular typing, tab, shift+tab, etc.
-			// We return false so the key goes through normal processing
+			// Let all other keys go through normal processing
 			return false, v, nil
 		}
 	} else {
-		// In NORMAL mode, handle navigation and vim commands
+		// In NORMAL mode, we don't interfere - let form handle everything
 		switch keyString {
-		case "esc":
-			// In normal mode, ESC doesn't navigate back - it's already in normal mode
-			debug.LogToFilef("ℹ️ CREATE VIEW: ESC in normal mode - no action")
-			return true, v, nil
-			
 		case "backspace":
-			// In normal mode, backspace should NOT navigate back
-			debug.LogToFilef("🚫 CREATE VIEW: Blocking backspace navigation in normal mode")
+			// Block backspace navigation in normal mode
+			debug.LogToFilef("🚫 CREATE VIEW HandleKey: Blocking backspace navigation in normal mode")
 			return true, v, nil
 			
-		case "up", "down":
-			// Convert arrow keys to j/k for form navigation
-			var newKeyMsg tea.KeyMsg
-			if keyString == "up" {
-				newKeyMsg = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}}
-			} else { // down
-				newKeyMsg = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}}
-			}
-			
-			// Let form handle the converted key
-			newForm, cmd := v.form.Update(newKeyMsg)
-			v.form = newForm.(*CustomCreateForm)
-			return true, v, cmd
-			
-		case "d":
-			// Delete current field's text
-			debug.LogToFilef("✂️ CREATE VIEW: Delete command - clearing current field")
-			v.clearCurrentField()
+		case "esc":
+			// In normal mode, ESC doesn't do anything
+			debug.LogToFilef("ℹ️ CREATE VIEW HandleKey: ESC in normal mode - no action")
 			return true, v, nil
-			
-		case "c":
-			// Change - clear current field and enter insert mode
-			debug.LogToFilef("✏️ CREATE VIEW: Change command - clearing field and entering insert mode")
-			v.clearCurrentField()
-			v.form.SetInsertMode(true)
-			return true, v, nil
-			
-		case "q", "b":
-			// In normal mode, these are navigation keys - don't handle them here
-			// Let them flow through to handleKeyMsg
-			debug.LogToFilef("🔙 CREATE VIEW HandleKey: Navigation key '%s' in normal mode - returning false to let handleKeyMsg handle it", keyString)
-			return false, v, nil
 			
 		default:
-			// Other keys in normal mode - let default handling occur
+			// Let everything else go through to Update/handleKeyMsg
+			debug.LogToFilef("➡️ CREATE VIEW HandleKey: Passing '%s' through to Update", keyString)
 			return false, v, nil
 		}
 	}

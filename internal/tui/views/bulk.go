@@ -359,8 +359,12 @@ func (v *BulkView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return v, nil
 
 	case errMsg:
-		// Error occurred
+		// Error occurred - show it in instructions mode
+		debug.LogToFilef("DEBUG: BulkView - error occurred: %v\n", msg.err)
 		v.error = msg.err
+		// Go back to instructions mode to show the error
+		v.mode = ModeInstructions
+		v.fileSelector = nil // Clear file selector
 		return v, nil
 
 	case spinner.TickMsg:
@@ -487,12 +491,37 @@ func (v *BulkView) View() string {
 
 // renderInstructions renders the initial instructions screen
 func (v *BulkView) renderInstructions() string {
-	if v.layout == nil {
-		v.layout = components.NewWindowLayout(v.width, v.height)
+	// Don't use WindowLayout here - it's designed for single full-screen views
+	// We need to manually handle the layout to ensure status line is at bottom
+	
+	// Calculate available space
+	availableHeight := v.height - 1 // Reserve 1 line for status line
+	if availableHeight < 5 {
+		availableHeight = 5
 	}
-
+	
 	// Instructions content
-	instructions := []string{
+	var instructions []string
+	
+	// Show error if there is one
+	if v.error != nil {
+		errorStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("196")).
+			Bold(true)
+		
+		instructions = append(instructions, 
+			errorStyle.Render("❌ Error loading configuration files:"),
+			"",
+			fmt.Sprintf("%v", v.error),
+			"",
+			"Please check that your selected files contain valid configuration.",
+			"",
+			"---",
+			"",
+		)
+	}
+	
+	instructions = append(instructions,
 		"Welcome to the Bulk Operations interface.",
 		"",
 		"This tool allows you to:",
@@ -507,28 +536,47 @@ func (v *BulkView) renderInstructions() string {
 		"• YAML (.yaml, .yml) - Configuration files",
 		"• JSONL (.jsonl) - Line-delimited JSON",
 		"• Markdown (.md) - Documentation with task blocks",
-	}
+	)
 
 	content := strings.Join(instructions, "\n")
 
-	// Use WindowLayout system for consistent styling
-	boxStyle := v.layout.CreateStandardBox()
-	titleStyle := v.layout.CreateTitleStyle()
-	contentStyle := v.layout.CreateContentStyle()
+	// Create styles
+	boxStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("62"))
+	
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("205"))
+	
+	contentStyle := lipgloss.NewStyle().
+		Padding(1, 2)
 
 	title := titleStyle.Render("Bulk Operations")
 	styledContent := contentStyle.Render(content)
 	
-	// Create the main container with proper dimensions
-	boxWidth, boxHeight := v.layout.GetBoxDimensions()
+	// Create the main container that fills available height
+	// Account for border (2 chars) when setting dimensions
+	boxWidth := v.width - 4
+	boxHeight := availableHeight - 2
+	
+	if boxWidth < 10 {
+		boxWidth = 10
+	}
+	if boxHeight < 3 {
+		boxHeight = 3
+	}
+	
 	mainContainer := boxStyle.
 		Width(boxWidth).
 		Height(boxHeight).
+		MaxHeight(boxHeight).
 		Render(lipgloss.JoinVertical(lipgloss.Left, title, "", styledContent))
 
 	// Status line
 	statusLine := v.renderStatusLine("BULK")
 
+	// Ensure status line is at the bottom
 	return lipgloss.JoinVertical(lipgloss.Left, mainContainer, statusLine)
 }
 
@@ -639,7 +687,7 @@ func (v *BulkView) renderStatusLine(layoutName string) string {
 	case ModeFileBrowser:
 		if v.fileSelector != nil && v.fileSelector.GetInputMode() {
 			modeIndicator = " [INPUT]"
-			helpText = "type:filter esc:nav mode enter:confirm ctrl+a:all ctrl+d:none"
+			helpText = "↑↓:nav space:select type:filter esc:nav mode enter:confirm ctrl+a:all"
 		} else {
 			modeIndicator = " [NAV]"
 			helpText = "↑↓/j/k:nav space:select i:input mode b/esc:back enter:confirm"
