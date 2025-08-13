@@ -259,35 +259,25 @@ func (v *BulkView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch v.mode {
 		case ModeFileBrowser:
 			if v.fileSelector != nil {
-				// When in INPUT mode, pass all keys except 'q' to the file selector
-				if v.fileSelector.GetInputMode() {
-					// Only intercept 'q' for quit in INPUT mode
-					if msg.String() == "q" && len(v.fileSelector.GetFilterInput()) == 0 {
-						// Only quit if filter is empty
-						debug.LogToFile("DEBUG: BulkView - handling 'q' for quit in FileBrowser\n")
-						return v.handleFileBrowserKeys(msg)
-					}
-					// Pass everything else to file selector (including backspace!)
-					debug.LogToFilef("DEBUG: BulkView - passing key '%s' to file selector (INPUT mode)\n", msg.String())
-					newFileSelector, cmd := v.fileSelector.Update(msg)
-					v.fileSelector = newFileSelector
-					cmds = append(cmds, cmd)
-					return v, tea.Batch(cmds...)
-				} else {
-					// In NAV mode, check if this is a navigation key we should handle
+				// The CoreViewKeymap.HandleKey will handle INPUT mode keys like 'q', 'b', 'backspace'
+				// So here we only need to handle the remaining keys
+				
+				// In NAV mode, check if this is a navigation key we should handle
+				if !v.fileSelector.GetInputMode() {
 					if msg.Type == tea.KeyEsc || msg.String() == "q" {
-						// Handle navigation keys
-						debug.LogToFile("DEBUG: BulkView - handling navigation key in FileBrowser (NAV mode)\n")
+						// Handle navigation keys in NAV mode
+						debug.LogToFile("DEBUG: BulkView.Update - handling navigation key in FileBrowser (NAV mode)\n")
 						return v.handleFileBrowserKeys(msg)
-					} else {
-						// Pass other keys to file selector
-						debug.LogToFilef("DEBUG: BulkView - passing key '%s' to file selector (NAV mode)\n", msg.String())
-						newFileSelector, cmd := v.fileSelector.Update(msg)
-						v.fileSelector = newFileSelector
-						cmds = append(cmds, cmd)
-						return v, tea.Batch(cmds...)
 					}
 				}
+				
+				// For all other keys, pass to file selector
+				// Note: Keys handled by HandleKey() won't reach here
+				debug.LogToFilef("DEBUG: BulkView.Update - passing key '%s' to file selector\n", msg.String())
+				newFileSelector, cmd := v.fileSelector.Update(msg)
+				v.fileSelector = newFileSelector
+				cmds = append(cmds, cmd)
+				return v, tea.Batch(cmds...)
 			}
 		}
 		
@@ -554,15 +544,7 @@ func (v *BulkView) renderFileBrowser() string {
 	}
 
 	// Status line with mode indicator
-	modeText := "FZF-BULK"
-	if v.fileSelector != nil {
-		if v.fileSelector.GetInputMode() {
-			modeText = "FZF-BULK [INPUT]"
-		} else {
-			modeText = "FZF-BULK [NAV]"
-		}
-	}
-	statusLine := v.renderStatusLine(modeText)
+	statusLine := v.renderStatusLine("FZF-BULK")
 
 	// Use double column layout to render everything
 	return v.doubleColumnLayout.RenderWithTitle(
@@ -633,13 +615,17 @@ func (v *BulkView) renderRunList() string {
 func (v *BulkView) renderStatusLine(layoutName string) string {
 	// Simple help text based on current mode
 	var helpText string
+	var modeIndicator string
+	
 	switch v.mode {
 	case ModeInstructions:
 		helpText = "f:browse files q:quit ?:help"
 	case ModeFileBrowser:
 		if v.fileSelector != nil && v.fileSelector.GetInputMode() {
+			modeIndicator = " [INPUT]"
 			helpText = "type:filter esc:nav mode enter:confirm ctrl+a:all ctrl+d:none"
 		} else {
+			modeIndicator = " [NAV]"
 			helpText = "↑↓/j/k:nav space:select i:input mode b/esc:back enter:confirm"
 		}
 	case ModeRunList:
@@ -648,9 +634,12 @@ func (v *BulkView) renderStatusLine(layoutName string) string {
 		helpText = "q:quit ?:help"
 	}
 
+	// Compose the left side with layout name and mode indicator
+	leftText := fmt.Sprintf("[%s]%s", layoutName, modeIndicator)
+
 	return v.statusLine.
 		SetWidth(v.width).
-		SetLeft(fmt.Sprintf("[%s]", layoutName)).
+		SetLeft(leftText).
 		SetRight("").
 		SetHelp(helpText).
 		ResetStyle().
@@ -749,19 +738,45 @@ func (v *BulkView) renderResults() string {
 
 // IsKeyDisabled returns true if the given key should be ignored for this view
 func (v *BulkView) IsKeyDisabled(keyString string) bool {
-	// When in ModeFileBrowser with FZF INPUT mode active, disable backspace navigation
-	if v.mode == ModeFileBrowser && v.fileSelector != nil && v.fileSelector.GetInputMode() {
-		// Disable backspace from being handled as navigation
-		if keyString == "backspace" {
-			debug.LogToFilef("DEBUG: BulkView.IsKeyDisabled - disabling backspace in FZF INPUT mode\n")
-			return true
-		}
-	}
+	// We don't disable any keys - we handle them in HandleKey instead
 	return false
 }
 
 // HandleKey allows views to provide custom handling for specific keys
 func (v *BulkView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Model, cmd tea.Cmd) {
-	// Let the default Update method handle everything
+	keyString := keyMsg.String()
+	debug.LogToFilef("DEBUG: BulkView.HandleKey - received key '%s', mode=%d\n", keyString, v.mode)
+	
+	// When in ModeFileBrowser with FZF INPUT mode, handle keys specially
+	if v.mode == ModeFileBrowser && v.fileSelector != nil && v.fileSelector.GetInputMode() {
+		debug.LogToFilef("DEBUG: BulkView.HandleKey - in FZF INPUT mode, handling key '%s'\n", keyString)
+		
+		// In INPUT mode, we need to intercept navigation keys and pass them to file selector
+		switch keyString {
+		case "backspace":
+			debug.LogToFilef("DEBUG: BulkView.HandleKey - passing backspace to file selector for deletion\n")
+			// Pass backspace to file selector for text deletion
+			newFileSelector, cmd := v.fileSelector.Update(keyMsg)
+			v.fileSelector = newFileSelector
+			return true, v, cmd
+			
+		case "q":
+			debug.LogToFilef("DEBUG: BulkView.HandleKey - passing 'q' to file selector as text input\n")
+			// In INPUT mode, 'q' is just a character to type, not quit!
+			newFileSelector, cmd := v.fileSelector.Update(keyMsg)
+			v.fileSelector = newFileSelector
+			return true, v, cmd
+			
+		case "b":
+			debug.LogToFilef("DEBUG: BulkView.HandleKey - passing 'b' to file selector as text input\n")
+			// In INPUT mode, 'b' is just a character to type, not back!
+			newFileSelector, cmd := v.fileSelector.Update(keyMsg)
+			v.fileSelector = newFileSelector
+			return true, v, cmd
+		}
+	}
+	
+	debug.LogToFilef("DEBUG: BulkView.HandleKey - not handling key '%s', returning false\n", keyString)
+	// Let the default Update method handle everything else
 	return false, v, nil
 }

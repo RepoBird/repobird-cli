@@ -448,3 +448,41 @@ func (f *FormComponent) SetInsertMode(mode bool) {
 		f.blurCurrentField()
 	}
 }
+
+// GetFocusIndex returns the currently focused field index
+func (f *FormComponent) GetFocusIndex() int {
+	return f.focusIndex
+}
+
+// SetFocusIndex sets the focused field index
+func (f *FormComponent) SetFocusIndex(index int) {
+	if index >= 0 && index < len(f.fields) {
+		f.blurCurrentField()
+		f.focusIndex = index
+		if f.insertMode {
+			f.focusCurrentField()
+		}
+	}
+}
+
+// ClearCurrentField clears the value of the currently focused field
+func (f *FormComponent) ClearCurrentField() {
+	if f.focusIndex < len(f.fields) {
+		field := &f.fields[f.focusIndex]
+		field.Value = ""
+		switch field.Type {
+		case TextInput:
+			field.textInput.SetValue("")
+		case TextArea:
+			field.textArea.SetValue("")
+		}
+	}
+}
+
+// GetCurrentFieldName returns the name of the currently focused field
+func (f *FormComponent) GetCurrentFieldName() string {
+	if f.focusIndex < len(f.fields) {
+		return f.fields[f.focusIndex].Name
+	}
+	return ""
+}

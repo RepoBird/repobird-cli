@@ -2,6 +2,7 @@ package views
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -133,6 +134,17 @@ func (v *CreateRunView) Init() tea.Cmd {
 		v.form.SetValue("target", savedFormData.Target)
 		v.form.SetValue("prompt", savedFormData.Prompt)
 		v.form.SetValue("context", savedFormData.Context)
+		
+		// Restore the focus index if available in Fields map
+		if savedFormData.Fields != nil {
+			if focusIndexStr, ok := savedFormData.Fields["_focusIndex"]; ok {
+				// Parse the focus index (stored as string)
+				if focusIndex, err := strconv.Atoi(focusIndexStr); err == nil {
+					v.form.SetFocusIndex(focusIndex)
+					debug.LogToFilef("🎯 CREATE VIEW: Restored focus index: %d", focusIndex)
+				}
+			}
+		}
 	}
 
 	return v.form.Init()
@@ -308,18 +320,25 @@ func (v *CreateRunView) View() string {
 
 // renderStatusLine renders the status line with help text based on form mode
 func (v *CreateRunView) renderStatusLine(layoutName string) string {
-	// Dynamic help text based on form mode
+	// Add mode indicator
+	var modeIndicator string
 	var helpText string
+	
 	if v.form.IsInsertMode() {
-		helpText = "[i]edit [esc]normal [tab]next [shift+tab]prev [ctrl+s]submit"
+		modeIndicator = " [INPUT]"
+		helpText = "[esc]normal [tab]next [shift+tab]prev [ctrl+s]submit"
 	} else {
-		helpText = "[i]edit [j/k/↑↓]navigate [b/q]back [ctrl+s]submit"
+		modeIndicator = ""
+		helpText = "[i]insert [d]delete [c]change [j/k/↑↓]nav [b/q]back [ctrl+s]submit"
 	}
+	
+	// Compose the left side with layout name and mode indicator
+	leftText := fmt.Sprintf("[%s]%s", layoutName, modeIndicator)
 	
 	// Create statusline component
 	statusLine := components.NewStatusLine().
 		SetWidth(v.width).
-		SetLeft(fmt.Sprintf("[%s]", layoutName)).
+		SetLeft(leftText).
 		SetRight("").
 		SetHelp(helpText).
 		ResetStyle().
@@ -332,6 +351,10 @@ func (v *CreateRunView) renderStatusLine(layoutName string) string {
 func (v *CreateRunView) saveFormData() {
 	values := v.form.GetValues()
 	
+	// Create fields map to store additional state
+	fields := make(map[string]string)
+	fields["_focusIndex"] = fmt.Sprintf("%d", v.form.GetFocusIndex())
+	
 	formData := &tuicache.FormData{
 		Title:      values["title"],
 		Repository: values["repository"],
@@ -340,10 +363,11 @@ func (v *CreateRunView) saveFormData() {
 		Prompt:     values["prompt"],
 		Context:    values["context"],
 		RunType:    "run", // Default run type
+		Fields:     fields, // Store focus index and other metadata
 	}
 	
 	v.cache.SetFormData(formData)
-	debug.LogToFilef("💾 CREATE VIEW: Form data saved to cache")
+	debug.LogToFilef("💾 CREATE VIEW: Form data saved to cache (focus: %d)", v.form.GetFocusIndex())
 }
 
 // submitRunCmd creates a command to submit the run asynchronously
@@ -383,14 +407,15 @@ func NewCreateRunViewWithCache(
 
 // IsKeyDisabled implements CoreViewKeymap interface to control key behavior
 func (v *CreateRunView) IsKeyDisabled(keyString string) bool {
-	// Disable backspace navigation when in insert mode to prevent unwanted navigation
-	if keyString == "backspace" && v.form.IsInsertMode() {
-		debug.LogToFilef("🚫 CREATE VIEW: Disabling backspace navigation in insert mode")
-		return true
+	// Disable navigation keys when in insert mode to prevent unwanted navigation
+	if v.form.IsInsertMode() {
+		switch keyString {
+		case "backspace", "esc", "b", "q":
+			// These keys should be handled by the form in insert mode
+			debug.LogToFilef("🚫 CREATE VIEW: Disabling %s navigation in insert mode", keyString)
+			return true
+		}
 	}
-	
-	// Note: esc is not disabled in insert mode - form handles it to exit insert mode
-	// Only back navigation keys (b/q) are disabled in normal mode
 	
 	return false
 }
@@ -399,7 +424,7 @@ func (v *CreateRunView) IsKeyDisabled(keyString string) bool {
 func (v *CreateRunView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Model, cmd tea.Cmd) {
 	keyString := keyMsg.String()
 	
-	// Handle arrow key navigation in normal mode (like j/k)
+	// Handle vim commands and arrow keys in normal mode
 	if !v.form.IsInsertMode() {
 		switch keyString {
 		case "up", "down":
@@ -415,8 +440,34 @@ func (v *CreateRunView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Mo
 			newForm, cmd := v.form.Update(newKeyMsg)
 			v.form = newForm.(*components.FormComponent)
 			return true, v, cmd
+			
+		case "d":
+			// Delete current field's text
+			debug.LogToFilef("✂️ CREATE VIEW: Delete command - clearing current field")
+			v.clearCurrentField()
+			return true, v, nil
+			
+		case "c":
+			// Change - clear current field and enter insert mode
+			debug.LogToFilef("✏️ CREATE VIEW: Change command - clearing field and entering insert mode")
+			v.clearCurrentField()
+			v.form.SetInsertMode(true)
+			return true, v, nil
 		}
 	}
 	
 	return false, v, nil
+}
+
+// clearCurrentField clears the text of the currently focused field
+func (v *CreateRunView) clearCurrentField() {
+	// Clear the current field using the form's new method
+	v.form.ClearCurrentField()
+	
+	// Log which field was cleared
+	fieldName := v.form.GetCurrentFieldName()
+	debug.LogToFilef("🗑️ CREATE VIEW: Cleared field '%s'", fieldName)
+	
+	// Auto-save the form state after clearing
+	v.saveFormData()
 }
