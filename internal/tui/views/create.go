@@ -416,45 +416,48 @@ func (v *CreateRunView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Mo
 	keyString := keyMsg.String()
 	debug.LogToFilef("🔑 CREATE VIEW HandleKey: key='%s', insertMode=%v", keyString, v.form.IsInsertMode())
 	
-	// In the new architecture, we let the form handle most keys via Update()
-	// We only need to handle a few special cases here
-	
-	if v.form.IsInsertMode() {
-		// In INSERT mode, handle special navigation keys that shouldn't type
-		switch keyString {
-		case "esc":
-			// ESC is handled by the form itself now
-			debug.LogToFilef("⬅️ CREATE VIEW HandleKey: ESC in insert mode - let form handle it")
-			return false, v, nil
-			
-		case "backspace":
-			// Backspace should be handled by form for text deletion
-			debug.LogToFilef("⌫ CREATE VIEW HandleKey: Backspace in insert mode - let form handle it")
-			return false, v, nil
-			
-		default:
-			// Let all other keys go through normal processing
-			return false, v, nil
-		}
-	} else {
-		// In NORMAL mode, we don't interfere - let form handle everything
-		switch keyString {
-		case "backspace":
-			// Block backspace navigation in normal mode
-			debug.LogToFilef("🚫 CREATE VIEW HandleKey: Blocking backspace navigation in normal mode")
-			return true, v, nil
-			
-		case "esc":
-			// In normal mode, ESC doesn't do anything
+	// IMPORTANT: Handle ESC specially to prevent navigation
+	if keyString == "esc" {
+		if v.form.IsInsertMode() {
+			// In insert mode, ESC should exit to normal mode (not navigate)
+			debug.LogToFilef("⬅️ CREATE VIEW HandleKey: ESC in insert mode - exiting to normal mode")
+			v.form.SetInsertMode(false)
+			v.saveFormData()
+			return true, v, nil // Return handled=true to prevent navigation
+		} else {
+			// In normal mode, ESC does nothing (not navigate)
 			debug.LogToFilef("ℹ️ CREATE VIEW HandleKey: ESC in normal mode - no action")
-			return true, v, nil
-			
-		default:
-			// Let everything else go through to Update/handleKeyMsg
-			debug.LogToFilef("➡️ CREATE VIEW HandleKey: Passing '%s' through to Update", keyString)
-			return false, v, nil
+			return true, v, nil // Return handled=true to prevent navigation
 		}
 	}
+	
+	// Handle 'q' specially - in normal mode it should navigate back
+	if keyString == "q" && !v.form.IsInsertMode() {
+		debug.LogToFilef("🔙 CREATE VIEW HandleKey: 'q' in normal mode - navigating back")
+		v.saveFormData()
+		return true, v, func() tea.Msg {
+			return messages.NavigateBackMsg{}
+		}
+	}
+	
+	// Handle 'b' specially - in normal mode it should navigate back
+	if keyString == "b" && !v.form.IsInsertMode() {
+		debug.LogToFilef("🔙 CREATE VIEW HandleKey: 'b' in normal mode - navigating back")
+		v.saveFormData()
+		return true, v, func() tea.Msg {
+			return messages.NavigateBackMsg{}
+		}
+	}
+	
+	// Block backspace navigation in normal mode
+	if keyString == "backspace" && !v.form.IsInsertMode() {
+		debug.LogToFilef("🚫 CREATE VIEW HandleKey: Blocking backspace navigation in normal mode")
+		return true, v, nil
+	}
+	
+	// Let everything else go through to the form's Update method
+	debug.LogToFilef("➡️ CREATE VIEW HandleKey: Passing '%s' through to form Update", keyString)
+	return false, v, nil
 }
 
 // clearCurrentField clears the text of the currently focused field
