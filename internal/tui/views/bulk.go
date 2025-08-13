@@ -296,8 +296,15 @@ func (v *BulkView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case components.BulkFileSelectedMsg:
 		// File(s) selected, load configurations from actual files
-		debug.LogToFilef("DEBUG: BulkView - files selected: %v\n", msg.Files)
-		if !msg.Canceled && len(msg.Files) > 0 {
+		debug.LogToFilef("DEBUG: BulkView - files selected: %v, canceled: %v\n", msg.Files, msg.Canceled)
+		if msg.Canceled {
+			// User canceled file selection, go back to instructions
+			debug.LogToFile("DEBUG: BulkView - file selection canceled, returning to instructions\n")
+			v.mode = ModeInstructions
+			v.fileSelector = nil // Clear file selector
+			return v, nil
+		}
+		if len(msg.Files) > 0 {
 			return v.loadFiles(msg.Files)
 		}
 		return v, nil

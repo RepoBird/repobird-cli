@@ -813,6 +813,46 @@ func (b *BulkFileSelector) GetFileListContent(width, height int) string {
 	header := fmt.Sprintf("Files (%d/%d selected):", selectedCount, len(b.filteredFiles))
 	content = append(content, headerStyle.Render(header))
 
+	// Check if we have files or are still loading
+	if b.loading {
+		content = append(content, "")
+		content = append(content, lipgloss.NewStyle().
+			Foreground(lipgloss.Color("214")).
+			Render("⟳ Loading configuration files..."))
+		return strings.Join(content, "\n")
+	}
+	
+	if b.loadError != nil {
+		content = append(content, "")
+		content = append(content, lipgloss.NewStyle().
+			Foreground(lipgloss.Color("196")).
+			Render(fmt.Sprintf("Error loading files: %v", b.loadError)))
+		return strings.Join(content, "\n")
+	}
+	
+	if len(b.files) == 0 {
+		content = append(content, "")
+		content = append(content, lipgloss.NewStyle().
+			Foreground(lipgloss.Color("241")).
+			Render("No configuration files found."))
+		content = append(content, "")
+		content = append(content, lipgloss.NewStyle().
+			Foreground(lipgloss.Color("245")).
+			Render("Looking for: *.json, *.yaml, *.yml, *.jsonl, *.md"))
+		content = append(content, lipgloss.NewStyle().
+			Foreground(lipgloss.Color("245")).
+			Render("in current directory and subdirectories."))
+		return strings.Join(content, "\n")
+	}
+	
+	if len(b.filteredFiles) == 0 && b.filterInput != "" {
+		content = append(content, "")
+		content = append(content, lipgloss.NewStyle().
+			Foreground(lipgloss.Color("241")).
+			Render(fmt.Sprintf("No files match filter: '%s'", b.filterInput)))
+		return strings.Join(content, "\n")
+	}
+	
 	// File list
 	visibleFiles := height - 4 // Account for filter, spacing, and header
 	if visibleFiles < 1 {

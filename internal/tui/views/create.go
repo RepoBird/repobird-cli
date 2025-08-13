@@ -195,6 +195,9 @@ func (v *CreateRunView) handleWindowSizeMsg(msg tea.WindowSizeMsg) (tea.Model, t
 
 // handleKeyMsg processes keyboard input
 func (v *CreateRunView) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Most key handling is done in HandleKey() via CoreViewKeymap
+	// Here we only handle keys that HandleKey doesn't process
+	
 	// Handle navigation keys in normal mode
 	if !v.form.IsInsertMode() {
 		switch msg.String() {
@@ -212,11 +215,11 @@ func (v *CreateRunView) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	// Delegate to form component
+	// Delegate to form component for any remaining keys
 	newForm, cmd := v.form.Update(msg)
 	v.form = newForm.(*components.FormComponent)
 	
-	// Auto-save form data when values change (debounced)
+	// Auto-save form data when values change
 	v.saveFormData()
 	
 	return v, cmd
@@ -407,26 +410,61 @@ func NewCreateRunViewWithCache(
 
 // IsKeyDisabled implements CoreViewKeymap interface to control key behavior
 func (v *CreateRunView) IsKeyDisabled(keyString string) bool {
-	// Disable navigation keys when in insert mode to prevent unwanted navigation
-	if v.form.IsInsertMode() {
-		switch keyString {
-		case "backspace", "esc", "b", "q":
-			// These keys should be handled by the form in insert mode
-			debug.LogToFilef("🚫 CREATE VIEW: Disabling %s navigation in insert mode", keyString)
-			return true
-		}
-	}
-	
+	// We don't disable any keys - we handle them properly in HandleKey
 	return false
 }
 
 // HandleKey implements CoreViewKeymap interface for custom key handling
 func (v *CreateRunView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Model, cmd tea.Cmd) {
 	keyString := keyMsg.String()
+	debug.LogToFilef("🔑 CREATE VIEW HandleKey: key='%s', insertMode=%v", keyString, v.form.IsInsertMode())
 	
-	// Handle vim commands and arrow keys in normal mode
-	if !v.form.IsInsertMode() {
+	// Handle keys differently based on mode
+	if v.form.IsInsertMode() {
+		// In INSERT mode, we need to handle special keys but pass through typing
 		switch keyString {
+		case "esc":
+			// ESC exits insert mode
+			debug.LogToFilef("⬅️ CREATE VIEW: ESC pressed - exiting insert mode")
+			v.form.SetInsertMode(false)
+			v.saveFormData() // Save when exiting insert mode
+			return true, v, nil
+			
+		case "backspace":
+			// Pass backspace to form for text deletion
+			debug.LogToFilef("⌫ CREATE VIEW: Backspace in insert mode - passing to form")
+			newForm, cmd := v.form.Update(keyMsg)
+			v.form = newForm.(*components.FormComponent)
+			v.saveFormData() // Auto-save on change
+			return true, v, cmd
+			
+		case "q", "b":
+			// In insert mode, these are just characters to type
+			debug.LogToFilef("⌨️ CREATE VIEW: Typing '%s' in insert mode", keyString)
+			newForm, cmd := v.form.Update(keyMsg)
+			v.form = newForm.(*components.FormComponent)
+			v.saveFormData() // Auto-save on change
+			return true, v, cmd
+			
+		default:
+			// For all other keys in insert mode, let the form handle them
+			// This includes regular typing, tab, shift+tab, etc.
+			// We return false so the key goes through normal processing
+			return false, v, nil
+		}
+	} else {
+		// In NORMAL mode, handle navigation and vim commands
+		switch keyString {
+		case "esc":
+			// In normal mode, ESC doesn't navigate back - it's already in normal mode
+			debug.LogToFilef("ℹ️ CREATE VIEW: ESC in normal mode - no action")
+			return true, v, nil
+			
+		case "backspace":
+			// In normal mode, backspace should NOT navigate back
+			debug.LogToFilef("🚫 CREATE VIEW: Blocking backspace navigation in normal mode")
+			return true, v, nil
+			
 		case "up", "down":
 			// Convert arrow keys to j/k for form navigation
 			var newKeyMsg tea.KeyMsg
@@ -453,10 +491,17 @@ func (v *CreateRunView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Mo
 			v.clearCurrentField()
 			v.form.SetInsertMode(true)
 			return true, v, nil
+			
+		case "q", "b":
+			// In normal mode, these are navigation keys - let handleKeyMsg handle them
+			debug.LogToFilef("🔙 CREATE VIEW: Navigation key '%s' in normal mode - not handling", keyString)
+			return false, v, nil
+			
+		default:
+			// Other keys in normal mode - let default handling occur
+			return false, v, nil
 		}
 	}
-	
-	return false, v, nil
 }
 
 // clearCurrentField clears the text of the currently focused field
