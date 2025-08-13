@@ -2,10 +2,12 @@ package views
 
 import (
 	"fmt"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/repobird/repobird-cli/internal/tui/components"
+	"github.com/repobird/repobird-cli/internal/tui/debug"
 	"github.com/repobird/repobird-cli/internal/tui/messages"
 )
 
@@ -129,13 +131,13 @@ func (e *ErrorView) View() string {
 		Align(lipgloss.Center, lipgloss.Center).
 		Render(content)
 
-	// Create box content
+	// Create box
 	boxedContent := boxStyle.Render(centeredContent)
 	
 	// Create status line
 	statusLine := e.renderStatusLine()
 	
-	// Join box and status line
+	// Join box and status line directly without gap
 	return lipgloss.JoinVertical(lipgloss.Left, boxedContent, statusLine)
 }
 
