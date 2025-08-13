@@ -68,18 +68,15 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmds []tea.Cmd
 		cmds = append(cmds, a.current.Init())
 		
-		// Always send a window size message to ensure proper initialization
+		// Only send window size if we have valid dimensions
 		if a.width > 0 && a.height > 0 {
 			debug.LogToFilef("📐 APP: Sending stored window size: %dx%d\n", a.width, a.height)
 			cmds = append(cmds, func() tea.Msg {
 				return tea.WindowSizeMsg{Width: a.width, Height: a.height}
 			})
 		} else {
-			debug.LogToFile("📐 APP: Requesting window size\n")
-			// Request window size if we don't have it yet
-			cmds = append(cmds, func() tea.Msg {
-				return tea.WindowSizeMsg{}
-			})
+			debug.LogToFile("📐 APP: No valid window size yet, waiting for terminal to send it\n")
+			// Don't send an empty WindowSizeMsg - wait for the terminal to send the real one
 		}
 		return a, tea.Batch(cmds...)
 	}
