@@ -559,8 +559,8 @@ func TestBulkViewStatusLineHelp(t *testing.T) {
 		mode     BulkMode
 		expected string
 	}{
-		{ModeFileBrowser, "↑↓:navigate space:select enter:confirm F:files q:quit"},
-		{ModeRunList, "↑↓:navigate space:toggle F:files ctrl+s:submit q:quit"},
+		{ModeFileBrowser, "↑↓/j/k:nav space:select i:input mode b/esc:back enter:confirm"},
+		{ModeRunList, "↑↓:navigate space:toggle f:files ctrl+s:submit q:quit"},
 		{ModeRunEdit, "q:quit ?:help"},
 		{ModeProgress, "q:quit ?:help"},
 		{ModeResults, "q:quit ?:help"},
@@ -627,16 +627,17 @@ func TestBulkViewNavigationMessages(t *testing.T) {
 	view.width = 80
 	view.height = 24
 
-	t.Run("File select quit returns NavigateBackMsg", func(t *testing.T) {
+	t.Run("File select quit returns to instructions mode", func(t *testing.T) {
 		view.mode = ModeFileBrowser
+		view.fileSelector = components.NewBulkFileSelector(80, 24)
 		keyMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}}
 		
-		_, cmd := view.Update(keyMsg)
-		assert.NotNil(t, cmd)
+		model, cmd := view.Update(keyMsg)
+		updatedView := model.(*BulkView)
 		
-		navMsg := cmd()
-		_, ok := navMsg.(messages.NavigateBackMsg)
-		assert.True(t, ok)
+		assert.Equal(t, ModeInstructions, updatedView.mode)
+		assert.Nil(t, updatedView.fileSelector)
+		assert.Nil(t, cmd)
 	})
 
 	t.Run("Run list quit returns NavigateBackMsg", func(t *testing.T) {
