@@ -87,6 +87,40 @@ Key features:
 - Vim-style keybindings
 - Clipboard integration
 - Persistent state management
+- Global layout system for consistent sizing
+
+**WindowLayout System:**
+The TUI implements a centralized layout system (`components/window_layout.go`) that ensures consistent sizing and borders across all views except the Dashboard.
+
+**Problem Solved:**
+Previously, each view manually calculated its own dimensions and borders, leading to:
+- Inconsistent border cutoffs across views
+- Code duplication of sizing logic
+- Maintenance nightmares when border calculations changed
+- Views breaking when lipgloss rendering behavior changed
+
+**Solution:**
+```go
+// Single source of truth for all sizing calculations
+layout := components.NewWindowLayout(terminalWidth, terminalHeight)
+
+// Consistent methods across all views
+boxWidth, boxHeight := layout.GetBoxDimensions()         // For lipgloss containers
+contentWidth, contentHeight := layout.GetContentDimensions() // For content areas
+viewportWidth, viewportHeight := layout.GetViewportDimensions() // For bubble tea viewports
+
+// Standard styling
+boxStyle := layout.CreateStandardBox()     // Consistent borders
+titleStyle := layout.CreateTitleStyle()    // Consistent titles
+contentStyle := layout.CreateContentStyle() // Consistent content areas
+```
+
+**Usage Guidelines:**
+- ✅ **Use WindowLayout**: Details View, Status View, Create Run View, Error View, List View
+- ❌ **Don't Use**: Dashboard (uses custom multi-column layout)
+- **Architecture**: Embed `layout *components.WindowLayout` in view structs
+- **Updates**: Call `layout.Update(width, height)` on terminal resize
+- **Benefits**: Perfect borders, no cutoffs, consistent appearance, easy maintenance
 
 ### 3. API Client (`/internal/api/`)
 Robust HTTP client implementation with enterprise-grade features.

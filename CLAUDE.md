@@ -339,6 +339,7 @@ When working on this codebase:
 - **View History Stack**: Back navigation support with `NavigateBackMsg`, dashboard reset with `NavigateToDashboardMsg`
 - **🆕 Core Keymap System**: Centralized key processing with per-view customization (see Key Management section)
 - **🆕 View File Organization**: Large views split into focused files (e.g., dashboard split into 8 files by functionality)
+- **🆕 Global Layout System**: Centralized sizing via `WindowLayout` component for consistent borders across all views
 - **Debug Logging**: Use `debug.LogToFilef()` from `internal/tui/debug` package (configurable via `REPOBIRD_DEBUG_LOG`)
 
 #### Navigation Architecture
@@ -349,6 +350,50 @@ When working on this codebase:
 - **Shared State**: Single cache instance shared across all views from app-level
 - **Context Management**: Use navigation context for temporary data, cleared on dashboard return
 - **Error Recovery**: Recoverable errors allow back navigation, non-recoverable errors clear history stack
+
+### BulkView Architecture (Reference Implementation)
+
+The BulkView serves as a reference implementation demonstrating proper navigation patterns and WindowLayout usage:
+
+#### Split File Organization
+- **`bulk.go`** (main controller) - Core Update/View/Init methods and mode management
+- **`bulk_commands.go`** - File loading, submission, and progress tracking commands
+- **`bulk_messages.go`** - Custom message types for bulk operations
+- **`bulk_test.go`** - Comprehensive test coverage for all modes and navigation
+
+#### Navigation Pattern Compliance
+```go
+// ✅ Correct: Message-based navigation instead of direct view creation
+func (v *BulkView) handleFileSelectKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+    case key.Matches(msg, v.keys.Quit):
+        return v, func() tea.Msg {
+            return messages.NavigateBackMsg{}  // Navigation message
+        }
+}
+
+// ✅ Correct: WindowSizeMsg handling for proper initialization
+func (v *BulkView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+    case tea.WindowSizeMsg:
+        v.width = msg.Width
+        v.height = msg.Height
+        v.layout = components.NewWindowLayout(v.width, v.height) // Global layout
+        // Update components...
+}
+```
+
+#### WindowLayout System Usage
+- Uses `components.NewWindowLayout()` for consistent borders and sizing
+- Status line integration with mode-specific help text
+- Proper viewport calculations for content areas
+- Responsive design that handles terminal resizing
+
+#### Multi-Mode State Management
+- **File Selection Mode**: Browse and select configuration files
+- **Run List Mode**: Review and toggle individual runs
+- **Progress Mode**: Real-time progress tracking
+- **Results Mode**: Summary with success/failure details
+
+This architecture serves as the template for implementing other complex views that require multiple modes and consistent navigation behavior.
 
 ### Key Management (Core Keymap System)
 
@@ -448,6 +493,90 @@ func (v *CreateView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Model
 - Navigation via messages only - no direct view creation
 - Views are self-loading in `Init()` - no parent state coupling
 - Cache encapsulation: Views use `cache.GetRuns()`, `cache.SetRuns()` instead of managing cache state
+
+### Global Layout System (WindowLayout)
+
+**CRITICAL**: All views except Dashboard MUST use the global WindowLayout system for consistent sizing and borders.
+
+#### Purpose
+Eliminates the architectural nightmare of each view manually calculating its own dimensions and borders. Previously, views had inconsistent border cutoffs and duplicate sizing logic that broke when lipgloss rendering behavior changed.
+
+#### Usage Pattern
+```go
+// In view struct
+type MyView struct {
+    layout *components.WindowLayout
+    // ... other fields
+}
+
+// In constructor
+func NewMyView(client APIClient, cache *cache.SimpleCache) *MyView {
+    return &MyView{
+        layout: components.NewWindowLayout(80, 24), // default dimensions
+        // ... other initialization
+    }
+}
+
+// In handleWindowSizeMsg
+func (v *MyView) handleWindowSizeMsg(msg tea.WindowSizeMsg) {
+    v.width = msg.Width
+    v.height = msg.Height
+    v.layout.Update(msg.Width, msg.Height) // Update layout calculations
+    
+    // Get viewport dimensions from layout
+    viewportWidth, viewportHeight := v.layout.GetViewportDimensions()
+    v.viewport.Width = viewportWidth
+    v.viewport.Height = viewportHeight
+}
+
+// In View() method
+func (v *MyView) View() string {
+    if !v.layout.IsValidDimensions() {
+        return v.layout.GetMinimalView("My View - Loading...")
+    }
+    
+    // Use layout for all sizing
+    boxStyle := v.layout.CreateStandardBox()
+    titleStyle := v.layout.CreateTitleStyle()
+    contentStyle := v.layout.CreateContentStyle()
+    
+    // ... render with consistent styling
+}
+```
+
+#### Key Methods
+- `NewWindowLayout(width, height)` - Create layout calculator
+- `Update(width, height)` - Recalculate on resize
+- `GetBoxDimensions()` - Box width/height for lipgloss containers
+- `GetViewportDimensions()` - Content area for bubble tea viewports
+- `CreateStandardBox()` - Consistent rounded border box
+- `CreateTitleStyle()` - Standard title formatting
+- `CreateContentStyle()` - Content area styling
+- `IsValidDimensions()` - Check if terminal is large enough
+
+#### Views That MUST Use WindowLayout
+- ✅ **Details View** (single-box content display)
+- ✅ **Status View** (single-box info display)  
+- ✅ **Create Run View** (form-based layout)
+- ✅ **Error View** (error message display)
+- ✅ **List View** (single-column list display)
+- ✅ **Bulk View** (multi-mode view with consistent borders and status line)
+- ❌ **Dashboard** (uses custom 3-column Miller Columns layout)
+
+#### Benefits
+- **Consistent Borders**: All views have perfect borders without cutoffs
+- **Single Source of Truth**: Change layout logic once, applies everywhere
+- **Lipgloss Compatibility**: Automatically accounts for border expansion (2px wider than set width)
+- **Responsive Design**: Handles terminal resizing gracefully
+- **Easy Maintenance**: No more hunting through views to fix border issues
+- **Future Proof**: New views just adopt the pattern
+
+#### Anti-Patterns to Avoid
+- ❌ Manual border calculations in view code
+- ❌ Hardcoded margins and padding
+- ❌ Direct lipgloss sizing without using layout
+- ❌ Copy-pasting sizing logic between views
+- ❌ Ignoring the layout system for "simple" views
 
 ### Testing Patterns  
 - **Table-Driven Tests**: Use struct slices with test cases for systematic testing

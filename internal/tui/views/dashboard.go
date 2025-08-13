@@ -492,16 +492,11 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			d.showStatusInfo = false
 			return d, nil
 		case msg.Type == tea.KeyRunes && string(msg.Runes) == "s" && !d.showStatusInfo:
-			// Toggle status info view
-			d.showStatusInfo = true
-			// Initialize status info navigation
-			d.initializeStatusInfoFields()
-			// Reset scroll offsets
-			d.statusInfoKeyOffset = 0
-			d.statusInfoValueOffset = 0
-			d.statusInfoFocusColumn = 1 // Default to value column
-			// Refresh user info when showing
-			cmds = append(cmds, d.loadUserInfo())
+			// Navigate to status view
+			debug.LogToFilef("🏥 DASHBOARD: 's' key detected - navigating to STATUS view 🏥\n")
+			cmds = append(cmds, func() tea.Msg {
+				return messages.NavigateToStatusMsg{}
+			})
 			return d, tea.Batch(cmds...)
 		case d.showDocs:
 			// Handle navigation in help overlay

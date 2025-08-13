@@ -169,6 +169,24 @@ func (a *App) handleNavigation(msg messages.NavigationMsg) (tea.Model, tea.Cmd) 
 
 		return a, a.current.Init()
 
+	case messages.NavigateToStatusMsg:
+		debug.LogToFilef("🏥 STATUS NAV: Navigating to status view 🏥\n")
+		a.viewStack = append(a.viewStack, a.current)
+		a.current = views.NewStatusView(a.client)
+
+		// Send current window dimensions to the new view if we have them
+		var cmds []tea.Cmd
+		cmds = append(cmds, a.current.Init())
+		if a.width > 0 && a.height > 0 {
+			debug.LogToFilef("📐 STATUS NAV: Sending WindowSizeMsg to new StatusView: %dx%d 📐\n", a.width, a.height)
+			cmds = append(cmds, func() tea.Msg {
+				return tea.WindowSizeMsg{Width: a.width, Height: a.height}
+			})
+		} else {
+			debug.LogToFile("⚠️ STATUS NAV: No stored dimensions to send to StatusView ⚠️\n")
+		}
+		return a, tea.Batch(cmds...)
+
 	case messages.NavigateToBulkMsg:
 		debug.LogToFilef("🏗️ BULK NAV: Attempting to navigate to bulk view 🏗️\n")
 		debug.LogToFilef("🔍 BULK NAV: Client type: %T 🔍\n", a.client)

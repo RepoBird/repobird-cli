@@ -246,6 +246,82 @@ Press **s** in the dashboard to view:
 - **s/q/ESC** - Close overlay
 - **Q** - Force quit from overlay
 
+## Bulk Operations View
+
+Press **b** in the dashboard to access bulk operations for processing multiple configuration files.
+
+### Bulk View Modes
+
+The bulk view operates in several sequential modes:
+
+#### 1. File Selection Mode (Default)
+- Browse and select configuration files (JSON, YAML, JSONL, Markdown)
+- Fuzzy search through available files in project directory
+- Multi-file selection with checkboxes
+- Preview file contents before selection
+
+**Navigation:**
+- **↑↓** or **j/k** - Navigate through files
+- **Space** - Toggle file selection
+- **Enter** - Confirm selection and proceed to run list
+- **Ctrl+A** - Select all visible files
+- **Ctrl+D** - Deselect all files
+- **q** - Return to dashboard
+
+#### 2. Run List Mode
+- Review all runs loaded from selected configuration files
+- Toggle individual runs for submission
+- Edit run parameters before submission
+- View repository and branch information
+
+**Navigation:**
+- **↑↓** or **j/k** - Navigate through runs
+- **Space** - Toggle run selection
+- **F** - Return to file selection
+- **Ctrl+S** - Submit selected runs
+- **q** - Return to dashboard
+
+#### 3. Progress Mode
+- Real-time progress tracking for submitted bulk runs
+- View completion statistics and individual run status
+- Option to cancel batch operation
+
+#### 4. Results Mode
+- Summary of completed bulk operation
+- Success/failure status for each run
+- Direct links to created runs
+- Error details for failed runs
+
+### Bulk View Architecture
+
+The bulk view follows the navigation pattern with proper separation of concerns:
+
+```go
+// Clean navigation messages instead of direct view creation
+func (v *BulkView) handleRunListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+    case key.Matches(msg, v.keys.Quit):
+        return v, func() tea.Msg {
+            return messages.NavigateBackMsg{}  // Back to dashboard
+        }
+}
+
+// Uses global layout system for consistent styling
+func (v *BulkView) renderRunList() string {
+    if v.layout == nil {
+        v.layout = components.NewWindowLayout(v.width, v.height)
+    }
+    // ... consistent rendering with status line
+}
+```
+
+### Bulk View Features
+
+- **Split File Architecture**: Organized into focused modules (`bulk_commands.go`, `bulk_messages.go`, etc.)
+- **Global Layout System**: Uses `WindowLayout` for consistent borders and sizing
+- **Message-Based Navigation**: All navigation through type-safe messages
+- **Status Line Integration**: Context-aware help text and loading indicators
+- **Error Recovery**: Graceful error handling with navigation options
+
 ## Tips and Tricks
 
 ### Quick Repository Selection
@@ -363,7 +439,8 @@ viewportWidth, viewportHeight := v.layout.GetViewportDimensions()
 - ✅ **Create Run View**: Form-based views
 - ✅ **Error View**: Error display views
 - ✅ **List View**: Single-column list views
-- ❌ **Dashboard**: Uses custom multi-column layout
+- ✅ **Bulk View**: All modes except complex multi-step flows
+- ❌ **Dashboard**: Uses custom 3-column Miller Columns layout (renderTripleColumnLayout)
 
 ### ScrollableList Component
 - Multi-column scrollable lists with keyboard navigation

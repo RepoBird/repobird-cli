@@ -1,6 +1,7 @@
 package views
 
 import (
+	"fmt"
 	"strings"
 	
 	"github.com/charmbracelet/bubbles/help"
@@ -11,6 +12,7 @@ import (
 	"github.com/repobird/repobird-cli/internal/api"
 	"github.com/repobird/repobird-cli/internal/tui/components"
 	"github.com/repobird/repobird-cli/internal/tui/debug"
+	"github.com/repobird/repobird-cli/internal/tui/messages"
 )
 
 // BulkMode represents the current mode of the bulk view
@@ -48,6 +50,7 @@ const (
 	StatusCancelled
 )
 
+
 // BulkView represents the bulk runs TUI view
 type BulkView struct {
 	// API client
@@ -68,8 +71,6 @@ type BulkView struct {
 	// UI state
 	mode         BulkMode
 	fileSelector *components.BulkFileSelector
-	runEditor    *RunEditor
-	progressView *BulkProgressView
 	help         help.Model
 	keys         bulkKeyMap
 	width        int
@@ -82,7 +83,9 @@ type BulkView struct {
 	error      error
 
 	// Components
-	spinner spinner.Model
+	spinner    spinner.Model
+	statusLine *components.StatusLine
+	layout     *components.WindowLayout
 }
 
 // bulkKeyMap defines key bindings for the bulk view
@@ -115,11 +118,6 @@ type bulkKeyMap struct {
 	Quit key.Binding
 }
 
-// NewBulkFZFView creates a new bulk FZF view (compatibility function)
-func NewBulkFZFView(client *api.Client) *BulkView {
-	return NewBulkView(client)
-}
-
 // NewBulkView creates a new bulk view
 func NewBulkView(client *api.Client) *BulkView {
 	s := spinner.New()
@@ -127,19 +125,17 @@ func NewBulkView(client *api.Client) *BulkView {
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
 	fileSelector := components.NewBulkFileSelector(80, 24)
-	// Don't activate immediately - show instructions first
-	
+
 	return &BulkView{
 		client:       client,
 		mode:         ModeFileSelect,
 		fileSelector: fileSelector,
-		runEditor:    NewRunEditor(),
-		progressView: NewBulkProgressView(),
 		help:         help.New(),
 		keys:         defaultBulkKeyMap(),
 		spinner:      s,
 		runType:      "run",
 		runs:         []BulkRunItem{},
+		statusLine:   components.NewStatusLine(),
 	}
 }
 
@@ -227,7 +223,10 @@ func defaultBulkKeyMap() bulkKeyMap {
 // Init initializes the bulk view
 func (v *BulkView) Init() tea.Cmd {
 	debug.LogToFile("DEBUG: BulkView.Init() called\n")
-	return v.spinner.Tick
+	return tea.Batch(
+		v.spinner.Tick,
+		v.fileSelector.Activate(), // Start with file selector
+	)
 }
 
 // Update handles messages for the bulk view
@@ -241,9 +240,23 @@ func (v *BulkView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		v.width = msg.Width
 		v.height = msg.Height
 		v.help.Width = msg.Width
+		
+		// Create layout for proper sizing
+		v.layout = components.NewWindowLayout(msg.Width, msg.Height)
+
+		// Update file selector dimensions
+		if v.fileSelector != nil {
+			v.fileSelector.SetDimensions(msg.Width, msg.Height)
+		}
 
 	case tea.KeyMsg:
 		debug.LogToFilef("DEBUG: BulkView - handling KeyMsg: '%s', mode=%d\n", msg.String(), v.mode)
+		
+		// Handle global quit keys regardless of mode
+		if msg.String() == "Q" || msg.Type == tea.KeyCtrlC {
+			return v, tea.Quit
+		}
+		
 		switch v.mode {
 		case ModeFileSelect:
 			debug.LogToFile("DEBUG: BulkView - delegating to handleFileSelectKeys\n")
@@ -251,23 +264,19 @@ func (v *BulkView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case ModeRunList:
 			debug.LogToFile("DEBUG: BulkView - delegating to handleRunListKeys\n")
 			return v.handleRunListKeys(msg)
-		case ModeRunEdit:
-			debug.LogToFile("DEBUG: BulkView - delegating to handleRunEditKeys\n")
-			return v.handleRunEditKeys(msg)
-		case ModeProgress:
-			debug.LogToFile("DEBUG: BulkView - delegating to handleProgressKeys\n")
-			return v.handleProgressKeys(msg)
-		case ModeResults:
-			debug.LogToFile("DEBUG: BulkView - delegating to handleResultsKeys\n")
-			return v.handleResultsKeys(msg)
 		}
 
-	case fileSelectedMsg:
-		// File(s) selected, load configurations
-		return v.loadFiles(msg.files)
+	case components.BulkFileSelectedMsg:
+		// File(s) selected, load configurations from actual files
+		debug.LogToFilef("DEBUG: BulkView - files selected: %v\n", msg.Files)
+		if !msg.Canceled && len(msg.Files) > 0 {
+			return v.loadFiles(msg.Files)
+		}
+		return v, nil
 
 	case bulkRunsLoadedMsg:
 		// Runs loaded from files
+		debug.LogToFilef("DEBUG: BulkView - runs loaded: %d\n", len(msg.runs))
 		v.runs = msg.runs
 		v.repository = msg.repository
 		v.repoID = msg.repoID
@@ -275,6 +284,7 @@ func (v *BulkView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		v.runType = msg.runType
 		v.batchTitle = msg.batchTitle
 		v.mode = ModeRunList
+		v.selectedRun = 0
 		return v, nil
 
 	case bulkSubmittedMsg:
@@ -290,13 +300,23 @@ func (v *BulkView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Start polling for progress
 			return v, v.pollProgress()
 		}
+		return v, nil
 
 	case bulkProgressMsg:
-		// Progress update received
-		v.progressView.UpdateProgress(msg)
+		// Progress update received - would need to update progress view
 		if msg.completed {
 			v.mode = ModeResults
 		}
+		return v, nil
+
+	case bulkCancelledMsg:
+		// Bulk operation cancelled
+		v.mode = ModeResults
+		return v, nil
+
+	case errMsg:
+		// Error occurred
+		v.error = msg.err
 		return v, nil
 
 	case spinner.TickMsg:
@@ -307,12 +327,12 @@ func (v *BulkView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// Update sub-components based on mode
 	switch v.mode {
-	case ModeRunEdit:
-		cmd := v.runEditor.UpdateRunEditor(msg)
-		cmds = append(cmds, cmd)
-	case ModeProgress:
-		cmd := v.progressView.UpdateProgressView(msg)
-		cmds = append(cmds, cmd)
+	case ModeFileSelect:
+		if v.fileSelector != nil {
+			newFileSelector, cmd := v.fileSelector.Update(msg)
+			v.fileSelector = newFileSelector
+			cmds = append(cmds, cmd)
+		}
 	}
 
 	debug.LogToFilef("DEBUG: BulkView.Update() - returning with %d commands\n", len(cmds))
@@ -324,20 +344,18 @@ func (v *BulkView) handleFileSelectKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	debug.LogToFilef("DEBUG: BulkView.handleFileSelectKeys() - key='%s'\n", msg.String())
 	switch {
 	case key.Matches(msg, v.keys.Quit):
-		return v, tea.Quit
+		// Navigate back to dashboard instead of quitting directly
+		return v, func() tea.Msg {
+			return messages.NavigateBackMsg{}
+		}
 	case key.Matches(msg, v.keys.ListMode):
 		if len(v.runs) > 0 {
 			v.mode = ModeRunList
 		}
 		return v, nil
-	case key.Matches(msg, v.keys.FileMode):
-		// 'F' key pressed - activate file selector and start loading files
-		debug.LogToFilef("DEBUG: BulkView.handleFileSelectKeys() - 'F' key pressed, activating file selector\n")
-		cmd := v.fileSelector.Activate()
-		return v, cmd
 	default:
-		// File selector doesn't need standard Bubble Tea updates
-		debug.LogToFilef("DEBUG: BulkView.handleFileSelectKeys() - unhandled key: '%s'\n", msg.String())
+		// Let file selector handle the key
+		debug.LogToFilef("DEBUG: BulkView.handleFileSelectKeys() - passing to file selector: '%s'\n", msg.String())
 		return v, nil
 	}
 }
@@ -345,7 +363,10 @@ func (v *BulkView) handleFileSelectKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (v *BulkView) handleRunListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, v.keys.Quit):
-		return v, tea.Quit
+		// Navigate back to dashboard instead of quitting directly
+		return v, func() tea.Msg {
+			return messages.NavigateBackMsg{}
+		}
 	case key.Matches(msg, v.keys.Up):
 		if v.selectedRun > 0 {
 			v.selectedRun--
@@ -358,131 +379,13 @@ func (v *BulkView) handleRunListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if v.selectedRun < len(v.runs) {
 			v.runs[v.selectedRun].Selected = !v.runs[v.selectedRun].Selected
 		}
+	case key.Matches(msg, v.keys.FileMode):
+		v.mode = ModeFileSelect
 	case key.Matches(msg, v.keys.Submit):
+		// Submit selected bulk runs
 		return v, v.submitBulkRuns()
-	case key.Matches(msg, v.keys.FileMode):
-		v.mode = ModeFileSelect
 	}
 	return v, nil
-}
-
-func (v *BulkView) handleRunEditKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	if key.Matches(msg, v.keys.Cancel) {
-		v.mode = ModeRunList
-		return v, nil
-	}
-	cmd := v.runEditor.UpdateRunEditor(msg)
-	return v, cmd
-}
-
-func (v *BulkView) handleProgressKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch {
-	case key.Matches(msg, v.keys.Quit):
-		return v, tea.Quit
-	case key.Matches(msg, v.keys.Cancel):
-		return v, v.cancelBatch()
-	}
-	return v, nil
-}
-
-func (v *BulkView) handleResultsKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch {
-	case key.Matches(msg, v.keys.Quit):
-		return v, tea.Quit
-	case key.Matches(msg, v.keys.FileMode):
-		v.mode = ModeFileSelect
-		v.runs = []BulkRunItem{}
-		v.results = []BulkRunResult{}
-		v.error = nil
-		v.batchID = ""
-	}
-	return v, nil
-}
-
-// Rendering methods
-func (v *BulkView) renderFileSelect() string {
-	debug.LogToFile("DEBUG: BulkView.renderFileSelect() called\n")
-	if v.fileSelector == nil {
-		debug.LogToFile("DEBUG: BulkView.renderFileSelect() - fileSelector is nil!\n")
-		return "File selector not initialized"
-	}
-	
-	// Check if file selector is active
-	if !v.fileSelector.IsActive() {
-		debug.LogToFile("DEBUG: BulkView.renderFileSelect() - showing instructions (selector not active)\n")
-		return v.renderBulkInstructions()
-	}
-	
-	debug.LogToFile("DEBUG: BulkView.renderFileSelect() - calling fileSelector.View()\n")
-	result := v.fileSelector.View(nil) // Pass nil for StatusLine - will need to be fixed
-	debug.LogToFilef("DEBUG: BulkView.renderFileSelect() - result length: %d\n", len(result))
-	return result
-}
-
-func (v *BulkView) renderRunList() string {
-	return "Run List Mode - Implementation in separate files"
-}
-
-func (v *BulkView) renderRunEdit() string {
-	return v.runEditor.View()
-}
-
-func (v *BulkView) renderProgress() string {
-	return v.progressView.View()
-}
-
-func (v *BulkView) renderResults() string {
-	return "Results Mode - Implementation in separate files"
-}
-
-// renderBulkInstructions renders the initial instruction screen for bulk operations
-func (v *BulkView) renderBulkInstructions() string {
-	debug.LogToFile("DEBUG: BulkView.renderBulkInstructions() called\n")
-	
-	if v.width <= 0 || v.height <= 0 {
-		return "⟳ Initializing Bulk Instructions..."
-	}
-
-	// Calculate available space
-	availableHeight := v.height - 3 // Reserve space for title and status
-	availableWidth := v.width - 4   // Account for padding
-
-	// Create instruction text
-	instructions := []string{
-		"📦 Bulk Run Operations",
-		"",
-		"This view allows you to run multiple AI tasks from configuration files.",
-		"",
-		"Instructions:",
-		"• Press 'F' to browse and select configuration files",
-		"• Supported formats: JSON, YAML, JSONL, Markdown",
-		"• You can select multiple files to process together",
-		"• Each file can contain one or more run configurations",
-		"",
-		"Key Bindings:",
-		"• F     - Browse files (Fuzzy finder)",
-		"• L     - View run list (if runs are loaded)",
-		"• q     - Quit to dashboard",
-		"• ?     - Show help",
-		"",
-		"Ready to get started? Press 'F' to browse files!",
-	}
-
-	// Style for the instructions
-	instructionStyle := lipgloss.NewStyle().
-		Width(availableWidth).
-		Height(availableHeight).
-		Padding(2).
-		Margin(1).
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("62")).
-		Align(lipgloss.Center, lipgloss.Center)
-
-	// Join instructions and apply styling
-	content := strings.Join(instructions, "\n")
-	styledContent := instructionStyle.Render(content)
-
-	return styledContent
 }
 
 // View renders the bulk view
@@ -514,4 +417,198 @@ func (v *BulkView) View() string {
 		debug.LogToFilef("DEBUG: BulkView - unknown mode: %d\n", v.mode)
 		return "Unknown mode"
 	}
+}
+
+// renderFileSelect renders the file selection view
+func (v *BulkView) renderFileSelect() string {
+	if v.layout == nil {
+		v.layout = components.NewWindowLayout(v.width, v.height)
+	}
+
+	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("205"))
+	title := titleStyle.Render("Select Configuration Files")
+	
+	// Get file selector content
+	var content string
+	if v.fileSelector != nil {
+		content = v.fileSelector.View(v.statusLine)
+	} else {
+		content = "File selector not initialized"
+	}
+
+	// Render status line
+	statusLine := v.renderStatusLine("BULK")
+	
+	return lipgloss.JoinVertical(
+		lipgloss.Left,
+		title,
+		content,
+		statusLine,
+	)
+}
+
+// renderRunList renders the run list view
+func (v *BulkView) renderRunList() string {
+	if v.layout == nil {
+		v.layout = components.NewWindowLayout(v.width, v.height)
+	}
+
+	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("205"))
+	title := titleStyle.Render(fmt.Sprintf("Bulk Runs (%d)", len(v.runs)))
+
+	// Repository info
+	repoInfo := fmt.Sprintf("Repository: %s | Source: %s | Type: %s",
+		v.repository, v.sourceBranch, v.runType)
+	repoStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+
+	// Runs list
+	var runsList strings.Builder
+	selectedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true)
+
+	for i, run := range v.runs {
+		prefix := "  "
+		if i == v.selectedRun {
+			prefix = "> "
+		}
+
+		title := run.Title
+		if title == "" {
+			title = fmt.Sprintf("Run %d", i+1)
+		}
+
+		statusIcon := ""
+		if run.Selected {
+			statusIcon = "[✓] "
+		} else {
+			statusIcon = "[ ] "
+		}
+
+		line := fmt.Sprintf("%s%s%s", prefix, statusIcon, title)
+		if i == v.selectedRun {
+			line = selectedStyle.Render(line)
+		}
+		runsList.WriteString(line + "\n")
+	}
+
+	// Render status line
+	statusLine := v.renderStatusLine("BULK")
+
+	return lipgloss.JoinVertical(
+		lipgloss.Left,
+		title,
+		repoStyle.Render(repoInfo),
+		"",
+		runsList.String(),
+		statusLine,
+	)
+}
+
+// renderStatusLine renders the status line
+func (v *BulkView) renderStatusLine(layoutName string) string {
+	// Simple help text based on current mode
+	var helpText string
+	switch v.mode {
+	case ModeFileSelect:
+		helpText = "↑↓:navigate space:select enter:confirm F:files q:quit"
+	case ModeRunList:
+		helpText = "↑↓:navigate space:toggle F:files ctrl+s:submit q:quit"
+	default:
+		helpText = "q:quit ?:help"
+	}
+
+	return v.statusLine.
+		SetWidth(v.width).
+		SetLeft(fmt.Sprintf("[%s]", layoutName)).
+		SetRight("").
+		SetHelp(helpText).
+		ResetStyle().
+		SetLoading(false).
+		Render()
+}
+
+// renderRunEdit renders the run editing view (placeholder)
+func (v *BulkView) renderRunEdit() string {
+	if v.layout == nil {
+		v.layout = components.NewWindowLayout(v.width, v.height)
+	}
+
+	content := "Run Edit Mode - Implementation in bulk_run_editor.go"
+	statusLine := v.renderStatusLine("BULK")
+	
+	return lipgloss.JoinVertical(lipgloss.Left, content, statusLine)
+}
+
+// renderProgress renders the progress view (placeholder)
+func (v *BulkView) renderProgress() string {
+	if v.layout == nil {
+		v.layout = components.NewWindowLayout(v.width, v.height)
+	}
+
+	var content string
+	if v.submitting {
+		content = fmt.Sprintf("%s Submitting bulk runs...", v.spinner.View())
+	} else {
+		content = "Progress Mode - Implementation in bulk_progress_view.go"
+	}
+	
+	statusLine := v.renderStatusLine("BULK")
+	
+	return lipgloss.JoinVertical(lipgloss.Left, content, statusLine)
+}
+
+// renderResults renders the results view (placeholder)
+func (v *BulkView) renderResults() string {
+	if v.layout == nil {
+		v.layout = components.NewWindowLayout(v.width, v.height)
+	}
+
+	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("205"))
+	title := titleStyle.Render("Bulk Run Results")
+
+	var content strings.Builder
+
+	if v.error != nil {
+		errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("9"))
+		content.WriteString(errorStyle.Render(fmt.Sprintf("Error: %v\n", v.error)))
+	}
+
+	if len(v.results) > 0 {
+		content.WriteString("\nCreated Runs:\n")
+		for _, result := range v.results {
+			statusIcon := "✓"
+			statusColor := lipgloss.Color("10")
+
+			if result.Status == "failed" {
+				statusIcon = "✗"
+				statusColor = lipgloss.Color("9")
+			}
+
+			style := lipgloss.NewStyle().Foreground(statusColor)
+			content.WriteString(fmt.Sprintf("  %s %s (ID: %d)\n",
+				style.Render(statusIcon),
+				result.Title,
+				result.ID,
+			))
+
+			if result.Error != "" {
+				content.WriteString(fmt.Sprintf("    Error: %s\n", result.Error))
+			}
+			if result.URL != "" {
+				content.WriteString(fmt.Sprintf("    URL: %s\n", result.URL))
+			}
+		}
+	}
+
+	if v.batchID != "" {
+		content.WriteString(fmt.Sprintf("\nBatch ID: %s\n", v.batchID))
+	}
+
+	statusLine := v.renderStatusLine("BULK")
+
+	return lipgloss.JoinVertical(
+		lipgloss.Left,
+		title,
+		content.String(),
+		statusLine,
+	)
 }
