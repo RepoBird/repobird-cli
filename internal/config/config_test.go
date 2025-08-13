@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -349,11 +350,32 @@ func setupTempHome(t *testing.T) string {
 	require.NoError(t, err)
 
 	originalHome := os.Getenv("HOME")
+	originalXDGConfig := os.Getenv("XDG_CONFIG_HOME")
+	originalAPIURL := os.Getenv("REPOBIRD_API_URL")
+	originalAPIKey := os.Getenv("REPOBIRD_API_KEY")
+	
 	os.Setenv("HOME", tempDir)
+	os.Setenv("XDG_CONFIG_HOME", tempDir) // Also set XDG for complete isolation
+	os.Unsetenv("REPOBIRD_API_URL") // Clear any env vars that might affect config
+	os.Unsetenv("REPOBIRD_API_KEY")
+	
+	// Create a new viper instance to avoid global state pollution
+	viper.New()
+	
+	// Reset viper to clear any cached config
+	viper.Reset()
 
 	t.Cleanup(func() {
 		os.Setenv("HOME", originalHome)
+		os.Setenv("XDG_CONFIG_HOME", originalXDGConfig)
+		if originalAPIURL != "" {
+			os.Setenv("REPOBIRD_API_URL", originalAPIURL)
+		}
+		if originalAPIKey != "" {
+			os.Setenv("REPOBIRD_API_KEY", originalAPIKey)
+		}
 		os.RemoveAll(tempDir)
+		viper.Reset() // Reset viper after test
 	})
 
 	return tempDir

@@ -21,7 +21,7 @@ func initializeCacheForTesting() {
 
 func TestGetCachedList(t *testing.T) {
 	// Reset global cache before each test
-	initializeCache()
+	ensureGlobalCache()
 
 	t.Run("returns empty when cache is empty", func(t *testing.T) {
 		runs, cached, _, _, _ := GetCachedList()
@@ -61,7 +61,7 @@ func TestGetCachedList(t *testing.T) {
 
 func TestSetCachedList(t *testing.T) {
 	// Reset global cache before each test
-	initializeCache()
+	ensureGlobalCache()
 
 	t.Run("sets cache with proper values", func(t *testing.T) {
 		runs := []models.RunResponse{
@@ -117,7 +117,7 @@ func TestSetCachedList(t *testing.T) {
 
 func TestAddCachedDetail(t *testing.T) {
 	// Reset global cache before each test
-	initializeCache()
+	ensureGlobalCache()
 
 	t.Run("adds active run detail to cache", func(t *testing.T) {
 		run := &models.RunResponse{
@@ -190,7 +190,7 @@ func TestAddCachedDetail(t *testing.T) {
 }
 
 func TestGetSelectedIndex(t *testing.T) {
-	initializeCache()
+	ensureGlobalCache()
 
 	t.Run("returns selected index", func(t *testing.T) {
 		// Set some cached data first
@@ -208,7 +208,7 @@ func TestGetSelectedIndex(t *testing.T) {
 }
 
 func TestSetSelectedIndex(t *testing.T) {
-	initializeCache()
+	ensureGlobalCache()
 
 	t.Run("sets selected index", func(t *testing.T) {
 		SetSelectedIndex(7)
@@ -221,7 +221,7 @@ func TestSetSelectedIndex(t *testing.T) {
 }
 
 func TestFormDataOperations(t *testing.T) {
-	initializeCache()
+	ensureGlobalCache()
 
 	t.Run("save and retrieve form data", func(t *testing.T) {
 		formData := &FormData{
@@ -261,7 +261,7 @@ func TestFormDataOperations(t *testing.T) {
 }
 
 func TestClearCache(t *testing.T) {
-	initializeCache()
+	ensureGlobalCache()
 
 	t.Run("clears all cache data", func(t *testing.T) {
 		// Setup cache with data
@@ -295,7 +295,7 @@ func TestClearCache(t *testing.T) {
 }
 
 func TestClearActiveCache(t *testing.T) {
-	initializeCache()
+	ensureGlobalCache()
 
 	t.Run("removes only active runs from cache", func(t *testing.T) {
 		// Add mixed runs
@@ -336,7 +336,7 @@ func TestClearActiveCache(t *testing.T) {
 }
 
 func TestCacheConcurrency(t *testing.T) {
-	initializeCache()
+	ensureGlobalCache()
 
 	t.Run("concurrent reads and writes to list", func(t *testing.T) {
 		var wg sync.WaitGroup
