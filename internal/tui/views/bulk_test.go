@@ -156,6 +156,9 @@ func TestBulkViewFileSelectKeys(t *testing.T) {
 	})
 
 	t.Run("ListMode key switches to run list when runs exist", func(t *testing.T) {
+		// Reset view state for this test
+		view.mode = ModeFileBrowser
+		view.fileSelector = components.NewBulkFileSelector(80, 24)
 		view.runs = []BulkRunItem{
 			{Title: "Test Run", Selected: true},
 		}
@@ -169,6 +172,9 @@ func TestBulkViewFileSelectKeys(t *testing.T) {
 	})
 
 	t.Run("ListMode key does nothing when no runs", func(t *testing.T) {
+		// Reset view state for this test
+		view.mode = ModeFileBrowser
+		view.fileSelector = components.NewBulkFileSelector(80, 24)
 		view.runs = []BulkRunItem{}
 
 		keyMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'L'}}
@@ -466,7 +472,7 @@ func TestBulkViewRendering(t *testing.T) {
 		output := view.View()
 
 		assert.Contains(t, output, "Select Configuration Files")
-		assert.Contains(t, output, "[BULK]")
+		assert.Contains(t, output, "[FZF-BULK]")
 	})
 
 	t.Run("Run list mode rendering", func(t *testing.T) {
@@ -497,7 +503,7 @@ func TestBulkViewRendering(t *testing.T) {
 
 		output := view.View()
 
-		assert.Contains(t, output, "Run Edit Mode")
+		assert.Contains(t, output, "Edit Run")
 		assert.Contains(t, output, "[BULK]")
 	})
 

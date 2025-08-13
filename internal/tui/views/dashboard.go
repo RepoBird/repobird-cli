@@ -140,7 +140,10 @@ func NewDashboardView(client APIClient) *DashboardView {
 		client:           client,
 		keys:             components.DefaultKeyMap,
 		help:             help.New(),
-		disabledKeys:     map[string]bool{"esc": true}, // Disable escape key on dashboard (b is for bulk navigation)
+		disabledKeys:     map[string]bool{
+			"esc": true, // Disable escape key on dashboard (b is for bulk navigation)
+			"q":   true, // Disable q key navigation so dashboard can handle quit locally
+		},
 		currentLayout:    models.LayoutTripleColumn,
 		loading:          true,
 		initializing:     true,
