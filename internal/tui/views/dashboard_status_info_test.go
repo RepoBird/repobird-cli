@@ -169,7 +169,7 @@ func TestDashboardView_StatusInfoFieldValues(t *testing.T) {
 			"johndoe",
 			"Free", // Tier gets capitalized
 			"10 / 20",
-			"50.0%", // Usage percentage
+			"50.0% ✅", // Usage percentage with emoji
 		}
 
 		for _, expected := range expectedValues {

@@ -52,7 +52,8 @@ func (d *DashboardView) initializeStatusInfoFields() {
 		lineNum++
 
 		// Usage info based on plan type
-		if d.userInfo.Tier == "FREE" || d.userInfo.Tier == "BASIC" {
+		upperTier := strings.ToUpper(d.userInfo.Tier)
+		if upperTier == "FREE" || upperTier == "BASIC" {
 			// Show runs remaining for usage-based plans
 			var runsRemaining string
 			if d.userInfo.TotalRuns > 0 {
@@ -88,7 +89,7 @@ func (d *DashboardView) initializeStatusInfoFields() {
 				d.statusInfoFieldLines = append(d.statusInfoFieldLines, lineNum)
 				lineNum++
 			}
-		} else if d.userInfo.Tier == "PRO" {
+		} else if upperTier == "PRO" {
 			// Show percentage for PRO plans
 			if d.userInfo.TotalRuns > 0 {
 				usedRuns := d.userInfo.TotalRuns - d.userInfo.RemainingRuns
@@ -170,6 +171,13 @@ func (d *DashboardView) handleStatusInfoNavigation(msg tea.KeyMsg) (tea.Model, t
 				d.statusInfoKeyOffset = 0
 				d.statusInfoValueOffset = 0
 			}
+		} else if msg.String() == "k" {
+			if d.statusInfoSelectedRow > 0 {
+				d.statusInfoSelectedRow--
+				// Reset horizontal scroll when moving to a new row
+				d.statusInfoKeyOffset = 0
+				d.statusInfoValueOffset = 0
+			}
 		} else if msg.String() == "g" {
 			d.statusInfoSelectedRow = 0
 		} else if msg.String() == "G" {
@@ -179,6 +187,10 @@ func (d *DashboardView) handleStatusInfoNavigation(msg tea.KeyMsg) (tea.Model, t
 				d.statusInfoKeyOffset = 0
 				d.statusInfoValueOffset = 0
 			}
+		} else if msg.String() == "s" {
+			// Exit status info overlay with 's'
+			d.showStatusInfo = false
+			return d, nil
 		} else if msg.String() == "y" {
 			// Copy current field to clipboard
 			if d.statusInfoSelectedRow >= 0 && d.statusInfoSelectedRow < len(d.statusInfoFields) {
@@ -212,13 +224,11 @@ func (d *DashboardView) handleStatusInfoNavigation(msg tea.KeyMsg) (tea.Model, t
 			}
 		}
 	case tea.KeyUp:
-		if msg.String() == "k" || msg.Type == tea.KeyUp {
-			if d.statusInfoSelectedRow > 0 {
-				d.statusInfoSelectedRow--
-				// Reset horizontal scroll when moving to a new row
-				d.statusInfoKeyOffset = 0
-				d.statusInfoValueOffset = 0
-			}
+		if d.statusInfoSelectedRow > 0 {
+			d.statusInfoSelectedRow--
+			// Reset horizontal scroll when moving to a new row
+			d.statusInfoKeyOffset = 0
+			d.statusInfoValueOffset = 0
 		}
 	case tea.KeyLeft:
 		if d.statusInfoFocusColumn == 1 {

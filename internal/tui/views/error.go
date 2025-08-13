@@ -29,9 +29,9 @@ func NewErrorView(err error, message string, recoverable bool) *ErrorView {
 		message:     message,
 		recoverable: recoverable,
 		keymaps:     components.DefaultKeyMap,
-		layout:      components.NewWindowLayout(80, 24), // Default dimensions like StatusView
-		width:       80,
-		height:      24,
+		layout:      nil, // Don't initialize layout until we have dimensions
+		width:       0,   // Don't set default width - wait for WindowSizeMsg
+		height:      0,   // Don't set default height - wait for WindowSizeMsg
 	}
 }
 
@@ -46,7 +46,11 @@ func (e *ErrorView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		e.width = msg.Width
 		e.height = msg.Height
-		e.layout.Update(msg.Width, msg.Height)
+		if e.layout == nil {
+			e.layout = components.NewWindowLayout(msg.Width, msg.Height)
+		} else {
+			e.layout.Update(msg.Width, msg.Height)
+		}
 		return e, nil
 
 	case tea.KeyMsg:
@@ -74,6 +78,11 @@ func (e *ErrorView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // View implements tea.Model
 func (e *ErrorView) View() string {
 	debug.LogToFilef("🔴 ERROR VIEW: Starting render, terminal=%dx%d 🔴\n", e.width, e.height)
+	
+	// Check if layout is initialized and dimensions are valid
+	if e.layout == nil || e.width == 0 || e.height == 0 {
+		return "" // Wait for proper dimensions
+	}
 	
 	if !e.layout.IsValidDimensions() {
 		return e.layout.GetMinimalView("Error - Loading...")

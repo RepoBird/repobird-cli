@@ -20,8 +20,11 @@ fi
 
 # Run tests and capture output
 echo "Running tests..."
+START_TIME=$(date +%s)
 OUTPUT=$(REPOBIRD_ENV=dev $TEST_CMD 2>&1)
 TEST_EXIT_CODE=$?
+END_TIME=$(date +%s)
+TOTAL_TIME=$((END_TIME - START_TIME))
 
 # Only show failures and build errors, not all the passing tests
 echo "$OUTPUT" | grep -E "(^FAIL|^---\s+FAIL:|^\s+[a-zA-Z_][a-zA-Z0-9_]*\.go:[0-9]+:|panic:|Error:|build failed)"
@@ -50,6 +53,15 @@ else
     PASS_RATE=0
 fi
 
+# Format time display
+if [ $TOTAL_TIME -ge 60 ]; then
+    MINUTES=$((TOTAL_TIME / 60))
+    SECONDS=$((TOTAL_TIME % 60))
+    TIME_DISPLAY="${MINUTES}m ${SECONDS}s"
+else
+    TIME_DISPLAY="${TOTAL_TIME}s"
+fi
+
 # Print compact summary
 echo ""
 echo -e "${BOLD}========================================"
@@ -61,23 +73,24 @@ if [ $TEST_EXIT_CODE -eq 0 ]; then
     if [ $SKIPPED -gt 0 ]; then
         echo -e "${YELLOW}Skipped: $SKIPPED${NC}"
     fi
+    echo -e "${BLUE}Time: ${TIME_DISPLAY}${NC}"
 else
     echo -e "${RED}❌ TESTS FAILED${NC}"
     echo -e "${BOLD}========================================${NC}"
     
-    # Show test counts on one line
-    echo -e "Results: ${GREEN}$PASSED passed${NC}, ${RED}$FAILED failed${NC}, ${YELLOW}$SKIPPED skipped${NC} / $TOTAL_TESTS total (${PASS_RATE}%)"
-    
     # Show failed tests if any
     if [ $FAILED -gt 0 ]; then
-        echo ""
         echo -e "${RED}Failed Tests:${NC}"
         while IFS= read -r test_info; do
             if [ -n "$test_info" ]; then
                 echo -e "  ${RED}•${NC} $test_info"
             fi
         done <<< "$FAILED_TESTS_INFO"
+        echo ""
     fi
+    
+    # Show test counts on one line
+    echo -e "Results: ${GREEN}$PASSED passed${NC}, ${RED}$FAILED failed${NC}, ${YELLOW}$SKIPPED skipped${NC} / $TOTAL_TESTS total (${PASS_RATE}%) ${BLUE}(${TIME_DISPLAY})${NC}"
 fi
 
 echo -e "${BOLD}========================================${NC}"

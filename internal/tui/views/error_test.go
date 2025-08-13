@@ -175,8 +175,9 @@ func TestErrorViewRendering(t *testing.T) {
 
 	t.Run("Recoverable error rendering", func(t *testing.T) {
 		view := NewErrorView(errors.New("test error"), "Something went wrong", true)
-		view.width = 80
-		view.height = 24
+		// Send window size message to initialize layout
+		updatedView, _ := view.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+		view = updatedView.(*ErrorView)
 
 		output := view.View()
 
@@ -188,8 +189,9 @@ func TestErrorViewRendering(t *testing.T) {
 
 	t.Run("Non-recoverable error rendering", func(t *testing.T) {
 		view := NewErrorView(errors.New("fatal error"), "Fatal error occurred", false)
-		view.width = 80
-		view.height = 24
+		// Send window size message to initialize layout
+		updatedView, _ := view.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+		view = updatedView.(*ErrorView)
 
 		output := view.View()
 
@@ -202,8 +204,9 @@ func TestErrorViewRendering(t *testing.T) {
 
 	t.Run("Error without error object", func(t *testing.T) {
 		view := NewErrorView(nil, "An error occurred", true)
-		view.width = 80
-		view.height = 24
+		// Send window size message to initialize layout
+		updatedView, _ := view.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+		view = updatedView.(*ErrorView)
 
 		output := view.View()
 
@@ -215,8 +218,9 @@ func TestErrorViewRendering(t *testing.T) {
 	t.Run("Long error message", func(t *testing.T) {
 		longMessage := "This is a very long error message that might wrap or be truncated depending on the terminal width and the rendering logic of the error view component"
 		view := NewErrorView(errors.New("error"), longMessage, true)
-		view.width = 80
-		view.height = 24
+		// Send window size message to initialize layout
+		updatedView, _ := view.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+		view = updatedView.(*ErrorView)
 
 		output := view.View()
 
@@ -227,8 +231,9 @@ func TestErrorViewRendering(t *testing.T) {
 
 func TestErrorViewStyling(t *testing.T) {
 	view := NewErrorView(errors.New("test"), "Test error", true)
-	view.width = 80
-	view.height = 24
+	// Send window size message to initialize layout
+	updatedView, _ := view.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	view = updatedView.(*ErrorView)
 
 	output := view.View()
 
