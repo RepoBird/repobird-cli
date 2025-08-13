@@ -222,12 +222,22 @@ func (f *CustomCreateForm) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	} else {
 		// Normal mode navigation
+		debug.LogToFilef("🔑 CUSTOM FORM: Normal mode key: '%s'", msg.String())
+		
 		switch msg.String() {
+		case "q", "b":
+			// These keys should NOT be handled by the form in normal mode
+			// They need to bubble up to the CreateRunView for navigation
+			debug.LogToFilef("🔙 CUSTOM FORM: Navigation key '%s' detected, NOT handling (let parent handle)", msg.String())
+			// Return without handling so the key bubbles up
+			return f, nil
+			
 		case "i":
 			// Enter insert mode for text fields
 			if currentField.Type == "text" || currentField.Type == "textarea" {
 				f.insertMode = true
 				f.focusCurrentField()
+				debug.LogToFilef("✏️ CUSTOM FORM: Entering insert mode for field '%s'", currentField.Name)
 				return f, textinput.Blink
 			}
 			return f, nil
@@ -236,7 +246,7 @@ func (f *CustomCreateForm) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			// Delete current field's text (vim-like)
 			if currentField.Type == "text" || currentField.Type == "textarea" {
 				f.ClearCurrentField()
-				debug.LogToFilef("✂️ CREATE FORM: Deleted field '%s' content", currentField.Name)
+				debug.LogToFilef("✂️ CUSTOM FORM: Deleted field '%s' content", currentField.Name)
 			}
 			return f, nil
 			
@@ -246,17 +256,19 @@ func (f *CustomCreateForm) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				f.ClearCurrentField()
 				f.insertMode = true
 				f.focusCurrentField()
-				debug.LogToFilef("✏️ CREATE FORM: Change mode - cleared field '%s' and entering insert", currentField.Name)
+				debug.LogToFilef("✏️ CUSTOM FORM: Change mode - cleared field '%s' and entering insert", currentField.Name)
 				return f, textinput.Blink
 			}
 			return f, nil
 			
 		case "j", "down":
 			f.nextField()
+			debug.LogToFilef("⬇️ CUSTOM FORM: Moving to next field")
 			return f, nil
 			
 		case "k", "up":
 			f.prevField()
+			debug.LogToFilef("⬆️ CUSTOM FORM: Moving to previous field")
 			return f, nil
 			
 		case "enter", " ":
@@ -267,17 +279,19 @@ func (f *CustomCreateForm) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				if currentField.Name == "runtype" {
 					f.runTypeIndex = (f.runTypeIndex + 1) % len(currentField.Options)
 					currentField.Value = currentField.Options[f.runTypeIndex]
-					debug.LogToFilef("🔄 CREATE FORM: Toggled runtype to %s", currentField.Value)
+					debug.LogToFilef("🔄 CUSTOM FORM: Toggled runtype to %s", currentField.Value)
 				}
 			case "button":
 				// Submit the form
 				if currentField.Name == "submit" && f.validate() {
+					debug.LogToFilef("🚀 CUSTOM FORM: Submit button pressed")
 					return f, f.submitCmd()
 				}
 			default:
 				// Enter insert mode for text fields
 				f.insertMode = true
 				f.focusCurrentField()
+				debug.LogToFilef("✏️ CUSTOM FORM: ENTER pressed - entering insert mode for field '%s'", currentField.Name)
 				return f, textinput.Blink
 			}
 			return f, nil
@@ -285,9 +299,14 @@ func (f *CustomCreateForm) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "ctrl+s":
 			// Submit from any field
 			if f.validate() {
+				debug.LogToFilef("💾 CUSTOM FORM: CTRL+S pressed - submitting form")
 				return f, f.submitCmd()
 			}
+			debug.LogToFilef("⚠️ CUSTOM FORM: CTRL+S pressed but validation failed")
 			return f, nil
+			
+		default:
+			debug.LogToFilef("❓ CUSTOM FORM: Unhandled key in normal mode: '%s'", msg.String())
 		}
 	}
 	
@@ -560,14 +579,16 @@ func (f *CustomCreateForm) SetFocusIndex(index int) {
 func (f *CustomCreateForm) ClearCurrentField() {
 	if f.focusIndex < len(f.fields) {
 		field := &f.fields[f.focusIndex]
-		if field.Type == "text" || field.Type == "textarea" {
+		// Only clear text-based fields
+		switch field.Type {
+		case "text":
 			field.Value = ""
-			switch field.Type {
-			case "text":
-				field.textInput.SetValue("")
-			case "textarea":
-				field.textArea.SetValue("")
-			}
+			field.textInput.SetValue("")
+			field.textInput.Reset() // Ensure cursor is reset
+		case "textarea":
+			field.Value = ""
+			field.textArea.SetValue("")
+			field.textArea.Reset() // Ensure cursor is reset
 		}
 	}
 }

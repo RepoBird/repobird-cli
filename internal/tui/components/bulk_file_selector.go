@@ -56,8 +56,8 @@ type BulkFileSelectedMsg struct {
 	Canceled bool
 }
 
-// filesLoadedMsg is sent when files are loaded
-type filesLoadedMsg struct {
+// FilesLoadedMsg is sent when files are loaded
+type FilesLoadedMsg struct {
 	files     []FileItem
 	err       error
 	isPartial bool // Indicates if more files are coming
@@ -133,7 +133,7 @@ func (b *BulkFileSelector) Activate() tea.Cmd {
 func (b *BulkFileSelector) LoadFilesCmd() tea.Cmd {
 	return func() tea.Msg {
 		files, err := b.findConfigFiles()
-		return filesLoadedMsg{files: files, err: err}
+		return FilesLoadedMsg{files: files, err: err}
 	}
 }
 
@@ -142,7 +142,7 @@ func (b *BulkFileSelector) LoadFilesProgressiveCmd() tea.Cmd {
 	return func() tea.Msg {
 		currentDir, err := os.Getwd()
 		if err != nil {
-			return filesLoadedMsg{files: nil, err: err}
+			return FilesLoadedMsg{files: nil, err: err}
 		}
 
 		// Start with a reasonable depth to find files in subdirectories like run-tasks/
@@ -170,7 +170,7 @@ func (b *BulkFileSelector) LoadFilesProgressiveCmd() tea.Cmd {
 		}
 
 		// Return initial batch immediately
-		return filesLoadedMsg{files: items, err: nil}
+		return FilesLoadedMsg{files: items, err: nil}
 	}
 }
 
@@ -237,7 +237,7 @@ func (b *BulkFileSelector) Update(msg tea.Msg) (*BulkFileSelector, tea.Cmd) {
 	}
 
 	switch msg := msg.(type) {
-	case filesLoadedMsg:
+	case FilesLoadedMsg:
 		if msg.err != nil {
 			b.loading = false
 			b.loadError = msg.err
