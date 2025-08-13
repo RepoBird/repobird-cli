@@ -66,26 +66,31 @@ func getCacheDir() (string, error) {
 
 // getCacheDirForUser returns the appropriate cache directory for a specific user
 func getCacheDirForUser(userID *int) (string, error) {
-	// Use os.UserCacheDir for cross-platform compatibility
-	baseDir, err := os.UserCacheDir()
-	if err != nil {
-		return "", err
+	// Use XDG_CONFIG_HOME for consistency with TUI cache
+	configDir := os.Getenv("XDG_CONFIG_HOME")
+	if configDir == "" {
+		// Fallback to default config directory
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return "", err
+		}
+		configDir = filepath.Join(homeDir, ".config")
 	}
 
 	var cacheDir string
 	if userID != nil {
 		// Special handling for debug/test mode (negative user IDs)
 		if *userID < 0 {
-			cacheDir = filepath.Join(baseDir, appName, "debug", fmt.Sprintf("user-%d", *userID), "runs")
+			cacheDir = filepath.Join(configDir, appName, "cache", "debug", fmt.Sprintf("%d", *userID), "runs")
 			debug.LogToFilef("DEBUG: Using debug cache directory: %s (userID=%d)\n", cacheDir, *userID)
 		} else {
-			// User-specific cache directory for real users
-			cacheDir = filepath.Join(baseDir, appName, "users", fmt.Sprintf("user-%d", *userID), "runs")
+			// User-specific cache directory for real users - just use the ID directly
+			cacheDir = filepath.Join(configDir, appName, "cache", "users", fmt.Sprintf("%d", *userID), "runs")
 			debug.LogToFilef("DEBUG: Using user-specific cache directory: %s (userID=%d)\n", cacheDir, *userID)
 		}
 	} else {
 		// Fallback to shared cache directory for backward compatibility
-		cacheDir = filepath.Join(baseDir, appName, "shared", "runs")
+		cacheDir = filepath.Join(configDir, appName, "cache", "shared", "runs")
 		debug.LogToFilef("DEBUG: Using shared cache directory: %s (no userID)\n", cacheDir)
 	}
 

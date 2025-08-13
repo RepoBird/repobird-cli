@@ -412,17 +412,54 @@ Eliminates inconsistent view sizing by providing centralized layout calculations
 
 #### Usage Pattern
 ```go
-// In view constructor
-layout: components.NewWindowLayout(width, height)
+// CRITICAL: In view constructor - DO NOT initialize layout with default dimensions
+type MyView struct {
+    layout *components.WindowLayout  // Initialize as nil
+    width  int                       // Start with 0
+    height int                       // Start with 0
+}
 
-// In View() method
-boxStyle := v.layout.CreateStandardBox()
-titleStyle := v.layout.CreateTitleStyle()
-contentStyle := v.layout.CreateContentStyle()
+func NewMyView(client APIClient, cache *cache.SimpleCache, id string) *MyView {
+    return &MyView{
+        layout: nil,  // CRITICAL: Don't initialize here
+        width:  0,    // CRITICAL: Wait for WindowSizeMsg
+        height: 0,    // CRITICAL: Wait for WindowSizeMsg
+    }
+}
 
-// For viewports
-viewportWidth, viewportHeight := v.layout.GetViewportDimensions()
+// CRITICAL: Initialize layout ONLY in handleWindowSizeMsg
+func (v *MyView) handleWindowSizeMsg(msg tea.WindowSizeMsg) {
+    v.width = msg.Width
+    v.height = msg.Height
+    
+    if v.layout == nil {
+        v.layout = components.NewWindowLayout(msg.Width, msg.Height)
+    } else {
+        v.layout.Update(msg.Width, msg.Height)
+    }
+}
+
+// In View() method - safety check for nil layout
+func (v *MyView) View() string {
+    if v.layout == nil {
+        return ""  // Wait for dimensions
+    }
+    
+    boxStyle := v.layout.CreateStandardBox()
+    titleStyle := v.layout.CreateTitleStyle()
+    contentStyle := v.layout.CreateContentStyle()
+    
+    // For viewports
+    viewportWidth, viewportHeight := v.layout.GetViewportDimensions()
+}
 ```
+
+#### Critical Initialization Rules
+- **⚠️ NEVER** initialize WindowLayout in constructors with default dimensions
+- **⚠️ NEVER** send WindowSizeMsg from Init() method  
+- **✅ ALWAYS** wait for actual terminal dimensions before creating layout
+- **✅ ALWAYS** check for nil layout in View() method
+- **✅ ALWAYS** initialize layout in handleWindowSizeMsg on first call
 
 #### Methods
 - `GetBoxDimensions()` - Returns width/height for lipgloss containers

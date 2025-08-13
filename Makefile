@@ -175,9 +175,24 @@ clean:
 	@rm -f coverage.out coverage.html
 	@echo "Clean complete"
 
-## test: Run all tests (development)
+## test: Run all tests with summary (development)
 test:
+	@./scripts/test-summary.sh go test -v -race -timeout 30s ./...
+
+## test-no-summary: Run all tests without summary (raw output)
+test-no-summary:
 	$(DEV_ENV) $(GOTEST) -v -race -timeout 30s ./...
+
+## test-quick: Run tests only for changed packages (fast feedback)
+test-quick:
+	@echo "Running tests for changed packages..."
+	@CHANGED_PKGS=$$(git diff --name-only HEAD | grep -E '\.go$$' | xargs -I {} dirname {} | sort -u | sed 's|^|./|' | grep -v '^\.$$' | tr '\n' ' '); \
+	if [ -n "$$CHANGED_PKGS" ]; then \
+		echo "Testing packages: $$CHANGED_PKGS"; \
+		./scripts/test-summary.sh go test -v -race -timeout 30s $$CHANGED_PKGS; \
+	else \
+		echo "No Go files changed"; \
+	fi
 
 ## test-unit: Run unit tests only (development)
 test-unit:

@@ -1,7 +1,6 @@
 package cache
 
 import (
-	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -28,9 +27,14 @@ func NewPermanentCache(userID string) (*PermanentCache, error) {
 		configDir = xdg.ConfigHome
 	}
 
-	// User-specific cache directory
-	userHash := hashUserID(userID)
-	baseDir := filepath.Join(configDir, "repobird", "cache", "users", userHash)
+	// User-specific cache directory - use actual user ID
+	var baseDir string
+	if userID == "" || userID == "anonymous" {
+		baseDir = filepath.Join(configDir, "repobird", "cache", "anonymous")
+	} else {
+		baseDir = filepath.Join(configDir, "repobird", "cache", "users", userID)
+	}
+	
 	if err := os.MkdirAll(baseDir, 0700); err != nil {
 		return nil, fmt.Errorf("failed to create cache directory: %w", err)
 	}
@@ -41,14 +45,6 @@ func NewPermanentCache(userID string) (*PermanentCache, error) {
 	}, nil
 }
 
-// hashUserID creates a stable hash for directory naming
-func hashUserID(userID string) string {
-	if userID == "" || userID == "anonymous" {
-		return "anonymous"
-	}
-	h := sha256.Sum256([]byte(userID))
-	return fmt.Sprintf("user-%x", h[:8])
-}
 
 // GetRun retrieves a cached run from disk (terminal states or old stuck runs)
 func (p *PermanentCache) GetRun(id string) (*models.RunResponse, bool) {

@@ -6,6 +6,7 @@ import (
 	"time"
 	
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/repobird/repobird-cli/internal/api"
 	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/repobird/repobird-cli/internal/services"
@@ -309,11 +310,11 @@ func (a *App) handleNavigation(msg messages.NavigationMsg) (tea.Model, tea.Cmd) 
 // View implements tea.Model interface - delegates rendering to current view
 func (a *App) View() string {
 	if !a.authenticated {
-		return "\n  🔐 Authenticating and initializing cache...\n"
+		return a.renderAuthLoadingView()
 	}
 	
 	if a.current == nil {
-		return "Initializing..."
+		return a.renderInitializingView()
 	}
 	
 	// Debug: Log app view rendering
@@ -473,35 +474,39 @@ func (a *App) handleNavigationAction(action keymap.KeyAction, keyMsg tea.KeyMsg)
 	return false, a, nil
 }
 
+// renderAuthLoadingView renders the authentication loading screen with proper layout
+func (a *App) renderAuthLoadingView() string {
+	if a.width <= 0 || a.height <= 0 {
+		return "🔐 Authenticating..."
+	}
+	
+	// Simple centered message without creating a layout (follows critical pattern)
+	return lipgloss.NewStyle().
+		Width(a.width).
+		Height(a.height).
+		Align(lipgloss.Center, lipgloss.Center).
+		Render("🔐 Authenticating and initializing cache...")
+}
+
+// renderInitializingView renders the initialization screen with proper layout
+func (a *App) renderInitializingView() string {
+	if a.width <= 0 || a.height <= 0 {
+		return "Initializing..."
+	}
+	
+	// Simple centered message without creating a layout (follows critical pattern)
+	return lipgloss.NewStyle().
+		Width(a.width).
+		Height(a.height).
+		Align(lipgloss.Center, lipgloss.Center).
+		Render("⏳ Initializing views...")
+}
+
 // authenticateAndInitCache authenticates with the API and initializes the cache with user context
 func (a *App) authenticateAndInitCache() tea.Cmd {
 	return func() tea.Msg {
-		// Always create the cache first
-		debug.LogToFile("📦 AUTH: Creating cache...\n")
-		a.cache = cache.NewSimpleCache()
-		_ = a.cache.LoadFromDisk()
-		debug.LogToFile("✅ AUTH: Cache created and loaded\n")
-		
-		// Check if we have valid cached auth (within 2 weeks)
-		if a.cache.IsAuthCacheValid() {
-			if authCache, found := a.cache.GetAuthCache(); found && authCache.UserInfo != nil {
-				// Use cached user info
-				services.SetCurrentUser(authCache.UserInfo)
-				debug.LogToFilef("🔐 AUTH: Using cached auth (valid for %v) - user ID=%d, email=%s 🔐\n", 
-					authCache.CacheDuration, authCache.UserInfo.ID, authCache.UserInfo.Email)
-				
-				// Still refresh the cache data (runs, etc) even though we skip auth
-				debug.LogToFile("🔄 AUTH: Refreshing cache data (runs, repos, etc)...\n")
-				// Cache refresh happens automatically when views load their data
-				
-				return authCompleteMsg{
-					userInfo: authCache.UserInfo,
-					err:      nil,
-				}
-			}
-		}
-		
-		debug.LogToFile("🔐 AUTH: No valid cached auth, authenticating with API...\n")
+		// First try to authenticate to get user ID
+		debug.LogToFile("🔐 AUTH: Starting authentication process...\n")
 		
 		// Use a shorter timeout to prevent hanging
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -514,29 +519,61 @@ func (a *App) authenticateAndInitCache() tea.Cmd {
 		
 		var userInfo *models.UserInfo
 		var err error
+		var needsAuth = true
 		
+		// Try to get user info first (to set context before creating cache)
 		if getter, ok := a.client.(userInfoGetter); ok {
-			debug.LogToFile("🔐 AUTH: Calling GetUserInfoWithContext...\n")
-			userInfo, err = getter.GetUserInfoWithContext(ctx)
-			if err == nil && userInfo != nil {
-				// Set the current user globally for cache operations
-				services.SetCurrentUser(userInfo)
-				debug.LogToFilef("🔐 AUTH: Successfully authenticated user ID=%d, email=%s 🔐\n", userInfo.ID, userInfo.Email)
-				
-				// Cache the auth info for 2 weeks
-				if cacheErr := a.cache.SetAuthCache(userInfo); cacheErr != nil {
-					debug.LogToFilef("⚠️ AUTH: Failed to cache auth info: %v ⚠️\n", cacheErr)
-				} else {
-					debug.LogToFile("✅ AUTH: Cached auth info for 2 weeks\n")
+			// First, try a quick check if we have cached auth by creating temp cache
+			tempCache := cache.NewSimpleCache()
+			_ = tempCache.LoadFromDisk()
+			
+			if tempCache.IsAuthCacheValid() {
+				if authCache, found := tempCache.GetAuthCache(); found && authCache.UserInfo != nil {
+					// Use cached user info
+					services.SetCurrentUser(authCache.UserInfo)
+					userInfo = authCache.UserInfo
+					needsAuth = false
+					debug.LogToFilef("🔐 AUTH: Using cached auth (valid for %v) - user ID=%d, email=%s 🔐\n", 
+						authCache.CacheDuration, authCache.UserInfo.ID, authCache.UserInfo.Email)
 				}
-			} else if err != nil {
-				// Log the error but continue - we'll use anonymous mode
-				debug.LogToFilef("⚠️ AUTH: Authentication failed (will use anonymous mode): %v ⚠️\n", err)
-				// Don't return error - continue with anonymous cache
-				err = nil
+			}
+			
+			if needsAuth {
+				debug.LogToFile("🔐 AUTH: No valid cached auth, authenticating with API...\n")
+				userInfo, err = getter.GetUserInfoWithContext(ctx)
+				if err == nil && userInfo != nil {
+					// Set the current user globally for cache operations
+					services.SetCurrentUser(userInfo)
+					debug.LogToFilef("🔐 AUTH: Successfully authenticated user ID=%d, email=%s 🔐\n", userInfo.ID, userInfo.Email)
+				} else if err != nil {
+					// Log the error but continue - we'll use anonymous mode
+					debug.LogToFilef("⚠️ AUTH: Authentication failed (will use anonymous mode): %v ⚠️\n", err)
+					// Don't return error - continue with anonymous cache
+					err = nil
+				}
 			}
 		} else {
 			debug.LogToFile("⚠️ AUTH: Client doesn't support GetUserInfoWithContext, using anonymous cache ⚠️\n")
+		}
+		
+		// Now create the cache with the correct user context
+		debug.LogToFile("📦 AUTH: Creating cache with user context...\n")
+		a.cache = cache.NewSimpleCache()
+		_ = a.cache.LoadFromDisk()
+		debug.LogToFile("✅ AUTH: Cache created and loaded\n")
+		
+		// If we just authenticated (not from cache), save the auth info
+		if needsAuth && userInfo != nil {
+			// Cache the auth info for 2 weeks
+			if cacheErr := a.cache.SetAuthCache(userInfo); cacheErr != nil {
+				debug.LogToFilef("⚠️ AUTH: Failed to cache auth info: %v ⚠️\n", cacheErr)
+			} else {
+				debug.LogToFile("✅ AUTH: Cached auth info for 2 weeks\n")
+			}
+		}
+		
+		if !needsAuth {
+			debug.LogToFile("🔄 AUTH: Refreshing cache data (runs, repos, etc)...\n")
 		}
 		
 		return authCompleteMsg{

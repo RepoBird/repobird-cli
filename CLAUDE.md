@@ -501,27 +501,41 @@ func (v *CreateView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Model
 #### Purpose
 Eliminates the architectural nightmare of each view manually calculating its own dimensions and borders. Previously, views had inconsistent border cutoffs and duplicate sizing logic that broke when lipgloss rendering behavior changed.
 
-#### Usage Pattern
+#### CRITICAL WindowLayout Initialization Pattern
+
+**⚠️ BREAKING CHANGE**: The WindowLayout initialization pattern has been updated to fix width issues after navigation.
+
 ```go
-// In view struct
+// CRITICAL: In view struct - Initialize layout as nil
 type MyView struct {
-    layout *components.WindowLayout
+    layout *components.WindowLayout  // MUST be nil initially
+    width  int                       // MUST start as 0
+    height int                       // MUST start as 0
     // ... other fields
 }
 
-// In constructor
-func NewMyView(client APIClient, cache *cache.SimpleCache) *MyView {
+// CRITICAL: In constructor - DO NOT initialize layout with default dimensions
+func NewMyView(client APIClient, cache *cache.SimpleCache, id string) *MyView {
     return &MyView{
-        layout: components.NewWindowLayout(80, 24), // default dimensions
+        layout: nil,  // ⚠️ CRITICAL: Don't initialize here
+        width:  0,    // ⚠️ CRITICAL: Wait for WindowSizeMsg
+        height: 0,    // ⚠️ CRITICAL: Wait for WindowSizeMsg
         // ... other initialization
     }
 }
 
-// In handleWindowSizeMsg
+// CRITICAL: Initialize layout ONLY in handleWindowSizeMsg
 func (v *MyView) handleWindowSizeMsg(msg tea.WindowSizeMsg) {
     v.width = msg.Width
     v.height = msg.Height
-    v.layout.Update(msg.Width, msg.Height) // Update layout calculations
+    
+    // Initialize layout on first WindowSizeMsg only
+    if v.layout == nil {
+        v.layout = components.NewWindowLayout(msg.Width, msg.Height)
+        debug.LogToFilef("📐 VIEW INIT: Created layout with %dx%d 📐\n", msg.Width, msg.Height)
+    } else {
+        v.layout.Update(msg.Width, msg.Height)
+    }
     
     // Get viewport dimensions from layout
     viewportWidth, viewportHeight := v.layout.GetViewportDimensions()
@@ -529,8 +543,23 @@ func (v *MyView) handleWindowSizeMsg(msg tea.WindowSizeMsg) {
     v.viewport.Height = viewportHeight
 }
 
-// In View() method
+// CRITICAL: In Init() method - DO NOT send WindowSizeMsg
+func (v *MyView) Init() tea.Cmd {
+    var cmds []tea.Cmd
+    
+    // ⚠️ CRITICAL: Don't send WindowSizeMsg here - wait for app to send it
+    // This was causing width issues after navigation
+    
+    // ... other initialization
+    return tea.Batch(cmds...)
+}
+
+// CRITICAL: In View() method - Safety check for nil layout
 func (v *MyView) View() string {
+    if v.layout == nil || v.width == 0 || v.height == 0 {
+        return ""  // Wait for proper dimensions
+    }
+    
     if !v.layout.IsValidDimensions() {
         return v.layout.GetMinimalView("My View - Loading...")
     }
@@ -543,6 +572,20 @@ func (v *MyView) View() string {
     // ... render with consistent styling
 }
 ```
+
+#### WindowLayout Initialization Rules
+
+**⚠️ CRITICAL RULES** (fixes navigation width issues):
+
+1. **NEVER** initialize WindowLayout in constructors with default dimensions
+2. **NEVER** send WindowSizeMsg from Init() method  
+3. **NEVER** set width/height to default values in constructors
+4. **ALWAYS** wait for actual terminal dimensions before creating layout
+5. **ALWAYS** check for nil layout in View() method
+6. **ALWAYS** initialize layout in handleWindowSizeMsg on first call only
+7. **ALWAYS** let the App router send WindowSizeMsg after navigation
+
+**Common Bug**: Initializing layout with default 80x24 dimensions causes subsequent navigation to use incorrect width even after proper WindowSizeMsg is received.
 
 #### Key Methods
 - `NewWindowLayout(width, height)` - Create layout calculator

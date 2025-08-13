@@ -17,6 +17,7 @@ type ErrorView struct {
 	width       int
 	height      int
 	keymaps     components.KeyMap
+	layout      *components.WindowLayout
 }
 
 // NewErrorView creates a new error view
@@ -26,6 +27,7 @@ func NewErrorView(err error, message string, recoverable bool) *ErrorView {
 		message:     message,
 		recoverable: recoverable,
 		keymaps:     components.DefaultKeyMap,
+		layout:      nil, // ⚠️ CRITICAL: Don't initialize here
 	}
 }
 
@@ -40,6 +42,13 @@ func (e *ErrorView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		e.width = msg.Width
 		e.height = msg.Height
+		
+		// Initialize layout on first WindowSizeMsg only
+		if e.layout == nil {
+			e.layout = components.NewWindowLayout(msg.Width, msg.Height)
+		} else {
+			e.layout.Update(msg.Width, msg.Height)
+		}
 		return e, nil
 
 	case tea.KeyMsg:
@@ -66,11 +75,19 @@ func (e *ErrorView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // View implements tea.Model
 func (e *ErrorView) View() string {
-	if e.width == 0 || e.height == 0 {
-		return ""
+	if e.layout == nil || e.width == 0 || e.height == 0 {
+		return "" // Wait for proper dimensions
+	}
+	
+	if !e.layout.IsValidDimensions() {
+		return e.layout.GetMinimalView("Error - Loading...")
 	}
 
-	// Styles
+	// Use WindowLayout for consistent sizing
+	boxStyle := e.layout.CreateStandardBox()
+	contentStyle := e.layout.CreateContentStyle()
+
+	// Error-specific styles
 	errorStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("196")).
 		Bold(true)
@@ -83,12 +100,6 @@ func (e *ErrorView) View() string {
 	instructionStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("242")).
 		Italic(true)
-
-	containerStyle := lipgloss.NewStyle().
-		Width(e.width).
-		Height(e.height).
-		Align(lipgloss.Center, lipgloss.Center).
-		Padding(2)
 
 	// Build content
 	content := lipgloss.JoinVertical(
@@ -118,5 +129,13 @@ func (e *ErrorView) View() string {
 		instructionStyle.Render(instruction),
 	)
 
-	return containerStyle.Render(content)
+	// Center content within the box
+	viewportWidth, viewportHeight := e.layout.GetViewportDimensions()
+	centeredContent := contentStyle.
+		Width(viewportWidth).
+		Height(viewportHeight).
+		Align(lipgloss.Center, lipgloss.Center).
+		Render(content)
+
+	return boxStyle.Render(centeredContent)
 }
