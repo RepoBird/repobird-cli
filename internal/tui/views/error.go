@@ -27,7 +27,9 @@ func NewErrorView(err error, message string, recoverable bool) *ErrorView {
 		message:     message,
 		recoverable: recoverable,
 		keymaps:     components.DefaultKeyMap,
-		layout:      nil, // ⚠️ CRITICAL: Don't initialize here
+		layout:      components.NewWindowLayout(80, 24), // Default dimensions like StatusView
+		width:       80,
+		height:      24,
 	}
 }
 
@@ -42,13 +44,7 @@ func (e *ErrorView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		e.width = msg.Width
 		e.height = msg.Height
-		
-		// Initialize layout on first WindowSizeMsg only
-		if e.layout == nil {
-			e.layout = components.NewWindowLayout(msg.Width, msg.Height)
-		} else {
-			e.layout.Update(msg.Width, msg.Height)
-		}
+		e.layout.Update(msg.Width, msg.Height)
 		return e, nil
 
 	case tea.KeyMsg:
@@ -75,10 +71,6 @@ func (e *ErrorView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // View implements tea.Model
 func (e *ErrorView) View() string {
-	if e.layout == nil || e.width == 0 || e.height == 0 {
-		return "" // Wait for proper dimensions
-	}
-	
 	if !e.layout.IsValidDimensions() {
 		return e.layout.GetMinimalView("Error - Loading...")
 	}
@@ -137,5 +129,31 @@ func (e *ErrorView) View() string {
 		Align(lipgloss.Center, lipgloss.Center).
 		Render(content)
 
-	return boxStyle.Render(centeredContent)
+	// Create box content
+	boxedContent := boxStyle.Render(centeredContent)
+	
+	// Create status line
+	statusLine := e.renderStatusLine()
+	
+	// Join box and status line
+	return lipgloss.JoinVertical(lipgloss.Left, boxedContent, statusLine)
+}
+
+// renderStatusLine renders the status line with appropriate help text
+func (e *ErrorView) renderStatusLine() string {
+	var helpText string
+	if e.recoverable {
+		helpText = "[enter/esc]go back [q]quit"
+	} else {
+		helpText = "[enter]dashboard [q]quit"
+	}
+	
+	statusLine := components.NewStatusLine().
+		SetWidth(e.width).
+		SetLeft("[ERROR]").
+		SetRight("").
+		SetHelp(helpText).
+		ResetStyle()
+	
+	return statusLine.Render()
 }

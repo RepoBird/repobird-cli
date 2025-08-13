@@ -9,13 +9,13 @@ import (
 type WindowLayout struct {
 	terminalWidth  int
 	terminalHeight int
-	
+
 	// Calculated dimensions
-	contentWidth   int
-	contentHeight  int
-	boxWidth       int
-	boxHeight      int
-	
+	contentWidth  int
+	contentHeight int
+	boxWidth      int
+	boxHeight     int
+
 	// Layout constants
 	statusLineHeight int
 	borderMargin     int
@@ -31,7 +31,7 @@ func NewWindowLayout(terminalWidth, terminalHeight int) *WindowLayout {
 		borderMargin:     2, // Lipgloss boxes render 2 pixels wider than set width
 		topMargin:        2, // Additional top margin for border visibility (increased)
 	}
-	
+
 	layout.calculateDimensions()
 	return layout
 }
@@ -41,11 +41,11 @@ func (w *WindowLayout) calculateDimensions() {
 	// Box dimensions account for lipgloss border expansion
 	w.boxWidth = w.terminalWidth - w.borderMargin
 	w.boxHeight = w.terminalHeight - w.statusLineHeight - w.topMargin // Removed extra -1 to use more vertical space
-	
+
 	// Content dimensions are inside the box (account for borders + padding)
-	w.contentWidth = w.boxWidth - 4  // Border (2) + padding (2)
+	w.contentWidth = w.boxWidth - 4   // Border (2) + padding (2)
 	w.contentHeight = w.boxHeight - 3 // Title (1) + borders/padding (2)
-	
+
 	// Minimum dimensions
 	if w.boxWidth < 10 {
 		w.boxWidth = 10
@@ -59,7 +59,7 @@ func (w *WindowLayout) calculateDimensions() {
 	if w.contentHeight < 1 {
 		w.contentHeight = 1
 	}
-	
+
 	// Debug logging
 	debug.LogToFilef("🏗️ LAYOUT: Terminal %dx%d → Box %dx%d → Content %dx%d 🏗️\n",
 		w.terminalWidth, w.terminalHeight,
@@ -97,7 +97,7 @@ func (w *WindowLayout) CreateTitleStyle() lipgloss.Style {
 	return lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("63")).
-		Width(w.boxWidth - 2). // Account for border
+		Width(w.boxWidth-2). // Account for border
 		Align(lipgloss.Center).
 		Padding(0, 1)
 }
@@ -105,7 +105,7 @@ func (w *WindowLayout) CreateTitleStyle() lipgloss.Style {
 // CreateContentStyle creates a standard content area style
 func (w *WindowLayout) CreateContentStyle() lipgloss.Style {
 	return lipgloss.NewStyle().
-		Width(w.boxWidth - 2). // Account for border
+		Width(w.boxWidth-2). // Account for border
 		Height(w.contentHeight).
 		Padding(0, 1)
 }
@@ -137,9 +137,9 @@ func (w *WindowLayout) Update(terminalWidth, terminalHeight int) {
 type LayoutType int
 
 const (
-	LayoutStandard LayoutType = iota // Standard single box with statusline
-	LayoutDashboard                  // Multi-column dashboard layout
-	LayoutSplit                      // Split pane layout
+	LayoutStandard  LayoutType = iota // Standard single box with statusline
+	LayoutDashboard                   // Multi-column dashboard layout
+	LayoutSplit                       // Split pane layout
 )
 
 // GetLayoutForType returns a configured layout for specific view types
@@ -157,3 +157,4 @@ func (w *WindowLayout) GetLayoutForType(layoutType LayoutType) *WindowLayout {
 		return w
 	}
 }
+
