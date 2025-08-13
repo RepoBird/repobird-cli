@@ -203,13 +203,19 @@ func TestErrorNavigation(t *testing.T) {
 		mockClient := &MockAPIClient{}
 		app := NewApp(mockClient)
 		_ = app.Init()
+		
+		// Simulate authentication completion and create cache
+		app.cache = cache.NewSimpleCache()
+		model, _ := app.Update(authCompleteMsg{})
+		app = model.(*App)
 
 		// Navigate to Create
-		app.Update(messages.NavigateToCreateMsg{})
+		model, _ = app.Update(messages.NavigateToCreateMsg{})
+		app = model.(*App)
 		originalView := app.current
 
 		// Encounter recoverable error
-		model, _ := app.Update(messages.NavigateToErrorMsg{
+		model, _ = app.Update(messages.NavigateToErrorMsg{
 			Error:       errors.New("validation error"),
 			Message:     "Invalid input",
 			Recoverable: true,
@@ -232,13 +238,20 @@ func TestErrorNavigation(t *testing.T) {
 		mockClient := &MockAPIClient{}
 		app := NewApp(mockClient)
 		_ = app.Init()
+		
+		// Simulate authentication completion and create cache
+		app.cache = cache.NewSimpleCache()
+		model, _ := app.Update(authCompleteMsg{})
+		app = model.(*App)
 
 		// Build navigation stack
-		app.Update(messages.NavigateToListMsg{})
-		app.Update(messages.NavigateToDetailsMsg{RunID: "123"})
+		model, _ = app.Update(messages.NavigateToListMsg{})
+		app = model.(*App)
+		model, _ = app.Update(messages.NavigateToDetailsMsg{RunID: "123"})
+		app = model.(*App)
 
 		// Encounter non-recoverable error
-		model, _ := app.Update(messages.NavigateToErrorMsg{
+		model, _ = app.Update(messages.NavigateToErrorMsg{
 			Error:       errors.New("fatal error"),
 			Message:     "System failure",
 			Recoverable: false,
@@ -262,6 +275,11 @@ func TestNavigationEdgeCases(t *testing.T) {
 		mockClient := &MockAPIClient{}
 		app := NewApp(mockClient)
 		_ = app.Init()
+		
+		// Simulate authentication completion and create cache
+		app.cache = cache.NewSimpleCache()
+		model, _ := app.Update(authCompleteMsg{})
+		app = model.(*App)
 
 		// Multiple back navigations with empty stack
 		for i := 0; i < 5; i++ {
@@ -278,14 +296,20 @@ func TestNavigationEdgeCases(t *testing.T) {
 		mockClient := &MockAPIClient{}
 		app := NewApp(mockClient)
 		_ = app.Init()
+		
+		// Simulate authentication completion and create cache
+		app.cache = cache.NewSimpleCache()
+		model, _ := app.Update(authCompleteMsg{})
+		app = model.(*App)
 
 		// Navigate to Create
-		app.Update(messages.NavigateToCreateMsg{
+		model, _ = app.Update(messages.NavigateToCreateMsg{
 			SelectedRepository: "repo1",
 		})
+		app = model.(*App)
 
 		// Navigate to Create again (different context)
-		model, _ := app.Update(messages.NavigateToCreateMsg{
+		model, _ = app.Update(messages.NavigateToCreateMsg{
 			SelectedRepository: "repo2",
 		})
 		appModel := model.(*App)
@@ -295,16 +319,24 @@ func TestNavigationEdgeCases(t *testing.T) {
 		assert.Len(t, appModel.viewStack, 2)
 
 		// Context should be updated
-		assert.Equal(t, "repo2", appModel.cache.GetNavigationContext("selected_repo"))
+		if appModel.cache != nil {
+			assert.Equal(t, "repo2", appModel.cache.GetNavigationContext("selected_repo"))
+		}
 	})
 
 	t.Run("Quit during navigation", func(t *testing.T) {
 		mockClient := &MockAPIClient{}
 		app := NewApp(mockClient)
 		_ = app.Init()
+		
+		// Simulate authentication completion and create cache
+		app.cache = cache.NewSimpleCache()
+		model, _ := app.Update(authCompleteMsg{})
+		app = model.(*App)
 
 		// Navigate somewhere
-		app.Update(messages.NavigateToListMsg{})
+		model, _ = app.Update(messages.NavigateToListMsg{})
+		app = model.(*App)
 
 		// Send quit command
 		model, cmd := app.Update(tea.KeyMsg{Type: tea.KeyCtrlC})

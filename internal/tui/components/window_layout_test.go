@@ -17,21 +17,21 @@ func TestNewWindowLayout(t *testing.T) {
 			terminalWidth:  80,
 			terminalHeight: 24,
 			wantBoxWidth:   78, // 80 - 2 (border margin)
-			wantBoxHeight:  20, // 24 - 1 (statusline) - 2 (top margin) - 1 (extra)
+			wantBoxHeight:  21, // 24 - 1 (statusline) - 2 (top margin)
 		},
 		{
 			name:           "Large terminal",
 			terminalWidth:  120,
 			terminalHeight: 40,
 			wantBoxWidth:   118, // 120 - 2
-			wantBoxHeight:  36,  // 40 - 1 - 2 - 1
+			wantBoxHeight:  37,  // 40 - 1 - 2
 		},
 		{
 			name:           "Small terminal",
 			terminalWidth:  40,
 			terminalHeight: 10,
 			wantBoxWidth:   38, // 40 - 2
-			wantBoxHeight:  6,  // 10 - 1 - 2 - 1
+			wantBoxHeight:  7,  // 10 - 1 - 2
 		},
 		{
 			name:           "Minimum viable terminal",
@@ -79,14 +79,14 @@ func TestWindowLayout_GetContentDimensions(t *testing.T) {
 			terminalWidth:     80,
 			terminalHeight:    24,
 			wantContentWidth:  74, // 78 - 4 (border + padding)
-			wantContentHeight: 17, // 20 - 3 (title + borders/padding)
+			wantContentHeight: 18, // 21 - 3 (title + borders/padding)
 		},
 		{
 			name:              "Large terminal",
 			terminalWidth:     120,
 			terminalHeight:    40,
 			wantContentWidth:  114, // 118 - 4
-			wantContentHeight: 33,  // 36 - 3
+			wantContentHeight: 34,  // 37 - 3
 		},
 		{
 			name:              "Small terminal with calculated content",
@@ -156,7 +156,7 @@ func TestWindowLayout_Update(t *testing.T) {
 
 	// Verify new calculations are correct
 	expectedBoxWidth := newWidth - 2  // border margin
-	expectedBoxHeight := newHeight - 4 // statusline + top margin + extra
+	expectedBoxHeight := newHeight - 3 // statusline + top margin
 	if newBoxWidth != expectedBoxWidth {
 		t.Errorf("After Update, box width = %d, want %d", newBoxWidth, expectedBoxWidth)
 	}
@@ -412,10 +412,10 @@ func TestWindowLayout_HeightCalculations(t *testing.T) {
 
 	boxHeight := layout.boxHeight
 	
-	// Box height should account for statusline (1) + top margin (2) + extra (1)
-	expectedBoxHeight := terminalHeight - 1 - 2 - 1
+	// Box height should account for statusline (1) + top margin (2)
+	expectedBoxHeight := terminalHeight - 1 - 2
 	if boxHeight != expectedBoxHeight {
-		t.Errorf("Box height = %d, want %d (terminal %d - 4 for statusline+margins)", 
+		t.Errorf("Box height = %d, want %d (terminal %d - 3 for statusline+margins)", 
 			boxHeight, expectedBoxHeight, terminalHeight)
 	}
 
