@@ -2,6 +2,7 @@ package views
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/help"
@@ -707,6 +708,7 @@ func (d *DashboardView) View() string {
 	if d.error != nil {
 		// Use global WindowLayout system for error state
 		layout := components.NewWindowLayout(d.width, d.height)
+		debug.LogToFilef("🔴 DASHBOARD ERROR: Created layout for %dx%d terminal 🔴\n", d.width, d.height)
 		if !layout.IsValidDimensions() {
 			return layout.GetMinimalView("Dashboard Error")
 		}
@@ -728,14 +730,16 @@ func (d *DashboardView) View() string {
 		// Create status line separately (outside the box)
 		statusLine := d.renderStatusLine("ERROR")
 		
-		// Add empty line between box and status line for spacing
-		emptyLine := lipgloss.NewStyle().Height(1).Render("")
-		
 		// Follow StatusView pattern: render box content separately, then join with status line outside
-		return lipgloss.JoinVertical(lipgloss.Left, 
-			boxStyle.Render(centeredContent),
-			emptyLine,
-			statusLine)
+		// No empty line - the box height already accounts for proper spacing
+		boxedContent := boxStyle.Render(centeredContent)
+		boxLines := strings.Count(boxedContent, "\n") + 1
+		statusLines := strings.Count(statusLine, "\n") + 1
+		result := lipgloss.JoinVertical(lipgloss.Left, boxedContent, statusLine)
+		totalLines := strings.Count(result, "\n") + 1
+		debug.LogToFilef("🔴 DASHBOARD ERROR: Box=%d lines, Status=%d lines, Total=%d lines (should be %d) 🔴\n", 
+			boxLines, statusLines, totalLines, d.height)
+		return result
 	}
 
 	// Show cached content while loading new data
