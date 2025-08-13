@@ -203,10 +203,10 @@ runs:
 				Force:      true,
 				Runs: []BulkRunConfig{
 					{
-						Prompt:  "Fix the authentication bug where users cannot login\nwith valid credentials",
+						Prompt:  "Fix the authentication bug where users cannot login\nwith valid credentials\n",
 						Title:   "Fix auth issue",
 						Target:  "fix/auth-bug",
-						Context: "Error occurs after recent security update\nCheck session handling",
+						Context: "Error occurs after recent security update\nCheck session handling\n",
 					},
 					{
 						Prompt:  "Add password reset functionality",
@@ -492,11 +492,21 @@ func TestParseBulkConfig_SingleToMultiConversion(t *testing.T) {
 	filePath := createTempFile(t, tmpDir, "single.json", singleConfig)
 
 	// This should detect it's a single config and convert to bulk
-	_, err := ParseBulkConfig(filePath)
+	config, err := ParseBulkConfig(filePath)
 
-	// Note: This will fail because utils.LoadConfigFromFile is not mocked
-	// In a real test, we'd need to refactor to inject the dependency
-	assert.Error(t, err) // Expected to fail without proper mocking
+	// The function should successfully convert single config to bulk
+	require.NoError(t, err)
+	require.NotNil(t, config)
+	
+	// Verify the conversion
+	assert.Equal(t, "org/repo", config.Repository)
+	assert.Equal(t, "main", config.Source)
+	assert.Equal(t, "run", config.RunType)
+	assert.Len(t, config.Runs, 1)
+	assert.Equal(t, "Fix authentication bug", config.Runs[0].Prompt)
+	assert.Equal(t, "Auth Fix", config.Runs[0].Title)
+	assert.Equal(t, "fix/auth", config.Runs[0].Target)
+	assert.Equal(t, "Users cannot login", config.Runs[0].Context)
 }
 
 func TestLoadBulkConfig_MultipleFiles(t *testing.T) {

@@ -700,9 +700,33 @@ func (d *DashboardView) View() string {
 	title := titleStyle.Render("Repobird.ai CLI")
 
 	if d.error != nil {
-		content = fmt.Sprintf("Error loading dashboard data: %s\n\nPress 'r' to retry, 'q' to quit", d.error.Error())
-		statusline := d.renderStatusLine("DASH")
-		return lipgloss.JoinVertical(lipgloss.Left, title, content, statusline)
+		// Use global WindowLayout system for error state
+		layout := components.NewWindowLayout(d.width, d.height)
+		if !layout.IsValidDimensions() {
+			return layout.GetMinimalView("Dashboard Error")
+		}
+		
+		boxStyle := layout.CreateStandardBox()
+		contentStyle := layout.CreateContentStyle()
+		
+		// Create error content
+		errorContent := fmt.Sprintf("Error loading dashboard data: %s\n\nPress 'r' to retry, 'q' to quit", d.error.Error())
+		
+		// Get viewport dimensions for proper centering
+		viewportWidth, viewportHeight := layout.GetViewportDimensions()
+		centeredContent := contentStyle.
+			Width(viewportWidth).
+			Height(viewportHeight - 2). // Leave room for status line
+			Align(lipgloss.Center, lipgloss.Center).
+			Render(errorContent)
+		
+		// Add status line at bottom
+		statusline := d.renderStatusLine("ERROR")
+		
+		// Combine with proper layout
+		fullContent := lipgloss.JoinVertical(lipgloss.Left, centeredContent, statusline)
+		
+		return boxStyle.Render(fullContent)
 	}
 
 	// Show cached content while loading new data

@@ -297,7 +297,7 @@ func ClearCache() {
 // InitializeCacheForUser reinitializes the cache for a specific user
 func InitializeCacheForUser(userID *int) {
 	ensureGlobalCache()
-	// Clear current cache first (but preserve user info if same user AND form data AND terminal details)
+	// Clear current cache first (but preserve user info, form data, and terminal details if same user)
 	var savedUserInfo *models.UserInfo
 	var savedUserInfoTime time.Time
 	var savedFormData *FormData
@@ -305,13 +305,13 @@ func InitializeCacheForUser(userID *int) {
 
 	if globalCache != nil {
 		globalCache.mu.RLock()
-		// Always preserve form data
-		savedFormData = globalCache.formData
-
+		
 		if globalCache.userInfo != nil && userID != nil && globalCache.userInfo.ID == *userID {
-			// Save user info and terminal details if it's the same user
+			// Save user info, form data, and terminal details if it's the same user
 			savedUserInfo = globalCache.userInfo
 			savedUserInfoTime = globalCache.userInfoTime
+			// Only preserve form data for the same user
+			savedFormData = globalCache.formData
 			// Preserve terminal details for the same user
 			if globalCache.terminalDetails != nil {
 				savedTerminalDetails = make(map[string]*models.RunResponse)
