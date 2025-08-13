@@ -213,7 +213,8 @@ func (d *DashboardView) handleMillerColumnsNavigation(msg tea.KeyMsg) tea.Cmd {
 		}
 
 		if textToCopy != "" {
-			if err := d.copyToClipboard(textToCopy); err == nil {
+			cmd := d.copyToClipboard(textToCopy)
+			if cmd != nil {
 				// Show what's actually on the clipboard, truncated for display if needed
 				displayText := textToCopy
 				maxLen := 30
@@ -221,12 +222,10 @@ func (d *DashboardView) handleMillerColumnsNavigation(msg tea.KeyMsg) tea.Cmd {
 					displayText = displayText[:maxLen-3] + "..."
 				}
 				d.statusLine.SetTemporaryMessageWithType(fmt.Sprintf("📋 Copied \"%s\"", displayText), components.MessageSuccess, 150*time.Millisecond)
+				return cmd
 			} else {
 				d.statusLine.SetTemporaryMessageWithType("✗ Failed to copy", components.MessageError, 150*time.Millisecond)
 			}
-			d.yankBlink = true
-			d.yankBlinkTime = time.Now()
-			return d.startYankBlinkAnimation()
 		}
 
 	case msg.Type == tea.KeyRunes && string(msg.Runes) == "o":

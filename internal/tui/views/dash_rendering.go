@@ -198,8 +198,8 @@ func (d *DashboardView) renderRepositoriesColumn(width, height int) string {
 		// Highlight selected repository
 		if i == d.selectedRepoIdx {
 			if d.focusedColumn == 0 {
-				// Single blink: bright green briefly when yankBlink is true
-				if d.yankBlink && time.Since(d.yankBlinkTime) < 250*time.Millisecond {
+				// Single blink: bright green briefly when clipboard manager is highlighting
+				if d.clipboardManager.ShouldHighlight() {
 					// Bright green flash
 					item = lipgloss.NewStyle().
 						Width(width).
@@ -291,23 +291,14 @@ func (d *DashboardView) renderRunsColumn(width, height int) string {
 			if i == d.selectedRunIdx {
 				if d.focusedColumn == 1 {
 					// Custom blinking: toggle between bright and normal colors
-					if d.yankBlink && time.Since(d.yankBlinkTime) < 250*time.Millisecond {
-						if d.yankBlink {
-							// Bright green when visible
-							item = lipgloss.NewStyle().
-								Width(width).
-								Background(lipgloss.Color("82")). // Bright green
-								Foreground(lipgloss.Color("0")).  // Black text
-								Bold(true).
-								Render(item)
-						} else {
-							// Normal highlight when "off"
-							item = lipgloss.NewStyle().
-								Width(width).
-								Background(lipgloss.Color("33")).
-								Foreground(lipgloss.Color("255")).
-								Render(item)
-						}
+					if d.clipboardManager.ShouldHighlight() {
+						// Bright green when visible
+						item = lipgloss.NewStyle().
+							Width(width).
+							Background(lipgloss.Color("82")). // Bright green
+							Foreground(lipgloss.Color("0")).  // Black text
+							Bold(true).
+							Render(item)
 					} else {
 						// Normal focused highlight (no blinking)
 						item = lipgloss.NewStyle().
@@ -405,25 +396,15 @@ func (d *DashboardView) renderDetailsColumn(width, height int) string {
 
 			if d.focusedColumn == 2 && i == d.selectedDetailLine {
 				// Custom blinking: toggle between bright and normal colors
-				if d.copiedMessage != "" && time.Since(d.copiedMessageTime) < 250*time.Millisecond {
-					if d.yankBlink {
-						// Bright green when visible
-						styledLine = lipgloss.NewStyle().
-							MaxWidth(contentWidth).
-							Inline(true).
-							Background(lipgloss.Color("82")). // Bright green
-							Foreground(lipgloss.Color("0")).  // Black text
-							Bold(true).
-							Render(displayLine)
-					} else {
-						// Normal highlight when "off"
-						styledLine = lipgloss.NewStyle().
-							MaxWidth(contentWidth).
-							Inline(true).
-							Background(lipgloss.Color("63")).
-							Foreground(lipgloss.Color("255")).
-							Render(displayLine)
-					}
+				if d.clipboardManager.ShouldHighlight() {
+					// Bright green when visible
+					styledLine = lipgloss.NewStyle().
+						MaxWidth(contentWidth).
+						Inline(true).
+						Background(lipgloss.Color("82")). // Bright green
+						Foreground(lipgloss.Color("0")).  // Black text
+						Bold(true).
+						Render(displayLine)
 				} else {
 					// Normal focused highlight (no blinking)
 					styledLine = lipgloss.NewStyle().

@@ -74,8 +74,7 @@ type DashboardView struct {
 	// Clipboard feedback
 	copiedMessage     string
 	copiedMessageTime time.Time
-	yankBlink         bool      // Toggle for blinking effect
-	yankBlinkTime     time.Time // Time when blink started (separate from message timing)
+	clipboardManager  components.ClipboardManager
 
 	// Unified status line component
 	statusLine *components.StatusLine
@@ -138,23 +137,24 @@ func NewDashboardView(client APIClient) *DashboardView {
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("63"))
 
 	dashboard := &DashboardView{
-		client:          client,
-		keys:            components.DefaultKeyMap,
-		help:            help.New(),
-		disabledKeys:    map[string]bool{"esc": true}, // Disable escape key on dashboard (b is for bulk navigation)
-		currentLayout:   models.LayoutTripleColumn,
-		loading:         true,
-		initializing:    true,
-		refreshInterval: 30 * time.Second,
-		apiRepositories: make(map[int]models.APIRepository),
-		fzfColumn:       -1, // No FZF mode initially
-		spinner:         s,
-		statusLine:      components.NewStatusLine(),
-		helpView:        components.NewHelpView(),
-		repoViewport:    viewport.New(0, 0), // Will be sized in Update
-		runsViewport:    viewport.New(0, 0),
-		detailsViewport: viewport.New(0, 0),
-		cache:           cache.NewSimpleCache(), // Embedded cache
+		client:           client,
+		keys:             components.DefaultKeyMap,
+		help:             help.New(),
+		disabledKeys:     map[string]bool{"esc": true}, // Disable escape key on dashboard (b is for bulk navigation)
+		currentLayout:    models.LayoutTripleColumn,
+		loading:          true,
+		initializing:     true,
+		refreshInterval:  30 * time.Second,
+		apiRepositories:  make(map[int]models.APIRepository),
+		fzfColumn:        -1, // No FZF mode initially
+		spinner:          s,
+		statusLine:       components.NewStatusLine(),
+		helpView:         components.NewHelpView(),
+		clipboardManager: components.NewClipboardManager(),
+		repoViewport:     viewport.New(0, 0), // Will be sized in Update
+		runsViewport:     viewport.New(0, 0),
+		detailsViewport:  viewport.New(0, 0),
+		cache:            cache.NewSimpleCache(), // Embedded cache
 	}
 
 	// Load persisted cache data if available
@@ -352,12 +352,10 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// File hash sync completed, no action needed
 		debug.LogToFilef("  File hash sync completed\n")
 
-	case yankBlinkMsg:
-		// Single blink: toggle off after being on
-		if d.yankBlink {
-			d.yankBlink = false // Turn off after being on - completes the single blink
-		}
-		// No more blinking after the single on-off cycle
+	case components.ClipboardBlinkMsg:
+		// Handle clipboard blink animation
+		d.clipboardManager, cmd = d.clipboardManager.Update(msg)
+		return d, cmd
 
 	case messageClearMsg:
 		// Trigger UI refresh when message expires (no action needed - just refresh)
@@ -369,7 +367,7 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case clearStatusMsg:
 		// Clear the clipboard message after timeout
 		d.copiedMessage = ""
-		d.yankBlink = false
+		d.clipboardManager.Reset()
 
 	case components.FZFSelectedMsg:
 		// Handle FZF selection result

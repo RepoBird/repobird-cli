@@ -19,11 +19,12 @@ import (
 type BulkMode int
 
 const (
-	ModeFileSelect BulkMode = iota
-	ModeRunList
-	ModeRunEdit
-	ModeProgress
-	ModeResults
+	ModeInstructions BulkMode = iota // Initial screen with instructions
+	ModeFileBrowser               // FZF file browser (full screen)
+	ModeRunList                   // Run validation list
+	ModeRunEdit                   // Individual run editing
+	ModeProgress                  // Submission progress
+	ModeResults                   // Final results
 )
 
 // BulkRunItem represents a single run in the bulk collection
@@ -70,7 +71,7 @@ type BulkView struct {
 
 	// UI state
 	mode         BulkMode
-	fileSelector *components.BulkFileSelector
+	fileSelector *components.BulkFileSelector // Only used in ModeFileBrowser
 	help         help.Model
 	keys         bulkKeyMap
 	width        int
@@ -124,18 +125,15 @@ func NewBulkView(client *api.Client) *BulkView {
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
-	fileSelector := components.NewBulkFileSelector(80, 24)
-
 	return &BulkView{
-		client:       client,
-		mode:         ModeFileSelect,
-		fileSelector: fileSelector,
-		help:         help.New(),
-		keys:         defaultBulkKeyMap(),
-		spinner:      s,
-		runType:      "run",
-		runs:         []BulkRunItem{},
-		statusLine:   components.NewStatusLine(),
+		client:     client,
+		mode:       ModeInstructions, // Start with instructions, not file selector
+		help:       help.New(),
+		keys:       defaultBulkKeyMap(),
+		spinner:    s,
+		runType:    "run",
+		runs:       []BulkRunItem{},
+		statusLine: components.NewStatusLine(),
 	}
 }
 
@@ -223,10 +221,7 @@ func defaultBulkKeyMap() bulkKeyMap {
 // Init initializes the bulk view
 func (v *BulkView) Init() tea.Cmd {
 	debug.LogToFile("DEBUG: BulkView.Init() called\n")
-	return tea.Batch(
-		v.spinner.Tick,
-		v.fileSelector.Activate(), // Start with file selector
-	)
+	return v.spinner.Tick // Just start spinner, no file selector yet
 }
 
 // Update handles messages for the bulk view
@@ -258,9 +253,12 @@ func (v *BulkView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		
 		switch v.mode {
-		case ModeFileSelect:
-			debug.LogToFile("DEBUG: BulkView - delegating to handleFileSelectKeys\n")
-			return v.handleFileSelectKeys(msg)
+		case ModeInstructions:
+			debug.LogToFile("DEBUG: BulkView - delegating to handleInstructionsKeys\n")
+			return v.handleInstructionsKeys(msg)
+		case ModeFileBrowser:
+			debug.LogToFile("DEBUG: BulkView - delegating to handleFileBrowserKeys\n")
+			return v.handleFileBrowserKeys(msg)
 		case ModeRunList:
 			debug.LogToFile("DEBUG: BulkView - delegating to handleRunListKeys\n")
 			return v.handleRunListKeys(msg)
@@ -327,7 +325,7 @@ func (v *BulkView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// Update sub-components based on mode
 	switch v.mode {
-	case ModeFileSelect:
+	case ModeFileBrowser:
 		if v.fileSelector != nil {
 			newFileSelector, cmd := v.fileSelector.Update(msg)
 			v.fileSelector = newFileSelector
@@ -340,22 +338,46 @@ func (v *BulkView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // Event handlers for different modes
-func (v *BulkView) handleFileSelectKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	debug.LogToFilef("DEBUG: BulkView.handleFileSelectKeys() - key='%s'\n", msg.String())
+// handleInstructionsKeys handles keys in the instructions mode
+func (v *BulkView) handleInstructionsKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	debug.LogToFilef("DEBUG: BulkView.handleInstructionsKeys() - key='%s'\n", msg.String())
 	switch {
 	case key.Matches(msg, v.keys.Quit):
 		// Navigate back to dashboard instead of quitting directly
 		return v, func() tea.Msg {
 			return messages.NavigateBackMsg{}
 		}
+	case key.Matches(msg, v.keys.FileMode) || msg.String() == "F":
+		// Switch to file browser mode and initialize file selector
+		v.mode = ModeFileBrowser
+		if v.fileSelector == nil {
+			v.fileSelector = components.NewBulkFileSelector(v.width, v.height)
+		}
+		return v, v.fileSelector.Activate()
 	case key.Matches(msg, v.keys.ListMode):
 		if len(v.runs) > 0 {
 			v.mode = ModeRunList
 		}
 		return v, nil
 	default:
-		// Let file selector handle the key
-		debug.LogToFilef("DEBUG: BulkView.handleFileSelectKeys() - passing to file selector: '%s'\n", msg.String())
+		// Ignore other keys in instructions mode
+		return v, nil
+	}
+}
+
+// handleFileBrowserKeys handles keys in the file browser mode
+func (v *BulkView) handleFileBrowserKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	debug.LogToFilef("DEBUG: BulkView.handleFileBrowserKeys() - key='%s'\n", msg.String())
+	switch {
+	case key.Matches(msg, v.keys.Quit) || msg.Type == tea.KeyEsc:
+		// Go back to instructions mode
+		v.mode = ModeInstructions
+		v.fileSelector = nil // Clear file selector
+		return v, nil
+	default:
+		// Let file selector handle ALL other keys (including typing for search)
+		debug.LogToFilef("DEBUG: BulkView.handleFileBrowserKeys() - passing to file selector: '%s'\n", msg.String())
+		// File selector handles the key through Update in the main Update method
 		return v, nil
 	}
 }
@@ -380,7 +402,11 @@ func (v *BulkView) handleRunListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			v.runs[v.selectedRun].Selected = !v.runs[v.selectedRun].Selected
 		}
 	case key.Matches(msg, v.keys.FileMode):
-		v.mode = ModeFileSelect
+		// Switch back to file browser mode
+		v.mode = ModeFileBrowser
+		if v.fileSelector == nil {
+			v.fileSelector = components.NewBulkFileSelector(v.width, v.height)
+		}
 	case key.Matches(msg, v.keys.Submit):
 		// Submit selected bulk runs
 		return v, v.submitBulkRuns()
@@ -398,9 +424,12 @@ func (v *BulkView) View() string {
 	}
 	
 	switch v.mode {
-	case ModeFileSelect:
-		debug.LogToFile("DEBUG: BulkView - rendering file select\n")
-		return v.renderFileSelect()
+	case ModeInstructions:
+		debug.LogToFile("DEBUG: BulkView - rendering instructions\n")
+		return v.renderInstructions()
+	case ModeFileBrowser:
+		debug.LogToFile("DEBUG: BulkView - rendering file browser\n")
+		return v.renderFileBrowser()
 	case ModeRunList:
 		debug.LogToFile("DEBUG: BulkView - rendering run list\n")
 		return v.renderRunList()
@@ -419,32 +448,87 @@ func (v *BulkView) View() string {
 	}
 }
 
-// renderFileSelect renders the file selection view
-func (v *BulkView) renderFileSelect() string {
+// renderInstructions renders the initial instructions screen
+func (v *BulkView) renderInstructions() string {
 	if v.layout == nil {
 		v.layout = components.NewWindowLayout(v.width, v.height)
 	}
 
-	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("205"))
-	title := titleStyle.Render("Select Configuration Files")
+	// Instructions content
+	instructions := []string{
+		"Welcome to the Bulk Operations interface.",
+		"",
+		"This tool allows you to:",
+		"• Process multiple configuration files at once",
+		"• Submit batch runs with different parameters",
+		"• Track progress across multiple operations",
+		"",
+		"Press F to browse and select configuration files to get started.",
+		"",
+		"Supported file formats:",
+		"• JSON (.json) - Task configuration files",
+		"• YAML (.yaml, .yml) - Configuration files",
+		"• JSONL (.jsonl) - Line-delimited JSON",
+		"• Markdown (.md) - Documentation with task blocks",
+	}
+
+	content := strings.Join(instructions, "\n")
+
+	// Use WindowLayout system for consistent styling
+	boxStyle := v.layout.CreateStandardBox()
+	titleStyle := v.layout.CreateTitleStyle()
+	contentStyle := v.layout.CreateContentStyle()
+
+	title := titleStyle.Render("Bulk Operations")
+	styledContent := contentStyle.Render(content)
 	
+	// Create the main container with proper dimensions
+	boxWidth, boxHeight := v.layout.GetBoxDimensions()
+	mainContainer := boxStyle.
+		Width(boxWidth).
+		Height(boxHeight).
+		Render(lipgloss.JoinVertical(lipgloss.Left, title, "", styledContent))
+
+	// Status line
+	statusLine := v.renderStatusLine("BULK")
+
+	return lipgloss.JoinVertical(lipgloss.Left, mainContainer, statusLine)
+}
+
+// renderFileBrowser renders the dedicated file browser page
+func (v *BulkView) renderFileBrowser() string {
+	if v.layout == nil {
+		v.layout = components.NewWindowLayout(v.width, v.height)
+	}
+
 	// Get file selector content
 	var content string
 	if v.fileSelector != nil {
-		content = v.fileSelector.View(v.statusLine)
+		// Render file selector WITHOUT the original status line
+		content = v.fileSelector.View(nil) // Pass nil to avoid double status line
 	} else {
 		content = "File selector not initialized"
 	}
 
-	// Render status line
-	statusLine := v.renderStatusLine("BULK")
+	// Use WindowLayout system for consistent styling
+	boxStyle := v.layout.CreateStandardBox()
+	titleStyle := v.layout.CreateTitleStyle()
+	contentStyle := v.layout.CreateContentStyle()
+
+	title := titleStyle.Render("Select Configuration Files")
+	styledContent := contentStyle.Render(content)
 	
-	return lipgloss.JoinVertical(
-		lipgloss.Left,
-		title,
-		content,
-		statusLine,
-	)
+	// Create the main container with proper dimensions
+	boxWidth, boxHeight := v.layout.GetBoxDimensions()
+	mainContainer := boxStyle.
+		Width(boxWidth).
+		Height(boxHeight).
+		Render(lipgloss.JoinVertical(lipgloss.Left, title, "", styledContent))
+
+	// Status line - this is the ONLY status line for this mode
+	statusLine := v.renderStatusLine("FZF-BULK")
+
+	return lipgloss.JoinVertical(lipgloss.Left, mainContainer, statusLine)
 }
 
 // renderRunList renders the run list view
@@ -508,8 +592,10 @@ func (v *BulkView) renderStatusLine(layoutName string) string {
 	// Simple help text based on current mode
 	var helpText string
 	switch v.mode {
-	case ModeFileSelect:
-		helpText = "↑↓:navigate space:select enter:confirm F:files q:quit"
+	case ModeInstructions:
+		helpText = "F:browse files q:quit ?:help"
+	case ModeFileBrowser:
+		helpText = "↑↓:navigate space:select enter:confirm esc:back q:quit"
 	case ModeRunList:
 		helpText = "↑↓:navigate space:toggle F:files ctrl+s:submit q:quit"
 	default:

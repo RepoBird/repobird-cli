@@ -11,6 +11,20 @@ import (
 	"golang.design/x/clipboard"
 )
 
+// ClipboardError represents a clipboard operation error
+type ClipboardError struct {
+	Message string
+}
+
+func (e ClipboardError) Error() string {
+	return e.Message
+}
+
+// NewClipboardError creates a new clipboard error
+func NewClipboardError(message string) error {
+	return ClipboardError{Message: message}
+}
+
 var clipboardInitialized bool
 var cgoAvailable bool
 
