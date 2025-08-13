@@ -42,6 +42,7 @@ func NewScrollableList(opts ...ScrollableListOption) *ScrollableList {
 		selected:      0,
 		focusedCol:    0,
 		columns:       1,
+		columnWidths:  make([]int, 1), // Initialize column widths for default 1 column
 		keyNav:        false,
 		valueNav:      true,
 		keymaps:       DefaultKeyMap,

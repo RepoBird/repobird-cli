@@ -38,7 +38,7 @@ func TestNewWindowLayout(t *testing.T) {
 			terminalWidth:  20,
 			terminalHeight: 5,
 			wantBoxWidth:   18, // 20 - 2
-			wantBoxHeight:  1,  // 5 - 1 - 2 - 1
+			wantBoxHeight:  3,  // 5 - 1 - 2 - 1 = 1, but enforced minimum is 3
 		},
 	}
 

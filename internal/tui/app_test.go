@@ -7,11 +7,22 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/repobird/repobird-cli/internal/api"
 	"github.com/repobird/repobird-cli/internal/models"
+	"github.com/repobird/repobird-cli/internal/tui/cache"
 	"github.com/repobird/repobird-cli/internal/tui/messages"
 	"github.com/repobird/repobird-cli/internal/tui/views"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
+
+// Helper function to simulate authentication completion
+// Since authCompleteMsg is not exported, we'll simulate it by manually setting the fields
+func completeAuthentication(app *App) {
+	// Simulate successful authentication by setting authenticated flag
+	// and creating the dashboard view manually
+	app.authenticated = true
+	app.cache = cache.NewSimpleCache()
+	app.current = views.NewDashboardView(app.client)
+}
 
 // MockAPIClient for testing
 type MockAPIClient struct {
@@ -101,7 +112,7 @@ func TestAppInitialization(t *testing.T) {
 
 	assert.NotNil(t, app)
 	assert.Equal(t, mockClient, app.client)
-	assert.NotNil(t, app.cache)
+	assert.Nil(t, app.cache) // Cache is nil until authentication completes
 	assert.Empty(t, app.viewStack)
 	assert.Nil(t, app.current)
 }
@@ -112,10 +123,9 @@ func TestAppInit(t *testing.T) {
 
 	cmd := app.Init()
 
-	// After Init, current should be dashboard
-	assert.NotNil(t, app.current)
-	assert.IsType(t, &views.DashboardView{}, app.current)
-	assert.NotNil(t, cmd) // Should return dashboard's Init command
+	// After Init, authentication starts but current is still nil
+	assert.Nil(t, app.current) // Dashboard created after authentication completes
+	assert.NotNil(t, cmd) // Should return authentication command
 }
 
 func TestAppViewMethod(t *testing.T) {
@@ -124,12 +134,12 @@ func TestAppViewMethod(t *testing.T) {
 
 	// Before Init
 	view := app.View()
-	assert.Equal(t, "Initializing...", view)
+	assert.Equal(t, "🔐 Authenticating...", view)
 
-	// After Init
+	// After Init (but before authentication completes)
 	_ = app.Init()
 	view = app.View()
-	assert.NotEqual(t, "Initializing...", view) // Should delegate to current view
+	assert.Equal(t, "🔐 Authenticating...", view) // Still authenticating
 }
 
 func TestAppNavigationMessages(t *testing.T) {
@@ -175,15 +185,16 @@ func TestAppNavigationMessages(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockClient := &MockAPIClient{}
 			app := NewApp(mockClient)
-			_ = app.Init() // Initialize with dashboard
+			_ = app.Init() // Initialize with authentication
+			completeAuthentication(app) // Complete authentication to enable navigation
 
 			// Handle navigation
-			model, cmd := app.handleNavigation(tt.msg)
+			model, _ := app.handleNavigation(tt.msg)
 
 			assert.IsType(t, app, model)
 			appModel := model.(*App)
 			assert.Len(t, appModel.viewStack, tt.expectStackSize)
-			assert.NotNil(t, cmd) // Should return view's Init command
+			// Note: cmd can be nil if the view's Init() returns nil (e.g., ErrorView)
 		})
 	}
 }
@@ -192,6 +203,7 @@ func TestAppNavigateBack(t *testing.T) {
 	mockClient := &MockAPIClient{}
 	app := NewApp(mockClient)
 	_ = app.Init()
+	completeAuthentication(app)
 
 	// Save initial dashboard
 	initialView := app.current
@@ -212,6 +224,7 @@ func TestAppNavigateBackWithEmptyStack(t *testing.T) {
 	mockClient := &MockAPIClient{}
 	app := NewApp(mockClient)
 	_ = app.Init()
+	completeAuthentication(app)
 
 	// Navigate back with empty stack should go to dashboard
 	model, _ := app.handleNavigation(messages.NavigateBackMsg{})
@@ -224,6 +237,7 @@ func TestAppNavigateBackWithEmptyStack(t *testing.T) {
 func TestAppNavigationContext(t *testing.T) {
 	mockClient := &MockAPIClient{}
 	app := NewApp(mockClient)
+	completeAuthentication(app) // Need cache for navigation context
 
 	// Test setting navigation context
 	app.setNavigationContext("test_key", "test_value")
@@ -248,6 +262,7 @@ func TestAppBulkViewNavigation(t *testing.T) {
 		apiClient := &api.Client{}
 		app := NewApp(apiClient)
 		_ = app.Init()
+		completeAuthentication(app)
 
 		model, cmd := app.handleNavigation(messages.NavigateToBulkMsg{})
 		appModel := model.(*App)
@@ -262,6 +277,7 @@ func TestAppBulkViewNavigation(t *testing.T) {
 		mockClient := &MockAPIClient{}
 		app := NewApp(mockClient)
 		_ = app.Init()
+		completeAuthentication(app)
 
 		initialView := app.current
 		model, cmd := app.handleNavigation(messages.NavigateToBulkMsg{})
@@ -277,6 +293,7 @@ func TestAppUpdate(t *testing.T) {
 	mockClient := &MockAPIClient{}
 	app := NewApp(mockClient)
 	_ = app.Init()
+	completeAuthentication(app)
 
 	t.Run("Handle navigation message", func(t *testing.T) {
 		msg := messages.NavigateToCreateMsg{}
@@ -308,6 +325,7 @@ func TestAppNavigationWithContext(t *testing.T) {
 	mockClient := &MockAPIClient{}
 	app := NewApp(mockClient)
 	_ = app.Init()
+	completeAuthentication(app)
 
 	t.Run("Navigate to Create with repository context", func(t *testing.T) {
 		msg := messages.NavigateToCreateMsg{
@@ -349,11 +367,12 @@ func TestAppNavigationWithContext(t *testing.T) {
 }
 
 func TestAppErrorNavigation(t *testing.T) {
-	mockClient := &MockAPIClient{}
-	app := NewApp(mockClient)
-	_ = app.Init()
-
 	t.Run("Recoverable error", func(t *testing.T) {
+		mockClient := &MockAPIClient{}
+		app := NewApp(mockClient)
+		_ = app.Init()
+		completeAuthentication(app)
+		
 		initialView := app.current
 
 		msg := messages.NavigateToErrorMsg{
@@ -371,6 +390,11 @@ func TestAppErrorNavigation(t *testing.T) {
 	})
 
 	t.Run("Non-recoverable error", func(t *testing.T) {
+		mockClient := &MockAPIClient{}
+		app := NewApp(mockClient)
+		_ = app.Init()
+		completeAuthentication(app)
+		
 		// First navigate somewhere
 		app.handleNavigation(messages.NavigateToCreateMsg{})
 		assert.Len(t, app.viewStack, 1)

@@ -125,7 +125,12 @@ func TestBulkViewGlobalQuitKeys(t *testing.T) {
 	for _, keyMsg := range tests {
 		model, cmd := view.Update(keyMsg)
 		assert.Equal(t, view, model)
-		assert.Equal(t, tea.Quit, cmd)
+		assert.NotNil(t, cmd)
+		
+		// Execute the command to check if it returns quit message
+		msg := cmd()
+		_, isQuitMsg := msg.(tea.QuitMsg)
+		assert.True(t, isQuitMsg, "Expected quit message")
 	}
 }
 
@@ -137,17 +142,17 @@ func TestBulkViewFileSelectKeys(t *testing.T) {
 	view.mode = ModeFileBrowser
 	view.fileSelector = components.NewBulkFileSelector(80, 24)
 
-	t.Run("Quit key returns NavigateBackMsg", func(t *testing.T) {
+	t.Run("Quit key returns to instructions mode", func(t *testing.T) {
 		keyMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}}
 		model, cmd := view.Update(keyMsg)
 
 		assert.Equal(t, view, model)
-		assert.NotNil(t, cmd)
+		assert.Nil(t, cmd) // No command returned, just mode change
 
-		// Execute the command to get the navigation message
-		navMsg := cmd()
-		_, ok := navMsg.(messages.NavigateBackMsg)
-		assert.True(t, ok, "Should return NavigateBackMsg")
+		// Should change mode back to instructions and clear file selector
+		updatedView := model.(*BulkView)
+		assert.Equal(t, ModeInstructions, updatedView.mode)
+		assert.Nil(t, updatedView.fileSelector)
 	})
 
 	t.Run("ListMode key switches to run list when runs exist", func(t *testing.T) {

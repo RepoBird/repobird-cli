@@ -68,7 +68,7 @@ func TestFindUnsupportedJSONFields(t *testing.T) {
 				"sources": "main", // should suggest "source"
 			},
 			expected:   []string{"sources"},
-			shouldWarn: true,
+			shouldWarn: false, // suggestions are returned, not printed to stderr
 		},
 	}
 

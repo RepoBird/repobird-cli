@@ -712,21 +712,21 @@ func (d *DashboardView) View() string {
 		// Create error content
 		errorContent := fmt.Sprintf("Error loading dashboard data: %s\n\nPress 'r' to retry, 'q' to quit", d.error.Error())
 		
-		// Get viewport dimensions for proper centering
+		// Get viewport dimensions for proper centering (no room reduction needed - status line is outside)
 		viewportWidth, viewportHeight := layout.GetViewportDimensions()
 		centeredContent := contentStyle.
 			Width(viewportWidth).
-			Height(viewportHeight - 2). // Leave room for status line
+			Height(viewportHeight).
 			Align(lipgloss.Center, lipgloss.Center).
 			Render(errorContent)
 		
-		// Add status line at bottom
-		statusline := d.renderStatusLine("ERROR")
+		// Create status line separately (outside the box)
+		statusLine := d.renderStatusLine("ERROR")
 		
-		// Combine with proper layout
-		fullContent := lipgloss.JoinVertical(lipgloss.Left, centeredContent, statusline)
-		
-		return boxStyle.Render(fullContent)
+		// Follow StatusView pattern: render box content separately, then join with status line outside
+		return lipgloss.JoinVertical(lipgloss.Left, 
+			boxStyle.Render(centeredContent), 
+			statusLine)
 	}
 
 	// Show cached content while loading new data

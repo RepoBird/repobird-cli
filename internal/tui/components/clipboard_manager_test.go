@@ -5,6 +5,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/repobird/repobird-cli/internal/utils"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -28,6 +29,11 @@ func TestCopyWithBlink_EmptyText(t *testing.T) {
 }
 
 func TestCopyWithBlink_Success(t *testing.T) {
+	// Skip clipboard tests in CI/headless environments where clipboard may not be available
+	if err := utils.WriteToClipboard("test"); err != nil {
+		t.Skipf("Skipping clipboard test: %v", err)
+	}
+	
 	cm := NewClipboardManager()
 	
 	// Test with valid text
@@ -42,6 +48,11 @@ func TestCopyWithBlink_Success(t *testing.T) {
 }
 
 func TestUpdate_ClipboardBlinkMsg(t *testing.T) {
+	// Skip clipboard tests in CI/headless environments where clipboard may not be available
+	if err := utils.WriteToClipboard("test"); err != nil {
+		t.Skipf("Skipping clipboard test: %v", err)
+	}
+	
 	cm := NewClipboardManager()
 	
 	// Start blink animation
@@ -56,6 +67,11 @@ func TestUpdate_ClipboardBlinkMsg(t *testing.T) {
 }
 
 func TestUpdate_OtherMessage(t *testing.T) {
+	// Skip clipboard tests in CI/headless environments where clipboard may not be available
+	if err := utils.WriteToClipboard("test"); err != nil {
+		t.Skipf("Skipping clipboard test: %v", err)
+	}
+	
 	cm := NewClipboardManager()
 	
 	// Start blink animation
@@ -71,6 +87,11 @@ func TestUpdate_OtherMessage(t *testing.T) {
 }
 
 func TestShouldHighlight_Timing(t *testing.T) {
+	// Skip clipboard tests in CI/headless environments where clipboard may not be available
+	if err := utils.WriteToClipboard("test"); err != nil {
+		t.Skipf("Skipping clipboard test: %v", err)
+	}
+	
 	cm := NewClipboardManager()
 	
 	// Before blink starts
@@ -100,6 +121,11 @@ func TestShouldHighlight_NoBlinkStarted(t *testing.T) {
 }
 
 func TestReset(t *testing.T) {
+	// Skip clipboard tests in CI/headless environments where clipboard may not be available
+	if err := utils.WriteToClipboard("test"); err != nil {
+		t.Skipf("Skipping clipboard test: %v", err)
+	}
+	
 	cm := NewClipboardManager()
 	
 	// Start blink animation
@@ -116,6 +142,11 @@ func TestReset(t *testing.T) {
 }
 
 func TestBlinkAnimation_FullCycle(t *testing.T) {
+	// Skip clipboard tests in CI/headless environments where clipboard may not be available
+	if err := utils.WriteToClipboard("test"); err != nil {
+		t.Skipf("Skipping clipboard test: %v", err)
+	}
+	
 	cm := NewClipboardManager()
 	
 	// Start blink
@@ -136,6 +167,11 @@ func TestBlinkAnimation_FullCycle(t *testing.T) {
 }
 
 func TestMultipleCopyOperations(t *testing.T) {
+	// Skip clipboard tests in CI/headless environments where clipboard may not be available
+	if err := utils.WriteToClipboard("test"); err != nil {
+		t.Skipf("Skipping clipboard test: %v", err)
+	}
+	
 	cm := NewClipboardManager()
 	
 	// First copy

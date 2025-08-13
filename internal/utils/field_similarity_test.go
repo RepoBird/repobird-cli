@@ -11,7 +11,7 @@ func TestSuggestFieldName(t *testing.T) {
 		desc     string
 	}{
 		{"sources", "source", "plural form should suggest singular"},
-		{"source", "source", "simple typo should be detected"},
+		{"souce", "source", "simple typo should be detected"},
 		{"repositry", "repository", "missing letter should be detected"},
 		{"repo", "", "too short and too different should not suggest"},
 		{"xyz", "", "completely different should not suggest"},

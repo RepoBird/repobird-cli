@@ -448,6 +448,12 @@ func (v *BulkView) handleRunListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if v.fileSelector == nil {
 			v.fileSelector = components.NewBulkFileSelector(v.width, v.height)
 		}
+	case key.Matches(msg, v.keys.FileMode):
+		// Switch to file browser mode (uppercase F key)
+		v.mode = ModeFileBrowser
+		if v.fileSelector == nil {
+			v.fileSelector = components.NewBulkFileSelector(v.width, v.height)
+		}
 	case key.Matches(msg, v.keys.Submit):
 		// Submit selected bulk runs
 		return v, v.submitBulkRuns()

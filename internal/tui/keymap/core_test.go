@@ -16,7 +16,7 @@ func TestCoreKeyRegistry(t *testing.T) {
 		assert.Equal(t, ActionNavigateBulk, registry.GetAction("B"))
 		assert.Equal(t, ActionNavigateNew, registry.GetAction("n"))
 		assert.Equal(t, ActionNavigateRefresh, registry.GetAction("r"))
-		assert.Equal(t, ActionNavigateQuit, registry.GetAction("q"))
+		assert.Equal(t, ActionNavigateBack, registry.GetAction("q"))  // q is now mapped to back navigation
 		assert.Equal(t, ActionNavigateHelp, registry.GetAction("?"))
 
 		// Test global actions
