@@ -49,6 +49,16 @@ func NewHelpView() *HelpView {
 func getDefaultHelpSections() []HelpSection {
 	return []HelpSection{
 		{
+			Title: "🚀 About RepoBird",
+			Content: []string{
+				"Cloud-powered AI agents that create production-ready pull requests",
+				"by understanding your entire codebase and following best practices.",
+				"",
+				"This CLI triggers single runs or parallel batch operations,",
+				"managing AI agent execution with real-time progress tracking.",
+			},
+		},
+		{
 			Title: "🎯 Basic Navigation",
 			Content: []string{
 				"↑/↓, j/k     Move up/down in current column",
