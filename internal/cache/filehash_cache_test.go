@@ -385,6 +385,12 @@ func TestFileHashCache_FetchFromAPI_Error(t *testing.T) {
 }
 
 func TestFileHashCache_EnsureLoaded(t *testing.T) {
+	// Use temp directory to avoid cache pollution
+	tmpDir := t.TempDir()
+	oldConfigHome := os.Getenv("XDG_CONFIG_HOME")
+	os.Setenv("XDG_CONFIG_HOME", tmpDir)
+	defer os.Setenv("XDG_CONFIG_HOME", oldConfigHome)
+	
 	cache := NewFileHashCache()
 	mockClient := &MockAPIClient{fileHashes: []models.FileHashEntry{
 		{IssueRunID: 1, FileHash: "testhash"},
