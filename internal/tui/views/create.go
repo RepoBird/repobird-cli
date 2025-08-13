@@ -150,14 +150,21 @@ func (v *CreateRunView) handleWindowSizeMsg(msg tea.WindowSizeMsg) (tea.Model, t
 
 // handleKeyMsg processes keyboard input
 func (v *CreateRunView) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	keyString := msg.String()
+	debug.LogToFilef("🎹 CREATE VIEW handleKeyMsg: key='%s', insertMode=%v", keyString, v.form.IsInsertMode())
+	
 	// Most key handling is done in HandleKey() via CoreViewKeymap
 	// Here we only handle keys that HandleKey doesn't process
 	
-	// Handle navigation keys in normal mode
+	// First delegate to form to see if it handles the key
+	newForm, cmd := v.form.Update(msg)
+	v.form = newForm.(*CustomCreateForm)
+	
+	// If we're in normal mode and the form didn't handle navigation keys, handle them here
 	if !v.form.IsInsertMode() {
-		switch msg.String() {
+		switch keyString {
 		case "q", "b":
-			debug.LogToFilef("🔙 CREATE VIEW: User requested back navigation")
+			debug.LogToFilef("🔙 CREATE VIEW: User requested back navigation with '%s' key", keyString)
 			// Save form data before navigating away
 			v.saveFormData()
 			return v, func() tea.Msg {
@@ -165,14 +172,11 @@ func (v *CreateRunView) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 
 		case "ctrl+c":
+			debug.LogToFilef("⛔ CREATE VIEW: Force quit requested")
 			// Force quit - handled by app layer
 			return v, tea.Quit
 		}
 	}
-
-	// Delegate to form component for any remaining keys
-	newForm, cmd := v.form.Update(msg)
-	v.form = newForm.(*CustomCreateForm)
 	
 	// Auto-save form data when values change
 	v.saveFormData()
@@ -486,8 +490,9 @@ func (v *CreateRunView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Mo
 			return true, v, nil
 			
 		case "q", "b":
-			// In normal mode, these are navigation keys - let handleKeyMsg handle them
-			debug.LogToFilef("🔙 CREATE VIEW: Navigation key '%s' in normal mode - not handling", keyString)
+			// In normal mode, these are navigation keys - don't handle them here
+			// Let them flow through to handleKeyMsg
+			debug.LogToFilef("🔙 CREATE VIEW HandleKey: Navigation key '%s' in normal mode - returning false to let handleKeyMsg handle it", keyString)
 			return false, v, nil
 			
 		default:
