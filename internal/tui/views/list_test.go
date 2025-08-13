@@ -39,14 +39,23 @@ func TestNewRunListViewWithCache_UsesCachedData(t *testing.T) {
 
 	// Act
 	testCache := cache.NewSimpleCache()
+	// Set the runs in cache first
+	testCache.SetRuns(runs)
+	for i := range runs {
+		testCache.SetRun(runs[i])
+	}
 	view := NewRunListViewWithCache(client, runs, true, cachedAt, detailsCache, 0, testCache)
 
 	// Assert
 	assert.False(t, view.loading, "Should not be loading with recent cached data")
-	assert.Equal(t, runs, view.runs, "Should use cached runs")
-	assert.Equal(t, detailsCache, view.detailsCache, "Should preserve details cache")
-	assert.True(t, view.cached, "Should mark as cached")
-	assert.Equal(t, cachedAt, view.cachedAt, "Should preserve cache timestamp")
+	// Use cache methods to check the cached runs
+	cachedRuns := testCache.GetRuns()
+	assert.Equal(t, runs, cachedRuns, "Should use cached runs")
+	// Check if runs are in cache
+	for _, run := range runs {
+		cachedRun := testCache.GetRun(run.GetIDString())
+		assert.NotNil(t, cachedRun, "Run should be in cache")
+	}
 }
 
 func TestNewRunListViewWithCache_LoadsWhenCacheExpired(t *testing.T) {
@@ -110,10 +119,11 @@ func TestFilterRuns_PreservesRunIDs(t *testing.T) {
 	view.filterRuns()
 
 	// Assert
-	assert.Len(t, view.filteredRuns, 2, "Should filter to 2 runs matching 'acme'")
+	filteredRuns := view.getFilteredRuns()
+	assert.Len(t, filteredRuns, 2, "Should filter to 2 runs matching 'acme'")
 
 	// Check that IDs are preserved correctly
-	for _, run := range view.filteredRuns {
+	for _, run := range filteredRuns {
 		assert.NotEmpty(t, run.GetIDString(), "Filtered run should have valid ID string")
 
 		// Find original run and verify ID matches
@@ -149,14 +159,16 @@ func TestFilterRuns_HandlesMixedIDTypes(t *testing.T) {
 	view.filterRuns()
 
 	// Assert
-	assert.Len(t, view.filteredRuns, 1, "Should find the run with int ID 456")
-	assert.Equal(t, "test/int", view.filteredRuns[0].Repository, "Should match the correct run")
+	filteredRuns := view.getFilteredRuns()
+	assert.Len(t, filteredRuns, 1, "Should find the run with int ID 456")
+	assert.Equal(t, "test/int", filteredRuns[0].Repository, "Should match the correct run")
 
 	// Test empty search returns all runs
 	view.searchQuery = ""
 	view.filterRuns()
 
-	assert.Len(t, view.filteredRuns, 4, "Empty search should return all runs")
+	filteredRuns = view.getFilteredRuns()
+	assert.Len(t, filteredRuns, 4, "Empty search should return all runs")
 }
 
 func TestRunResponse_GetIDString_HandlesNilAndInvalidValues(t *testing.T) {

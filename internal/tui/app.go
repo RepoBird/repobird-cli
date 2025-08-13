@@ -44,22 +44,22 @@ func NewApp(client APIClient) *App {
 
 // Init implements tea.Model interface - initializes with dashboard view
 func (a *App) Init() tea.Cmd {
-	// First authenticate to get the real user ID
-	return tea.Batch(
-		a.authenticateAndInitCache(),
-		func() tea.Msg {
-			// Send initial window size request
-			return tea.WindowSizeMsg{}
-		},
-	)
+	// Just authenticate, don't request window size yet
+	// The terminal will send the real window size automatically
+	return a.authenticateAndInitCache()
 }
 
 // Update implements tea.Model interface - handles navigation and delegates to current view
 func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Handle authentication completion first
-	if _, ok := msg.(authCompleteMsg); ok {
+	if authMsg, ok := msg.(authCompleteMsg); ok {
 		debug.LogToFile("🔐 APP: Authentication complete, initializing dashboard 🔐\n")
 		a.authenticated = true
+		
+		// Log any authentication issues (but continue anyway)
+		if authMsg.err != nil {
+			debug.LogToFilef("⚠️ APP: Auth had error (continuing anyway): %v\n", authMsg.err)
+		}
 		
 		// Initialize dashboard view now that we have user context
 		a.current = views.NewDashboardView(a.client)
@@ -67,9 +67,18 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Initialize the view with current window size if available
 		var cmds []tea.Cmd
 		cmds = append(cmds, a.current.Init())
+		
+		// Always send a window size message to ensure proper initialization
 		if a.width > 0 && a.height > 0 {
+			debug.LogToFilef("📐 APP: Sending stored window size: %dx%d\n", a.width, a.height)
 			cmds = append(cmds, func() tea.Msg {
 				return tea.WindowSizeMsg{Width: a.width, Height: a.height}
+			})
+		} else {
+			debug.LogToFile("📐 APP: Requesting window size\n")
+			// Request window size if we don't have it yet
+			cmds = append(cmds, func() tea.Msg {
+				return tea.WindowSizeMsg{}
 			})
 		}
 		return a, tea.Batch(cmds...)
@@ -356,9 +365,10 @@ func (a *App) processKeyWithFiltering(keyMsg tea.KeyMsg) (handled bool, model te
 		
 		// First check if view wants to disable this key entirely
 		if viewKeymap.IsKeyDisabled(keyString) {
-			debug.LogToFilef("🚫 PROCESSOR: Key '%s' is DISABLED by view - returning handled=true 🚫\n", keyString)
-			// Key is disabled - ignore it completely
-			return true, a, nil
+			debug.LogToFilef("🚫 PROCESSOR: Key '%s' is DISABLED by view - passing to Update for typing 🚫\n", keyString)
+			// Key is disabled for NAVIGATION but should still go to Update() for typing
+			// Return false so the key reaches the view's Update method
+			return false, a, nil
 		}
 		debug.LogToFilef("✅ PROCESSOR: Key '%s' is NOT disabled by view ✅\n", keyString)
 
@@ -469,8 +479,11 @@ func (a *App) handleNavigationAction(action keymap.KeyAction, keyMsg tea.KeyMsg)
 // authenticateAndInitCache authenticates with the API and initializes the cache with user context
 func (a *App) authenticateAndInitCache() tea.Cmd {
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		// Use a shorter timeout to prevent hanging
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
+		
+		debug.LogToFile("🔐 AUTH: Starting authentication...\n")
 		
 		// Check if we have a method to get user info
 		type userInfoGetter interface {
@@ -481,21 +494,27 @@ func (a *App) authenticateAndInitCache() tea.Cmd {
 		var err error
 		
 		if getter, ok := a.client.(userInfoGetter); ok {
+			debug.LogToFile("🔐 AUTH: Calling GetUserInfoWithContext...\n")
 			userInfo, err = getter.GetUserInfoWithContext(ctx)
 			if err == nil && userInfo != nil {
 				// Set the current user globally for cache operations
 				services.SetCurrentUser(userInfo)
 				debug.LogToFilef("🔐 AUTH: Successfully authenticated user ID=%d, email=%s 🔐\n", userInfo.ID, userInfo.Email)
-			} else {
-				debug.LogToFilef("⚠️ AUTH: Failed to authenticate: %v ⚠️\n", err)
+			} else if err != nil {
+				// Log the error but continue - we'll use anonymous mode
+				debug.LogToFilef("⚠️ AUTH: Authentication failed (will use anonymous mode): %v ⚠️\n", err)
+				// Don't return error - continue with anonymous cache
+				err = nil
 			}
 		} else {
 			debug.LogToFile("⚠️ AUTH: Client doesn't support GetUserInfoWithContext, using anonymous cache ⚠️\n")
 		}
 		
-		// Now create the cache with proper user context
+		// Always create the cache - even if auth failed
+		debug.LogToFile("📦 AUTH: Creating cache...\n")
 		a.cache = cache.NewSimpleCache()
 		_ = a.cache.LoadFromDisk()
+		debug.LogToFile("✅ AUTH: Cache created and loaded\n")
 		
 		return authCompleteMsg{
 			userInfo: userInfo,

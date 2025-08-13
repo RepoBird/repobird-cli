@@ -249,7 +249,6 @@ func TestDashboardView_StatusInfoClipboard(t *testing.T) {
 		// Simulate copying
 		dashboard.copiedMessage = "📋 Copied \"test@example.com\""
 		dashboard.copiedMessageTime = time.Now()
-		dashboard.yankBlink = true
 
 		// The status line should show the copied message
 		assert.NotEmpty(t, dashboard.copiedMessage, "Should have clipboard feedback")

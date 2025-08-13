@@ -425,7 +425,15 @@ func NewCreateRunViewWithCache(
 
 // IsKeyDisabled implements CoreViewKeymap interface to control key behavior
 func (v *CreateRunView) IsKeyDisabled(keyString string) bool {
-	// We don't disable any keys - we handle them properly in HandleKey
+	// In insert mode, disable NAVIGATION for these keys so they can be typed
+	// When a key is disabled, it bypasses navigation but still reaches Update() for typing
+	if v.form.IsInsertMode() {
+		switch keyString {
+		case "q", "b", "backspace":
+			debug.LogToFilef("🚫 CREATE VIEW IsKeyDisabled: Disabling '%s' navigation in insert mode to allow typing", keyString)
+			return true // Disable navigation processing - key will reach Update() for typing
+		}
+	}
 	return false
 }
 
@@ -449,23 +457,16 @@ func (v *CreateRunView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Mo
 		}
 	}
 	
-	// In insert mode, we need to allow 'q' and 'b' to be typed
-	if v.form.IsInsertMode() && (keyString == "q" || keyString == "b") {
-		debug.LogToFilef("✏️ CREATE VIEW HandleKey: '%s' in insert mode - allowing typing", keyString)
-		return false, v, nil // Let it go through to form for typing
-	}
-	
-	// In normal mode, 'q' and 'b' are handled by the keymap registry for back navigation
-	// We don't need to handle them here anymore since the registry maps them to ActionNavigateBack
-	
-	// Block backspace navigation in normal mode (allow typing in insert mode)
+	// In normal mode, block backspace navigation
 	if keyString == "backspace" && !v.form.IsInsertMode() {
 		debug.LogToFilef("🚫 CREATE VIEW HandleKey: Blocking backspace navigation in normal mode")
 		return true, v, nil
 	}
 	
-	// Let everything else go through - the keymap registry will handle navigation keys
-	debug.LogToFilef("➡️ CREATE VIEW HandleKey: Not handling '%s', letting keymap registry decide", keyString)
+	// Let everything else go through - the keymap registry will handle navigation keys in normal mode
+	// In insert mode, returning false means the key goes to Update() for typing
+	// In normal mode, returning false means the keymap registry handles navigation
+	debug.LogToFilef("➡️ CREATE VIEW HandleKey: Not handling '%s', letting system decide", keyString)
 	return false, v, nil
 }
 

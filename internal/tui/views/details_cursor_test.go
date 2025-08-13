@@ -121,10 +121,12 @@ func TestRunDetailsView_HighlightStyle(t *testing.T) {
 	})
 
 	t.Run("BlinkOnCopy", func(t *testing.T) {
+		// Initialize the status line if not already initialized
+		if view.statusLine == nil {
+			view.statusLine = components.NewStatusLine(80)
+		}
 		// Simulate copying with unified status line
 		view.statusLine.SetTemporaryMessageWithType("Test copied", components.MessageSuccess, 3*time.Second)
-		view.yankBlink = true
-		view.yankBlinkTime = time.Now()
 
 		lines := view.renderContentWithCursor()
 
