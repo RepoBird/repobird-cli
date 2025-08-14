@@ -84,17 +84,17 @@ func TestRunDetailsView_Navigation(t *testing.T) {
 	})
 
 	t.Run("BoundaryChecks", func(t *testing.T) {
-		// Try to navigate up from first row
+		// Try to navigate up from first row - should wrap to last
 		view.selectedRow = 0
 		msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}}
 		view.handleRowNavigation(msg)
-		assert.Equal(t, 0, view.selectedRow, "Should stay at first row")
+		assert.Equal(t, len(view.fieldValues)-1, view.selectedRow, "Should wrap to last row")
 
-		// Try to navigate down from last row
+		// Try to navigate down from last row - should wrap to first
 		view.selectedRow = len(view.fieldValues) - 1
 		msg = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}}
 		view.handleRowNavigation(msg)
-		assert.Equal(t, len(view.fieldValues)-1, view.selectedRow, "Should stay at last row")
+		assert.Equal(t, 0, view.selectedRow, "Should wrap to first row")
 	})
 }
 

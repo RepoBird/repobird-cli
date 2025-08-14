@@ -1,6 +1,7 @@
 package views
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -178,11 +179,15 @@ func TestDashboardCacheValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create a fresh cache for each test
+			// Create a fresh cache for each test with isolated directory
+			testTmpDir := t.TempDir()
+			t.Setenv("XDG_CONFIG_HOME", testTmpDir)
+			
 			testCache := cache.NewSimpleCache()
 			defer testCache.Stop()
 
-			// Set the runs in cache
+			// Clear any existing data and set the runs in cache
+			testCache.Clear()
 			if len(tt.runs) > 0 {
 				testCache.SetRuns(tt.runs)
 			}
@@ -303,7 +308,7 @@ func TestCacheValidationIntegration(t *testing.T) {
 	defer testCache.Stop()
 
 	// Create dashboard view (no client needed for this test)
-	dashboard := NewDashboardView(nil, testCache)
+	_ = NewDashboardView(nil, testCache)
 
 	// Set up test data with mixed valid/invalid runs
 	testRuns := []models.RunResponse{

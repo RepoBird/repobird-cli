@@ -198,6 +198,7 @@ func TestBulkViewRunListKeys(t *testing.T) {
 		{Title: "Run 3", Selected: true},
 	}
 	view.selectedRun = 1
+	view.focusMode = "runs" // Need to set focus mode for navigation to work
 
 	t.Run("Quit key returns NavigateBackMsg", func(t *testing.T) {
 		keyMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}}
@@ -231,7 +232,9 @@ func TestBulkViewRunListKeys(t *testing.T) {
 	})
 
 	t.Run("Down key moves selection down", func(t *testing.T) {
+		// Reset view state for this test
 		view.selectedRun = 0
+		view.focusMode = "runs"
 		keyMsg := tea.KeyMsg{Type: tea.KeyDown}
 		model, cmd := view.Update(keyMsg)
 		updatedView := model.(*BulkView)
@@ -251,7 +254,9 @@ func TestBulkViewRunListKeys(t *testing.T) {
 	})
 
 	t.Run("Space key toggles selection", func(t *testing.T) {
+		// Reset view state for this test
 		view.selectedRun = 1
+		view.focusMode = "runs"
 		originalSelection := view.runs[1].Selected
 
 		keyMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{' '}}
@@ -263,12 +268,12 @@ func TestBulkViewRunListKeys(t *testing.T) {
 	})
 
 	t.Run("FileMode key switches to file select", func(t *testing.T) {
-		keyMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'F'}}
+		keyMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}}
 		model, cmd := view.Update(keyMsg)
 		updatedView := model.(*BulkView)
 
 		assert.Equal(t, ModeFileBrowser, updatedView.mode)
-		assert.Nil(t, cmd)
+		assert.NotNil(t, cmd) // Should return fileSelector.Activate() command
 	})
 
 	t.Run("Submit key calls submitBulkRuns", func(t *testing.T) {
@@ -567,11 +572,11 @@ func TestBulkViewStatusLineHelp(t *testing.T) {
 		mode     BulkMode
 		expected string
 	}{
-		{ModeFileBrowser, "↑↓/j/k:nav space:select i:input mode b/esc:back enter:confirm"},
-		{ModeRunList, "↑↓:navigate space:toggle enter:submit f:add-files pgup/pgdn:scroll"},
-		{ModeRunEdit, "q:quit ?:help"},
-		{ModeProgress, "q:quit ?:help"},
-		{ModeResults, "q:quit ?:help"},
+		{ModeFileBrowser, "↑↓/j/k:nav space:select i:input mode esc:back enter:confirm"},
+		{ModeRunList, "↑↓/j/k:nav space:toggle enter:submit tab:buttons f:files"},
+		{ModeRunEdit, "[h]back [q]dashboard ?:help"},
+		{ModeProgress, "[h]back [q]dashboard ?:help"},
+		{ModeResults, "[h]back [q]dashboard ?:help"},
 	}
 
 	for _, tt := range tests {
