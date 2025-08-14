@@ -232,6 +232,8 @@ func (v *BulkResultsView) handleRunKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Invalidate dashboard cache to force refresh with new runs
 		debug.LogToFilef("📊 RESULTS: Invalidating dashboard cache before navigation\n")
 		v.cache.InvalidateActiveRuns()
+		// Set flag so dashboard knows to refresh
+		v.cache.SetNavigationContext("dashboard_needs_refresh", true)
 		
 		// Go to dashboard
 		return v, func() tea.Msg {
@@ -321,6 +323,8 @@ func (v *BulkResultsView) handleButtonKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		// Invalidate dashboard cache to force refresh with new runs
 		debug.LogToFilef("📊 RESULTS: Invalidating dashboard cache before navigation\n")
 		v.cache.InvalidateActiveRuns()
+		// Set flag so dashboard knows to refresh
+		v.cache.SetNavigationContext("dashboard_needs_refresh", true)
 		
 		// Go to dashboard
 		return v, func() tea.Msg {
