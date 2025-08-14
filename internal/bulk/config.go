@@ -12,7 +12,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const MaxBulkBatchSize = 10
+const MaxBulkBatchSize = 40
 
 // BulkConfig represents a bulk run configuration
 type BulkConfig struct {

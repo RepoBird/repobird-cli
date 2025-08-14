@@ -41,7 +41,33 @@ repobird bulk tui
 
 ## Configuration File Format
 
-Bulk runs are defined using JSON configuration files with the following structure:
+Bulk runs are defined using JSON configuration files. The system supports multiple file formats and only requires two fields: `repository` and `prompt` for each run.
+
+### Supported File Formats
+
+The bulk run system accepts JSON files with various structures:
+
+1. **Standard Bulk Format** - Full configuration with all options
+2. **Simplified Format** - Minimal required fields only
+3. **Mixed Format** - Some runs with full details, others minimal
+
+### Minimal Configuration Example
+
+```json
+{
+  "repositoryName": "owner/repo-name",
+  "runs": [
+    {
+      "prompt": "Fix authentication timeout bug in login.js"
+    },
+    {
+      "prompt": "Update user profile validation to handle special characters"
+    }
+  ]
+}
+```
+
+### Full Configuration Example
 
 ```json
 {
@@ -70,24 +96,31 @@ Bulk runs are defined using JSON configuration files with the following structur
 
 #### Root Level Fields
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `repositoryName` | string | Yes | Repository in `owner/repo` format |
-| `batchTitle` | string | No | Descriptive title for the entire batch |
-| `runType` | string | No | Either `run` (default) or `plan` |
-| `sourceBranch` | string | No | Source branch (defaults to repo default) |
-| `force` | boolean | No | Override duplicate detection (default: false) |
-| `runs` | array | Yes | Array of individual run configurations |
+| Field | Type | Required | Description | Default |
+|-------|------|----------|-------------|---------|
+| `repositoryName` | string | **Yes** | Repository in `owner/repo` format | - |
+| `runs` | array | **Yes** | Array of individual run configurations | - |
+| `batchTitle` | string | No | Descriptive title for the entire batch | Auto-generated |
+| `runType` | string | No | Either `run` or `plan` | `"run"` |
+| `sourceBranch` | string | No | Source branch for all runs | Repository default branch |
+| `force` | boolean | No | Override duplicate detection | `false` |
 
 #### Run Item Fields
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `prompt` | string | Yes | The task description for the AI agent |
-| `title` | string | No | Custom title (auto-generated from prompt if omitted) |
-| `context` | string | No | Additional context for the task |
-| `target` | string | No | Target branch name for this specific run |
-| `fileHash` | string | No | SHA-256 hash for duplicate detection |
+| Field | Type | Required | Description | Default |
+|-------|------|----------|-------------|---------|
+| `prompt` | string | **Yes** | The task description for the AI agent | - |
+| `title` | string | No | Custom title for the run | First 50 chars of prompt |
+| `context` | string | No | Additional context for the task | Empty |
+| `target` | string | No | Target branch name for this specific run | Auto-generated |
+| `fileHash` | string | No | SHA-256 hash for duplicate detection | Auto-calculated |
+
+### Field Priorities
+
+When fields are specified at both root and run level, the run-level value takes precedence:
+- Run-specific `target` overrides any auto-generated branch names
+- Run-specific context is appended to any global context
+- Each run can have its own unique configuration
 
 ## API Integration
 

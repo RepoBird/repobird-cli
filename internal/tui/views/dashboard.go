@@ -28,7 +28,6 @@ type DashboardView struct {
 
 	// Dashboard state
 	currentLayout      models.LayoutType
-	showDocs           bool // Show documentation overlay
 	selectedRepo       *models.Repository
 	selectedRepoIdx    int
 	selectedRunIdx     int
@@ -92,9 +91,6 @@ type DashboardView struct {
 	lastGPressTime time.Time // Time when 'g' was last pressed
 	waitingForG    bool      // Whether we're waiting for second 'g' in 'gg' command
 
-	// Documentation overlay state
-	docsCurrentPage int
-	docsSelectedRow int
 
 	// New scrollable help view
 	helpView *components.HelpView
@@ -243,7 +239,7 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return d, tea.Quit
 		}
 		// Handle normal quit when not in special modes
-		if keyMsg.String() == "q" && !d.showDocs && !d.showURLSelectionPrompt && d.fzfMode == nil {
+		if keyMsg.String() == "q" && !d.showURLSelectionPrompt && d.fzfMode == nil {
 			debug.LogToFilef("  Normal quit requested\n")
 			d.cache.SaveToDisk()
 			return d, tea.Quit
@@ -513,9 +509,6 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return messages.NavigateToStatusMsg{}
 			})
 			return d, tea.Batch(cmds...)
-		case d.showDocs:
-			// Handle navigation in help overlay
-			return d.handleHelpNavigation(msg)
 		case msg.Type == tea.KeyRunes && string(msg.Runes) == "n":
 			// Navigate to create new run view
 			var selectedRepository string
@@ -558,11 +551,10 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			d.currentLayout = models.LayoutRepositoriesOnly
 			return d, nil
 		case key.Matches(msg, d.keys.Help):
-			// Toggle docs overlay
-			d.showDocs = true
-			d.docsCurrentPage = 0
-			d.docsSelectedRow = 0
-			return d, nil
+			// Navigate to help view
+			return d, func() tea.Msg {
+				return messages.NavigateToHelpMsg{}
+			}
 		case key.Matches(msg, d.keys.Quit):
 			// Save cache to disk before quitting
 			_ = d.cache.SaveToDisk()
@@ -827,9 +819,6 @@ func (d *DashboardView) View() string {
 	}
 
 	// Overlay help if requested
-	if d.showDocs {
-		return d.renderHelp()
-	}
 
 	// Status line is already included in the layout-specific rendering functions
 	return finalView

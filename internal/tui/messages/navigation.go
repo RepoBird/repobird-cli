@@ -33,6 +33,9 @@ type NavigateToStatusMsg struct{}
 // NavigateToFileViewerMsg requests navigation to the file viewer
 type NavigateToFileViewerMsg struct{}
 
+// NavigateToHelpMsg requests navigation to the help view
+type NavigateToHelpMsg struct{}
+
 // NavigateBackMsg requests navigation to the previous view in the stack
 type NavigateBackMsg struct{}
 
@@ -52,5 +55,6 @@ func (NavigateToListMsg) IsNavigation() bool       { return true }
 func (NavigateToBulkMsg) IsNavigation() bool       { return true }
 func (NavigateToStatusMsg) IsNavigation() bool     { return true }
 func (NavigateToFileViewerMsg) IsNavigation() bool { return true }
+func (NavigateToHelpMsg) IsNavigation() bool       { return true }
 func (NavigateBackMsg) IsNavigation() bool         { return true }
 func (NavigateToErrorMsg) IsNavigation() bool      { return true }

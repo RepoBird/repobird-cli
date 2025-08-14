@@ -305,6 +305,24 @@ func (a *App) handleNavigation(msg messages.NavigationMsg) (tea.Model, tea.Cmd) 
 		a.current = fileViewer
 		return a, a.current.Init()
 
+	case messages.NavigateToHelpMsg:
+		debug.LogToFilef("📚 HELP NAV: Navigating to help view 📚\n")
+		a.viewStack = append(a.viewStack, a.current)
+		a.current = views.NewHelpView(a.client, a.cache)
+
+		// Send current window dimensions to the new view if we have them
+		var cmds []tea.Cmd
+		cmds = append(cmds, a.current.Init())
+		if a.width > 0 && a.height > 0 {
+			debug.LogToFilef("📐 HELP NAV: Sending WindowSizeMsg to new HelpView: %dx%d 📐\n", a.width, a.height)
+			cmds = append(cmds, func() tea.Msg {
+				return tea.WindowSizeMsg{Width: a.width, Height: a.height}
+			})
+		} else {
+			debug.LogToFile("⚠️ HELP NAV: No stored dimensions to send to HelpView ⚠️\n")
+		}
+		return a, tea.Batch(cmds...)
+
 	case messages.NavigateToErrorMsg:
 		if msg.Recoverable {
 			// Push to stack so user can go back
@@ -471,9 +489,8 @@ func (a *App) handleNavigationAction(action keymap.KeyAction, keyMsg tea.KeyMsg)
 		a.cache.SaveToDisk()
 		return true, a, tea.Quit
 	case keymap.ActionNavigateHelp:
-		debug.LogToFilef("❓ NAV ACTION: Ignoring ActionNavigateHelp (let view handle) ❓\n")
-		// Let view handle help for now
-		navMsg = nil
+		debug.LogToFilef("❓ NAV ACTION: Processing ActionNavigateHelp - creating NavigateToHelpMsg ❓\n")
+		navMsg = messages.NavigateToHelpMsg{}
 	default:
 		debug.LogToFilef("❓ NAV ACTION: Unknown action %v ❓\n", action)
 		return false, a, nil
