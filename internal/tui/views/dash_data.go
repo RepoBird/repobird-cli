@@ -64,21 +64,32 @@ func (d *DashboardView) loadDashboardData() tea.Cmd {
 
 		// In debug mode, always fetch fresh data
 		if cached && len(runs) > 0 && !isDebugMode {
-			// Validate that cached data is not test data
-			isValidCache := true
+			debug.LogToFilef("  ✅ CACHE: Found cached data: %d runs, %d details\n", len(runs), len(detailsCache))
+			
+			// Filter out invalid runs instead of clearing entire cache
+			validRuns := make([]models.RunResponse, 0, len(runs))
+			invalidCount := 0
+			
 			for _, run := range runs {
-				// Skip test data (runs with "test-" prefix or empty repository)
-				if strings.HasPrefix(run.ID, "test-") || run.Repository == "" {
-					isValidCache = false
-					debug.LogToFilef("DEBUG: Skipping invalid cached run: ID=%s, Repository=%s\n", run.ID, run.Repository)
-					break
+				// Skip test data or runs with empty repository (use proper GetRepositoryName method)
+				repoName := run.GetRepositoryName()
+				if strings.HasPrefix(run.ID, "test-") || repoName == "" {
+					invalidCount++
+					debug.LogToFilef("  🚮 CACHE: Filtering out invalid run: ID=%s, Repository='%s', RepositoryName='%s'\n", run.ID, run.Repository, run.RepositoryName)
+					continue
 				}
+				validRuns = append(validRuns, run)
 			}
+			
+			debug.LogToFilef("  📊 CACHE: Valid runs: %d, Invalid runs: %d, Total: %d\n", len(validRuns), invalidCount, len(runs))
+			
+			// Only clear cache if majority of runs are invalid (more than 50%)
+			if len(validRuns) > 0 && float64(len(validRuns))/float64(len(runs)) > 0.5 {
+				debug.LogToFilef("  ✅ CACHE: Using cached data with %d valid runs (filtered %d invalid)\n", len(validRuns), invalidCount)
 
-			if isValidCache {
 				// Convert to pointer slice
-				allRuns := make([]*models.RunResponse, len(runs))
-				for i, run := range runs {
+				allRuns := make([]*models.RunResponse, len(validRuns))
+				for i, run := range validRuns {
 					allRuns[i] = &run
 				}
 
@@ -89,6 +100,8 @@ func (d *DashboardView) loadDashboardData() tea.Cmd {
 					repositories = d.cache.BuildRepositoryOverviewFromRuns(allRuns)
 					d.cache.SetRepositoryOverview(repositories)
 				}
+				
+				debug.LogToFilef("  🏗️ CACHE: Built %d repositories from %d valid cached runs\n", len(repositories), len(validRuns))
 
 				return dashboardDataLoadedMsg{
 					repositories: repositories,
@@ -97,9 +110,9 @@ func (d *DashboardView) loadDashboardData() tea.Cmd {
 					error:        nil,
 				}
 			} else {
-				// Clear invalid cache and continue to API fetch
+				// Only clear cache if majority of runs are invalid
+				debug.LogToFilef("  ❌ CACHE: Too many invalid runs (%d/%d valid), clearing cache and fetching from API\n", len(validRuns), len(runs))
 				d.cache.Clear()
-				debug.LogToFilef("DEBUG: Cleared invalid cache data, fetching from API\n")
 			}
 		}
 

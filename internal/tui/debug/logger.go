@@ -12,16 +12,46 @@ func getDebugLogPath() string {
 	if path := os.Getenv("REPOBIRD_DEBUG_LOG"); path != "" {
 		return path
 	}
-	// Get the working directory
-	wd, err := os.Getwd()
-	if err != nil {
+	
+	// Find project root by looking for go.mod file
+	projectRoot := findProjectRoot()
+	if projectRoot == "" {
+		// Fallback to temp directory if project root not found
 		return filepath.Join(os.TempDir(), "repobird_debug.log")
 	}
-	// Use logs directory in the project
-	logsDir := filepath.Join(wd, "logs")
+	
+	// Use logs directory in the project root
+	logsDir := filepath.Join(projectRoot, "logs")
 	// Create logs directory if it doesn't exist
-	_ = os.MkdirAll(logsDir, 0755)
+	if err := os.MkdirAll(logsDir, 0755); err != nil {
+		// Fallback to temp directory if can't create logs dir
+		return filepath.Join(os.TempDir(), "repobird_debug.log")
+	}
 	return filepath.Join(logsDir, "repobird_debug.log")
+}
+
+// findProjectRoot searches for the project root by looking for go.mod
+func findProjectRoot() string {
+	wd, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	
+	dir := wd
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			return dir
+		}
+		
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			// Reached filesystem root
+			break
+		}
+		dir = parent
+	}
+	
+	return ""
 }
 
 // LogToFile writes a debug message to the debug log file

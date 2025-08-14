@@ -190,8 +190,14 @@ func (v *RunDetailsView) IsKeyDisabled(keyString string) bool {
 
 // HandleKey implements CoreViewKeymap interface for custom key handling
 func (v *RunDetailsView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Model, cmd tea.Cmd) {
-	// We don't need custom handling since we disabled the problematic keys
-	// and let the centralized system handle 'h' → ActionNavigateToDashboard
+	switch keyMsg.String() {
+	case "q":
+		// Stop polling before letting centralized system handle 'q' → ActionNavigateToDashboard
+		v.stopPolling()
+		// Return false to let centralized system handle the navigation (ActionNavigateToDashboard)
+		return false, v, nil
+	}
+	// Let centralized system handle all other keys
 	return false, v, nil
 }
 
@@ -200,10 +206,11 @@ func (v *RunDetailsView) handleKeyInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch {
-	case msg.String() == "q", msg.Type == tea.KeyEsc:
+	case msg.Type == tea.KeyEsc:
+		// Removed: msg.String() == "q" - let centralized system handle 'q' → ActionNavigateToDashboard
 		// Removed: key.Matches(msg, v.keys.Back) - 'b' is now disabled via IsKeyDisabled  
 		// Removed: msg.Type == tea.KeyBackspace - now disabled via IsKeyDisabled
-		// Only 'q' and 'esc' trigger back navigation now
+		// Only 'esc' triggers back navigation now
 		v.stopPolling()
 		// Navigate back or to dashboard
 		return v, func() tea.Msg {

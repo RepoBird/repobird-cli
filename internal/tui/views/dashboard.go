@@ -187,12 +187,10 @@ func (d *DashboardView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Mo
 			if d.focusedColumn == 2 && d.selectedRunData != nil {
 				runID := d.selectedRunData.GetIDString()
 				if runID != "" {
-					debug.LogToFilef("💾 DASHBOARD H: Saving detail position %d for run %s 💾\n", d.selectedDetailLine, runID)
 					d.detailLineMemory[runID] = d.selectedDetailLine
 				}
 			}
 			// Move to the left column
-			debug.LogToFilef("⬅️ DASHBOARD H: Moving LEFT from column %d to %d ⬅️\n", d.focusedColumn, d.focusedColumn-1)
 			d.focusedColumn--
 			return true, d, nil
 		}
