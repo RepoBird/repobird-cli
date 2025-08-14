@@ -266,6 +266,21 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		d.width = msg.Width
 		d.height = msg.Height
 
+		// Check if dashboard needs refresh after navigation
+		if needsRefresh := d.cache.GetNavigationContext("dashboard_needs_refresh"); needsRefresh != nil {
+			if refresh, ok := needsRefresh.(bool); ok && refresh {
+				debug.LogToFilef("🔄 DASHBOARD: Detected refresh flag - invalidating cache and reloading 🔄\n")
+				// Clear the flag first
+				d.cache.SetNavigationContext("dashboard_needs_refresh", nil)
+				// Invalidate active runs cache
+				d.cache.InvalidateActiveRuns()
+				// Trigger data reload
+				d.loading = true
+				cmds = append(cmds, d.loadDashboardData())
+				cmds = append(cmds, d.spinner.Tick)
+			}
+		}
+
 		// Update help view size
 		if d.helpView != nil {
 			d.helpView.SetSize(msg.Width, msg.Height)
