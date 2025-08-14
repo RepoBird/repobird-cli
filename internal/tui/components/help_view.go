@@ -290,10 +290,30 @@ func (h *HelpView) buildContent() {
 					formattedLine = fmt.Sprintf("  %-12s %s", cmd, desc)
 				}
 			} else if strings.HasPrefix(line, "•") {
-				// Bullet point
-				formattedLine = lipgloss.NewStyle().
-					Foreground(lipgloss.Color("245")).
-					Render(line)
+				// Bullet point - highlight field names in yellow
+				if strings.Contains(line, "       ") {
+					// Field definition with spaces between field name and description
+					parts := strings.SplitN(line, "       ", 2)
+					if len(parts) == 2 {
+						fieldName := lipgloss.NewStyle().
+							Foreground(lipgloss.Color("220")).
+							Render(parts[0])
+						desc := lipgloss.NewStyle().
+							Foreground(lipgloss.Color("245")).
+							Render(parts[1])
+						formattedLine = fmt.Sprintf("%s       %s", fieldName, desc)
+					} else {
+						// Regular bullet point
+						formattedLine = lipgloss.NewStyle().
+							Foreground(lipgloss.Color("245")).
+							Render(line)
+					}
+				} else {
+					// Regular bullet point
+					formattedLine = lipgloss.NewStyle().
+						Foreground(lipgloss.Color("245")).
+						Render(line)
+				}
 			} else if line != "" && !strings.HasPrefix(line, " ") && strings.Contains(line, ":") {
 				// Subsection header
 				formattedLine = lipgloss.NewStyle().
@@ -459,7 +479,7 @@ func (h *HelpView) View() string {
 	}
 
 	// Status line
-	shortHelp := "[↑↓/jk]scroll [Ctrl+u/d]halfpage [g/G]top/bottom [y]copy [?/q/ESC]back"
+	shortHelp := "[↑↓/jk]scroll [Ctrl+u/d/J/K]halfpage [g/G]top/bottom [y]copy [?/q/h/b]back"
 
 	// Show copy message if active
 	statusText := shortHelp

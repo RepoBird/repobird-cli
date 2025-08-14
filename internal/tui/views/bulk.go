@@ -26,7 +26,6 @@ const (
 	ModeRunEdit                      // Individual run editing
 	ModeProgress                     // Submission progress
 	ModeResults                      // Final results
-	ModeExamples                     // Examples view with yank functionality
 )
 
 // BulkRunItem represents a single run in the bulk collection
@@ -80,8 +79,6 @@ type BulkView struct {
 	viewport       viewport.Model // For scrollable content in RunList mode
 	selectedButton int            // For button navigation
 	focusMode      string         // "runs" or "buttons" for run list navigation
-	selectedExample int           // Selected example in examples view
-
 	// Layout systems
 	doubleColumnLayout *components.DoubleColumnLayout // For FZF file browser
 
@@ -95,7 +92,6 @@ type BulkView struct {
 	spinner    spinner.Model
 	statusLine *components.StatusLine
 	layout     *components.WindowLayout
-	
 }
 
 // bulkKeyMap defines key bindings for the bulk view
@@ -448,7 +444,7 @@ func (v *BulkView) handleInstructionsKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Navigate buttons down
 		maxButton := 3 // Files, Examples, Dashboard
 		if len(v.runs) > 0 {
-			maxButton = 4 // Files, Examples, Runs, Dashboard
+			maxButton = 4 // Files, Examples, Dashboard, Runs
 		}
 		if v.selectedButton < maxButton {
 			v.selectedButton++
@@ -470,25 +466,17 @@ func (v *BulkView) handleInstructionsKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			return v, v.fileSelector.Activate()
 		case 2: // Examples
-			v.mode = ModeExamples
-			v.selectedExample = 0
-			return v, nil
-		case 3: // View Runs or Dashboard
-			if len(v.runs) > 0 {
-				// View Runs button when runs exist
-				v.mode = ModeRunList
-				v.focusMode = "runs"
-				v.updateRunListViewport()
-			} else {
-				// Dashboard button when no runs
-				return v, func() tea.Msg {
-					return messages.NavigateToDashboardMsg{}
-				}
+			return v, func() tea.Msg {
+				return messages.NavigateToExamplesMsg{}
 			}
-		case 4: // Dashboard (when runs exist)
+		case 3: // Dashboard
 			return v, func() tea.Msg {
 				return messages.NavigateToDashboardMsg{}
 			}
+		case 4: // View Runs (only shown when runs exist)
+			v.mode = ModeRunList
+			v.focusMode = "runs"
+			v.updateRunListViewport()
 		}
 		return v, nil
 	case key.Matches(msg, v.keys.FZF) || msg.String() == "f":
@@ -573,13 +561,14 @@ func (v *BulkView) handleRunListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			} else {
 				// At top of runs, switch to buttons
 				v.focusMode = "buttons"
-				v.selectedButton = 2 // Select [DASH] button
+				v.selectedButton = 6 // Select last button
 				v.ensureButtonsVisible()
 			}
 		} else {
 			// In buttons mode, navigate up
 			if v.selectedButton > 1 {
 				v.selectedButton--
+				v.ensureButtonsVisible()
 			} else {
 				// At top button, wrap to runs
 				v.focusMode = "runs"
@@ -598,13 +587,14 @@ func (v *BulkView) handleRunListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			} else {
 				// At bottom of runs, switch to buttons
 				v.focusMode = "buttons"
-				v.selectedButton = 1 // Select [FZF-FILES] button
+				v.selectedButton = 1 // Select [FILES] button
 				v.ensureButtonsVisible()
 			}
 		} else {
-			// In buttons mode, navigate down
-			if v.selectedButton < 2 {
+			// In buttons mode, navigate down through all 6 buttons
+			if v.selectedButton < 6 {
 				v.selectedButton++
+				v.ensureButtonsVisible()
 			} else {
 				// At bottom button, wrap to runs
 				v.focusMode = "runs"
@@ -648,27 +638,39 @@ func (v *BulkView) handleRunListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			// Handle button selection
 			debug.LogToFile("DEBUG: In buttons mode\n")
 			
-			if v.selectedButton == 1 {
-				// [FZF-FILES] button
+			switch v.selectedButton {
+			case 1:
+				// [FILES] button
 				debug.LogToFile("DEBUG: Button 1 selected - switching to file browser\n")
 				v.mode = ModeFileBrowser
 				if v.fileSelector == nil {
 					v.fileSelector = components.NewBulkFileSelector(v.width, v.height)
 				}
 				return v, v.fileSelector.Activate()
-			}
 			
-			if v.selectedButton == 2 {
+			case 2:
+				// [EXAMPLES] button
+				debug.LogToFile("DEBUG: Button 2 selected - navigating to examples view\n")
+				return v, func() tea.Msg {
+					return messages.NavigateToExamplesMsg{}
+				}
+			
+			case 3:
 				// [DASH] button
-				debug.LogToFile("DEBUG: Button 2 selected - navigating to dashboard\n")
+				debug.LogToFile("DEBUG: Button 3 selected - navigating to dashboard\n")
 				return v, func() tea.Msg {
 					return messages.NavigateToDashboardMsg{}
 				}
-			}
 			
-			// Shouldn't reach here, but return to be safe
-			debug.LogToFile("DEBUG: Unknown button selected\n")
-			return v, nil
+			case 4, 5, 6:
+				// Test buttons - do nothing but log
+				debug.LogToFilef("DEBUG: Test button %d selected - no action\n", v.selectedButton)
+				return v, nil
+			
+			default:
+				debug.LogToFile("DEBUG: Unknown button selected\n")
+				return v, nil
+			}
 		}
 		
 		// In runs mode - submit selected bulk runs
@@ -741,9 +743,9 @@ func (v *BulkView) ensureSelectedVisible() {
 func (v *BulkView) ensureButtonsVisible() {
 	// Calculate where buttons are in the content
 	// Format: Title (1 line) + separator (1 line) + blank (1 line) + 
-	// instructions (2 lines) + blank (1 line) + header (1 line) + blank (1 line) +
-	// all runs + blank (2 lines) + buttons (2 lines)
-	buttonStartLine := 8 + len(v.runs) + 2 // Header lines + runs + spacing
+	// instructions (1 line) + blank (1 line) + header (1 line) + blank (1 line) +
+	// all runs + blank (2 lines) + buttons (6 lines for 6 buttons)
+	buttonStartLine := 7 + len(v.runs) + 2 // Header lines + runs + spacing
 	
 	// Get current viewport position
 	viewportTop := v.viewport.YOffset
@@ -795,9 +797,6 @@ func (v *BulkView) View() string {
 	case ModeResults:
 		debug.LogToFile("DEBUG: BulkView - rendering results\n")
 		return v.renderResults()
-	case ModeExamples:
-		debug.LogToFile("DEBUG: BulkView - rendering examples\n")
-		return v.renderExamples()
 	default:
 		debug.LogToFilef("DEBUG: BulkView - unknown mode: %d\n", v.mode)
 		return "Unknown mode"
@@ -866,7 +865,15 @@ func (v *BulkView) renderInstructions() string {
 		fullContent.WriteString(normalStyle.Render("  📚 Examples") + "\n")
 	}
 	
-	// Button 3: View Runs (only if runs loaded)
+	// Button 3: Dashboard (always shown)
+	buttonNum++
+	if v.selectedButton == buttonNum {
+		fullContent.WriteString(selectedStyle.Render("▸ 🏠 [DASH]") + "\n")
+	} else {
+		fullContent.WriteString(normalStyle.Render("  🏠 [DASH]") + "\n")
+	}
+	
+	// Button 4: View Runs (only if runs loaded)
 	if len(v.runs) > 0 {
 		buttonNum++
 		if v.selectedButton == buttonNum {
@@ -876,13 +883,7 @@ func (v *BulkView) renderInstructions() string {
 		}
 	}
 
-	// Button 4 (or 3): Dashboard
-	buttonNum++
-	if v.selectedButton == buttonNum {
-		fullContent.WriteString(selectedStyle.Render("▸ [DASH]") + "\n")
-	} else {
-		fullContent.WriteString(normalStyle.Render("  [DASH]") + "\n")
-	}
+	// No additional dashboard button needed - button 2 is already dashboard
 
 	debug.LogToFilef("🎯 BULK: buttons shown vertically, selected=%d\n", v.selectedButton)
 
@@ -1074,16 +1075,46 @@ func (v *BulkView) renderRunList() string {
 		Bold(true)
 
 	// Navigation buttons with selection highlight
+	// Button 1: FILES with emoji
 	if v.focusMode == "buttons" && v.selectedButton == 1 {
-		content.WriteString(selectedBtnStyle.Render("▸ [FZF-FILES]") + "\n")
+		content.WriteString(selectedBtnStyle.Render("▸ 📁 [FILES]") + "\n")
 	} else {
-		content.WriteString(normalBtnStyle.Render("  [FZF-FILES]") + "\n")
+		content.WriteString(normalBtnStyle.Render("  📁 [FILES]") + "\n")
 	}
 	
+	// Button 2: EXAMPLES with emoji
 	if v.focusMode == "buttons" && v.selectedButton == 2 {
-		content.WriteString(selectedBtnStyle.Render("▸ [DASH]") + "\n")
+		content.WriteString(selectedBtnStyle.Render("▸ 📚 [EXAMPLES]") + "\n")
 	} else {
-		content.WriteString(normalBtnStyle.Render("  [DASH]") + "\n")
+		content.WriteString(normalBtnStyle.Render("  📚 [EXAMPLES]") + "\n")
+	}
+	
+	// Button 3: DASH with emoji
+	if v.focusMode == "buttons" && v.selectedButton == 3 {
+		content.WriteString(selectedBtnStyle.Render("▸ 🏠 [DASH]") + "\n")
+	} else {
+		content.WriteString(normalBtnStyle.Render("  🏠 [DASH]") + "\n")
+	}
+	
+	// Button 4: TEST2
+	if v.focusMode == "buttons" && v.selectedButton == 4 {
+		content.WriteString(selectedBtnStyle.Render("▸ [TEST2]") + "\n")
+	} else {
+		content.WriteString(normalBtnStyle.Render("  [TEST2]") + "\n")
+	}
+	
+	// Button 5: TEST3
+	if v.focusMode == "buttons" && v.selectedButton == 5 {
+		content.WriteString(selectedBtnStyle.Render("▸ [TEST3]") + "\n")
+	} else {
+		content.WriteString(normalBtnStyle.Render("  [TEST3]") + "\n")
+	}
+	
+	// Button 6: TEST4
+	if v.focusMode == "buttons" && v.selectedButton == 6 {
+		content.WriteString(selectedBtnStyle.Render("▸ [TEST4]") + "\n")
+	} else {
+		content.WriteString(normalBtnStyle.Render("  [TEST4]") + "\n")
 	}
 
 	// Set viewport content
@@ -1417,33 +1448,3 @@ func (v *BulkView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Model, 
 }
 
 // renderExamples renders the examples view
-func (v *BulkView) renderExamples() string {
-	// Initialize layout if not done yet
-	if v.layout == nil {
-		v.layout = components.NewWindowLayout(v.width, v.height)
-	}
-
-	// Use WindowLayout system for consistent styling
-	boxStyle := v.layout.CreateStandardBox()
-	titleStyle := v.layout.CreateTitleStyle()
-	contentStyle := v.layout.CreateContentStyle()
-
-	title := titleStyle.Render("📚 Bulk Run Examples")
-
-	content := contentStyle.Render("Examples view not yet implemented.\nPress ESC or q to go back.")
-
-	// Get proper dimensions from layout
-	boxWidth, boxHeight := v.layout.GetBoxDimensions()
-
-	// Create the main container with proper dimensions
-	mainContainer := boxStyle.
-		Width(boxWidth).
-		Height(boxHeight).
-		Render(lipgloss.JoinVertical(lipgloss.Left, title, "", content))
-
-	// Status line
-	statusLine := v.renderStatusLine("BULK-EXAMPLES")
-
-	// Join with status line
-	return lipgloss.JoinVertical(lipgloss.Left, mainContainer, statusLine)
-}

@@ -123,7 +123,7 @@ func (h *HelpView) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Check for navigation keys first
 	switch msg.String() {
 	case "q", "esc", "b", "h":
-		// Navigate back
+		// Navigate back (h should go back like other views, not to dashboard)
 		debug.LogToFilef("🔙 HELP: Navigating back from help view\n")
 		return h, func() tea.Msg {
 			return messages.NavigateBackMsg{}
@@ -134,19 +134,26 @@ func (h *HelpView) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		debug.LogToFilef("⛔ HELP: Force quit from help view\n")
 		return h, tea.Quit
 
-	case "d":
-		// Navigate to dashboard
-		debug.LogToFilef("🏠 HELP: Navigating to dashboard from help view\n")
-		return h, func() tea.Msg {
-			return messages.NavigateToDashboardMsg{}
-		}
-
 	case "?":
 		// Toggle help (which means go back since we're already in help)
 		debug.LogToFilef("❓ HELP: Help toggle pressed, navigating back\n")
 		return h, func() tea.Msg {
 			return messages.NavigateBackMsg{}
 		}
+
+	case "J":
+		// Capital J for half-page down scrolling
+		debug.LogToFilef("📄 HELP: Half-page down scroll\n")
+		updatedHelp, cmd := h.helpComponent.Update(tea.KeyMsg{Type: tea.KeyCtrlD})
+		h.helpComponent = updatedHelp
+		return h, cmd
+
+	case "K":
+		// Capital K for half-page up scrolling
+		debug.LogToFilef("📄 HELP: Half-page up scroll\n")
+		updatedHelp, cmd := h.helpComponent.Update(tea.KeyMsg{Type: tea.KeyCtrlU})
+		h.helpComponent = updatedHelp
+		return h, cmd
 
 	default:
 		// Pass all other keys to the help component for scrolling and copying

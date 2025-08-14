@@ -165,7 +165,6 @@ func TestHelpView_NavigationKeys(t *testing.T) {
 		{"Back key", "b", messages.NavigateBackMsg{}},
 		{"Vim back", "h", messages.NavigateBackMsg{}},
 		{"Help toggle", "?", messages.NavigateBackMsg{}},
-		{"Dashboard", "d", messages.NavigateToDashboardMsg{}},
 	}
 
 	for _, tt := range tests {
@@ -215,7 +214,7 @@ func TestHelpView_ScrollingKeys(t *testing.T) {
 	helpView.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 
 	// Test scrolling keys (these should be passed to help component)
-	scrollKeys := []string{"j", "k", "down", "up", "ctrl+d", "ctrl+u", "pgdown", "pgup", "g", "G"}
+	scrollKeys := []string{"j", "k", "down", "up", "ctrl+d", "ctrl+u", "J", "K", "pgdown", "pgup", "g", "G"}
 
 	for _, key := range scrollKeys {
 		t.Run("Scroll key: "+key, func(t *testing.T) {
