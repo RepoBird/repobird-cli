@@ -1,398 +1,312 @@
-# Bulk Runs
-
-Bulk runs allow you to execute multiple AI-powered tasks simultaneously, streamlining workflows where you need to process many similar requests or apply multiple changes to a repository.
+# Bulk Runs Guide
 
 ## Overview
 
-The RepoBird CLI supports creating and managing bulk runs through both the command-line interface and the Terminal User Interface (TUI). Bulk runs are useful for:
+Execute multiple AI-powered tasks simultaneously for efficient batch processing.
 
-- Processing multiple bug fixes or feature requests at once
-- Applying consistent changes across multiple files or components
-- Running batch operations during maintenance windows
-- Executing related tasks in parallel to save time
+## Related Documentation
+- **[TUI Guide](tui-guide.md)** - Bulk view in TUI
+- **[API Reference](api-reference.md)** - Bulk API endpoints
+- **[Configuration Guide](configuration-guide.md)** - Bulk configuration
 
 ## Quick Start
 
 ### CLI Usage
-
 ```bash
-# Create bulk runs from a JSON configuration file
-repobird bulk run config.json
+# Submit bulk runs
+repobird bulk config.json
 
-# Follow progress in real-time
-repobird bulk run config.json --follow
+# With progress tracking
+repobird bulk config.json --follow
 
-# Check status of a bulk run batch
-repobird bulk status BATCH_ID
-
-# Cancel all runs in a batch
-repobird bulk cancel BATCH_ID
+# Dry run (validate only)
+repobird bulk config.json --dry-run
 ```
 
 ### TUI Usage
+Press `B` in dashboard to open bulk view:
+1. Select configuration file
+2. Review and toggle runs
+3. Submit and track progress
 
-```bash
-# Launch the TUI and navigate to bulk runs
-repobird tui
+## Configuration Format
 
-# Or directly start bulk run creation
-repobird bulk tui
-```
-
-## Configuration File Format
-
-Bulk runs are defined using JSON configuration files. The system supports multiple file formats and only requires two fields: `repository` and `prompt` for each run.
-
-### Supported File Formats
-
-The bulk run system accepts JSON files with various structures:
-
-1. **Standard Bulk Format** - Full configuration with all options
-2. **Simplified Format** - Minimal required fields only
-3. **Mixed Format** - Some runs with full details, others minimal
-
-### Minimal Configuration Example
-
+### Basic Structure
 ```json
 {
-  "repositoryName": "owner/repo-name",
+  "repository": "org/repo",
+  "source": "main",
+  "runType": "run",
   "runs": [
     {
-      "prompt": "Fix authentication timeout bug in login.js"
+      "title": "Fix auth bug",
+      "prompt": "Fix authentication issue in login flow",
+      "target": "fix/auth-bug"
     },
     {
-      "prompt": "Update user profile validation to handle special characters"
+      "title": "Add logging",
+      "prompt": "Add comprehensive logging to API endpoints",
+      "target": "feature/logging"
     }
   ]
 }
 ```
 
-### Full Configuration Example
-
+### Advanced Configuration
 ```json
 {
-  "repositoryName": "owner/repo-name",
-  "batchTitle": "Q1 2024 Bug Fixes",
-  "runType": "run",
-  "sourceBranch": "main",
-  "force": false,
+  "repository": "org/repo",
+  "source": "main",
+  "runType": "approval",
+  "parallel": true,
+  "maxConcurrent": 5,
+  "defaults": {
+    "context": "Follow existing code patterns",
+    "files": ["src/"],
+    "modelOverride": "claude-3"
+  },
   "runs": [
     {
-      "prompt": "Fix authentication timeout bug in login.js",
-      "title": "Auth timeout fix",
-      "context": "Users report getting logged out after 5 minutes",
-      "target": "fix/auth-timeout"
+      "title": "Update dependencies",
+      "prompt": "Update all npm dependencies to latest stable versions",
+      "target": "chore/update-deps",
+      "priority": "high"
     },
     {
-      "prompt": "Update user profile validation to handle special characters",
-      "title": "Profile validation update",
-      "target": "fix/profile-validation"
+      "title": "Refactor auth module",
+      "prompt": "Refactor authentication to use JWT tokens",
+      "target": "refactor/auth-jwt",
+      "context": "Maintain backward compatibility",
+      "files": ["src/auth/", "src/middleware/"]
     }
   ]
 }
 ```
 
-### Configuration Fields
+## Configuration Options
 
-#### Root Level Fields
+### Global Settings
+| Field | Type | Description | Default |
+|-------|------|-------------|---------|
+| `repository` | string | Target repository (org/repo) | Required |
+| `source` | string | Source branch | Required |
+| `runType` | string | "run" or "approval" | "run" |
+| `parallel` | bool | Execute runs in parallel | true |
+| `maxConcurrent` | int | Max parallel runs | 5 |
+| `defaults` | object | Default values for all runs | {} |
 
-| Field | Type | Required | Description | Default |
-|-------|------|----------|-------------|---------|
-| `repositoryName` | string | **Yes** | Repository in `owner/repo` format | - |
-| `runs` | array | **Yes** | Array of individual run configurations | - |
-| `batchTitle` | string | No | Descriptive title for the entire batch | Auto-generated |
-| `runType` | string | No | Either `run` or `plan` | `"run"` |
-| `sourceBranch` | string | No | Source branch for all runs | Repository default branch |
-| `force` | boolean | No | Override duplicate detection | `false` |
+### Run Settings
+| Field | Type | Description | Required |
+|-------|------|-------------|----------|
+| `title` | string | Run title | Yes |
+| `prompt` | string | Task description | Yes |
+| `target` | string | Target branch | No |
+| `context` | string | Additional context | No |
+| `files` | array | Specific files/dirs | No |
+| `priority` | string | Run priority | No |
+| `skip` | bool | Skip this run | No |
 
-#### Run Item Fields
+## Bulk View Features
 
-| Field | Type | Required | Description | Default |
-|-------|------|----------|-------------|---------|
-| `prompt` | string | **Yes** | The task description for the AI agent | - |
-| `title` | string | No | Custom title for the run | First 50 chars of prompt |
-| `context` | string | No | Additional context for the task | Empty |
-| `target` | string | No | Target branch name for this specific run | Auto-generated |
-| `fileHash` | string | No | SHA-256 hash for duplicate detection | Auto-calculated |
+### File Selection Mode
+- Browse configuration files
+- Preview file contents
+- Validate JSON structure
+- Recent files history
 
-### Field Priorities
+### Run List Mode
+- Toggle individual runs (space)
+- Select/deselect all (a/A)
+- Preview run details
+- Validate before submission
 
-When fields are specified at both root and run level, the run-level value takes precedence:
-- Run-specific `target` overrides any auto-generated branch names
-- Run-specific context is appended to any global context
-- Each run can have its own unique configuration
+### Progress Mode
+- Real-time status updates
+- Success/failure tracking
+- Error messages
+- Cancel option (Ctrl+C)
 
-## API Integration
-
-The bulk runs feature integrates with the RepoBird API using the `/api/v1/runs/bulk` endpoint. The API specification is documented in `docs/CLI_API_SPECIFICATION.yaml`.
-
-### Request Structure
-
-The CLI transforms your configuration into an API request with the following structure:
-
-```json
-{
-  "repositoryName": "owner/repo",
-  "batchTitle": "Optional batch title",
-  "runType": "run",
-  "sourceBranch": "main",
-  "force": false,
-  "runs": [
-    {
-      "prompt": "Task description",
-      "title": "Optional title",
-      "target": "optional-target-branch",
-      "context": "Additional context",
-      "fileHash": "optional-sha256-hash"
-    }
-  ]
-}
-```
-
-### Response Handling
-
-The API returns a structured response with successful and failed runs:
-
-```json
-{
-  "data": {
-    "batchId": "batch_20240120_abc123",
-    "batchTitle": "Optional batch title",
-    "successful": [
-      {
-        "id": 12345,
-        "status": "QUEUED",
-        "repositoryName": "owner/repo",
-        "title": "Task title",
-        "requestIndex": 0
-      }
-    ],
-    "failed": [
-      {
-        "requestIndex": 1,
-        "prompt": "Failed task prompt",
-        "error": "DUPLICATE_RUN",
-        "message": "Duplicate detected (ID 12300). Use force=true to override.",
-        "existingRunId": 12300
-      }
-    ],
-    "metadata": {
-      "totalRequested": 2,
-      "totalSuccessful": 1,
-      "totalFailed": 1
-    }
-  }
-}
-```
-
-## Terminal User Interface (TUI)
-
-The TUI provides an interactive way to create and manage bulk runs with the following features:
-
-### Navigation Flow
-
-1. **File Selection Mode**: Choose configuration files from your filesystem
-2. **Run List Mode**: Review and select which runs to execute
-3. **Submission Mode**: Shows progress while submitting to the API
-4. **Results Mode**: Displays the outcome of bulk run creation
-
-### Key Bindings
-
-| Key | Action | Context |
-|-----|--------|---------|
-| `f` | Activate file fuzzy search | File selection |
-| `Enter` | Select file/confirm selection | Any mode |
-| `Space` | Toggle run selection | Run list |
-| `Ctrl+A` | Select all runs | Run list |
-| `Ctrl+D` | Deselect all runs | Run list |
-| `Ctrl+S` | Submit selected runs | Run list |
-| `q` | Go back/quit | Any mode |
-| `?` | Show help | Any mode |
-
-### File Discovery
-
-The TUI automatically discovers bulk run configuration files by:
-
-- Scanning current directory and subdirectories (up to 3 levels deep)
-- Looking for `.json` files
-- Filtering for files with bulk run structure
-- Limiting to 500 files maximum for performance
-
-### Fuzzy Search Integration
-
-Built-in fuzzy search helps you quickly find files and navigate options:
-
-- **Real-time filtering**: Type to filter results instantly
-- **Smart matching**: Uses fuzzy string matching for flexible searches
-- **Keyboard navigation**: Arrow keys or `Ctrl+J/K` for navigation
-- **Visual indicators**: Clear marking of current selection
-
-## Status and Monitoring
-
-### Check Batch Status
-
-```bash
-# Get current status of all runs in a batch
-repobird bulk status BATCH_ID
-
-# Follow progress with real-time updates
-repobird bulk status BATCH_ID --follow
-```
-
-### Batch Status Information
-
-The status command provides:
-
-- **Aggregate Status**: Overall batch status (QUEUED, PROCESSING, COMPLETED, etc.)
-- **Individual Run Status**: Status of each run in the batch
-- **Progress Information**: Completion percentage for active runs
-- **Timing Information**: Start time and estimated completion
-- **Statistics**: Counts of queued, processing, completed, and failed runs
-
-### Status Examples
-
-```bash
-$ repobird bulk status batch_20240120_abc123
-
-Batch: batch_20240120_abc123
-Title: Authentication module refactoring
-Status: PROCESSING
-Started: 2024-01-20 10:00:00
-
-Runs:
-  ✓ Fix auth issue (ID: 12345) - DONE
-    Completed: 2024-01-20 10:30:00
-    PR: https://github.com/owner/repo/pull/123
-    
-  ⏳ Password reset feature (ID: 12346) - PROCESSING (45%)
-    Started: 2024-01-20 10:15:00
-    
-  📋 Profile validation (ID: 12347) - QUEUED
-
-Statistics:
-  Total: 3 runs
-  Completed: 1
-  Processing: 1  
-  Queued: 1
-  Failed: 0
-
-Estimated completion: 2024-01-20 10:45:00
-```
+### Results Mode
+- Summary statistics
+- Failed run details
+- PR URLs for successful runs
+- Export results
 
 ## Best Practices
 
 ### Configuration Management
+```bash
+# Organize configs
+bulk-configs/
+├── bugfixes/
+│   ├── critical-fixes.json
+│   └── minor-fixes.json
+├── features/
+│   └── q4-features.json
+└── maintenance/
+    └── dependency-updates.json
+```
 
-- **Organize by purpose**: Group related tasks in separate configuration files
-- **Use descriptive titles**: Both batch titles and individual run titles should be clear
-- **Version control**: Store configuration files in your repository for reproducibility
-- **Test with plans**: Use `"runType": "plan"` to preview changes before execution
+### Validation
+```bash
+# Always dry-run first
+repobird bulk config.json --dry-run
 
-### Performance Considerations
+# Check JSON validity
+jq . config.json
 
-- **Batch size limits**: Maximum of 10 runs per batch
-- **Resource usage**: Consider repository size and complexity when batching
-- **Parallel execution**: The API runs tasks with configurable parallelism (default: 5)
-- **Rate limiting**: Be aware of API rate limits (100 requests/minute)
+# Validate with schema
+ajv validate -s bulk-schema.json -d config.json
+```
 
 ### Error Handling
+```json
+{
+  "onError": "continue",  // continue, stop, or rollback
+  "retryFailed": true,
+  "maxRetries": 3,
+  "runs": [...]
+}
+```
 
-- **Duplicate detection**: Use file hashes to prevent accidental re-runs
-- **Force flag**: Override duplicate detection when intentional
-- **Partial success**: Handle scenarios where some runs succeed and others fail
-- **Retry strategy**: Failed runs can be retried individually
+## Examples
 
-### Branch Management
+### Bug Fix Batch
+```json
+{
+  "repository": "myorg/app",
+  "source": "main",
+  "runType": "run",
+  "runs": [
+    {
+      "title": "Fix null pointer in user service",
+      "prompt": "Fix NPE when user.email is null",
+      "target": "fix/user-npe",
+      "files": ["src/services/UserService.java"]
+    },
+    {
+      "title": "Fix race condition in cache",
+      "prompt": "Add proper locking to prevent cache corruption",
+      "target": "fix/cache-race",
+      "files": ["src/cache/"]
+    }
+  ]
+}
+```
 
-- **Source branches**: Specify appropriate source branches for your changes
-- **Target branches**: Use descriptive target branch names for tracking
-- **Naming conventions**: Consider using prefixes like `bulk/`, `fix/`, or `feature/`
+### Feature Implementation
+```json
+{
+  "repository": "myorg/frontend",
+  "source": "develop",
+  "runType": "approval",
+  "defaults": {
+    "context": "Use React hooks and TypeScript"
+  },
+  "runs": [
+    {
+      "title": "Add dark mode",
+      "prompt": "Implement dark mode toggle with system preference detection",
+      "target": "feature/dark-mode"
+    },
+    {
+      "title": "Add export functionality",
+      "prompt": "Add CSV and PDF export for data tables",
+      "target": "feature/export"
+    }
+  ]
+}
+```
+
+### Refactoring Tasks
+```json
+{
+  "repository": "myorg/backend",
+  "source": "main",
+  "parallel": false,
+  "runs": [
+    {
+      "title": "Extract service layer",
+      "prompt": "Refactor business logic from controllers to service layer",
+      "target": "refactor/service-layer"
+    },
+    {
+      "title": "Add dependency injection",
+      "prompt": "Replace manual instantiation with DI container",
+      "target": "refactor/di"
+    }
+  ]
+}
+```
+
+## Monitoring
+
+### CLI Progress
+```bash
+# Follow all runs
+repobird bulk config.json --follow
+
+# Check specific batch
+repobird bulk status batch-123
+
+# List recent batches
+repobird bulk list
+```
+
+### TUI Navigation
+- `B` - Open bulk view
+- `Tab` - Navigate sections
+- `Space` - Toggle selection
+- `Enter` - Submit/Continue
+- `q` - Back/Cancel
 
 ## Troubleshooting
 
 ### Common Issues
 
-**Empty Results Screen**
-- Check debug logs: `tail -f /tmp/repobird_debug.log`
-- Verify API connectivity and authentication
-- Ensure configuration file format is correct
-
-**Duplicate Run Errors**
-- Review existing runs to identify duplicates
-- Use `force: true` in configuration to override
-- Check file hash uniqueness if using duplicate detection
-
-**Authentication Issues**
-- Verify API key: `repobird config get api-key`
-- Test authentication: `repobird status`
-- Check repository access permissions
-
-### Debug Logging
-
-Enable debug logging for detailed troubleshooting:
-
+**Invalid JSON:**
 ```bash
-# Set debug log location (optional)
-export REPOBIRD_DEBUG_LOG=/path/to/debug.log
+# Validate JSON
+jq . config.json || echo "Invalid JSON"
+```
 
-# Run with debug output
-repobird bulk run config.json --debug
+**Authentication Errors:**
+```bash
+# Verify API key
+repobird auth verify
+```
 
-# Monitor debug log in real-time
+**Rate Limiting:**
+```json
+{
+  "maxConcurrent": 2,
+  "delayBetweenRuns": 5000
+}
+```
+
+### Debug Mode
+```bash
+REPOBIRD_DEBUG_LOG=1 repobird bulk config.json
 tail -f /tmp/repobird_debug.log
 ```
 
-### Configuration Validation
+## Performance Tips
 
-Validate your configuration before submission:
+1. **Batch Similar Tasks** - Group related changes
+2. **Use Parallel Execution** - For independent tasks
+3. **Set Reasonable Limits** - maxConcurrent based on API limits
+4. **Monitor Progress** - Use --follow or TUI
+5. **Validate First** - Always use --dry-run
 
-```bash
-# Use plan mode to preview without execution
-repobird bulk run config.json --type plan
+## API Integration
 
-# Check repository and branch access
-repobird status --repo owner/repo
+### Programmatic Usage
+```go
+client := api.NewClient(apiKey)
+batch := &api.BulkRunRequest{
+    Repository: "org/repo",
+    Source:     "main",
+    Runs:       runs,
+}
+results, err := client.CreateBulkRuns(ctx, batch)
 ```
-
-## Integration Examples
-
-### CI/CD Pipeline Integration
-
-```yaml
-# GitHub Actions example
-- name: Run bulk fixes
-  run: |
-    repobird bulk run .github/bulk-fixes.json --follow
-    
-- name: Check bulk status
-  run: |
-    repobird bulk status $BATCH_ID
-```
-
-### Automated Maintenance
-
-```bash
-#!/bin/bash
-# Weekly maintenance script
-
-# Run security updates
-repobird bulk run configs/security-updates.json --follow
-
-# Apply coding standard fixes
-repobird bulk run configs/linting-fixes.json --follow
-
-# Update documentation
-repobird bulk run configs/doc-updates.json --follow
-```
-
-## Related Documentation
-
-- [CLI Reference](cli-reference.md) - Complete command-line reference
-- [TUI Guide](interactive-mode.md) - Terminal interface usage
-- [API Specification](CLI_API_SPECIFICATION.yaml) - Complete API documentation
-- [Configuration Guide](configuration-guide.md) - Advanced configuration options
-- [Troubleshooting](troubleshooting.md) - Common issues and solutions
-
-For implementation details, see:
-- [Bulk Runs Implementation Plan](../tasks/bulk-runs-cli-implementation-plan.md)
-- [Server API Requirements](../tasks/bulk-runs-server-api-requirements.md)

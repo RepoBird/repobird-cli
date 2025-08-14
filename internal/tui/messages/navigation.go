@@ -30,6 +30,9 @@ type NavigateToListMsg struct {
 // NavigateToBulkMsg requests navigation to the bulk operations view
 type NavigateToBulkMsg struct{}
 
+// NavigateToBulkResultsMsg requests navigation to the bulk results view
+type NavigateToBulkResultsMsg struct{}
+
 // NavigateToStatusMsg requests navigation to the status/user info view
 type NavigateToStatusMsg struct{}
 
@@ -59,6 +62,7 @@ func (NavigateToDetailsMsg) IsNavigation() bool    { return true }
 func (NavigateToDashboardMsg) IsNavigation() bool  { return true }
 func (NavigateToListMsg) IsNavigation() bool       { return true }
 func (NavigateToBulkMsg) IsNavigation() bool       { return true }
+func (NavigateToBulkResultsMsg) IsNavigation() bool { return true }
 func (NavigateToStatusMsg) IsNavigation() bool     { return true }
 func (NavigateToFileViewerMsg) IsNavigation() bool { return true }
 func (NavigateToHelpMsg) IsNavigation() bool       { return true }

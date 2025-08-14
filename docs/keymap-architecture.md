@@ -1,232 +1,178 @@
-# TUI Key Management Architecture
+# Keymap Architecture
 
 ## Overview
 
-RepoBird CLI uses a centralized key processing system that provides consistent, extensible key handling across all views. This system was implemented to solve the problem of scattered key handling and provide a clean way for any view to disable or customize specific keys.
+Centralized key processing system providing consistent, extensible key handling across all TUI views.
+
+## Related Documentation
+- **[TUI Guide](tui-guide.md)** - Complete TUI navigation and usage
+- **[Architecture Overview](architecture.md)** - System design patterns
+- **[Dashboard Layouts](dashboard-layouts.md)** - View-specific key handling
 
 ## Architecture
 
 ### Core Components
 
-1. **CoreKeyRegistry** (`internal/tui/keymap/core.go`)
-   - Central registry of all keys and their default actions
-   - Maps key strings to actions (navigation, global, view-specific)
-   - Extensible system for registering new keys
+**1. CoreKeyRegistry** (`internal/tui/keymap/core.go`)
+- Central registry mapping keys to actions
+- Defines navigation, global, and view-specific actions
 
-2. **CoreViewKeymap Interface**
-   - Optional interface that views can implement
-   - Provides `IsKeyDisabled()` for disabling keys
-   - Provides `HandleKey()` for custom key handling
-
-3. **Centralized Processor** (`App.processKeyWithFiltering()`)
-   - Single entry point for all key processing
-   - Checks view keymaps before executing actions
-   - Routes actions to appropriate handlers
-
-### Key Processing Flow
-
-```
-┌─────────────┐    ┌──────────────────────┐    ┌─────────────────┐
-│ Key Press   │ -> │ App.processKey...()  │ -> │ Action Handler  │
-└─────────────┘    └──────────────────────┘    └─────────────────┘
-                            │
-                            ▼
-                   ┌─────────────────────┐
-                   │ View Keymap Check   │
-                   │ IsKeyDisabled()?    │
-                   │ HandleKey()?        │
-                   └─────────────────────┘
+**2. CoreViewKeymap Interface**
+```go
+type CoreViewKeymap interface {
+    IsKeyDisabled(keyString string) bool
+    HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Model, cmd tea.Cmd)
+}
 ```
 
-### Action Types
+**3. Processing Flow**
+```
+Key Press → App.processKeyWithFiltering() → View Check → Action
+                    ↓
+            1. Check IsKeyDisabled()
+            2. Try HandleKey()
+            3. Process global actions
+            4. Convert to navigation
+            5. Delegate to view
+```
 
-**Navigation Actions**
+## Key Categories
+
+### Navigation Keys
 - `b` - Back navigation
-- `B` - Bulk operations  
+- `B` - Bulk operations
 - `n` - New item
 - `r` - Refresh
-- `q` - Quit
+- `q` - Quit/back
 - `?` - Help
 
-**Global Actions**
-- `Q` - Force quit (always works)
-- `ctrl+c` - Force quit (always works)
+### Global Keys (Always Active)
+- `Q` / `ctrl+c` - Force quit from anywhere
 
-**View-Specific Actions**
-- `s` - Status/info
+### View-Specific Keys
+- `s` - Status overlay
 - `f` - Filter/search
 - `enter` - Select
 - `tab` - Next field
-- Arrow keys, etc.
+- Arrow keys - Navigation
 
-## Implementation Guide
+## Implementation
 
-### For Views That Need Key Customization
-
-1. **Implement the Interface**
+### Disable Keys in a View
 ```go
 type MyView struct {
     disabledKeys map[string]bool
 }
 
-func (v *MyView) IsKeyDisabled(keyString string) bool {
-    return v.disabledKeys[keyString]
-}
-
-func (v *MyView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Model, cmd tea.Cmd) {
-    // Custom key handling logic
-    return false, v, nil // Let system handle if no custom logic
-}
-```
-
-2. **Disable Unwanted Keys**
-```go
 func NewMyView() *MyView {
     return &MyView{
         disabledKeys: map[string]bool{
-            "b":   true, // Disable back navigation
+            "b": true,   // Disable back
             "esc": true, // Disable escape
         },
     }
 }
+
+func (v *MyView) IsKeyDisabled(key string) bool {
+    return v.disabledKeys[key]
+}
 ```
 
-3. **Custom Key Behaviors**
+### Custom Key Handling
 ```go
-func (v *MyView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Model, cmd tea.Cmd) {
-    switch keyMsg.String() {
+func (v *MyView) HandleKey(msg tea.KeyMsg) (handled bool, model tea.Model, cmd tea.Cmd) {
+    switch msg.String() {
     case "ctrl+s":
         if v.canSave() {
             return true, v, v.saveCommand()
         }
     case "ctrl+r":
-        return true, v, v.customRefreshCommand()
+        return true, v, v.customRefresh()
     }
-    return false, v, nil // Let system handle other keys
+    return false, v, nil // System handles other keys
 }
 ```
 
-### Key Processing Priority
+## Processing Priority
 
-1. **Disabled Check**: If `IsKeyDisabled(key)` returns `true` → ignore completely
-2. **Custom Handler**: If `HandleKey()` returns `handled=true` → use custom result
-3. **Global Actions**: Force quit, etc. → handled regardless of view state  
-4. **Navigation Actions**: Back, bulk, etc. → converted to navigation messages
-5. **View-Specific**: Other keys → delegated to view's `Update()` method
+1. **Disabled Check** - Ignored if disabled
+2. **Custom Handler** - View's custom logic
+3. **Global Actions** - Force quit always works
+4. **Navigation** - Converted to messages
+5. **View Default** - Delegated to Update()
 
-### Examples
+## Real Examples
 
-#### Dashboard (Disables Back Navigation)
+### Dashboard (No Back Navigation)
 ```go
-type DashboardView struct {
-    disabledKeys map[string]bool
-}
-
-func NewDashboardView(client APIClient) *DashboardView {
+func NewDashboardView() *DashboardView {
     return &DashboardView{
         disabledKeys: map[string]bool{
-            "b":   true, // No back navigation from dashboard
-            "esc": true, // No escape from dashboard
+            "b": true,   // Top level, no back
+            "esc": true,
         },
     }
 }
+```
 
-func (d *DashboardView) IsKeyDisabled(keyString string) bool {
-    return d.disabledKeys[keyString]
-}
-
-func (d *DashboardView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Model, cmd tea.Cmd) {
-    return false, d, nil // No custom handling needed
+### Details View (Custom Copy)
+```go
+func (d *DetailsView) HandleKey(msg tea.KeyMsg) (handled bool, model tea.Model, cmd tea.Cmd) {
+    if msg.String() == "y" {
+        // Custom yank behavior
+        return true, d, d.copyToClipboard()
+    }
+    return false, d, nil
 }
 ```
 
-#### Create View (Custom Save Shortcut)
+### Bulk View (Mode-Specific Keys)
 ```go
-func (c *CreateView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Model, cmd tea.Cmd) {
-    if keyMsg.String() == "ctrl+s" && c.isFormValid() {
-        // Custom save with validation
-        return true, c, c.submitFormCommand()
+func (b *BulkView) IsKeyDisabled(key string) bool {
+    switch b.mode {
+    case FileSelectMode:
+        return key == "enter" && b.selectedFile == ""
+    case ProgressMode:
+        return key == "q" // Can't quit during progress
     }
-    return false, c, nil
+    return false
 }
 ```
 
 ## Benefits
 
-- **Consistent Behavior**: Same key handling logic across all views
-- **Extensible**: Easy to add new keys or customize existing ones
-- **Maintainable**: Single place to understand key processing
-- **Debuggable**: Clear flow for tracing key handling
-- **Backward Compatible**: Views without keymap interface work unchanged
-- **No Conflicts**: View-scoped keymaps prevent conflicts during navigation
+✅ **Consistent** - Same key behavior across views  
+✅ **Extensible** - Easy to add new keys/actions  
+✅ **Maintainable** - Single processing location  
+✅ **Debuggable** - Clear processing flow  
+✅ **Flexible** - Per-view customization
 
-## How Keymap Conflicts Are Prevented
+## Best Practices
 
-### View-Scoped Processing
-- **No Global Registry**: No global keymap state that needs cleanup
-- **Per-View Interface Check**: `a.current.(keymap.CoreViewKeymap)` checked fresh on every key press
-- **Automatic Transition**: When views change, old view keymap is simply replaced - no deregistration needed
+1. **Minimal Disabling** - Only disable when necessary
+2. **Clear Feedback** - Show why keys are disabled
+3. **Document Changes** - Note non-standard behavior
+4. **Test Thoroughly** - Verify key interactions
+5. **Consistent Patterns** - Follow established conventions
 
-### Navigation Flow
-```
-Key Press → App.processKeyWithFiltering() → Current View Keymap Check → Action Execution
-```
+## Adding New Keys
 
-1. **Interface Check**: System checks if current view implements `CoreViewKeymap`
-2. **View Control**: If implemented, view controls which keys are disabled/customized
-3. **Isolated Scope**: Each view's keymap is completely isolated from others
-4. **Clean Transitions**: View changes automatically update keymap behavior
+1. Register in `CoreKeyRegistry`
+2. Define action type
+3. Add to processing logic
+4. Update help text
+5. Test across views
 
-### No Registration/Deregistration Required
-- Views simply implement the interface (or don't)
-- No setup/teardown of keymap state
-- No memory leaks or stale key bindings
-- View stack preserves keymap behavior when navigating back
+## Debugging
 
-## Debugging Key Issues
-
-1. **Add Debug Logging**
 ```go
-func (a *App) processKeyWithFiltering(keyMsg tea.KeyMsg) (handled bool, model tea.Model, cmd tea.Cmd) {
-    keyString := keyMsg.String()
-    debug.LogToFilef("Key pressed: %s", keyString)
-    
-    if viewKeymap, hasKeymap := a.current.(keymap.CoreViewKeymap); hasKeymap {
-        if viewKeymap.IsKeyDisabled(keyString) {
-            debug.LogToFilef("Key %s disabled by view", keyString)
-            return true, a, nil
-        }
-    }
-    // ...
-}
+// In processKeyWithFiltering()
+debug.LogToFilef("Key pressed: %s, Disabled: %v", 
+    keyString, view.IsKeyDisabled(keyString))
 ```
 
-2. **Check Key Registry**
-```go
-action := a.keyRegistry.GetAction(keyString)
-debug.LogToFilef("Key %s maps to action %v", keyString, action)
+Enable debug logging:
+```bash
+REPOBIRD_DEBUG_LOG=1 repobird tui
+tail -f /tmp/repobird_debug.log
 ```
-
-3. **Verify Interface Implementation**
-```go
-if viewKeymap, hasKeymap := a.current.(keymap.CoreViewKeymap); hasKeymap {
-    debug.LogToFilef("View implements CoreViewKeymap: %T", a.current)
-} else {
-    debug.LogToFilef("View does not implement CoreViewKeymap: %T", a.current)
-}
-```
-
-## Migration Guide
-
-### Existing Views
-1. Views without `CoreViewKeymap` continue to work unchanged
-2. All keys are enabled by default
-3. No migration required unless custom behavior is needed
-
-### Adding Key Customization
-1. Add `CoreViewKeymap` interface to view struct
-2. Implement `IsKeyDisabled()` method
-3. Implement `HandleKey()` method (can return `false, view, nil` if no custom handling)
-4. Remove any existing scattered key handling from `Update()` method
-
-This architecture provides a clean, extensible foundation for key handling that scales with the application's complexity while maintaining simplicity for basic use cases.

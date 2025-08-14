@@ -11,6 +11,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/repobird/repobird-cli/internal/api"
+	"github.com/repobird/repobird-cli/internal/api/dto"
+	"github.com/repobird/repobird-cli/internal/tui/cache"
 	"github.com/repobird/repobird-cli/internal/tui/components"
 	"github.com/repobird/repobird-cli/internal/tui/debug"
 	"github.com/repobird/repobird-cli/internal/tui/messages"
@@ -56,6 +58,7 @@ const (
 type BulkView struct {
 	// API client
 	client *api.Client
+	cache  *cache.SimpleCache
 
 	// Configuration
 	repository   string
@@ -127,7 +130,7 @@ type bulkKeyMap struct {
 }
 
 // NewBulkView creates a new bulk view
-func NewBulkView(client *api.Client) *BulkView {
+func NewBulkView(client *api.Client, cache *cache.SimpleCache) *BulkView {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
@@ -137,6 +140,7 @@ func NewBulkView(client *api.Client) *BulkView {
 
 	return &BulkView{
 		client:                 client,
+		cache:                  cache,
 		mode:                   ModeInstructions, // Start with instructions, not file selector
 		help:                   help.New(),
 		keys:                   defaultBulkKeyMap(),
@@ -400,24 +404,21 @@ func (v *BulkView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		v.results = msg.results
 		if msg.err != nil {
 			v.error = msg.err
-			v.mode = ModeResults
+			// Navigate to results view to show error
+			return v, v.navigateToResults(msg)
 		} else {
-			v.mode = ModeProgress
-			// Start polling for progress
-			return v, v.pollProgress()
+			// Navigate to results view to show submission results
+			return v, v.navigateToResults(msg)
 		}
-		return v, nil
 
 	case bulkProgressMsg:
-		// Progress update received - would need to update progress view
-		if msg.completed {
-			v.mode = ModeResults
-		}
+		// Progress update received - this should not happen anymore as we navigate immediately
+		debug.LogToFilef("⚠️ BULK: Received bulkProgressMsg but should have navigated to results\n")
 		return v, nil
 
 	case bulkCancelledMsg:
-		// Bulk operation cancelled
-		v.mode = ModeResults
+		// Bulk operation cancelled - this should not happen anymore as we navigate immediately
+		debug.LogToFilef("⚠️ BULK: Received bulkCancelledMsg but should have navigated to results\n")
 		return v, nil
 
 	case errMsg:
@@ -806,6 +807,88 @@ func (v *BulkView) handleRunListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	return v, tea.Batch(cmds...)
+}
+
+// navigateToResults prepares navigation context and returns navigation command
+func (v *BulkView) navigateToResults(msg bulkSubmittedMsg) tea.Cmd {
+	debug.LogToFilef("📊 BULK: Preparing to navigate to results view\n")
+	debug.LogToFilef("📊 BULK: BatchID: %s, Results count: %d, Error: %v\n", msg.batchID, len(msg.results), msg.err)
+	
+	// Create a map of original runs indexed by their position
+	originalRuns := make(map[int]BulkRunItem)
+	for i, run := range v.runs {
+		originalRuns[i] = run
+	}
+	
+	// Prepare navigation context with all the data the results view needs
+	navigationContext := map[string]interface{}{
+		"batchID":      msg.batchID,
+		"batchTitle":   v.batchTitle,
+		"repository":   v.repository,
+		"originalRuns": originalRuns,
+	}
+	
+	// Process the API response from bulkSubmittedMsg
+	var successful []dto.RunCreatedItem
+	var failed []dto.RunError
+	
+	if msg.err != nil {
+		// If there's an error, all runs failed
+		for i, run := range v.runs {
+			failed = append(failed, dto.RunError{
+				RequestIndex: i,
+				Prompt:       run.Prompt,
+				Message:      msg.err.Error(),
+			})
+		}
+	} else if msg.results != nil {
+		// The results from bulkSubmittedMsg are already processed from API response
+		// They contain both successful and failed runs mixed together
+		for i, result := range msg.results {
+			if result.Error != "" {
+				// This is a failed run
+				failed = append(failed, dto.RunError{
+					RequestIndex: i,
+					Prompt:       result.Title,
+					Message:      result.Error,
+				})
+			} else {
+				// This is a successful run
+				successful = append(successful, dto.RunCreatedItem{
+					ID:     result.ID,
+					Title:  result.Title,
+					Status: result.Status,
+					RepositoryName: v.repository,
+				})
+			}
+		}
+	}
+	
+	navigationContext["successful"] = successful
+	navigationContext["failed"] = failed
+	
+	// Add statistics
+	navigationContext["statistics"] = dto.BulkStatistics{
+		Total:     len(v.runs),
+		Completed: len(successful),
+		Failed:    len(failed),
+	}
+	
+	debug.LogToFilef("📊 BULK: Navigation context prepared - Success: %d, Failed: %d\n", len(successful), len(failed))
+	
+	// Store context in cache - store each field separately
+	v.cache.SetNavigationContext("batchID", msg.batchID)
+	v.cache.SetNavigationContext("batchTitle", v.batchTitle)
+	v.cache.SetNavigationContext("repository", v.repository)
+	v.cache.SetNavigationContext("successful", successful)
+	v.cache.SetNavigationContext("failed", failed)
+	v.cache.SetNavigationContext("statistics", navigationContext["statistics"])
+	v.cache.SetNavigationContext("originalRuns", originalRuns)
+	
+	// Return navigation command
+	return func() tea.Msg {
+		return messages.NavigateToBulkResultsMsg{}
+	}
 }
 
 // updateRunListViewport is now called from renderRunList to update content

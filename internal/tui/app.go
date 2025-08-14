@@ -287,7 +287,7 @@ func (a *App) handleNavigation(msg messages.NavigationMsg) (tea.Model, tea.Cmd) 
 		// This should be refactored to accept the interface
 		if apiClient, ok := a.client.(*api.Client); ok {
 			debug.LogToFilef("✅ BULK NAV: Client type is correct, creating BulkView ✅\n")
-			a.current = views.NewBulkView(apiClient)
+			a.current = views.NewBulkView(apiClient, a.cache)
 
 			// Send current window dimensions to the new view if we have them
 			var cmds []tea.Cmd
@@ -303,6 +303,27 @@ func (a *App) handleNavigation(msg messages.NavigationMsg) (tea.Model, tea.Cmd) 
 		}
 		debug.LogToFilef("❌ BULK NAV: Client type is WRONG - cannot create BulkView! ❌\n")
 		// If not the right client type, just return without navigation
+		return a, nil
+
+	case messages.NavigateToBulkResultsMsg:
+		debug.LogToFilef("📊 BULK RESULTS NAV: Navigating to bulk results view 📊\n")
+		a.viewStack = append(a.viewStack, a.current)
+		// BulkResultsView requires a concrete *api.Client
+		if apiClient, ok := a.client.(*api.Client); ok {
+			debug.LogToFilef("✅ BULK RESULTS NAV: Creating BulkResultsView ✅\n")
+			a.current = views.NewBulkResultsView(apiClient, a.cache)
+			
+			// Send current window dimensions to the new view if we have them
+			var cmds []tea.Cmd
+			cmds = append(cmds, a.current.Init())
+			if a.width > 0 && a.height > 0 {
+				cmds = append(cmds, func() tea.Msg {
+					return tea.WindowSizeMsg{Width: a.width, Height: a.height}
+				})
+			}
+			return a, tea.Batch(cmds...)
+		}
+		debug.LogToFilef("❌ BULK RESULTS NAV: Client type is wrong - cannot create BulkResultsView! ❌\n")
 		return a, nil
 
 	case messages.NavigateToFileViewerMsg:

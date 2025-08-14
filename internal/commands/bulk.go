@@ -17,6 +17,7 @@ import (
 	"github.com/repobird/repobird-cli/internal/cache"
 	"github.com/repobird/repobird-cli/internal/config"
 	"github.com/repobird/repobird-cli/internal/errors"
+	tuicache "github.com/repobird/repobird-cli/internal/tui/cache"
 	tuiviews "github.com/repobird/repobird-cli/internal/tui/views"
 	"github.com/spf13/cobra"
 
@@ -64,9 +65,12 @@ Examples:
 
 	cmd.Flags().BoolVarP(&bulkFollow, "follow", "f", false, "Follow batch progress")
 	cmd.Flags().BoolVar(&bulkDryRun, "dry-run", false, "Validate without submitting")
-	cmd.Flags().BoolVar(&bulkForce, "force", false, "Override duplicate detection")
+	cmd.Flags().BoolVar(&bulkForce, "force", false, "Deprecated - has no effect (kept for backwards compatibility)")
 	cmd.Flags().BoolVarP(&bulkInteractive, "interactive", "i", false, "Interactive bulk mode")
 	cmd.Flags().IntVarP(&bulkParallel, "parallel", "p", 5, "Max concurrent runs")
+	
+	// Mark force flag as deprecated
+	cmd.Flags().MarkDeprecated("force", "file hashes are now for tracking only and won't block runs")
 
 	return cmd
 }
@@ -124,10 +128,8 @@ func runBulk(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// Apply force flag if set
-	if bulkForce {
-		bulkConfig.Force = true
-	}
+	// Note: force flag is deprecated and has no effect
+	// File hashes are now for tracking purposes only
 
 	// Create API client
 	apiURL := os.Getenv("REPOBIRD_API_URL")
@@ -136,28 +138,23 @@ func runBulk(cmd *cobra.Command, args []string) error {
 	}
 	client := api.NewClient(cfg.APIKey, apiURL, debug)
 
-	// Generate file hashes for duplicate detection (only if not forcing)
+	// Generate file hashes for tracking purposes (always generated now)
 	var runHashes []string
-	if !bulkConfig.Force {
-		fileHashCache := cache.NewFileHashCache()
-		for i, run := range bulkConfig.Runs {
-			// Create a hash based on the run content for duplicate detection
-			// Note: Including timestamp would prevent duplicate detection, so we don't
-			hashContent := fmt.Sprintf("%s-%s-%s-%s",
-				bulkConfig.Repository,
-				run.Prompt,
-				run.Target,
-				run.Context,
-			)
-			hash := cache.CalculateStringHash(hashContent)
-			runHashes = append(runHashes, hash)
+	fileHashCache := cache.NewFileHashCache()
+	for i, run := range bulkConfig.Runs {
+		// Create a hash based on the run content for tracking
+		// This helps with audit and debugging but won't block duplicate runs
+		hashContent := fmt.Sprintf("%s-%s-%s-%s",
+			bulkConfig.Repository,
+			run.Prompt,
+			run.Target,
+			run.Context,
+		)
+		hash := cache.CalculateStringHash(hashContent)
+		runHashes = append(runHashes, hash)
 
-			// Cache the hash
-			fileHashCache.Set(fmt.Sprintf("bulk-run-%d", i), hash)
-		}
-	} else {
-		// When forcing, don't send file hashes to skip duplicate detection
-		runHashes = make([]string, len(bulkConfig.Runs))
+		// Cache the hash for tracking
+		fileHashCache.Set(fmt.Sprintf("bulk-run-%d", i), hash)
 	}
 
 	// Convert to API request format
@@ -167,7 +164,8 @@ func runBulk(cmd *cobra.Command, args []string) error {
 		RunType:        bulkConfig.RunType,
 		SourceBranch:   bulkConfig.Source,
 		BatchTitle:     bulkConfig.BatchTitle,
-		Force:          bulkConfig.Force,
+		// Force is deprecated but kept for backwards compatibility
+		Force:          false,
 		Runs:           make([]dto.RunItem, len(bulkConfig.Runs)),
 		Options: dto.BulkOptions{
 			Parallel: bulkParallel,
@@ -181,8 +179,8 @@ func runBulk(cmd *cobra.Command, args []string) error {
 			Target:  run.Target,
 			Context: run.Context,
 		}
-		// Only include file hash if we're not forcing (to enable duplicate detection)
-		if !bulkConfig.Force && i < len(runHashes) {
+		// Always include file hash for tracking purposes
+		if i < len(runHashes) {
 			item.FileHash = runHashes[i]
 		}
 		bulkRequest.Runs[i] = item
@@ -318,8 +316,9 @@ func runBulkInteractive() error {
 	}
 	client := api.NewClient(cfg.APIKey, apiURL, debug)
 
-	// Launch bulk TUI view
-	bulkView := tuiviews.NewBulkView(client)
+	// Launch bulk TUI view with a cache instance
+	cache := tuicache.NewSimpleCache()
+	bulkView := tuiviews.NewBulkView(client, cache)
 	p := tea.NewProgram(bulkView, tea.WithAltScreen())
 
 	_, err = p.Run()

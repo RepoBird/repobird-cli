@@ -11,10 +11,11 @@ info:
     ## Rate Limiting
     API requests are rate-limited to 100 requests per minute per API key.
 
-    ## File Hash Duplicate Detection
-    The API supports file hash-based duplicate detection to prevent re-running identical task files.
-    When submitting a run with a fileHash, the system checks for existing runs with the same hash.
-    Use the `force` parameter to override duplicate detection.
+    ## File Hash Tracking
+    The API supports file hash tracking for audit and debugging purposes.
+    When submitting a run with a fileHash, the system logs if an identical hash was previously used
+    but allows the new run to proceed. Duplicate file hashes are permitted and will not block execution.
+    The `force` parameter is deprecated for file hash handling and has no effect on duplicate detection.
   contact:
     name: RepoBird Support
     email: support@repobird.ai
@@ -42,8 +43,8 @@ components:
       properties:
         error:
           type: string
-          description: Error code (e.g., DUPLICATE_RUN, REPO_NOT_FOUND)
-          example: DUPLICATE_RUN
+          description: Error code (e.g., REPO_NOT_FOUND, QUOTA_EXCEEDED, REPOSITORY_DISABLED, ALL_RUNS_FAILED, RUN_CREATION_FAILED)
+          example: REPO_NOT_FOUND
         message:
           type: string
           description: Human-readable error message
@@ -155,7 +156,7 @@ components:
         fileHash:
           type: string
           nullable: true
-          description: SHA-256 hash of the issue run task file
+          description: SHA-256 hash of the issue run task file (for tracking purposes, duplicates allowed)
           example: a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3
         filesModified:
           type: array
@@ -280,12 +281,13 @@ components:
           example: main
         fileHash:
           type: string
-          description: SHA-256 hash of the task file for duplicate detection
+          description: SHA-256 hash of the task file for tracking purposes (duplicates allowed)
           example: a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3
         force:
           type: boolean
           default: false
-          description: Force creation even if duplicate hash exists
+          deprecated: true
+          description: Deprecated - has no effect on file hash handling. Kept for backwards compatibility.
           example: false
       required:
         - prompt
@@ -327,11 +329,12 @@ components:
         force:
           type: boolean
           default: false
-          description: Override duplicate detection for all runs
+          deprecated: true
+          description: Deprecated - has no effect on file hash handling. Kept for backwards compatibility.
         runs:
           type: array
           minItems: 1
-          maxItems: 10
+          maxItems: 40
           items:
             type: object
             properties:
@@ -353,7 +356,7 @@ components:
                 example: fix/auth-bug-1
               fileHash:
                 type: string
-                description: SHA-256 hash for duplicate detection
+                description: SHA-256 hash for tracking purposes (duplicates allowed)
                 example: abc123def456
             required:
               - prompt
@@ -419,14 +422,10 @@ components:
                     example: Add password reset
                   error:
                     type: string
-                    example: DUPLICATE_RUN
+                    example: RUN_CREATION_FAILED
                   message:
                     type: string
-                    example: Duplicate detected (ID 12300). Use force true to override.
-                  existingRunId:
-                    type: integer
-                    description: ID of existing run if duplicate
-                    example: 12300
+                    example: Failed to create run due to an error
             metadata:
               type: object
               properties:
@@ -640,7 +639,7 @@ paths:
       summary: Create new run
       description: |
         Creates a new AI agent run for the specified repository.
-        Supports duplicate detection via file hash.
+        Supports file hash tracking for audit purposes (duplicates allowed).
       tags:
         - Runs
       requestBody:
@@ -657,19 +656,12 @@ paths:
                   prompt: Fix the login bug in auth.js
                   title: Fix authentication issue
               withHash:
-                summary: Run with file hash for duplicate detection
+                summary: Run with file hash for tracking
                 value:
                   repositoryName: acme/webapp
                   prompt: Implement JWT authentication
                   title: Add auth system
                   fileHash: a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3
-              forceDuplicate:
-                summary: Force run despite duplicate hash
-                value:
-                  repositoryName: acme/webapp
-                  prompt: Implement JWT authentication
-                  fileHash: a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3
-                  force: true
       responses:
         '200':
           description: Run created successfully
@@ -715,17 +707,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        '409':
-          description: Conflict (duplicate file hash detected)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-              examples:
-                duplicate:
-                  value:
-                    error: DUPLICATE_RUN
-                    message: 'Duplicate run detected: A run with this file hash already exists (ID: 12345). Use --force to override.'
 
     get:
       summary: List user's runs
@@ -933,8 +914,8 @@ paths:
       summary: Get all file hashes for user's runs
       description: |
         Returns all non-empty fileHash values for the authenticated user's runs.
-        Used by CLI to cache known file hashes and detect duplicates before submission.
-        This endpoint helps prevent accidental re-runs of identical task files.
+        Used by CLI for tracking and debugging purposes. Note that duplicate file hashes
+        are allowed and will not prevent new runs from being created.
       tags:
         - Runs
       responses:
@@ -956,7 +937,7 @@ paths:
                           example: 12345
                         fileHash:
                           type: string
-                          description: SHA-256 hash of the issue run task file
+                          description: SHA-256 hash of the issue run task file (duplicates allowed)
                           example: a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3
                       required:
                         - issueRunId
@@ -1025,7 +1006,7 @@ paths:
       summary: Create bulk runs
       description: |
         Creates multiple AI agent runs in a single batch for the specified repository.
-        Maximum of 10 runs per batch. Supports partial success with 207 Multi-Status.
+        Maximum of 40 runs per batch. Supports partial success with 207 Multi-Status.
         Each run can have its own configuration while sharing common settings.
       tags:
         - Runs
@@ -1106,9 +1087,8 @@ paths:
                       failed:
                         - requestIndex: 1
                           prompt: Add password reset
-                          error: DUPLICATE_RUN
-                          message: Duplicate detected (ID 12300). Use force true to override.
-                          existingRunId: 12300
+                          error: RUN_CREATION_FAILED
+                          message: Failed to create run due to an error
                       metadata:
                         totalRequested: 2
                         totalSuccessful: 1
@@ -1138,11 +1118,65 @@ paths:
                         error:
                           type: string
         '403':
-          description: Forbidden (quota exceeded or repo disabled)
+          description: Forbidden (quota exceeded, repo disabled, or all runs failed)
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/BulkRunResponse'
+                oneOf:
+                  - $ref: '#/components/schemas/BulkRunResponse'
+                  - type: object
+                    properties:
+                      error:
+                        type: string
+                        enum: [QUOTA_EXCEEDED, REPOSITORY_DISABLED, ALL_RUNS_FAILED]
+                      message:
+                        type: string
+                      data:
+                        $ref: '#/components/schemas/BulkRunResponse/properties/data'
+              examples:
+                quotaExceeded:
+                  value:
+                    error: QUOTA_EXCEEDED
+                    message: 'Insufficient run runs remaining. Need 5, have 2'
+                    batchId: null
+                repositoryDisabled:
+                  value:
+                    error: REPOSITORY_DISABLED
+                    message: Repository acme/webapp is disabled
+                    data:
+                      batchId: batch_20240120_xyz789
+                      batchTitle: null
+                      successful: []
+                      failed:
+                        - requestIndex: 0
+                          prompt: Fix auth bug
+                          error: REPOSITORY_DISABLED
+                          message: Repository acme/webapp is disabled
+                      metadata:
+                        totalRequested: 1
+                        totalSuccessful: 0
+                        totalFailed: 1
+                allRunsFailed:
+                  value:
+                    error: ALL_RUNS_FAILED
+                    message: All 2 run(s) failed. Check individual errors in the failed array.
+                    data:
+                      batchId: batch_20240120_def456
+                      batchTitle: null
+                      successful: []
+                      failed:
+                        - requestIndex: 0
+                          prompt: Fix bug 1
+                          error: RUN_CREATION_FAILED
+                          message: Failed to create run
+                        - requestIndex: 1
+                          prompt: Fix bug 2
+                          error: RUN_CREATION_FAILED
+                          message: Failed to create run
+                      metadata:
+                        totalRequested: 2
+                        totalSuccessful: 0
+                        totalFailed: 2
 
   /api/v1/runs/bulk/{batchId}:
     get:
@@ -1383,8 +1417,8 @@ tags:
   - name: Runs
     description: |
       AI agent run management including creation, listing, and monitoring.
-      Supports duplicate detection via file hashes.
-      Bulk operations allow creating up to 10 runs in a single request.
+      Supports file hash tracking for audit purposes (duplicates are allowed).
+      Bulk operations allow creating up to 40 runs in a single request.
   - name: Repositories
     description: |
       Repository management and configuration.

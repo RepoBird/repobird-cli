@@ -7,6 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/repobird/repobird-cli/internal/api"
 	"github.com/repobird/repobird-cli/internal/api/dto"
+	"github.com/repobird/repobird-cli/internal/tui/cache"
 	"github.com/repobird/repobird-cli/internal/tui/components"
 	"github.com/repobird/repobird-cli/internal/tui/messages"
 	"github.com/stretchr/testify/assert"
@@ -43,7 +44,8 @@ func (m *MockBulkAPIClient) CancelBulkRuns(ctx context.Context, batchID string) 
 func TestNewBulkView(t *testing.T) {
 	// Create a real API client for now since BulkView requires *api.Client
 	client := &api.Client{}
-	view := NewBulkView(client)
+	testCache := cache.NewSimpleCache()
+	view := NewBulkView(client, testCache)
 
 	assert.NotNil(t, view)
 	assert.Equal(t, client, view.client)
@@ -61,7 +63,8 @@ func TestNewBulkView(t *testing.T) {
 
 func TestBulkViewInit(t *testing.T) {
 	client := &api.Client{}
-	view := NewBulkView(client)
+	testCache := cache.NewSimpleCache()
+	view := NewBulkView(client, testCache)
 
 	cmd := view.Init()
 	assert.NotNil(t, cmd)
@@ -92,7 +95,8 @@ func TestBulkViewStatusConstants(t *testing.T) {
 
 func TestBulkViewWindowSizeMsg(t *testing.T) {
 	client := &api.Client{}
-	view := NewBulkView(client)
+	testCache := cache.NewSimpleCache()
+	view := NewBulkView(client, testCache)
 
 	msg := tea.WindowSizeMsg{
 		Width:  120,
@@ -113,7 +117,8 @@ func TestBulkViewWindowSizeMsg(t *testing.T) {
 
 func TestBulkViewGlobalQuitKeys(t *testing.T) {
 	client := &api.Client{}
-	view := NewBulkView(client)
+	testCache := cache.NewSimpleCache()
+	view := NewBulkView(client, testCache)
 	view.width = 80
 	view.height = 24
 
@@ -136,7 +141,8 @@ func TestBulkViewGlobalQuitKeys(t *testing.T) {
 
 func TestBulkViewFileSelectKeys(t *testing.T) {
 	client := &api.Client{}
-	view := NewBulkView(client)
+	testCache := cache.NewSimpleCache()
+	view := NewBulkView(client, testCache)
 	view.width = 80
 	view.height = 24
 	view.mode = ModeFileBrowser
@@ -188,7 +194,8 @@ func TestBulkViewFileSelectKeys(t *testing.T) {
 
 func TestBulkViewRunListKeys(t *testing.T) {
 	client := &api.Client{}
-	view := NewBulkView(client)
+	testCache := cache.NewSimpleCache()
+	view := NewBulkView(client, testCache)
 	view.width = 80
 	view.height = 24
 	view.mode = ModeRunList
@@ -297,7 +304,8 @@ func TestBulkViewRunListKeys(t *testing.T) {
 
 func TestBulkViewBulkFileSelectedMsg(t *testing.T) {
 	client := &api.Client{}
-	view := NewBulkView(client)
+	testCache := cache.NewSimpleCache()
+	view := NewBulkView(client, testCache)
 
 	t.Run("Canceled selection does nothing", func(t *testing.T) {
 		msg := components.BulkFileSelectedMsg{
@@ -336,7 +344,8 @@ func TestBulkViewBulkFileSelectedMsg(t *testing.T) {
 
 func TestBulkViewBulkRunsLoadedMsg(t *testing.T) {
 	client := &api.Client{}
-	view := NewBulkView(client)
+	testCache := cache.NewSimpleCache()
+	view := NewBulkView(client, testCache)
 
 	runs := []BulkRunItem{
 		{Title: "Run 1", Prompt: "Test prompt 1"},
@@ -368,7 +377,8 @@ func TestBulkViewBulkRunsLoadedMsg(t *testing.T) {
 
 func TestBulkViewBulkSubmittedMsg(t *testing.T) {
 	client := &api.Client{}
-	view := NewBulkView(client)
+	testCache := cache.NewSimpleCache()
+	view := NewBulkView(client, testCache)
 	view.submitting = true
 
 	t.Run("Successful submission", func(t *testing.T) {
@@ -390,8 +400,8 @@ func TestBulkViewBulkSubmittedMsg(t *testing.T) {
 		assert.Equal(t, "batch-123", updatedView.batchID)
 		assert.Equal(t, results, updatedView.results)
 		assert.Nil(t, updatedView.error)
-		assert.Equal(t, ModeProgress, updatedView.mode)
-		assert.NotNil(t, cmd) // Should be pollProgress()
+		// Mode doesn't change - navigation happens via command
+		assert.NotNil(t, cmd) // Should be navigation command
 	})
 
 	t.Run("Submission with error", func(t *testing.T) {
@@ -409,14 +419,15 @@ func TestBulkViewBulkSubmittedMsg(t *testing.T) {
 		assert.False(t, updatedView.submitting)
 		assert.Equal(t, "batch-123", updatedView.batchID)
 		assert.Equal(t, testError, updatedView.error)
-		assert.Equal(t, ModeResults, updatedView.mode)
-		assert.Nil(t, cmd)
+		// Mode doesn't change - navigation happens via command
+		assert.NotNil(t, cmd) // Should be navigation command
 	})
 }
 
 func TestBulkViewBulkProgressMsg(t *testing.T) {
 	client := &api.Client{}
-	view := NewBulkView(client)
+	testCache := cache.NewSimpleCache()
+	view := NewBulkView(client, testCache)
 
 	t.Run("Progress update incomplete", func(t *testing.T) {
 		msg := bulkProgressMsg{
@@ -438,26 +449,30 @@ func TestBulkViewBulkProgressMsg(t *testing.T) {
 		model, cmd := view.Update(msg)
 		updatedView := model.(*BulkView)
 
-		assert.Equal(t, ModeResults, updatedView.mode)
+		// Progress messages don't change mode anymore (navigation happens immediately on submission)
+		assert.NotEqual(t, ModeResults, updatedView.mode)
 		assert.Nil(t, cmd)
 	})
 }
 
 func TestBulkViewBulkCancelledMsg(t *testing.T) {
 	client := &api.Client{}
-	view := NewBulkView(client)
+	testCache := cache.NewSimpleCache()
+	view := NewBulkView(client, testCache)
 
 	msg := bulkCancelledMsg{}
 	model, cmd := view.Update(msg)
 	updatedView := model.(*BulkView)
 
-	assert.Equal(t, ModeResults, updatedView.mode)
+	// Cancelled messages don't change mode anymore (navigation happens immediately on submission)
+	assert.NotEqual(t, ModeResults, updatedView.mode)
 	assert.Nil(t, cmd)
 }
 
 func TestBulkViewErrMsg(t *testing.T) {
 	client := &api.Client{}
-	view := NewBulkView(client)
+	testCache := cache.NewSimpleCache()
+	view := NewBulkView(client, testCache)
 
 	testError := assert.AnError
 	msg := errMsg{err: testError}
@@ -471,7 +486,8 @@ func TestBulkViewErrMsg(t *testing.T) {
 
 func TestBulkViewRendering(t *testing.T) {
 	client := &api.Client{}
-	view := NewBulkView(client)
+	testCache := cache.NewSimpleCache()
+	view := NewBulkView(client, testCache)
 
 	t.Run("Before window size is set", func(t *testing.T) {
 		output := view.View()
@@ -564,7 +580,8 @@ func TestBulkViewRendering(t *testing.T) {
 
 func TestBulkViewStatusLineHelp(t *testing.T) {
 	client := &api.Client{}
-	view := NewBulkView(client)
+	testCache := cache.NewSimpleCache()
+	view := NewBulkView(client, testCache)
 	view.width = 80
 	view.height = 24
 
@@ -588,7 +605,8 @@ func TestBulkViewStatusLineHelp(t *testing.T) {
 
 func TestBulkViewLayoutSystem(t *testing.T) {
 	client := &api.Client{}
-	view := NewBulkView(client)
+	testCache := cache.NewSimpleCache()
+	view := NewBulkView(client, testCache)
 
 	// Simulate window size update
 	msg := tea.WindowSizeMsg{Width: 100, Height: 30}
@@ -621,7 +639,8 @@ func TestBulkViewLayoutSystem(t *testing.T) {
 
 func TestBulkViewModelInterface(t *testing.T) {
 	client := &api.Client{}
-	view := NewBulkView(client)
+	testCache := cache.NewSimpleCache()
+	view := NewBulkView(client, testCache)
 
 	// Verify it implements tea.Model interface
 	var _ tea.Model = view
@@ -636,7 +655,8 @@ func TestBulkViewModelInterface(t *testing.T) {
 
 func TestBulkViewNavigationMessages(t *testing.T) {
 	client := &api.Client{}
-	view := NewBulkView(client)
+	testCache := cache.NewSimpleCache()
+	view := NewBulkView(client, testCache)
 	view.width = 80
 	view.height = 24
 
@@ -668,7 +688,8 @@ func TestBulkViewNavigationMessages(t *testing.T) {
 
 func TestBulkViewDimensions(t *testing.T) {
 	client := &api.Client{}
-	view := NewBulkView(client)
+	testCache := cache.NewSimpleCache()
+	view := NewBulkView(client, testCache)
 
 	tests := []struct {
 		width  int

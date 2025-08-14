@@ -1,893 +1,259 @@
-# RepoBird CLI - Troubleshooting Guide
+# Troubleshooting Guide
+
+## Overview
+
+Common issues and solutions for RepoBird CLI.
+
+## Related Documentation
+- **[Configuration Guide](configuration-guide.md)** - Configuration setup
+- **[API Reference](api-reference.md)** - API errors
+- **[TUI Guide](tui-guide.md)** - TUI issues
+- **[Development Guide](development-guide.md)** - Debug techniques
 
 ## Quick Diagnostics
 
-Run the diagnostic command to check your setup:
 ```bash
-repobird diagnose
-```
-
-This checks:
-- API connectivity
-- Authentication status
-- Configuration validity
-- Cache status
-- System compatibility
-
-## Common Issues and Solutions
-
-### Authentication Issues
-
-#### Error: "API key not found"
-**Symptoms:**
-- Commands fail with authentication error
-- Cannot access RepoBird API
-
-**Solutions:**
-1. Check if API key is set:
-```bash
-repobird auth info
-```
-
-2. Set API key using secure method:
-```bash
-repobird auth login
-# Or
-repobird config set api-key
-```
-
-3. Verify environment variable:
-```bash
-echo $REPOBIRD_API_KEY
-```
-
-4. Check config file:
-```bash
-cat ~/.repobird/config.yaml | grep api_key
-```
-
-#### Error: "Invalid API key"
-**Solutions:**
-1. Verify API key is correct:
-```bash
+# Check setup
 repobird auth verify
+
+# Test API connection
+repobird status
+
+# Enable debug mode
+REPOBIRD_DEBUG_LOG=1 repobird tui
+tail -f /tmp/repobird_debug.log
 ```
 
-2. Re-login with correct key:
+## Common Issues
+
+### Authentication
+
+#### API Key Not Found
 ```bash
-repobird auth logout
-repobird auth login
+# Check all sources
+repobird config get api-key
+echo $REPOBIRD_API_KEY
+
+# Set API key
+repobird config set api-key YOUR_KEY
 ```
 
-3. Check for extra spaces or characters:
+#### Invalid API Key
+- Verify key at https://app.repobird.ai/settings
+- Check for extra spaces/newlines
+- Ensure correct environment (prod/dev)
+
+### Network Issues
+
+#### Connection Refused
 ```bash
-# Remove and re-add without spaces
-repobird config delete api-key
-repobird config set api-key
-```
+# Check API URL
+repobird config get api-url
 
-### Connection Issues
-
-#### Error: "Connection refused" or "Network error"
-**Symptoms:**
-- Cannot connect to API
-- Timeout errors
-
-**Solutions:**
-1. Check internet connectivity:
-```bash
-ping api.repobird.ai
+# Test connectivity
 curl -I https://api.repobird.ai/health
+
+# Use custom endpoint
+export REPOBIRD_API_URL=https://custom.api.url
 ```
 
-2. Check proxy settings:
+#### Timeout Errors
 ```bash
-echo $HTTP_PROXY
-echo $HTTPS_PROXY
+# Increase timeout
+export REPOBIRD_TIMEOUT=60m
+
+# Check for proxy
+export HTTP_PROXY=http://proxy:8080
+export HTTPS_PROXY=http://proxy:8080
 ```
 
-3. Test with custom endpoint:
+### TUI Problems
+
+#### Display Issues
 ```bash
-REPOBIRD_API_URL=https://api.repobird.ai repobird status
+# Check terminal
+echo $TERM
+
+# Try different terminal
+export TERM=xterm-256color
+
+# Reset terminal
+reset
 ```
 
-4. Increase timeout:
+#### Navigation Not Working
+- Check for tmux/screen interference
+- Verify terminal supports ANSI escape codes
+- Try different terminal emulator
+
+#### Slow Performance
 ```bash
-repobird config set timeout 60s
-# Or
-REPOBIRD_TIMEOUT=60s repobird status
-```
+# Clear cache
+rm -rf ~/.config/repobird/cache/
 
-#### Error: "SSL certificate verification failed"
-**Solutions:**
-1. Update CA certificates:
-```bash
-# macOS
-brew install ca-certificates
-
-# Linux
-sudo apt-get update && sudo apt-get install ca-certificates
-
-# Alpine
-apk add --update ca-certificates
-```
-
-2. For testing only (NOT for production):
-```bash
-export SSL_CERT_FILE=/path/to/cert.pem
-```
-
-### Rate Limiting
-
-#### Error: "Rate limit exceeded"
-**Symptoms:**
-- HTTP 429 errors
-- "Too many requests" messages
-
-**Solutions:**
-1. Check rate limit status:
-```bash
-repobird auth info
-```
-
-2. Wait for reset:
-```bash
-# Check retry-after header in debug mode
-REPOBIRD_DEBUG=true repobird status
-```
-
-3. Reduce request frequency:
-```bash
-# Increase polling interval for TUI
-repobird config set tui.refresh_interval 30s
-```
-
-### Run Creation Issues
-
-#### Error: "Failed to create run"
-**Symptoms:**
-- Run creation fails
-- Validation errors
-
-**Solutions:**
-1. Validate task file:
-```bash
-# Check JSON syntax
-jq . task.json
-
-# Dry run
-repobird run task.json --dry-run
-```
-
-2. Check required fields:
-```json
-{
-  "prompt": "Required: task description",
-  "repository": "Required: org/repo format",
-  "source": "Required: branch name",
-  "runType": "Required: 'run' or 'approval'"
-}
-```
-
-3. Verify repository access:
-```bash
-# Check if repo exists and is accessible
-git ls-remote https://github.com/org/repo
-```
-
-#### Error: "Repository not found"
-**Solutions:**
-1. Check repository format:
-```bash
-# Correct format: org/repo
-# Wrong: https://github.com/org/repo
-# Wrong: org/repo.git
-```
-
-2. Verify repository exists:
-```bash
-gh repo view org/repo
-```
-
-3. Check permissions:
-```bash
-# Ensure API key has access to repository
-repobird auth info
-```
-
-#### Duplicate Run Detection
-
-**Understanding Duplicate Detection:**
-When you load a task file (JSON, YAML, Markdown, etc.), RepoBird calculates a SHA-256 hash of the file content to detect duplicates.
-
-**Visual Indicators:**
-- ✓ **Green** next to Submit button: Ready to submit (not a duplicate)
-- ⚠️ **Yellow** next to Submit button: Duplicate detected, but can still submit
-
-**When Submitting a Duplicate:**
-Instead of showing an error page, RepoBird shows a friendly prompt:
-```
-[DUPLICATE] ⚠️ DUPLICATE RUN DETECTED (ID: 123) - Override? [y] yes [n] no
-```
-
-**Actions:**
-- Press `y` to override and submit the duplicate run
-- Press `n` or `ESC` to cancel and return to the form
-- The system automatically handles the retry with force flag
-
-**Troubleshooting Duplicate Issues:**
-
-1. **False Positives**: If you get duplicate warnings for different tasks:
-```bash
-# Clear the file hash cache
-rm -rf ~/.cache/repobird/users/user-*/file_hashes.json
-```
-
-2. **Cache Out of Sync**: If duplicate detection seems inconsistent:
-```bash
-# Force cache refresh by restarting the TUI
-repobird tui
-```
-
-3. **Intentional Duplicates**: To always allow duplicates without prompting:
-```bash
-# Edit your task file to make it unique (add a comment or timestamp)
-# Or use different file names for similar tasks
+# Disable animations
+export REPOBIRD_NO_ANIMATIONS=1
 ```
 
 ### Cache Issues
 
-#### Stale or Corrupted Cache
-**Symptoms:**
-- Outdated information displayed
-- Inconsistent data
-- TUI crashes
-
-**Solutions:**
-1. Clear cache:
+#### Stale Data
 ```bash
-repobird cache clear
+# Clear all cache
+rm -rf ~/.config/repobird/cache/
+
+# Clear specific user cache
+rm -rf ~/.config/repobird/cache/users/*/
 ```
 
-2. Delete cache directory:
+#### Permission Denied
 ```bash
-rm -rf ~/.cache/repobird
+# Fix permissions
+chmod -R 700 ~/.config/repobird/
 ```
 
-3. Disable cache temporarily:
-```bash
-repobird status --no-cache
-```
-
-4. Disable cache permanently:
-```bash
-repobird config set cache.enabled false
-```
-
-#### User-Specific Cache Issues
-**Symptoms:**
-- Seeing another user's run data
-- Cache not being saved for current user
-- Mixed data from different users
-
-**New Cache Structure:**
-RepoBird CLI now uses user-specific cache directories to prevent data mixing:
-```
-~/.cache/repobird/
-├── users/
-│   ├── user-123/  # User ID-based directories
-│   │   ├── runs/
-│   │   └── repository_history.json
-│   └── user-456/
-└── shared/        # Fallback for unknown users
-    ├── runs/
-    └── repository_history.json
-```
-
-**Solutions:**
-1. Ensure you're authenticated:
-```bash
-repobird auth verify
-```
-
-2. Clear user-specific cache:
-```bash
-# Clear only your cache
-rm -rf ~/.cache/repobird/users/user-YOUR_ID
-```
-
-3. Reset to shared cache:
-```bash
-# If user ID detection fails, manually clear shared cache
-rm -rf ~/.cache/repobird/shared
-```
-
-4. Check cache location:
-```bash
-# Debug which cache directory is being used
-REPOBIRD_DEBUG=true repobird status 2>&1 | grep cache
-```
-
-### TUI Issues
-
-#### TUI Not Displaying Correctly
-**Symptoms:**
-- Garbled display
-- Missing colors
-- Layout issues
-
-**Solutions:**
-1. Check terminal compatibility:
-```bash
-echo $TERM
-# Should be xterm-256color or similar
-```
-
-2. Set proper terminal:
-```bash
-export TERM=xterm-256color
-```
-
-3. Disable colors if needed:
-```bash
-export REPOBIRD_NO_COLOR=true
-```
-
-4. Try different terminal emulator:
-- iTerm2 (macOS)
-- Windows Terminal (Windows)
-- Alacritty (Cross-platform)
-
-#### TUI Keyboard Shortcuts Not Working
-**Solutions:**
-1. Check for conflicting terminal shortcuts
-2. Try different terminal emulator
-3. Disable vim mode if enabled:
-```bash
-repobird config set tui.vim_mode false
-```
-
-### File Permission Issues
-
-#### Error: "Permission denied"
-**Symptoms:**
-- Cannot read/write config
-- Cannot access cache
-
-**Solutions:**
-1. Fix directory permissions:
-```bash
-chmod 755 ~/.repobird
-chmod 644 ~/.repobird/config.yaml
-```
-
-2. Check ownership:
-```bash
-ls -la ~/.repobird
-# Fix if needed
-chown -R $(whoami) ~/.repobird
-```
-
-3. Run with proper user:
-```bash
-# Don't use sudo unless necessary
-repobird status  # Good
-sudo repobird status  # Usually wrong
-```
-
-### Installation Issues
+### Build/Installation
 
 #### Command Not Found
-**Solutions:**
-1. Check if installed:
 ```bash
+# Check installation
 which repobird
-```
 
-2. Add to PATH:
-```bash
-# If installed in ~/go/bin
-export PATH=$PATH:~/go/bin
+# Add to PATH
+export PATH=$PATH:$HOME/go/bin
 
-# If installed in /usr/local/bin
-export PATH=$PATH:/usr/local/bin
-```
-
-3. Reinstall:
-```bash
+# Reinstall
 go install github.com/repobird/cli/cmd/repobird@latest
 ```
 
 #### Version Mismatch
-**Solutions:**
-1. Check version:
 ```bash
+# Check version
 repobird version
-```
 
-2. Update to latest:
-```bash
+# Update to latest
 go install github.com/repobird/cli/cmd/repobird@latest
 ```
 
-3. Clean install:
+## Debug Techniques
+
+### Enable Verbose Logging
 ```bash
-go clean -cache
-go install github.com/repobird/cli/cmd/repobird@latest
+# Debug environment variable
+export REPOBIRD_DEBUG_LOG=1
+
+# Run command
+repobird tui
+
+# View logs
+tail -f /tmp/repobird_debug.log
 ```
 
-### Performance Issues
-
-#### Slow Response Times
-**Solutions:**
-1. Enable debug to see timing:
+### Trace API Calls
 ```bash
-REPOBIRD_DEBUG=true repobird status
+# Enable HTTP debugging
+export REPOBIRD_HTTP_DEBUG=1
+
+# See all API requests/responses
+repobird status --debug
 ```
 
-2. Check network latency:
+### Profile Performance
 ```bash
-ping api.repobird.ai
-traceroute api.repobird.ai
+# CPU profiling
+CPUPROFILE=cpu.prof repobird tui
+
+# Analyze profile
+go tool pprof cpu.prof
 ```
 
-3. Reduce timeout for faster failures:
-```bash
-repobird config set timeout 30s
-```
+## Error Messages
 
-4. Use caching:
-```bash
-repobird config set cache.enabled true
-```
+### API Errors
 
-#### High Memory Usage
-**Solutions:**
-1. Clear cache:
-```bash
-repobird cache clear
-```
+| Error | Cause | Solution |
+|-------|-------|----------|
+| `401 Unauthorized` | Invalid API key | Check API key configuration |
+| `403 Forbidden` | No access to resource | Verify repository permissions |
+| `429 Too Many Requests` | Rate limited | Wait and retry |
+| `500 Internal Server Error` | Server issue | Retry later |
+| `503 Service Unavailable` | Maintenance | Check status page |
 
-2. Limit cache size:
-```bash
-repobird config set cache.max_size 50MB
-```
+### CLI Errors
 
-3. Check for memory leaks:
-```bash
-# Run with profiling
-GODEBUG=gctrace=1 repobird status
-```
+| Error | Cause | Solution |
+|-------|-------|----------|
+| `context deadline exceeded` | Timeout | Increase timeout setting |
+| `no such file or directory` | Missing config | Run `repobird config init` |
+| `permission denied` | File permissions | Fix with `chmod` |
+| `invalid character` | Corrupted JSON | Check task file format |
 
-## Platform-Specific Issues
+## Platform-Specific
 
 ### macOS
-
-#### Keychain Access Issues
-**Problem:** Cannot store API key in keychain
-
-**Solutions:**
-1. Reset keychain access:
 ```bash
+# Keychain access issues
 security unlock-keychain
-```
 
-2. Grant terminal access:
-- System Preferences → Security & Privacy → Privacy → Full Disk Access
-- Add Terminal.app or iTerm.app
-
-3. Use alternative storage:
-```bash
-export REPOBIRD_API_KEY="your-key"
-```
-
-### Windows
-
-#### Path Issues
-**Problem:** Paths with spaces cause errors
-
-**Solutions:**
-1. Use quotes:
-```cmd
-repobird run "C:\My Documents\task.json"
-```
-
-2. Use short paths:
-```cmd
-repobird run C:\MYDOCU~1\task.json
-```
-
-#### PowerShell Execution Policy
-**Problem:** Scripts blocked by execution policy
-
-**Solutions:**
-```powershell
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+# Code signing
+xattr -d com.apple.quarantine repobird
 ```
 
 ### Linux
-
-#### Library Dependencies
-**Problem:** Missing shared libraries
-
-**Solutions:**
-1. Install dependencies:
 ```bash
-# Debian/Ubuntu
-sudo apt-get install libssl-dev ca-certificates
+# Missing dependencies
+sudo apt-get install ca-certificates
 
-# RHEL/CentOS
-sudo yum install openssl-devel ca-certificates
-
-# Alpine
-apk add openssl ca-certificates
+# Keyring issues
+sudo apt-get install gnome-keyring
 ```
 
-## Docker Issues
+### Windows
+```powershell
+# Path issues
+$env:Path += ";C:\Users\$env:USERNAME\go\bin"
 
-### Container Networking
-**Problem:** Cannot connect to API from container
+# Execution policy
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned
+```
 
-**Solutions:**
-1. Use host network:
+## Recovery Steps
+
+### Complete Reset
 ```bash
-docker run --network host repobird-cli status
+# Backup config
+cp ~/.repobird/config.yaml ~/.repobird/config.yaml.bak
+
+# Remove all data
+rm -rf ~/.repobird/
+rm -rf ~/.config/repobird/
+
+# Reinitialize
+repobird config init
+repobird config set api-key YOUR_KEY
 ```
 
-2. Check DNS:
+### Cache Recovery
 ```bash
-docker run repobird-cli nslookup api.repobird.ai
-```
+# List cache contents
+ls -la ~/.config/repobird/cache/
 
-### Environment Variables
-**Problem:** Environment variables not passed to container
-
-**Solutions:**
-```bash
-docker run -e REPOBIRD_API_KEY=$REPOBIRD_API_KEY repobird-cli status
-```
-
-## CI/CD Issues
-
-### GitHub Actions
-**Problem:** Authentication fails in workflow
-
-**Solutions:**
-1. Check secret is set:
-```yaml
-- name: Check RepoBird
-  env:
-    REPOBIRD_API_KEY: ${{ secrets.REPOBIRD_API_KEY }}
-  run: repobird status
-```
-
-2. Enable debug:
-```yaml
-- name: Debug RepoBird
-  env:
-    REPOBIRD_DEBUG: true
-    REPOBIRD_API_KEY: ${{ secrets.REPOBIRD_API_KEY }}
-  run: repobird auth verify
-```
-
-### Jenkins
-**Problem:** Credentials not available
-
-**Solutions:**
-```groovy
-withCredentials([string(credentialsId: 'repobird-api-key', variable: 'REPOBIRD_API_KEY')]) {
-    sh 'repobird status'
-}
-```
-
-## Debug Mode
-
-### Enable Comprehensive Debugging
-```bash
-# Maximum debug output
-export REPOBIRD_DEBUG=true
-export REPOBIRD_DEBUG_FILE=/tmp/repobird.log
-repobird status --debug
-
-# View debug log
-tail -f /tmp/repobird.log
-```
-
-### Debug Specific Components
-```bash
-# API requests only
-REPOBIRD_DEBUG_API=true repobird status
-
-# Cache operations only
-REPOBIRD_DEBUG_CACHE=true repobird status
-
-# TUI events
-REPOBIRD_DEBUG_TUI=true repobird tui 2>tui.log
+# Selective cleanup
+find ~/.config/repobird/cache/ -name "*.tmp" -delete
 ```
 
 ## Getting Help
 
-### Self-Help Resources
-1. Check documentation:
-```bash
-repobird help
-repobird help [command]
-```
+### Resources
+- GitHub Issues: https://github.com/repobird/cli/issues
+- Documentation: https://docs.repobird.ai
+- Status Page: https://status.repobird.ai
 
-2. View configuration:
-```bash
-repobird config list
-repobird auth info
-```
-
-3. Run diagnostics:
-```bash
-repobird diagnose
-```
-
-### Community Support
-- GitHub Issues: [github.com/repobird/cli/issues](https://github.com/repobird/cli/issues)
-- Discord: [discord.gg/repobird](https://discord.gg/repobird)
-- Email: support@repobird.ai
-
-### Reporting Issues
-
+### Diagnostic Information
 When reporting issues, include:
-
-1. **Version information:**
 ```bash
 repobird version
 go version
-echo $OSTYPE
-```
-
-2. **Debug output:**
-```bash
-REPOBIRD_DEBUG=true repobird [command] 2>&1 | tee debug.log
-```
-
-3. **Configuration (sanitized):**
-```bash
-repobird config list | sed 's/api_key: .*/api_key: REDACTED/'
-```
-
-4. **Steps to reproduce:**
-- Exact commands run
-- Expected behavior
-- Actual behavior
-- Error messages
-
-5. **Environment:**
-- Operating system
-- Terminal emulator
-- Shell (bash/zsh/fish)
-- Proxy settings (if applicable)
-
-## Recovery Procedures
-
-### Complete Reset
-```bash
-# Backup current config
-cp -r ~/.repobird ~/.repobird.backup
-
-# Remove all RepoBird data
-rm -rf ~/.repobird
-
-# Reinstall
-go install github.com/repobird/cli/cmd/repobird@latest
-
-# Reconfigure
-repobird auth login
-```
-
-### Partial Reset
-```bash
-# Reset configuration only
-repobird config reset
-
-# Reset cache only
-repobird cache clear
-
-# Reset credentials only
-repobird auth logout
-repobird auth login
-```
-
-## Cache Issues
-
-### Problem: TUI Making Unnecessary API Calls for DONE Runs
-**Symptoms:**
-- Details view always makes API calls for completed runs
-- Slow navigation between run details
-- Network requests visible in API logs for cached runs
-
-**Debug Steps:**
-1. Enable debug logging to see cache behavior:
-```bash
-# Clear existing debug log
-rm -f /tmp/repobird_debug.log
-
-# Run with debug logging
-REPOBIRD_DEBUG=true repobird tui
-
-# Check debug log in another terminal
-tail -f /tmp/repobird_debug.log
-```
-
-2. Look for cache behavior indicators:
-```bash
-# Good signs (cache working):
-DEBUG: Cache HIT for runID='123'
-DEBUG: Using cached data for run '123'
-Details cache loaded: 8
-
-# Bad signs (cache not working):
-DEBUG: Cache MISS for runID='123'  
-DEBUG: Making API call for runID='123'
-Details cache loaded: 0
-```
-
-**Solutions:**
-
-1. **Check cache directory structure:**
-```bash
-ls -la ~/.cache/repobird/users/
-# Should show: user-{userID}/ directories
-# Each should contain runs/ with *.json files
-```
-
-2. **Verify user-specific cache:**
-```bash
-# Look for terminal run files
-find ~/.cache/repobird/users -name "*.json" -type f | head -10
-# Should show files like: user-123/runs/456.json
-```
-
-3. **Clear and rebuild cache if corrupted:**
-```bash
-# Clear all cache (will rebuild automatically)
-rm -rf ~/.cache/repobird/
-
-# Or clear specific user cache:
-rm -rf ~/.cache/repobird/users/user-{YOUR_USER_ID}/
-```
-
-4. **Remove legacy cache files:**
-```bash
-# Delete old cache structure that conflicts with new system
-rm -rf ~/.cache/repobird/runs/
-rm -rf ~/.cache/repobird/shared/runs/
-```
-
-### Problem: Cache Not Loading Across Sessions
-**Symptoms:**
-- Cache seems to work within session but resets on restart
-- Debug shows "Loaded 0 terminal runs from persistent cache"
-- Have to refetch all run details every restart
-
-**Solutions:**
-
-1. **Check persistent cache loading:**
-```bash
-# Enable debug mode and look for these lines on startup:
-DEBUG: Using user-specific cache directory: /home/user/.cache/repobird/users/user-123/runs
-DEBUG: Loaded 5 terminal runs from persistent cache
-```
-
-2. **Verify file permissions:**
-```bash
-# Check cache directory is writable
-ls -la ~/.cache/repobird/users/user-*/
-# Ensure runs/ directory and *.json files exist and are readable
-```
-
-3. **Test cache persistence manually:**
-```bash
-# Navigate to a DONE run in TUI, then quit
-# Restart TUI and navigate to same run
-# Should show "Cache HIT" instead of making API call
-```
-
-### Problem: Cache Growing Too Large
-**Symptoms:**
-- Slow TUI performance
-- Large cache directory size
-- Memory usage increasing over time
-
-**Solutions:**
-
-1. **Check cache size:**
-```bash
-du -sh ~/.cache/repobird/
-# Should be reasonable (< 50MB for typical usage)
-```
-
-2. **Clean old cache files:**
-```bash
-# RepoBird automatically cleans files older than 30 days
-# Manual cleanup if needed:
-find ~/.cache/repobird -name "*.json" -mtime +30 -delete
-```
-
-3. **Reset cache if extremely large:**
-```bash
-rm -rf ~/.cache/repobird/
-# Cache will rebuild automatically with current runs
-```
-
-### Problem: Multiple Users on Same Machine
-**Symptoms:**
-- Users see each other's data
-- Cache conflicts between users
-- Wrong run details showing
-
-**Solutions:**
-
-1. **Verify user-specific caches:**
-```bash
-# Each user should have their own directory:
-ls ~/.cache/repobird/users/
-# Should show: user-456/, user-789/, etc.
-```
-
-2. **Check authentication:**
-```bash
-repobird auth info
-# Verify correct user is authenticated
-```
-
-3. **Clear specific user cache:**
-```bash
-# If user data is mixed up:
-rm -rf ~/.cache/repobird/users/user-{INCORRECT_USER_ID}/
-# Re-authenticate and cache will rebuild correctly
-```
-
-### Debug Commands for Cache Issues
-
-```bash
-# Complete cache information
-REPOBIRD_DEBUG=true repobird diagnose 2>&1 | grep -i cache
-
-# Monitor cache behavior during navigation
-tail -f /tmp/repobird_debug.log | grep -E "(Cache|DEBUG:|Details cache)"
-
-# Check cache contents
-find ~/.cache/repobird -name "*.json" | wc -l  # Count cached files
-ls -la ~/.cache/repobird/users/user-*/runs/   # List cached runs
-
-# Test specific run cache
-REPOBIRD_DEBUG=true repobird status RUN_ID   # Should show cache hit/miss
-```
-
-## Preventive Measures
-
-### Regular Maintenance
-```bash
-# Weekly cache cleanup
-repobird cache clear
-
-# Update CLI monthly
-go install github.com/repobird/cli/cmd/repobird@latest
-
-# Verify setup quarterly
-repobird diagnose
-```
-
-### Backup Configuration
-```bash
-# Create backup
-tar -czf repobird-backup.tar.gz ~/.repobird
-
-# Restore from backup
-tar -xzf repobird-backup.tar.gz -C ~/
-```
-
-### Monitor Usage
-```bash
-# Check quota
-repobird auth info
-
-# Monitor rate limits
-REPOBIRD_DEBUG=true repobird status 2>&1 | grep -i rate
+echo $REPOBIRD_API_URL
+uname -a
 ```

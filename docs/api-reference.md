@@ -1,531 +1,205 @@
 # RepoBird CLI - API Reference
 
-## API Client Configuration
+## Overview
 
-### Base Configuration
-```go
-const (
-    BaseURL        = "https://api.repobird.ai/v1"
-    DefaultTimeout = 30 * time.Second
-    UserAgent      = "repobird-cli/{version}"
-)
-```
+REST API client implementation for RepoBird AI platform with resilience patterns and enterprise features.
 
-### Authentication
-All API requests require Bearer token authentication:
-```
-Authorization: Bearer <API_KEY>
-```
+## Related Documentation
+- **[Architecture Overview](architecture.md)** - System design and patterns
+- **[Configuration Guide](configuration-guide.md)** - API key and environment setup
+- **[Troubleshooting Guide](troubleshooting.md)** - Debug mode and error handling
+- **[Development Guide](development-guide.md)** - Client usage examples
 
-## API Endpoints
+## Configuration
 
-### 1. Create Run
-Creates a new AI-powered code generation run.
+**Base URL:** `https://api.repobird.ai/v1`  
+**Authentication:** Bearer token via `Authorization: Bearer <API_KEY>`  
+**Timeout:** 45 minutes default  
+**User Agent:** `repobird-cli/{version}`
 
-**Endpoint:** `POST /api/v1/runs`
+## Core Endpoints
 
-**Request Body:**
+### Create Run
+`POST /api/v1/runs` - Submit AI-powered code generation task
+
+**Request:**
 ```json
 {
   "prompt": "string",           // Required: Task description
-  "repository": "string",        // Required: Format: "org/repo"
-  "source": "string",           // Required: Source branch
-  "target": "string",           // Optional: Target branch
-  "runType": "string",          // Required: "run" or "approval"
-  "title": "string",            // Optional: PR title
-  "context": "string",          // Optional: Additional context
-  "files": ["string"],          // Optional: Specific files
-  "directories": ["string"],    // Optional: Specific directories
-  "messageToReviewer": "string", // Optional: For approval runs
-  "messageToApplier": "string",  // Optional: For approval runs
-  "gitProvider": "string",      // Optional: "github", "gitlab", etc.
-  "modelOverride": "string"     // Optional: Model selection
+  "repository": "org/repo",     // Required: GitHub/GitLab repo
+  "source": "main",            // Required: Source branch
+  "target": "feature/xyz",     // Optional: Target branch
+  "runType": "run|approval",   // Required: Execution mode
+  "files": ["path/to/file"]    // Optional: Specific files
 }
 ```
 
-**Response:**
-```json
-{
-  "data": {
-    "run": {
-      "id": "string",
-      "status": "string",
-      "createdAt": "2024-01-01T00:00:00Z",
-      "repository": "org/repo",
-      "sourceBranch": "main",
-      "targetBranch": "feature/branch",
-      "prUrl": "string"
-    }
-  }
-}
-```
-
-**Go Implementation:**
+**Methods:**
 ```go
 func (c *Client) CreateRun(ctx context.Context, req *RunRequest) (*Run, error)
 func (c *Client) CreateRunWithRetry(ctx context.Context, req *RunRequest) (*Run, error)
 ```
 
-### 2. Get Run Status
-Retrieves the current status and details of a run.
-
-**Endpoint:** `GET /api/v1/runs/{id}`
-
-**Path Parameters:**
-- `id` (string): The run ID
+### Get Run Status
+`GET /api/v1/runs/{id}` - Retrieve run details and progress
 
 **Response:**
 ```json
 {
-  "id": "string",
+  "id": "run-123",
   "status": "pending|running|completed|failed|cancelled",
-  "createdAt": "2024-01-01T00:00:00Z",
-  "updatedAt": "2024-01-01T00:00:00Z",
-  "completedAt": "2024-01-01T00:00:00Z",
-  "repository": "org/repo",
-  "sourceBranch": "main",
-  "targetBranch": "feature/branch",
-  "prUrl": "https://github.com/org/repo/pull/123",
-  "prompt": "string",
-  "runType": "run",
-  "error": "string",
-  "progress": {
-    "percentage": 75,
-    "message": "Processing files..."
-  }
+  "progress": { "percentage": 75, "message": "Processing..." },
+  "prUrl": "https://github.com/org/repo/pull/123"
 }
 ```
 
-**Go Implementation:**
+**Methods:**
 ```go
 func (c *Client) GetRun(ctx context.Context, id string) (*Run, error)
 func (c *Client) GetRunWithRetry(ctx context.Context, id string) (*Run, error)
 ```
 
-### 3. List Runs
-Lists all runs for the authenticated user.
+### List Runs
+`GET /api/v1/runs` - List user's runs with pagination
 
-**Endpoint:** `GET /api/v1/runs`
+**Query Parameters:** `page`, `limit` (max 1000), `status`, `repository`
 
-**Query Parameters:**
-- `page` (int): Page number (default: 1)
-- `limit` (int): Items per page (default: 20, max: 100)
-- `status` (string): Filter by status
-- `repository` (string): Filter by repository
-- `sort` (string): Sort field (createdAt, updatedAt)
-- `order` (string): Sort order (asc, desc)
-
-**Response:**
-```json
-{
-  "runs": [
-    {
-      "id": "string",
-      "status": "string",
-      "createdAt": "2024-01-01T00:00:00Z",
-      "repository": "org/repo",
-      "prompt": "string"
-    }
-  ],
-  "pagination": {
-    "page": 1,
-    "limit": 20,
-    "total": 100,
-    "totalPages": 5
-  }
-}
-```
-
-**Go Implementation:**
+**Method:**
 ```go
 func (c *Client) ListRuns(ctx context.Context, opts ListOptions) (*RunList, error)
 ```
 
-### 4. Get Run Logs
-Streams logs for a specific run in real-time.
+### Additional Endpoints
+- `DELETE /api/v1/runs/{id}` - Cancel active run
+- `GET /api/v1/runs/{id}/logs` - Stream run logs
+- `GET /api/v1/user` - Get user info and quotas
+- `GET /api/v1/repositories` - List accessible repositories
 
-**Endpoint:** `GET /api/v1/runs/{id}/logs`
+## Error Handling
 
-**Path Parameters:**
-- `id` (string): The run ID
+### Error Types
+| Code | HTTP Status | Description | Retryable |
+|------|-------------|-------------|-----------|
+| `AUTH_FAILED` | 401 | Invalid API key | No |
+| `QUOTA_EXCEEDED` | 429 | Usage limit reached | No |
+| `RATE_LIMITED` | 429 | Too many requests | Yes |
+| `SERVER_ERROR` | 500 | Internal error | Yes |
+| `SERVICE_UNAVAILABLE` | 503 | Service down | Yes |
 
-**Query Parameters:**
-- `follow` (bool): Whether to stream logs in real-time (default: false)
-- `tail` (int): Number of recent log lines to return (default: all)
-
-**Response:**
-```
-Content-Type: text/plain
-Content-Type: text/event-stream (for streaming)
-
-2024-01-01T10:00:00Z [INFO] Starting code analysis...
-2024-01-01T10:00:01Z [INFO] Processing file: src/main.go
-2024-01-01T10:00:02Z [INFO] Generating changes...
-```
-
-**Go Implementation:**
-```go
-func (c *Client) GetRunLogs(ctx context.Context, id string, follow bool) (io.ReadCloser, error)
-```
-
-### 5. Cancel Run
-Cancels an active run.
-
-**Endpoint:** `DELETE /api/v1/runs/{id}`
-
-**Path Parameters:**
-- `id` (string): The run ID
-
-**Response:**
-```json
-{
-  "id": "string",
-  "status": "cancelled",
-  "cancelledAt": "2024-01-01T00:00:00Z"
-}
-```
-
-**Go Implementation:**
-```go
-func (c *Client) CancelRun(ctx context.Context, id string) error
-```
-
-### 6. Get User Information
-Retrieves authenticated user information and account details.
-
-**Endpoint:** `GET /api/v1/user`
-
-**Response:**
-```json
-{
-  "id": 12345,
-  "username": "string",
-  "email": "user@example.com",
-  "name": "string",
-  "avatar": "https://example.com/avatar.jpg",
-  "plan": "pro",
-  "quota": {
-    "used": 10,
-    "limit": 100,
-    "period": "month",
-    "resetAt": "2024-02-01T00:00:00Z"
-  },
-  "preferences": {
-    "defaultRunType": "run",
-    "emailNotifications": true
-  }
-}
-```
-
-**Go Implementation:**
-```go
-func (c *Client) GetUserInfo(ctx context.Context) (*UserInfo, error)
-```
-
-### 7. List Repositories
-Lists repositories available to the authenticated user.
-
-**Endpoint:** `GET /api/v1/repositories`
-
-**Query Parameters:**
-- `page` (int): Page number (default: 1)
-- `limit` (int): Items per page (default: 20, max: 100)
-- `search` (string): Search repositories by name
-- `sort` (string): Sort field (name, updatedAt, createdAt)
-- `order` (string): Sort order (asc, desc)
-
-**Response:**
-```json
-{
-  "repositories": [
-    {
-      "id": 123456,
-      "name": "org/repo",
-      "fullName": "organization/repository",
-      "description": "Repository description",
-      "private": false,
-      "language": "Go",
-      "starCount": 42,
-      "forkCount": 12,
-      "updatedAt": "2024-01-01T00:00:00Z",
-      "createdAt": "2024-01-01T00:00:00Z",
-      "permissions": {
-        "admin": false,
-        "push": true,
-        "pull": true
-      }
-    }
-  ],
-  "pagination": {
-    "page": 1,
-    "limit": 20,
-    "total": 50,
-    "totalPages": 3
-  }
-}
-```
-
-**Go Implementation:**
-```go
-func (c *Client) ListRepositories(ctx context.Context, opts ListOptions) (*RepositoryList, error)
-```
-
-## Error Responses
-
-### Standard Error Format
+### Error Response Format
 ```json
 {
   "error": {
-    "code": "string",
-    "message": "string",
-    "details": {},
+    "code": "AUTH_FAILED",
+    "message": "Invalid API key",
     "retryable": false
   }
 }
 ```
 
-### Error Codes
-| Code | HTTP Status | Description | Retryable |
-|------|-------------|-------------|-----------|
-| `AUTH_FAILED` | 401 | Invalid or missing API key | No |
-| `FORBIDDEN` | 403 | Insufficient permissions | No |
-| `NOT_FOUND` | 404 | Resource not found | No |
-| `VALIDATION_ERROR` | 400 | Invalid request data | No |
-| `QUOTA_EXCEEDED` | 429 | Usage limit reached | No |
-| `RATE_LIMITED` | 429 | Too many requests | Yes |
-| `SERVER_ERROR` | 500 | Internal server error | Yes |
-| `SERVICE_UNAVAILABLE` | 503 | Service temporarily down | Yes |
-| `TIMEOUT` | 504 | Request timeout | Yes |
-
-## Client Configuration
-
-### Environment Variables
-```bash
-REPOBIRD_API_KEY=your_api_key_here
-REPOBIRD_API_URL=https://custom.api.url  # Optional
-REPOBIRD_DEBUG=true                      # Enable debug logging
-```
-
-### Programmatic Configuration
+### Go Error Handling
 ```go
-// Simple client initialization
-client := api.NewClient("your_api_key")
-
-// Or with custom configuration
-client := &api.Client{
-    BaseURL:    "https://api.repobird.ai/v1",
-    APIKey:     "your_api_key",
-    HTTPClient: &http.Client{
-        Timeout: 30 * time.Second,
-    },
+if err != nil {
+    switch {
+    case errors.IsAuthError(err):
+        // Handle authentication error
+    case errors.IsQuotaExceeded(err):
+        // Handle quota error  
+    case errors.IsRetryable(err):
+        // Retry with exponential backoff
+    }
 }
 ```
 
-## Retry Logic
+## Resilience Patterns
 
-### Exponential Backoff Configuration
+### Retry Configuration
 ```go
 type RetryConfig struct {
     MaxRetries     int           // Default: 5
     InitialDelay   time.Duration // Default: 1s
     MaxDelay       time.Duration // Default: 30s
     Multiplier     float64       // Default: 2.0
-    JitterFraction float64       // Default: 0.1
 }
 ```
-
-### Retryable Conditions
-- Network errors (connection refused, timeout)
-- HTTP 429 (Rate Limited)
-- HTTP 500, 502, 503, 504
-- Circuit breaker not open
 
 ### Circuit Breaker
-```go
-type CircuitBreaker struct {
-    FailureThreshold int           // Default: 5
-    RecoveryTimeout  time.Duration // Default: 30s
-    HalfOpenRequests int           // Default: 3
-}
-```
+- **Failure Threshold:** 5 consecutive failures
+- **Recovery Timeout:** 30 seconds
+- **States:** Closed → Open → Half-Open → Closed
 
-States:
-- **Closed**: Normal operation
-- **Open**: All requests fail immediately
-- **Half-Open**: Limited requests to test recovery
+### Rate Limiting
+**Client-side:** 10 req/s with burst of 20  
+**Server-side:** 60 req/min, 1000 req/hour
 
-## Rate Limiting
-
-### Client-Side Rate Limiting
-```go
-rateLimiter := rate.NewLimiter(
-    rate.Every(time.Second/10), // 10 requests per second
-    20,                          // Burst of 20
-)
-```
-
-### Server-Side Rate Limits
-- **Per-minute**: 60 requests
-- **Per-hour**: 1000 requests
-- **Concurrent runs**: 5
-
-Response headers:
+**Response Headers:**
 ```
 X-RateLimit-Limit: 60
 X-RateLimit-Remaining: 45
 X-RateLimit-Reset: 1704067200
-Retry-After: 30
 ```
 
 ## Polling Operations
 
-### Status Polling Configuration
+### Configuration
 ```go
-type PollerConfig struct {
-    InitialInterval time.Duration // Default: 2s
-    MaxInterval     time.Duration // Default: 30s
-    Multiplier      float64       // Default: 1.5
-    Timeout         time.Duration // Default: 45m
-}
+poller := utils.NewPoller(PollerConfig{
+    InitialInterval: 2 * time.Second,
+    MaxInterval:     30 * time.Second,
+    Timeout:         45 * time.Minute,
+})
 ```
 
-### Usage Example
+### Usage
 ```go
-poller := utils.NewPoller(config)
 err := poller.Poll(ctx, func() (bool, error) {
-    run, err := client.GetRun(ctx, runID)
-    if err != nil {
-        return false, err
-    }
+    run, _ := client.GetRun(ctx, runID)
     return run.IsTerminal(), nil
 })
 ```
 
-## WebSocket Events (Future)
+## Client Usage
 
-### Connection
-```javascript
-ws://api.repobird.ai/v1/ws?token=<API_KEY>
-```
-
-### Event Types
-```json
-{
-  "type": "run.status",
-  "data": {
-    "id": "string",
-    "status": "string",
-    "progress": {}
-  }
-}
-```
-
-## API Integration
-
-### Authentication Flow
-
+### Initialization
 ```go
-// API client initialization
-type Client struct {
-    baseURL    string
-    apiKey     string
-    httpClient *http.Client
-}
+// Simple
+client := api.NewClient("your_api_key")
 
-func NewClient(apiKey string) *Client {
-    return &Client{
-        baseURL:    "https://api.repobird.ai/v1",
-        apiKey:     apiKey,
-        httpClient: &http.Client{
-            Timeout: 30 * time.Second,
-        },
-    }
-}
-
-// Request with authentication
-func (c *Client) doRequest(method, path string, body interface{}) (*http.Response, error) {
-    req, err := http.NewRequest(method, c.baseURL+path, body)
-    if err != nil {
-        return nil, err
-    }
-    req.Header.Set("Authorization", "Bearer "+c.apiKey)
-    req.Header.Set("Content-Type", "application/json")
-    return c.httpClient.Do(req)
-}
-```
-
-## SDK Usage Examples
-
-### Basic Run Creation
-```go
-package main
-
-import (
-    "context"
-    "fmt"
-    "github.com/repobird/repobird-cli/internal/api"
-)
-
-func main() {
-    client := api.NewClient("your_api_key")
-    
-    run, err := client.CreateRun(context.Background(), &api.RunRequest{
-        Prompt:     "Fix the authentication bug",
-        Repository: "org/repo",
-        Source:     "main",
-        RunType:    "run",
-    })
-    
-    if err != nil {
-        panic(err)
-    }
-    
-    fmt.Printf("Run created: %s\n", run.ID)
-}
-```
-
-### Polling with Cancellation
-```go
-ctx, cancel := context.WithCancel(context.Background())
-defer cancel()
-
-// Handle interruption
-go func() {
-    sigCh := make(chan os.Signal, 1)
-    signal.Notify(sigCh, os.Interrupt)
-    <-sigCh
-    cancel()
-}()
-
-// Poll for completion
-err := client.PollRunStatus(ctx, runID, func(run *Run) {
-    fmt.Printf("Status: %s (%.0f%%)\n", 
-        run.Status, run.Progress.Percentage)
+// With custom config
+client := api.NewClient(api.Config{
+    APIKey:  "your_api_key",
+    BaseURL: "https://custom.api.url",
+    Timeout: 30 * time.Second,
 })
 ```
 
-### Error Handling
-```go
-run, err := client.CreateRun(ctx, request)
-if err != nil {
-    switch {
-    case errors.IsAuthError(err):
-        // Handle authentication error
-        fmt.Println("Please check your API key")
-    case errors.IsQuotaExceeded(err):
-        // Handle quota error
-        fmt.Println("Monthly quota exceeded")
-    case errors.IsRetryable(err):
-        // Retry operation
-        run, err = client.CreateRunWithRetry(ctx, request)
-    default:
-        // Handle other errors
-        fmt.Printf("Error: %v\n", err)
-    }
-}
+### Environment Variables
+```bash
+REPOBIRD_API_KEY=your_key
+REPOBIRD_API_URL=https://custom.url  # Optional
+REPOBIRD_DEBUG=true                  # Enable debug logging
 ```
 
-## Performance Considerations
+### Example: Create and Poll Run
+```go
+// Create run
+run, err := client.CreateRunWithRetry(ctx, &api.RunRequest{
+    Prompt:     "Fix authentication bug",
+    Repository: "org/repo",
+    Source:     "main",
+    RunType:    "run",
+})
+
+// Poll for completion
+poller := utils.NewPoller(config)
+err = poller.Poll(ctx, func() (bool, error) {
+    run, err := client.GetRun(ctx, run.ID)
+    fmt.Printf("Status: %s (%.0f%%)\n", run.Status, run.Progress.Percentage)
+    return run.IsTerminal(), err
+})
+```
+
+## Performance
 
 ### Connection Pooling
 ```go
@@ -533,70 +207,21 @@ transport := &http.Transport{
     MaxIdleConns:        100,
     MaxIdleConnsPerHost: 10,
     IdleConnTimeout:     90 * time.Second,
-    DisableCompression:  false,
 }
 ```
 
-### Request Optimization
-- Use conditional requests with ETags
+### Optimization Tips
+- Use pagination for large datasets
 - Enable HTTP/2 for multiplexing
 - Implement response caching
-- Use pagination for list operations
+- Monitor retry rates and circuit breaker state
 
-### Metrics
-Track these metrics for monitoring:
-- Request latency (p50, p95, p99)
-- Error rates by type
-- Retry attempts and success rate
-- Circuit breaker state changes
+## Debug Mode
 
-## Migration Guide
-
-### From v1 to v2
-```go
-// v1
-client := api.NewClient(apiKey)
-
-// v2
-client := api.NewClient(api.Config{
-    APIKey: apiKey,
-})
-```
-
-### Deprecated Methods
-| Old Method | New Method | Deprecation Date |
-|------------|------------|------------------|
-| `client.Status()` | `client.GetRun()` | v2.0.0 |
-| `client.Submit()` | `client.CreateRun()` | v2.0.0 |
-
-## API Versioning
-
-### Version Header
-```
-X-API-Version: v1
-```
-
-### Breaking Changes Policy
-- Major version changes may break compatibility
-- Minor versions add functionality
-- Patch versions fix bugs
-- Deprecation notices given 3 months in advance
-
-## Support
-
-### API Status
-- Status page: https://status.repobird.ai
-- Health check: `GET /health`
-
-### Rate Limit Information
+Enable verbose logging:
 ```bash
-curl -H "Authorization: Bearer $API_KEY" \
-  https://api.repobird.ai/api/v1/auth/rate-limit
+REPOBIRD_DEBUG_LOG=1 repobird status
+# Logs written to /tmp/repobird_debug.log
 ```
 
-### Debug Mode
-Enable detailed logging:
-```bash
-export REPOBIRD_DEBUG=true
-repobird status --debug
-```
+See **[Troubleshooting Guide](troubleshooting.md)** for debugging techniques.

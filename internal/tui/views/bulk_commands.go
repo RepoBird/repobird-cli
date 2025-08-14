@@ -8,7 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/repobird/repobird-cli/internal/api/dto"
 	"github.com/repobird/repobird-cli/internal/bulk"
-	"github.com/repobird/repobird-cli/internal/cache"
+	"github.com/repobird/repobird-cli/internal/tui/cache"
 )
 
 // Command functions for bulk view operations
