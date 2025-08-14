@@ -58,7 +58,6 @@ func (w *WindowLayout) calculateDimensions() {
 	if w.contentHeight < 1 {
 		w.contentHeight = 1
 	}
-
 }
 
 // GetBoxDimensions returns the box width and height for lipgloss container

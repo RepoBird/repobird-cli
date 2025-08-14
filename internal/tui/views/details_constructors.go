@@ -85,7 +85,7 @@ func NewRunDetailsViewWithData(client APIClient, cache *cache.SimpleCache, run m
 	// Pre-populate the status history and content
 	v.updateStatusHistory(string(run.Status), false)
 	v.updateContent() // Initialize content with the run data
-	
+
 	return v
 }
 

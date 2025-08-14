@@ -813,13 +813,13 @@ func (v *BulkView) handleRunListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (v *BulkView) navigateToResults(msg bulkSubmittedMsg) tea.Cmd {
 	debug.LogToFilef("📊 BULK: Preparing to navigate to results view\n")
 	debug.LogToFilef("📊 BULK: BatchID: %s, Results count: %d, Error: %v\n", msg.batchID, len(msg.results), msg.err)
-	
+
 	// Create a map of original runs indexed by their position
 	originalRuns := make(map[int]BulkRunItem)
 	for i, run := range v.runs {
 		originalRuns[i] = run
 	}
-	
+
 	// Prepare navigation context with all the data the results view needs
 	navigationContext := map[string]interface{}{
 		"batchID":      msg.batchID,
@@ -827,11 +827,11 @@ func (v *BulkView) navigateToResults(msg bulkSubmittedMsg) tea.Cmd {
 		"repository":   v.repository,
 		"originalRuns": originalRuns,
 	}
-	
+
 	// Process the API response from bulkSubmittedMsg
 	var successful []dto.RunCreatedItem
 	var failed []dto.RunError
-	
+
 	if msg.err != nil {
 		// If there's an error, all runs failed
 		for i, run := range v.runs {
@@ -855,27 +855,27 @@ func (v *BulkView) navigateToResults(msg bulkSubmittedMsg) tea.Cmd {
 			} else {
 				// This is a successful run
 				successful = append(successful, dto.RunCreatedItem{
-					ID:     result.ID,
-					Title:  result.Title,
-					Status: result.Status,
+					ID:             result.ID,
+					Title:          result.Title,
+					Status:         result.Status,
 					RepositoryName: v.repository,
 				})
 			}
 		}
 	}
-	
+
 	navigationContext["successful"] = successful
 	navigationContext["failed"] = failed
-	
+
 	// Add statistics
 	navigationContext["statistics"] = dto.BulkStatistics{
 		Total:     len(v.runs),
 		Completed: len(successful),
 		Failed:    len(failed),
 	}
-	
+
 	debug.LogToFilef("📊 BULK: Navigation context prepared - Success: %d, Failed: %d\n", len(successful), len(failed))
-	
+
 	// Store context in cache - store each field separately
 	v.cache.SetNavigationContext("batchID", msg.batchID)
 	v.cache.SetNavigationContext("batchTitle", v.batchTitle)
@@ -884,7 +884,7 @@ func (v *BulkView) navigateToResults(msg bulkSubmittedMsg) tea.Cmd {
 	v.cache.SetNavigationContext("failed", failed)
 	v.cache.SetNavigationContext("statistics", navigationContext["statistics"])
 	v.cache.SetNavigationContext("originalRuns", originalRuns)
-	
+
 	// Return navigation command
 	return func() tea.Msg {
 		return messages.NavigateToBulkResultsMsg{}

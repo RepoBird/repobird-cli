@@ -19,7 +19,7 @@ func TestDashboardFilteringLogic(t *testing.T) {
 	// simulateFilteringLogic replicates the actual filtering logic from dash_data.go
 	simulateFilteringLogic := func(runs []models.RunResponse) (validRuns []models.RunResponse, invalidCount int, shouldKeepCache bool) {
 		validRuns = make([]models.RunResponse, 0, len(runs))
-		
+
 		for _, run := range runs {
 			// Use the same validation logic as the fixed code
 			repoName := run.GetRepositoryName()
@@ -29,7 +29,7 @@ func TestDashboardFilteringLogic(t *testing.T) {
 			}
 			validRuns = append(validRuns, run)
 		}
-		
+
 		// Only clear cache if majority of runs are invalid (more than 50%)
 		shouldKeepCache = len(validRuns) > 0 && float64(len(validRuns))/float64(len(runs)) > 0.5
 		return
@@ -56,7 +56,7 @@ func TestDashboardFilteringLogic(t *testing.T) {
 				{
 					ID:             "run-2",
 					Repository:     "",
-					RepositoryName: "test/repo2", 
+					RepositoryName: "test/repo2",
 					Status:         models.StatusProcessing,
 					CreatedAt:      time.Now().Add(-30 * time.Minute),
 				},
@@ -107,7 +107,7 @@ func TestDashboardFilteringLogic(t *testing.T) {
 					CreatedAt:      time.Now().Add(-1 * time.Hour),
 				},
 				{
-					ID:             "run-7", 
+					ID:             "run-7",
 					Repository:     "",
 					RepositoryName: "test/repo5",
 					Status:         models.StatusProcessing,
@@ -318,33 +318,33 @@ func TestDashboardFilteringLogic(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Test the filtering logic
 			validRuns, invalidCount, shouldKeepCache := simulateFilteringLogic(tt.runs)
-			
+
 			assert.Equal(t, tt.expectedValid, len(validRuns), "Valid run count should match expected: %s", tt.description)
 			assert.Equal(t, tt.expectedInvalid, invalidCount, "Invalid run count should match expected: %s", tt.description)
 			assert.Equal(t, tt.expectedKeepCache, shouldKeepCache, "Cache keep decision should match expected: %s", tt.description)
-			
+
 			// Verify that valid runs are actually valid
 			for i, run := range validRuns {
 				assert.False(t, strings.HasPrefix(run.ID, "test-"), "Valid run %d should not have test- prefix: %s", i, run.ID)
 				assert.NotEmpty(t, run.GetRepositoryName(), "Valid run %d should have non-empty repository name: %s", i, run.ID)
 			}
-			
+
 			// Test with actual cache to verify integration
 			if len(tt.runs) > 0 {
 				// Create isolated cache for each test
 				testTmpDir := t.TempDir()
 				t.Setenv("XDG_CONFIG_HOME", testTmpDir)
-				
+
 				testCache := cache.NewSimpleCache()
 				defer testCache.Stop()
-				
+
 				testCache.Clear()
 				testCache.SetRuns(tt.runs)
 				cachedRuns, cached, _ := testCache.GetCachedList()
-				
+
 				require.True(t, cached, "Runs should be cached initially")
 				require.Len(t, cachedRuns, len(tt.runs), "All runs should be cached initially")
-				
+
 				// The actual dashboard would apply the filtering logic here
 				// and decide whether to keep the cache or clear it
 			}
@@ -367,10 +367,10 @@ func TestFilteringLogicEdgeCases(t *testing.T) {
 				CreatedAt:      time.Now().Add(-1 * time.Hour),
 			},
 		}
-		
+
 		validRuns := make([]models.RunResponse, 0, len(runs))
 		invalidCount := 0
-		
+
 		for _, run := range runs {
 			repoName := run.GetRepositoryName()
 			if strings.HasPrefix(run.ID, "test-") || repoName == "" {
@@ -379,9 +379,9 @@ func TestFilteringLogicEdgeCases(t *testing.T) {
 			}
 			validRuns = append(validRuns, run)
 		}
-		
+
 		shouldKeepCache := len(validRuns) > 0 && float64(len(validRuns))/float64(len(runs)) > 0.5
-		
+
 		assert.Equal(t, 1, len(validRuns), "Should have one valid run")
 		assert.Equal(t, 0, invalidCount, "Should have no invalid runs")
 		assert.True(t, shouldKeepCache, "Should keep cache for 100% valid (1/1)")
@@ -397,10 +397,10 @@ func TestFilteringLogicEdgeCases(t *testing.T) {
 				CreatedAt:      time.Now().Add(-1 * time.Hour),
 			},
 		}
-		
+
 		validRuns := make([]models.RunResponse, 0, len(runs))
 		invalidCount := 0
-		
+
 		for _, run := range runs {
 			repoName := run.GetRepositoryName()
 			if strings.HasPrefix(run.ID, "test-") || repoName == "" {
@@ -409,9 +409,9 @@ func TestFilteringLogicEdgeCases(t *testing.T) {
 			}
 			validRuns = append(validRuns, run)
 		}
-		
+
 		shouldKeepCache := len(validRuns) > 0 && float64(len(validRuns))/float64(len(runs)) > 0.5
-		
+
 		assert.Equal(t, 0, len(validRuns), "Should have no valid runs")
 		assert.Equal(t, 1, invalidCount, "Should have one invalid run")
 		assert.False(t, shouldKeepCache, "Should clear cache for 0% valid (0/1)")
@@ -421,21 +421,21 @@ func TestFilteringLogicEdgeCases(t *testing.T) {
 		runs := []models.RunResponse{
 			{
 				ID:             "legacy-valid",
-				Repository:     "legacy/repo",    // Legacy field has value
-				RepositoryName: "",               // Modern field empty
+				Repository:     "legacy/repo", // Legacy field has value
+				RepositoryName: "",            // Modern field empty
 				Status:         models.StatusDone,
 				CreatedAt:      time.Now().Add(-1 * time.Hour),
 			},
 		}
-		
+
 		// Test GetRepositoryName method directly
 		repoName := runs[0].GetRepositoryName()
 		assert.Equal(t, "legacy/repo", repoName, "GetRepositoryName should return Repository when RepositoryName is empty")
-		
+
 		// Test filtering logic
 		validRuns := make([]models.RunResponse, 0, len(runs))
 		invalidCount := 0
-		
+
 		for _, run := range runs {
 			repoName := run.GetRepositoryName()
 			if strings.HasPrefix(run.ID, "test-") || repoName == "" {
@@ -444,7 +444,7 @@ func TestFilteringLogicEdgeCases(t *testing.T) {
 			}
 			validRuns = append(validRuns, run)
 		}
-		
+
 		assert.Equal(t, 1, len(validRuns), "Should have one valid run with legacy Repository field")
 		assert.Equal(t, 0, invalidCount, "Should have no invalid runs")
 	})
@@ -453,21 +453,21 @@ func TestFilteringLogicEdgeCases(t *testing.T) {
 		runs := []models.RunResponse{
 			{
 				ID:             "both-fields",
-				Repository:     "legacy/repo",    // Legacy field
-				RepositoryName: "modern/repo",    // Modern field (should take precedence)
+				Repository:     "legacy/repo", // Legacy field
+				RepositoryName: "modern/repo", // Modern field (should take precedence)
 				Status:         models.StatusDone,
 				CreatedAt:      time.Now().Add(-1 * time.Hour),
 			},
 		}
-		
+
 		// Test GetRepositoryName method directly
 		repoName := runs[0].GetRepositoryName()
 		assert.Equal(t, "modern/repo", repoName, "GetRepositoryName should return RepositoryName when both fields present")
-		
+
 		// Test filtering logic
 		validRuns := make([]models.RunResponse, 0, len(runs))
 		invalidCount := 0
-		
+
 		for _, run := range runs {
 			repoName := run.GetRepositoryName()
 			if strings.HasPrefix(run.ID, "test-") || repoName == "" {
@@ -476,7 +476,7 @@ func TestFilteringLogicEdgeCases(t *testing.T) {
 			}
 			validRuns = append(validRuns, run)
 		}
-		
+
 		assert.Equal(t, 1, len(validRuns), "Should have one valid run with modern RepositoryName field")
 		assert.Equal(t, 0, invalidCount, "Should have no invalid runs")
 	})
@@ -485,21 +485,21 @@ func TestFilteringLogicEdgeCases(t *testing.T) {
 		runs := []models.RunResponse{
 			{
 				ID:             "whitespace-repo",
-				Repository:     "  ",  // Whitespace only
+				Repository:     "  ", // Whitespace only
 				RepositoryName: "",
 				Status:         models.StatusDone,
 				CreatedAt:      time.Now().Add(-1 * time.Hour),
 			},
 		}
-		
+
 		// Test GetRepositoryName method directly
 		repoName := runs[0].GetRepositoryName()
 		assert.Equal(t, "  ", repoName, "GetRepositoryName should return whitespace Repository")
-		
+
 		// Test filtering logic - whitespace is considered valid (not empty string)
 		validRuns := make([]models.RunResponse, 0, len(runs))
 		invalidCount := 0
-		
+
 		for _, run := range runs {
 			repoName := run.GetRepositoryName()
 			if strings.HasPrefix(run.ID, "test-") || repoName == "" {
@@ -508,7 +508,7 @@ func TestFilteringLogicEdgeCases(t *testing.T) {
 			}
 			validRuns = append(validRuns, run)
 		}
-		
+
 		assert.Equal(t, 1, len(validRuns), "Should have one valid run with whitespace repository name")
 		assert.Equal(t, 0, invalidCount, "Should have no invalid runs (whitespace is not empty)")
 	})
@@ -533,7 +533,7 @@ func TestCacheFilteringIntegration(t *testing.T) {
 			CreatedAt:      time.Now().Add(-2 * time.Hour),
 		},
 		{
-			ID:             "valid-2", 
+			ID:             "valid-2",
 			Repository:     "legacy/repo2",
 			RepositoryName: "",
 			Status:         models.StatusProcessing,
@@ -550,7 +550,7 @@ func TestCacheFilteringIntegration(t *testing.T) {
 		{
 			ID:             "test-invalid-1", // Test data prefix
 			Repository:     "",
-			RepositoryName: "test/repo4", 
+			RepositoryName: "test/repo4",
 			Status:         models.StatusFailed,
 			CreatedAt:      time.Now().Add(-20 * time.Minute),
 		},
@@ -566,17 +566,17 @@ func TestCacheFilteringIntegration(t *testing.T) {
 	t.Run("Cache integration with filtering", func(t *testing.T) {
 		// Store mixed runs in cache
 		testCache.SetRuns(mixedRuns)
-		
+
 		// Retrieve from cache
 		cachedRuns, cached, details := testCache.GetCachedList()
 		require.True(t, cached, "Runs should be cached")
 		require.Len(t, cachedRuns, 5, "All runs should be cached initially")
 		require.NotNil(t, details, "Details map should be present")
-		
+
 		// Apply filtering logic (simulating dashboard behavior)
 		validRuns := make([]models.RunResponse, 0, len(cachedRuns))
 		invalidCount := 0
-		
+
 		for _, run := range cachedRuns {
 			repoName := run.GetRepositoryName()
 			if strings.HasPrefix(run.ID, "test-") || repoName == "" {
@@ -585,19 +585,19 @@ func TestCacheFilteringIntegration(t *testing.T) {
 			}
 			validRuns = append(validRuns, run)
 		}
-		
+
 		// Verify filtering results
 		assert.Equal(t, 3, len(validRuns), "Should have 3 valid runs after filtering")
 		assert.Equal(t, 2, invalidCount, "Should have 2 invalid runs")
-		
+
 		// Verify cache keep decision (60% valid > 50%)
 		shouldKeepCache := len(validRuns) > 0 && float64(len(validRuns))/float64(len(cachedRuns)) > 0.5
 		assert.True(t, shouldKeepCache, "Should keep cache with 60% valid runs (3/5)")
-		
+
 		// Verify that valid runs have correct repository names (order may vary due to sorting)
 		expectedRepos := map[string]bool{
-			"test/repo1": false,
-			"legacy/repo2": false, 
+			"test/repo1":   false,
+			"legacy/repo2": false,
 			"modern/repo3": false,
 		}
 		for _, run := range validRuns {
@@ -617,7 +617,7 @@ func TestCacheFilteringIntegration(t *testing.T) {
 		for _, originalRun := range mixedRuns {
 			cachedRun := testCache.GetRun(originalRun.ID)
 			require.NotNil(t, cachedRun, "Individual run should be cached: %s", originalRun.ID)
-			
+
 			assert.Equal(t, originalRun.ID, cachedRun.ID, "Cached run ID should match")
 			assert.Equal(t, originalRun.GetRepositoryName(), cachedRun.GetRepositoryName(), "Repository name should be preserved")
 			assert.Equal(t, originalRun.Status, cachedRun.Status, "Status should be preserved")
@@ -656,19 +656,19 @@ func TestCacheFilteringIntegration(t *testing.T) {
 				CreatedAt:      time.Now().Add(-10 * time.Minute),
 			},
 		}
-		
+
 		// Clear and reset cache
 		testCache.Clear()
 		testCache.SetRuns(majorityInvalidRuns)
-		
+
 		cachedRuns, cached, _ := testCache.GetCachedList()
 		require.True(t, cached, "Runs should be cached")
 		require.Len(t, cachedRuns, 4, "All runs should be cached initially")
-		
+
 		// Apply filtering logic
 		validRuns := make([]models.RunResponse, 0, len(cachedRuns))
 		invalidCount := 0
-		
+
 		for _, run := range cachedRuns {
 			repoName := run.GetRepositoryName()
 			if strings.HasPrefix(run.ID, "test-") || repoName == "" {
@@ -677,15 +677,15 @@ func TestCacheFilteringIntegration(t *testing.T) {
 			}
 			validRuns = append(validRuns, run)
 		}
-		
+
 		// Verify filtering results
 		assert.Equal(t, 1, len(validRuns), "Should have 1 valid run after filtering")
 		assert.Equal(t, 3, invalidCount, "Should have 3 invalid runs")
-		
+
 		// Verify cache clear decision (25% valid < 50%)
 		shouldKeepCache := len(validRuns) > 0 && float64(len(validRuns))/float64(len(cachedRuns)) > 0.5
 		assert.False(t, shouldKeepCache, "Should clear cache with 25% valid runs (1/4)")
-		
+
 		// In the actual dashboard, cache would be cleared here and API would be called
 	})
 }

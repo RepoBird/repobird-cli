@@ -36,15 +36,15 @@ func TestNavigateToDetailsMsgWithRunData(t *testing.T) {
 		UpdatedAt:      time.Now().Add(-5 * time.Minute),
 		Title:          "Navigation Test Run",
 		// Files field not available in models.RunResponse
-		Context:        "Testing navigation with cached data",
+		Context: "Testing navigation with cached data",
 	}
 
 	tests := []struct {
-		name              string
-		runData           *models.RunResponse
-		expectedAPICall   bool
-		expectedLoading   bool
-		description       string
+		name            string
+		runData         *models.RunResponse
+		expectedAPICall bool
+		expectedLoading bool
+		description     string
 	}{
 		{
 			name:            "Navigation with RunData (avoids API call)",
@@ -84,7 +84,7 @@ func TestNavigateToDetailsMsgWithRunData(t *testing.T) {
 
 			// Handle navigation
 			resultModel, cmd := app.handleNavigation(navMsg)
-			
+
 			// Should return the app model
 			require.Equal(t, app, resultModel, "Navigation should return the app model")
 			require.NotNil(t, cmd, "Navigation should return a command")
@@ -119,8 +119,8 @@ func TestNavigationMessageRunDataPreservation(t *testing.T) {
 	originalRun := models.RunResponse{
 		ID:             "preservation-test-run",
 		Status:         models.StatusProcessing,
-		Repository:     "legacy/test-repo",     // Legacy field
-		RepositoryName: "modern/test-repo",     // Modern field (should take precedence)
+		Repository:     "legacy/test-repo", // Legacy field
+		RepositoryName: "modern/test-repo", // Modern field (should take precedence)
 		Source:         "develop",
 		Target:         "feature/preservation",
 		CreatedAt:      time.Now().Add(-3 * time.Hour),
@@ -128,8 +128,8 @@ func TestNavigationMessageRunDataPreservation(t *testing.T) {
 		Title:          "Data Preservation Test",
 		Context:        "Testing that all run data is preserved through navigation",
 		// Files field not available in models.RunResponse
-		RunType:        "plan",
-		RepoID:         12345,
+		RunType: "plan",
+		RepoID:  12345,
 	}
 
 	t.Run("NavigateToDetailsMsg preserves all RunData fields", func(t *testing.T) {
@@ -189,7 +189,7 @@ func TestNavigationMessageRunDataPreservation(t *testing.T) {
 
 		// Both messages should reference the same data
 		assert.Equal(t, navMsg1.RunData, navMsg2.RunData, "Both messages should reference the same RunData pointer")
-		
+
 		// Modifying the original should affect both (pointer semantics)
 		originalRun.Title = "Modified Title"
 		assert.Equal(t, "Modified Title", navMsg1.RunData.Title, "Changes should be reflected in navMsg1")
@@ -317,10 +317,10 @@ func TestDashboardToDetailsNavigationFlow(t *testing.T) {
 			t.Run("Key "+key+" uses centralized system", func(t *testing.T) {
 				// These keys should not be handled locally, allowing centralized system to use cached dashboard
 				assert.False(t, detailsView.IsKeyDisabled(key), "Key '%s' should not be disabled", key)
-				
+
 				keyMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(key)}
 				handled, model, cmd := detailsView.HandleKey(keyMsg)
-				
+
 				assert.False(t, handled, "Key '%s' should not be handled locally (centralized system handles it)", key)
 				assert.Equal(t, detailsView, model, "Model should remain unchanged")
 				// cmd may be nil or contain stopPolling command, both are fine
@@ -350,7 +350,7 @@ func TestRunDataAPIOptimization(t *testing.T) {
 	t.Run("Terminal status runs should use cached data", func(t *testing.T) {
 		terminalStatuses := []models.RunStatus{
 			models.StatusDone,
-			models.StatusFailed, 
+			models.StatusFailed,
 			// Note: CANCELLED might not be defined in models, using FAILED as example
 		}
 
@@ -392,7 +392,7 @@ func TestRunDataAPIOptimization(t *testing.T) {
 			Repository:     "",
 			RepositoryName: "test/old-repo",
 			Source:         "main",
-			CreatedAt:      time.Now().Add(-3 * time.Hour), // Over 2 hours old
+			CreatedAt:      time.Now().Add(-3 * time.Hour),                // Over 2 hours old
 			UpdatedAt:      time.Now().Add(-2*time.Hour - 30*time.Minute), // Last update > 2h ago
 			Title:          "Old Run Test",
 		}
@@ -405,7 +405,7 @@ func TestRunDataAPIOptimization(t *testing.T) {
 
 		assert.Equal(t, oldRun.ID, navMsg.RunID, "RunID should be set")
 		require.NotNil(t, navMsg.RunData, "RunData should be provided for old runs")
-		
+
 		// Verify the run is indeed old
 		age := time.Since(oldRun.CreatedAt)
 		assert.Greater(t, age, 2*time.Hour, "Run should be older than 2 hours")
@@ -419,7 +419,7 @@ func TestRunDataAPIOptimization(t *testing.T) {
 			ID:             "recent-run-test",
 			Status:         models.StatusProcessing,
 			Repository:     "",
-			RepositoryName: "test/recent-repo", 
+			RepositoryName: "test/recent-repo",
 			Source:         "develop",
 			CreatedAt:      time.Now().Add(-30 * time.Minute), // Recent
 			UpdatedAt:      time.Now().Add(-5 * time.Minute),  // Recently updated
@@ -441,7 +441,7 @@ func TestRunDataAPIOptimization(t *testing.T) {
 
 		view := views.NewRunDetailsViewWithData(client, testCache, recentRun)
 		assert.NotNil(t, view, "Recent runs with RunData should create view successfully")
-		
+
 		// The view might poll for updates later, but initial load should use cached data
 	})
 }

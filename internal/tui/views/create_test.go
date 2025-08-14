@@ -187,6 +187,13 @@ func TestCreateRunView_HandleKey_Navigation(t *testing.T) {
 			wantHandled: false,
 			wantNavMsg:  false,
 		},
+		{
+			name:        "h in insert mode is not handled (types h, doesn't navigate)",
+			insertMode:  true,
+			key:         "h",
+			wantHandled: false,
+			wantNavMsg:  false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -245,6 +252,94 @@ func TestCreateRunView_HandleKey_Backspace(t *testing.T) {
 
 	assert.True(t, handled, "backspace in normal mode should be handled")
 	assert.Nil(t, cmd, "backspace in normal mode should not produce command")
+}
+
+func TestCreateRunView_IsKeyDisabled(t *testing.T) {
+	tests := []struct {
+		name         string
+		insertMode   bool
+		key          string
+		wantDisabled bool
+	}{
+		// Insert mode tests
+		{
+			name:         "h is disabled in insert mode",
+			insertMode:   true,
+			key:          "h",
+			wantDisabled: true,
+		},
+		{
+			name:         "j is disabled in insert mode",
+			insertMode:   true,
+			key:          "j",
+			wantDisabled: true,
+		},
+		{
+			name:         "k is disabled in insert mode",
+			insertMode:   true,
+			key:          "k",
+			wantDisabled: true,
+		},
+		{
+			name:         "l is disabled in insert mode",
+			insertMode:   true,
+			key:          "l",
+			wantDisabled: true,
+		},
+		{
+			name:         "q is disabled in insert mode",
+			insertMode:   true,
+			key:          "q",
+			wantDisabled: true,
+		},
+		{
+			name:         "backspace is disabled in insert mode",
+			insertMode:   true,
+			key:          "backspace",
+			wantDisabled: true,
+		},
+		{
+			name:         "esc is NOT disabled in insert mode",
+			insertMode:   true,
+			key:          "esc",
+			wantDisabled: false,
+		},
+		{
+			name:         "ctrl+c is NOT disabled in insert mode",
+			insertMode:   true,
+			key:          "ctrl+c",
+			wantDisabled: false,
+		},
+		// Normal mode tests
+		{
+			name:         "h is NOT disabled in normal mode",
+			insertMode:   false,
+			key:          "h",
+			wantDisabled: false,
+		},
+		{
+			name:         "q is NOT disabled in normal mode",
+			insertMode:   false,
+			key:          "q",
+			wantDisabled: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create view
+			client := &MockCreateAPIClient{}
+			cache := cache.NewSimpleCache()
+			view := NewCreateRunView(client, cache)
+
+			// Set insert mode
+			view.form.SetInsertMode(tt.insertMode)
+
+			// Test IsKeyDisabled
+			gotDisabled := view.IsKeyDisabled(tt.key)
+			assert.Equal(t, tt.wantDisabled, gotDisabled, "IsKeyDisabled(%s) = %v, want %v", tt.key, gotDisabled, tt.wantDisabled)
+		})
+	}
 }
 
 func TestCreateRunView_FormStatePersistence(t *testing.T) {

@@ -422,11 +422,19 @@ func NewCreateRunViewWithCache(
 
 // IsKeyDisabled implements CoreViewKeymap interface to control key behavior
 func (v *CreateRunView) IsKeyDisabled(keyString string) bool {
-	// In insert mode, disable NAVIGATION for these keys so they can be typed
+	// In insert mode, disable ALL navigation keys except ESC and ctrl+c
 	// When a key is disabled, it bypasses navigation but still reaches Update() for typing
 	if v.form.IsInsertMode() {
+		// Only allow ESC and ctrl+c to be processed by navigation system
+		// Everything else should be disabled to allow normal typing
 		switch keyString {
-		case "q", "b", "backspace":
+		case "esc", "ctrl+c":
+			// These keys should NOT be disabled - they need special handling
+			debug.LogToFilef("✅ CREATE VIEW IsKeyDisabled: Allowing '%s' in insert mode for mode switching/quit", keyString)
+			return false
+		default:
+			// Disable ALL other keys from navigation processing in insert mode
+			// This includes h, j, k, l, q, b, backspace, etc.
 			debug.LogToFilef("🚫 CREATE VIEW IsKeyDisabled: Disabling '%s' navigation in insert mode to allow typing", keyString)
 			return true // Disable navigation processing - key will reach Update() for typing
 		}

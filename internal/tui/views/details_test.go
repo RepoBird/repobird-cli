@@ -452,25 +452,25 @@ func TestRunDetailsViewWithCacheAndDimensions_PreservesDimensions(t *testing.T) 
 func TestNewRunDetailsViewWithData_NoLoading(t *testing.T) {
 	client := api.NewClient("test-key", "http://localhost:8080", false)
 	testCache := cache.NewSimpleCache()
-	
+
 	testRun := models.RunResponse{
 		ID:        "test-789",
 		Status:    "DONE",
 		CreatedAt: time.Now().Add(-1 * time.Hour),
 		Title:     "Test run from dashboard",
 	}
-	
+
 	// Create view with data (should not be loading)
 	view := NewRunDetailsViewWithData(client, testCache, testRun)
-	
+
 	// Should not be loading since data was provided
 	assert.False(t, view.loading, "View should not be loading when created with data")
-	
+
 	// Should have the correct run data
 	assert.Equal(t, testRun.ID, view.run.ID, "Should have correct run ID")
-	assert.Equal(t, testRun.Status, view.run.Status, "Should have correct run status") 
+	assert.Equal(t, testRun.Status, view.run.Status, "Should have correct run status")
 	assert.Equal(t, testRun.Title, view.run.Title, "Should have correct run title")
-	
+
 	// Content should be populated (non-empty)
 	assert.NotEmpty(t, view.fullContent, "Content should be populated")
 	assert.Contains(t, view.fullContent, "Test run from dashboard", "Should contain run title in content")

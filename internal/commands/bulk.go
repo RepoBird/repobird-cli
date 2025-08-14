@@ -68,7 +68,7 @@ Examples:
 	cmd.Flags().BoolVar(&bulkForce, "force", false, "Deprecated - has no effect (kept for backwards compatibility)")
 	cmd.Flags().BoolVarP(&bulkInteractive, "interactive", "i", false, "Interactive bulk mode")
 	cmd.Flags().IntVarP(&bulkParallel, "parallel", "p", 5, "Max concurrent runs")
-	
+
 	// Mark force flag as deprecated
 	cmd.Flags().MarkDeprecated("force", "file hashes are now for tracking only and won't block runs")
 
@@ -165,8 +165,8 @@ func runBulk(cmd *cobra.Command, args []string) error {
 		SourceBranch:   bulkConfig.Source,
 		BatchTitle:     bulkConfig.BatchTitle,
 		// Force is deprecated but kept for backwards compatibility
-		Force:          false,
-		Runs:           make([]dto.RunItem, len(bulkConfig.Runs)),
+		Force: false,
+		Runs:  make([]dto.RunItem, len(bulkConfig.Runs)),
 		Options: dto.BulkOptions{
 			Parallel: bulkParallel,
 		},

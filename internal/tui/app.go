@@ -19,14 +19,14 @@ import (
 )
 
 type App struct {
-	client         APIClient
-	viewStack      []tea.Model // Navigation history
-	current        tea.Model
-	cache          *cache.SimpleCache
-	keyRegistry    *keymap.CoreKeyRegistry // Central key processing
-	width          int                     // Current window width
-	height         int                     // Current window height
-	authenticated  bool                    // Whether initial auth is complete
+	client        APIClient
+	viewStack     []tea.Model // Navigation history
+	current       tea.Model
+	cache         *cache.SimpleCache
+	keyRegistry   *keymap.CoreKeyRegistry // Central key processing
+	width         int                     // Current window width
+	height        int                     // Current window height
+	authenticated bool                    // Whether initial auth is complete
 }
 
 // authCompleteMsg is sent when authentication and cache initialization is complete
@@ -113,7 +113,6 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Centralized key processing
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
 		if handled, model, cmd := a.processKeyWithFiltering(keyMsg); handled {
-
 			// If the model is the app itself and we have a command, execute it
 			if appModel, isApp := model.(*App); isApp && cmd != nil {
 				return appModel, cmd
@@ -196,7 +195,7 @@ func (a *App) handleNavigation(msg messages.NavigationMsg) (tea.Model, tea.Cmd) 
 	case messages.NavigateToDashboardMsg:
 		// Clear stack - dashboard is home
 		a.viewStack = nil
-		
+
 		// Check if we have saved dashboard state to restore
 		if stateData := a.cache.GetNavigationContext("dashboardState"); stateData != nil {
 			debug.LogToFilef("🔍 APP: Found dashboard state in navigation context: %+v 🔍\n", stateData)
@@ -206,8 +205,8 @@ func (a *App) handleNavigation(msg messages.NavigationMsg) (tea.Model, tea.Cmd) 
 				selectedRunIdx, _ := state["selectedRunIdx"].(int)
 				selectedDetailLine, _ := state["selectedDetailLine"].(int)
 				focusedColumn, _ := state["focusedColumn"].(int)
-				
-				debug.LogToFilef("🏠 APP: Restoring Dashboard with saved state - repo=%d, run=%d, detail=%d, column=%d 🏠\n", 
+
+				debug.LogToFilef("🏠 APP: Restoring Dashboard with saved state - repo=%d, run=%d, detail=%d, column=%d 🏠\n",
 					selectedRepoIdx, selectedRunIdx, selectedDetailLine, focusedColumn)
 				a.current = views.NewDashboardViewWithState(a.client, a.cache, selectedRepoIdx, selectedRunIdx, selectedDetailLine, focusedColumn)
 			} else {
@@ -219,7 +218,7 @@ func (a *App) handleNavigation(msg messages.NavigationMsg) (tea.Model, tea.Cmd) 
 			debug.LogToFile("🏠 APP: Creating Dashboard view - hybrid cache will handle data caching 🏠\n")
 			a.current = views.NewDashboardView(a.client, a.cache)
 		}
-		
+
 		// Clear navigation context when going home (after we've used it)
 		a.clearAllNavigationContext()
 
@@ -312,7 +311,7 @@ func (a *App) handleNavigation(msg messages.NavigationMsg) (tea.Model, tea.Cmd) 
 		if apiClient, ok := a.client.(*api.Client); ok {
 			debug.LogToFilef("✅ BULK RESULTS NAV: Creating BulkResultsView ✅\n")
 			a.current = views.NewBulkResultsView(apiClient, a.cache)
-			
+
 			// Send current window dimensions to the new view if we have them
 			var cmds []tea.Cmd
 			cmds = append(cmds, a.current.Init())
@@ -431,14 +430,12 @@ func (a *App) getNavigationContext(key string) interface{} {
 	return a.cache.GetNavigationContext(key)
 }
 
-
 // processKeyWithFiltering is the centralized key processor that handles all key filtering and routing
 func (a *App) processKeyWithFiltering(keyMsg tea.KeyMsg) (handled bool, model tea.Model, cmd tea.Cmd) {
 	keyString := keyMsg.String()
 
 	// Check if current view implements CoreViewKeymap
 	if viewKeymap, hasKeymap := a.current.(keymap.CoreViewKeymap); hasKeymap {
-
 		// First check if view wants to disable this key entirely
 		if viewKeymap.IsKeyDisabled(keyString) {
 			debug.LogToFilef("🚫 PROCESSOR: Key '%s' is DISABLED by view - passing to Update for typing 🚫\n", keyString)

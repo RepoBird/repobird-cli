@@ -15,7 +15,7 @@ type NavigateToCreateMsg struct {
 // NavigateToDetailsMsg requests navigation to the run details view
 type NavigateToDetailsMsg struct {
 	RunID      string
-	FromCreate bool // Optional context indicating source
+	FromCreate bool                // Optional context indicating source
 	RunData    *models.RunResponse // Optional: cached run data to avoid API call
 }
 
@@ -57,15 +57,15 @@ type NavigateToErrorMsg struct {
 }
 
 // Implement NavigationMsg interface for all messages
-func (NavigateToCreateMsg) IsNavigation() bool     { return true }
-func (NavigateToDetailsMsg) IsNavigation() bool    { return true }
-func (NavigateToDashboardMsg) IsNavigation() bool  { return true }
-func (NavigateToListMsg) IsNavigation() bool       { return true }
-func (NavigateToBulkMsg) IsNavigation() bool       { return true }
+func (NavigateToCreateMsg) IsNavigation() bool      { return true }
+func (NavigateToDetailsMsg) IsNavigation() bool     { return true }
+func (NavigateToDashboardMsg) IsNavigation() bool   { return true }
+func (NavigateToListMsg) IsNavigation() bool        { return true }
+func (NavigateToBulkMsg) IsNavigation() bool        { return true }
 func (NavigateToBulkResultsMsg) IsNavigation() bool { return true }
-func (NavigateToStatusMsg) IsNavigation() bool     { return true }
-func (NavigateToFileViewerMsg) IsNavigation() bool { return true }
-func (NavigateToHelpMsg) IsNavigation() bool       { return true }
-func (NavigateToExamplesMsg) IsNavigation() bool   { return true }
-func (NavigateBackMsg) IsNavigation() bool         { return true }
-func (NavigateToErrorMsg) IsNavigation() bool      { return true }
+func (NavigateToStatusMsg) IsNavigation() bool      { return true }
+func (NavigateToFileViewerMsg) IsNavigation() bool  { return true }
+func (NavigateToHelpMsg) IsNavigation() bool        { return true }
+func (NavigateToExamplesMsg) IsNavigation() bool    { return true }
+func (NavigateBackMsg) IsNavigation() bool          { return true }
+func (NavigateToErrorMsg) IsNavigation() bool       { return true }

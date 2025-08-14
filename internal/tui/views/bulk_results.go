@@ -52,15 +52,15 @@ type BulkResultsView struct {
 
 // BulkResultsKeyMap defines the key bindings for the results view
 type BulkResultsKeyMap struct {
-	Up       key.Binding
-	Down     key.Binding
-	PageUp   key.Binding
-	PageDown key.Binding
-	Tab      key.Binding
-	Enter    key.Binding
-	Back     key.Binding
+	Up        key.Binding
+	Down      key.Binding
+	PageUp    key.Binding
+	PageDown  key.Binding
+	Tab       key.Binding
+	Enter     key.Binding
+	Back      key.Binding
 	Dashboard key.Binding
-	Quit     key.Binding
+	Quit      key.Binding
 }
 
 // DefaultBulkResultsKeyMap returns the default key bindings
@@ -108,10 +108,10 @@ func DefaultBulkResultsKeyMap() BulkResultsKeyMap {
 // NewBulkResultsView creates a new bulk results view
 func NewBulkResultsView(client *api.Client, cache *cache.SimpleCache) *BulkResultsView {
 	debug.LogToFilef("📊 Creating new BulkResultsView\n")
-	
+
 	vp := viewport.New(80, 20) // Default size, will be updated
 	vp.YPosition = 0
-	
+
 	v := &BulkResultsView{
 		client:       client,
 		cache:        cache,
@@ -202,7 +202,7 @@ func (v *BulkResultsView) handleWindowSizeMsg(msg tea.WindowSizeMsg) {
 	}
 
 	// Update viewport dimensions - account for box border and status line
-	v.viewport.Width = v.width - 4  // Account for border and padding
+	v.viewport.Width = v.width - 4   // Account for border and padding
 	v.viewport.Height = v.height - 5 // Account for border, status line, and tabs
 
 	// Update viewport content
@@ -423,37 +423,37 @@ func (v *BulkResultsView) renderSuccessfulRuns() string {
 	}
 
 	var content strings.Builder
-	
+
 	// Style for selected row
 	selectedStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("205")).
 		Bold(true)
-	
+
 	normalStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("252"))
-	
+
 	for i, run := range v.successful {
 		isSelected := v.focusMode == "runs" && i == v.selectedRow
-		
+
 		var line strings.Builder
 		if isSelected {
 			line.WriteString("▸ ")
 		} else {
 			line.WriteString("  ")
 		}
-		
+
 		icon := "✅"
 		status := lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Render(run.Status)
-		
+
 		line.WriteString(fmt.Sprintf("%s Run #%d - %s [%s]", icon, run.ID, run.Title, status))
-		
+
 		if isSelected {
 			content.WriteString(selectedStyle.Render(line.String()))
 		} else {
 			content.WriteString(normalStyle.Render(line.String()))
 		}
 		content.WriteString("\n")
-		
+
 		// Add details under selected item
 		if isSelected {
 			detailStyle := lipgloss.NewStyle().
@@ -474,55 +474,55 @@ func (v *BulkResultsView) renderFailedRuns() string {
 	}
 
 	var content strings.Builder
-	
+
 	// Style for selected row
 	selectedStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("205")).
 		Bold(true)
-	
+
 	normalStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("252"))
-	
+
 	for i, runErr := range v.failed {
 		isSelected := v.focusMode == "runs" && i == v.selectedRow
-		
+
 		var line strings.Builder
 		if isSelected {
 			line.WriteString("▸ ")
 		} else {
 			line.WriteString("  ")
 		}
-		
+
 		icon := "❌"
-		
+
 		// Get title from original run if available
 		title := "Untitled"
 		if original, ok := v.originalRuns[runErr.RequestIndex]; ok && original.Title != "" {
 			title = original.Title
 		}
-		
+
 		line.WriteString(fmt.Sprintf("%s %s - Failed", icon, title))
-		
+
 		if isSelected {
 			content.WriteString(selectedStyle.Render(line.String()))
 		} else {
 			content.WriteString(normalStyle.Render(line.String()))
 		}
 		content.WriteString("\n")
-		
+
 		// Add details under selected item
 		if isSelected {
 			detailStyle := lipgloss.NewStyle().
 				Foreground(lipgloss.Color("244")).
 				PaddingLeft(5)
-			
+
 			errorStyle := lipgloss.NewStyle().
 				Foreground(lipgloss.Color("196")).
 				PaddingLeft(5)
-			
+
 			content.WriteString(errorStyle.Render(fmt.Sprintf("Error: %s", runErr.Message)))
 			content.WriteString("\n")
-			
+
 			if runErr.ExistingRunId > 0 {
 				content.WriteString(detailStyle.Render(fmt.Sprintf("Existing Run: #%d", runErr.ExistingRunId)))
 				content.WriteString("\n")
@@ -536,21 +536,21 @@ func (v *BulkResultsView) renderFailedRuns() string {
 // renderButtons renders navigation buttons
 func (v *BulkResultsView) renderButtons() string {
 	var content strings.Builder
-	
+
 	selectedBtnStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("205")).
 		Bold(true)
-	
+
 	normalBtnStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("240"))
-	
+
 	// DASH button
 	if v.selectedButton == 1 {
 		content.WriteString(selectedBtnStyle.Render("▸ ← [DASH]"))
 	} else {
 		content.WriteString(normalBtnStyle.Render("  ← [DASH]"))
 	}
-	
+
 	return content.String()
 }
 
@@ -599,7 +599,7 @@ func (v *BulkResultsView) View() string {
 func (v *BulkResultsView) renderStatusLine(scrollIndicator string) string {
 	// Create formatter for consistent formatting
 	formatter := components.NewStatusFormatter("RESULTS", v.width)
-	
+
 	// Help text based on current mode
 	var helpText string
 	if v.focusMode == "runs" {
@@ -611,19 +611,19 @@ func (v *BulkResultsView) renderStatusLine(scrollIndicator string) string {
 	} else {
 		helpText = "enter: select [DASH] • ↑: back to list • esc: cancel • q: dash"
 	}
-	
+
 	// Statistics summary
 	stats := fmt.Sprintf("Total: %d | Success: %d | Failed: %d",
 		v.statistics.Total,
 		len(v.successful),
 		len(v.failed))
-	
+
 	// Combine left content with view name
 	leftContent := formatter.FormatViewName() + " " + stats
-	
+
 	// Right content is scroll indicator
 	rightContent := scrollIndicator
-	
+
 	// Use status line directly
 	return v.statusLine.
 		SetWidth(v.width).

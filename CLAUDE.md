@@ -88,14 +88,52 @@ if v.layout == nil {
 ```
 Never initialize in constructor - causes width issues.
 
+#### Lipgloss Border Calculations (CRITICAL)
+**Borders add 2 chars to width** - always subtract when calculating:
+```go
+// WRONG: Causes right-side cutoff
+leftBox := lipgloss.NewStyle().Width(termWidth/2).Border(...)
+rightBox := lipgloss.NewStyle().Width(termWidth/2).Border(...)
+
+// CORRECT: Account for border expansion
+totalWidth := termWidth - 4  // 2 boxes * 2 border chars
+leftBox := lipgloss.NewStyle().Width(totalWidth/2).Border(...)
+rightBox := lipgloss.NewStyle().Width(totalWidth/2).Border(...)
+```
+
+**Height calculations for full-screen views:**
+```go
+// Standard view with status bar
+availableHeight := height - 1  // 1 for status
+
+// With title and status
+availableHeight := height - 3  // 2 for title, 1 for status
+
+// Fix top border cutoff
+availableHeight := height - 3  // Extra space
+content := lipgloss.NewStyle().MarginTop(1).Render(boxes)
+```
+
 #### Key Processing Flow
 `internal/tui/app.go::processKeyWithFiltering()` → Check disabled → Custom handler → Navigation → View Update
+
+#### Dashboard Miller Columns Layout
+Three-column hierarchical navigation (Repositories → Runs → Details):
+```
+│ Repositories │ Runs        │ Details     │
+│ > myorg/app │ ✓ Fix bug   │ Run: 123    │
+│   team/api  │ ⚡ Running   │ Status: ... │
+```
+- **Navigation**: Tab (forward), Shift+Tab/h (back), Enter (select)
+- **Column widths**: 30%/35%/35% (standard), adjusts for terminal size
+- **Status icons**: ✓ done, ⚡ running, ✗ failed, ○ pending
+- **FZF search**: Press 'f' on any column for fuzzy filter
 
 #### Dashboard File Split
 Large views split for maintainability:
 - `dashboard.go` - Core Bubble Tea methods
-- `dash_navigation.go` - Key handling
-- `dash_rendering.go` - Display logic
+- `dash_navigation.go` - Key handling and column movement
+- `dash_rendering.go` - Miller columns layout rendering
 - `dash_data.go` - Data operations
 - Pattern: `{view}_*.go` for large views
 

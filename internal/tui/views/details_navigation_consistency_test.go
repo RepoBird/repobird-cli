@@ -49,7 +49,7 @@ func TestDetailsViewNavigationKeyConsistency(t *testing.T) {
 			description: "'h' should not be disabled and should use centralized system (ActionNavigateToDashboard)",
 		},
 		{
-			name:        "q key should use centralized system", 
+			name:        "q key should use centralized system",
 			key:         "q",
 			expectKey:   "q",
 			shouldBlock: false,
@@ -57,7 +57,7 @@ func TestDetailsViewNavigationKeyConsistency(t *testing.T) {
 		},
 		{
 			name:        "d key should use centralized system",
-			key:         "d", 
+			key:         "d",
 			expectKey:   "d",
 			shouldBlock: false,
 			description: "'d' should not be disabled and should use centralized system (ActionNavigateToDashboard)",
@@ -146,21 +146,21 @@ func TestDetailsViewNavigationBehaviorIntegration(t *testing.T) {
 
 	t.Run("Consistent navigation keys work identically", func(t *testing.T) {
 		consistentKeys := []string{"h", "q", "d"}
-		
+
 		for _, key := range consistentKeys {
 			t.Run("Key: "+key, func(t *testing.T) {
 				// All these keys should behave identically for navigation consistency
-				
+
 				// Should not be disabled
 				assert.False(t, view.IsKeyDisabled(key), "Navigation key '%s' should not be disabled", key)
-				
+
 				// Should let centralized system handle (return handled=false)
 				keyMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(key)}
 				handled, model, _ := view.HandleKey(keyMsg)
-				
+
 				assert.False(t, handled, "Navigation key '%s' should not be handled locally", key)
 				assert.Equal(t, view, model, "Model should remain unchanged for key '%s'", key)
-				
+
 				// For 'q' key, there might be a stopPolling command, but that's fine
 				// The important thing is that handled=false so centralized system processes it
 			})
@@ -176,12 +176,12 @@ func TestDetailsViewNavigationBehaviorIntegration(t *testing.T) {
 			{"b", tea.KeyRunes, []rune("b")},
 			{"backspace", tea.KeyBackspace, nil},
 		}
-		
+
 		for _, keyInfo := range disabledKeys {
 			t.Run("Key: "+keyInfo.key, func(t *testing.T) {
 				// Should be disabled
 				assert.True(t, view.IsKeyDisabled(keyInfo.key), "Key '%s' should be disabled", keyInfo.key)
-				
+
 				// Create appropriate KeyMsg
 				var keyMsg tea.KeyMsg
 				if keyInfo.runes != nil {
@@ -189,7 +189,7 @@ func TestDetailsViewNavigationBehaviorIntegration(t *testing.T) {
 				} else {
 					keyMsg = tea.KeyMsg{Type: keyInfo.keyType}
 				}
-				
+
 				// HandleKey should not handle disabled keys
 				handled, _, _ := view.HandleKey(keyMsg)
 				assert.False(t, handled, "Disabled key '%s' should not be handled", keyInfo.key)
@@ -200,18 +200,18 @@ func TestDetailsViewNavigationBehaviorIntegration(t *testing.T) {
 	t.Run("Navigation through Update method respects disabled keys", func(t *testing.T) {
 		// Test that disabled keys don't trigger navigation when sent through Update
 		originalView := view
-		
+
 		// Test 'b' key (should be ignored)
 		bKeyMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("b")}
 		model, cmd := view.Update(bKeyMsg)
-		
+
 		assert.Equal(t, originalView, model, "View should remain unchanged for disabled 'b' key")
 		assert.Nil(t, cmd, "No command should be returned for disabled 'b' key")
-		
+
 		// Test backspace key (should be ignored)
 		backspaceMsg := tea.KeyMsg{Type: tea.KeyBackspace}
 		model, cmd = view.Update(backspaceMsg)
-		
+
 		assert.Equal(t, originalView, model, "View should remain unchanged for disabled backspace key")
 		assert.Nil(t, cmd, "No command should be returned for disabled backspace key")
 	})
@@ -244,7 +244,7 @@ func TestDetailsViewCachedNavigationBehavior(t *testing.T) {
 			CreatedAt:      time.Now().Add(-2 * time.Hour),
 		},
 		{
-			ID:             "cached-run-2", 
+			ID:             "cached-run-2",
 			Status:         models.StatusProcessing,
 			RepositoryName: "test/cached-repo2",
 			CreatedAt:      time.Now().Add(-1 * time.Hour),
@@ -268,10 +268,10 @@ func TestDetailsViewCachedNavigationBehavior(t *testing.T) {
 		// Verify that navigation context exists (simulates dashboard state saving)
 		storedState := testCache.GetNavigationContext("dashboardState")
 		require.NotNil(t, storedState, "Dashboard state should be stored in navigation context")
-		
+
 		state, ok := storedState.(map[string]interface{})
 		require.True(t, ok, "Dashboard state should be a map")
-		
+
 		assert.Equal(t, 1, state["selectedRepoIdx"], "Selected repo index should be preserved")
 		assert.Equal(t, 2, state["selectedRunIdx"], "Selected run index should be preserved")
 		assert.Equal(t, 3, state["selectedDetailLine"], "Selected detail line should be preserved")
@@ -281,16 +281,16 @@ func TestDetailsViewCachedNavigationBehavior(t *testing.T) {
 	t.Run("Cached runs available for dashboard restoration", func(t *testing.T) {
 		// Verify that cached runs exist for dashboard to use
 		runs, cached, details := testCache.GetCachedList()
-		
+
 		assert.True(t, cached, "Runs should be cached")
 		require.Len(t, runs, 2, "Should have cached runs")
 		assert.NotNil(t, details, "Details map should exist")
-		
+
 		// Cache sorts by CreatedAt descending (newest first)
 		// cached-run-2 was created 1 hour ago, cached-run-1 was created 2 hours ago
 		assert.Equal(t, "cached-run-2", runs[0].ID, "Newer run should be first (cache sorts by CreatedAt desc)")
 		assert.Equal(t, "cached-run-1", runs[1].ID, "Older run should be second")
-		
+
 		// Verify that GetRepositoryName works on cached runs
 		assert.Equal(t, "test/cached-repo2", runs[0].GetRepositoryName(), "Repository name should be preserved for newer run")
 		assert.Equal(t, "test/cached-repo1", runs[1].GetRepositoryName(), "Repository name should be preserved for older run")
@@ -299,14 +299,14 @@ func TestDetailsViewCachedNavigationBehavior(t *testing.T) {
 	t.Run("Key handler behavior for cached navigation", func(t *testing.T) {
 		// Test that navigation keys return handled=false to use centralized system
 		navigationKeys := []string{"h", "q", "d"}
-		
+
 		for _, key := range navigationKeys {
 			keyMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(key)}
 			handled, model, _ := view.HandleKey(keyMsg)
-			
+
 			assert.False(t, handled, "Key '%s' should not be handled locally for cached navigation", key)
 			assert.Equal(t, view, model, "Model should remain unchanged for key '%s'", key)
-			
+
 			// The centralized system will use the cached data and navigation context
 			// to restore the dashboard without API calls
 		}
@@ -336,18 +336,18 @@ func TestDetailsViewConstructorWithData(t *testing.T) {
 
 	t.Run("NewRunDetailsViewWithData avoids loading state", func(t *testing.T) {
 		view := NewRunDetailsViewWithData(client, testCache, testRun)
-		
+
 		assert.False(t, view.loading, "View should not be in loading state when created with data")
 		assert.Equal(t, testRun.ID, view.run.ID, "Run ID should be set from provided data")
 		assert.Equal(t, testRun.Status, view.run.Status, "Run status should be set from provided data")
 		assert.Equal(t, testRun.Title, view.run.Title, "Run title should be set from provided data")
-		
+
 		// Verify that the view implements CoreViewKeymap
 		require.Implements(t, (*interface {
 			IsKeyDisabled(string) bool
 			HandleKey(tea.KeyMsg) (bool, tea.Model, tea.Cmd)
 		})(nil), view, "View created with data should implement CoreViewKeymap")
-		
+
 		// Verify navigation keys are properly configured
 		assert.False(t, view.IsKeyDisabled("h"), "'h' should not be disabled")
 		assert.False(t, view.IsKeyDisabled("q"), "'q' should not be disabled")
@@ -358,14 +358,14 @@ func TestDetailsViewConstructorWithData(t *testing.T) {
 	t.Run("Regular constructor comparison", func(t *testing.T) {
 		// Create view with regular constructor (would typically load from API)
 		regularView := NewRunDetailsView(client, testCache, testRun.ID)
-		
+
 		// Create view with data constructor (avoids API call)
 		dataView := NewRunDetailsViewWithData(client, testCache, testRun)
-		
+
 		// Both should have the same navigation key configuration
 		keys := []string{"h", "q", "d", "b", "backspace"}
 		for _, key := range keys {
-			assert.Equal(t, regularView.IsKeyDisabled(key), dataView.IsKeyDisabled(key), 
+			assert.Equal(t, regularView.IsKeyDisabled(key), dataView.IsKeyDisabled(key),
 				"Key '%s' disabled state should be the same for both constructors", key)
 		}
 	})
@@ -389,7 +389,7 @@ func TestNavigationMessageWithRunData(t *testing.T) {
 			RunID:   testRun.ID,
 			RunData: &testRun, // This avoids API call in the target view
 		}
-		
+
 		assert.Equal(t, testRun.ID, navMsg.RunID, "RunID should be set")
 		require.NotNil(t, navMsg.RunData, "RunData should be provided")
 		assert.Equal(t, testRun.ID, navMsg.RunData.ID, "RunData should contain the correct run")
@@ -403,7 +403,7 @@ func TestNavigationMessageWithRunData(t *testing.T) {
 			RunID:   testRun.ID,
 			RunData: nil, // This would cause API call in the target view
 		}
-		
+
 		assert.Equal(t, testRun.ID, navMsg.RunID, "RunID should be set")
 		assert.Nil(t, navMsg.RunData, "RunData should be nil for API-based navigation")
 	})

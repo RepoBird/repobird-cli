@@ -499,7 +499,7 @@ func (d *DashboardView) renderStatusLine(layoutName string) string {
 	// Use the existing status line instance that receives spinner updates
 	// Format help text based on available space (like StandardStatusLine does)
 	formattedHelp := formatter.FormatHelp(leftContent, dataInfo, shortHelp)
-	
+
 	return d.statusLine.
 		SetWidth(d.width).
 		SetLeft(leftContent).

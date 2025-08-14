@@ -16,7 +16,7 @@ func TestThirtyMinuteTTLBehavior(t *testing.T) {
 
 	t.Run("DataPolicies configuration", func(t *testing.T) {
 		// Verify the TTL policies are configured correctly per the conversation
-		
+
 		// Active runs should have 30-minute TTL (changed from 5 minutes)
 		activeRunsPolicy := DataPolicies["active_runs"]
 		assert.Equal(t, 30*time.Minute, activeRunsPolicy.TTL, "Active runs should have 30-minute TTL")
@@ -45,7 +45,7 @@ func TestThirtyMinuteTTLBehavior(t *testing.T) {
 	t.Run("HybridCache TTL behavior simulation", func(t *testing.T) {
 		// Test the intended behavior of 30-minute TTL for active runs
 		// This test simulates the TTL logic without waiting 30 minutes
-		
+
 		cache := NewSimpleCache()
 		defer cache.Stop()
 
@@ -92,27 +92,27 @@ func TestThirtyMinuteTTLBehavior(t *testing.T) {
 		// The hybrid cache routing logic should:
 		// - Put activeRun in memory layer (with 30-min TTL)
 		// - Put terminalRun in disk layer (permanent)
-		
+
 		// This behavior is implemented in the HybridCache, tested separately in hybrid_test.go
 		// Here we focus on the intended policy configuration
 	})
 
 	t.Run("TTL policy application verification", func(t *testing.T) {
 		// Verify that the cache policies are applied correctly
-		
+
 		// Test active runs policy
 		activePolicy := DataPolicies["active_runs"]
 		assert.Equal(t, 30*time.Minute, activePolicy.TTL, "Active runs TTL should be 30 minutes")
-		
+
 		// Verify this is different from the old 5-minute setting
 		assert.NotEqual(t, 5*time.Minute, activePolicy.TTL, "Should not be the old 5-minute TTL")
 		assert.Greater(t, activePolicy.TTL, 5*time.Minute, "New TTL should be longer than old TTL")
-		
+
 		// Convert to seconds for easier understanding
 		ttlSeconds := activePolicy.TTL.Seconds()
 		expectedSeconds := (30 * time.Minute).Seconds()
 		assert.Equal(t, expectedSeconds, ttlSeconds, "TTL should be exactly 30 minutes (1800 seconds)")
-		
+
 		// Verify the policy makes sense for dashboard navigation caching
 		assert.Greater(t, activePolicy.TTL, 10*time.Minute, "TTL should be long enough for typical user navigation")
 		assert.Less(t, activePolicy.TTL, 60*time.Minute, "TTL should not be too long to avoid stale data")
@@ -129,7 +129,7 @@ func TestCacheBehaviorWithTTL(t *testing.T) {
 
 	t.Run("Dashboard navigation benefits from longer TTL", func(t *testing.T) {
 		// Simulate a typical dashboard navigation scenario
-		
+
 		// User loads dashboard (t=0)
 		dashboardRuns := []models.RunResponse{
 			{
@@ -194,7 +194,7 @@ func TestCacheBehaviorWithTTL(t *testing.T) {
 		for _, originalRun := range dashboardRuns {
 			cachedRun := cache.GetRun(originalRun.ID)
 			require.NotNil(t, cachedRun, "Run %s should still be cached after 15 minutes", originalRun.ID)
-			assert.Equal(t, originalRun.GetRepositoryName(), cachedRun.GetRepositoryName(), 
+			assert.Equal(t, originalRun.GetRepositoryName(), cachedRun.GetRepositoryName(),
 				"Repository name should be preserved for run %s", originalRun.ID)
 		}
 
@@ -212,7 +212,7 @@ func TestCacheBehaviorWithTTL(t *testing.T) {
 
 	t.Run("Form data TTL behavior", func(t *testing.T) {
 		// Test form data caching with 30-minute TTL
-		
+
 		formData := &FormData{
 			Title:       "TTL Test Form",
 			Repository:  "test/ttl-repo",
@@ -243,7 +243,7 @@ func TestCacheBehaviorWithTTL(t *testing.T) {
 
 	t.Run("TTL comparison with previous behavior", func(t *testing.T) {
 		// Document the improvement from 5-minute to 30-minute TTL
-		
+
 		oldTTL := 5 * time.Minute
 		newTTL := DataPolicies["active_runs"].TTL
 
@@ -336,10 +336,10 @@ func TestNavigationPerformanceWithTTL(t *testing.T) {
 
 	t.Run("Navigation performance simulation", func(t *testing.T) {
 		// Simulate the performance characteristics of dashboard navigation
-		
+
 		// Initial dashboard load (API call required)
 		startTime := time.Now()
-		
+
 		initialRuns := []models.RunResponse{
 			{
 				ID:             "perf-test-1",
@@ -353,7 +353,7 @@ func TestNavigationPerformanceWithTTL(t *testing.T) {
 				ID:             "perf-test-2",
 				Status:         models.StatusDone,
 				Repository:     "",
-				RepositoryName: "test/perf-repo-2", 
+				RepositoryName: "test/perf-repo-2",
 				CreatedAt:      time.Now().Add(-1 * time.Hour),
 				Title:          "Performance Test Run 2",
 			},
@@ -368,7 +368,7 @@ func TestNavigationPerformanceWithTTL(t *testing.T) {
 			navStart := time.Now()
 			runs, cached, _ := cache.GetCachedList()
 			navigationTimes[i] = time.Since(navStart)
-			
+
 			assert.True(t, cached, "Navigation %d should hit cache", i+1)
 			assert.Len(t, runs, 2, "Navigation %d should return all runs", i+1)
 		}
@@ -382,26 +382,26 @@ func TestNavigationPerformanceWithTTL(t *testing.T) {
 
 		t.Logf("Initial cache time: %v", cacheTime)
 		t.Logf("Average navigation time: %v", avgNavTime)
-		
+
 		// Navigation from cache should be significantly faster than initial load
 		// This is the key benefit of the 30-minute TTL
 		assert.Less(t, avgNavTime, cacheTime, "Cache navigation should be faster than initial load")
-		
+
 		// With 30-minute TTL, all 10 navigations hit cache (in real usage, this could be
 		// dashboard -> details -> dashboard -> create -> dashboard, etc.)
 	})
 
 	t.Run("Cache hit ratio simulation", func(t *testing.T) {
 		// Simulate cache hit ratios with different TTL values
-		
+
 		// With 30-minute TTL: typical user session (20 minutes) should have high hit ratio
 		sessionDuration := 20 * time.Minute
 		ttl := DataPolicies["active_runs"].TTL // 30 minutes
-		
+
 		// User performs navigation every 2 minutes for 20 minutes
 		navigationInterval := 2 * time.Minute
 		totalNavigations := int(sessionDuration / navigationInterval) // 10 navigations
-		
+
 		cacheHits := 0
 		for i := 0; i < totalNavigations; i++ {
 			elapsed := time.Duration(i) * navigationInterval
@@ -409,10 +409,10 @@ func TestNavigationPerformanceWithTTL(t *testing.T) {
 				cacheHits++
 			}
 		}
-		
+
 		hitRatio := float64(cacheHits) / float64(totalNavigations)
 		assert.Equal(t, 1.0, hitRatio, "All navigations should hit cache within 30-minute TTL")
-		
+
 		// Compare with old 5-minute TTL
 		oldTTL := 5 * time.Minute
 		oldCacheHits := 0
@@ -422,12 +422,12 @@ func TestNavigationPerformanceWithTTL(t *testing.T) {
 				oldCacheHits++
 			}
 		}
-		
+
 		oldHitRatio := float64(oldCacheHits) / float64(totalNavigations)
 		assert.Less(t, oldHitRatio, hitRatio, "New TTL should have better hit ratio than old TTL")
 		assert.Equal(t, 0.3, oldHitRatio, "Old 5-minute TTL would have 30% hit ratio") // 3/10 navigations
-		
-		t.Logf("Navigation hit ratios: Old TTL (5min): %.1f%%, New TTL (30min): %.1f%%", 
+
+		t.Logf("Navigation hit ratios: Old TTL (5min): %.1f%%, New TTL (30min): %.1f%%",
 			oldHitRatio*100, hitRatio*100)
 	})
 }

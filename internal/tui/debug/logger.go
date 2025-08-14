@@ -12,14 +12,14 @@ func getDebugLogPath() string {
 	if path := os.Getenv("REPOBIRD_DEBUG_LOG"); path != "" {
 		return path
 	}
-	
+
 	// Find project root by looking for go.mod file
 	projectRoot := findProjectRoot()
 	if projectRoot == "" {
 		// Fallback to temp directory if project root not found
 		return filepath.Join(os.TempDir(), "repobird_debug.log")
 	}
-	
+
 	// Use logs directory in the project root
 	logsDir := filepath.Join(projectRoot, "logs")
 	// Create logs directory if it doesn't exist
@@ -36,13 +36,13 @@ func findProjectRoot() string {
 	if err != nil {
 		return ""
 	}
-	
+
 	dir := wd
 	for {
 		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
 			return dir
 		}
-		
+
 		parent := filepath.Dir(dir)
 		if parent == dir {
 			// Reached filesystem root
@@ -50,7 +50,7 @@ func findProjectRoot() string {
 		}
 		dir = parent
 	}
-	
+
 	return ""
 }
 

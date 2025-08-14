@@ -390,16 +390,32 @@ func (f *CustomCreateForm) renderField(field CustomFormField, focused bool) stri
 				value = lipgloss.NewStyle().
 					Foreground(lipgloss.Color("239")).
 					Render(field.Placeholder)
+			} else {
+				// Compact multi-line text to single line when not in insert mode
+				// This prevents overflow issues
+				lines := strings.Split(value, "\n")
+				if len(lines) > 1 {
+					// Show first line with ellipsis to indicate more content
+					firstLine := strings.TrimSpace(lines[0])
+					if firstLine == "" && len(lines) > 1 {
+						// If first line is empty, try to find first non-empty line
+						for _, line := range lines {
+							if trimmed := strings.TrimSpace(line); trimmed != "" {
+								firstLine = trimmed
+								break
+							}
+						}
+					}
+					if firstLine == "" {
+						firstLine = "[empty]"
+					}
+					value = firstLine + " ..."
+				} else {
+					value = strings.TrimSpace(value)
+				}
 			}
 			if focused {
-				lines := strings.Split(value, "\n")
-				if len(lines) > 0 {
-					lines[0] = f.focusedStyle.Render("▶ " + lines[0])
-					for i := 1; i < len(lines); i++ {
-						lines[i] = "  " + lines[i]
-					}
-				}
-				input = strings.Join(lines, "\n")
+				input = f.focusedStyle.Render("▶ " + value)
 			} else {
 				input = "  " + value
 			}

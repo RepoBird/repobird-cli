@@ -65,11 +65,11 @@ func (d *DashboardView) loadDashboardData() tea.Cmd {
 		// In debug mode, always fetch fresh data
 		if cached && len(runs) > 0 && !isDebugMode {
 			debug.LogToFilef("  ✅ CACHE: Found cached data: %d runs, %d details\n", len(runs), len(detailsCache))
-			
+
 			// Filter out invalid runs instead of clearing entire cache
 			validRuns := make([]models.RunResponse, 0, len(runs))
 			invalidCount := 0
-			
+
 			for _, run := range runs {
 				// Skip test data or runs with empty repository (use proper GetRepositoryName method)
 				repoName := run.GetRepositoryName()
@@ -80,9 +80,9 @@ func (d *DashboardView) loadDashboardData() tea.Cmd {
 				}
 				validRuns = append(validRuns, run)
 			}
-			
+
 			debug.LogToFilef("  📊 CACHE: Valid runs: %d, Invalid runs: %d, Total: %d\n", len(validRuns), invalidCount, len(runs))
-			
+
 			// Only clear cache if majority of runs are invalid (more than 50%)
 			if len(validRuns) > 0 && float64(len(validRuns))/float64(len(runs)) > 0.5 {
 				debug.LogToFilef("  ✅ CACHE: Using cached data with %d valid runs (filtered %d invalid)\n", len(validRuns), invalidCount)
@@ -100,7 +100,7 @@ func (d *DashboardView) loadDashboardData() tea.Cmd {
 					repositories = d.cache.BuildRepositoryOverviewFromRuns(allRuns)
 					d.cache.SetRepositoryOverview(repositories)
 				}
-				
+
 				debug.LogToFilef("  🏗️ CACHE: Built %d repositories from %d valid cached runs\n", len(repositories), len(validRuns))
 
 				return dashboardDataLoadedMsg{
@@ -199,7 +199,7 @@ func (d *DashboardView) loadDashboardData() tea.Cmd {
 
 			// Cache the loaded data for future use (using non-deadlock safe methods)
 			debug.LogToFilef("  Caching loaded data to avoid future API calls\n")
-			
+
 			// Convert []*models.RunResponse to []models.RunResponse for caching
 			runsForCache := make([]models.RunResponse, len(allRuns))
 			for i, run := range allRuns {
@@ -207,7 +207,7 @@ func (d *DashboardView) loadDashboardData() tea.Cmd {
 					runsForCache[i] = *run
 				}
 			}
-			
+
 			// Cache runs and repository overview
 			d.cache.SetCachedList(runsForCache, detailsCache)
 			d.cache.SetRepositoryOverview(repositories)

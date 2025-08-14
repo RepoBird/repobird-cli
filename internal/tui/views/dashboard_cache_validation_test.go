@@ -103,7 +103,7 @@ func TestDashboardCacheValidation(t *testing.T) {
 				},
 			},
 			expectedCached: true, // GetCachedList returns true when runs exist in cache
-			expectedValid:  2, // Only run-5 and run-7 are valid
+			expectedValid:  2,    // Only run-5 and run-7 are valid
 			expectedTotal:  4,
 			description:    "Mixed runs with exactly 50% valid should clear cache (not > 50%)",
 		},
@@ -147,13 +147,13 @@ func TestDashboardCacheValidation(t *testing.T) {
 				},
 			},
 			expectedCached: true, // GetCachedList returns true when runs exist in cache
-			expectedValid:  1,     // Only run-8 is valid
+			expectedValid:  1,    // Only run-8 is valid
 			expectedTotal:  5,
 			description:    "Majority invalid runs should clear cache and fetch from API",
 		},
 		{
-			name: "Empty runs list",
-			runs: []models.RunResponse{},
+			name:           "Empty runs list",
+			runs:           []models.RunResponse{},
 			expectedCached: false,
 			expectedValid:  0,
 			expectedTotal:  0,
@@ -164,7 +164,7 @@ func TestDashboardCacheValidation(t *testing.T) {
 			runs: []models.RunResponse{
 				{
 					ID:             "run-9",
-					Repository:     "legacy/repo6",  // Legacy field
+					Repository:     "legacy/repo6", // Legacy field
 					RepositoryName: "modern/repo6", // Modern field (should take precedence)
 					Status:         models.StatusDone,
 					CreatedAt:      time.Now().Add(-1 * time.Hour),
@@ -182,7 +182,7 @@ func TestDashboardCacheValidation(t *testing.T) {
 			// Create a fresh cache for each test with isolated directory
 			testTmpDir := t.TempDir()
 			t.Setenv("XDG_CONFIG_HOME", testTmpDir)
-			
+
 			testCache := cache.NewSimpleCache()
 			defer testCache.Stop()
 
@@ -197,7 +197,7 @@ func TestDashboardCacheValidation(t *testing.T) {
 
 			// Verify basic cache behavior
 			assert.Equal(t, tt.expectedCached, cached, tt.description)
-			
+
 			if tt.expectedCached {
 				require.NotNil(t, cachedRuns, "Cached runs should not be nil when cached=true")
 				assert.Len(t, cachedRuns, len(tt.runs), "Cached runs length should match input")
@@ -230,7 +230,7 @@ func TestDashboardCacheValidation(t *testing.T) {
 				// Test the cache clearing threshold (50% valid runs)
 				// This represents what the dashboard WOULD do with the cache
 				shouldKeepCache := len(validRuns) > 0 && float64(len(validRuns))/float64(len(cachedRuns)) > 0.5
-				
+
 				// Verify the filtering decision logic
 				if len(validRuns) > len(cachedRuns)/2 {
 					// More than 50% valid - dashboard would keep cache
@@ -247,11 +247,11 @@ func TestDashboardCacheValidation(t *testing.T) {
 // TestGetRepositoryNameMethod tests the GetRepositoryName method that was crucial to the fix
 func TestGetRepositoryNameMethod(t *testing.T) {
 	tests := []struct {
-		name               string
-		repository         string
-		repositoryName     string
-		expectedResult     string
-		description        string
+		name           string
+		repository     string
+		repositoryName string
+		expectedResult string
+		description    string
 	}{
 		{
 			name:           "Modern API with RepositoryName only",
@@ -261,7 +261,7 @@ func TestGetRepositoryNameMethod(t *testing.T) {
 			description:    "Should return RepositoryName when Repository is empty",
 		},
 		{
-			name:           "Legacy API with Repository only", 
+			name:           "Legacy API with Repository only",
 			repository:     "test/legacy-repo",
 			repositoryName: "",
 			expectedResult: "test/legacy-repo",
@@ -354,7 +354,7 @@ func TestCacheValidationIntegration(t *testing.T) {
 		cachedRun := testCache.GetRun(originalRun.ID)
 		require.NotNil(t, cachedRun, "Individual run should be cached: %s", originalRun.ID)
 		assert.Equal(t, originalRun.ID, cachedRun.ID, "Cached run ID should match")
-		
+
 		// Test GetRepositoryName on cached run
 		expectedRepo := originalRun.GetRepositoryName()
 		actualRepo := cachedRun.GetRepositoryName()

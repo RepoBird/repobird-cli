@@ -109,7 +109,7 @@ type DashboardView struct {
 func NewDashboardViewWithState(client APIClient, cache *cache.SimpleCache, selectedRepoIdx, selectedRunIdx, selectedDetailLine, focusedColumn int) *DashboardView {
 	dashboard := NewDashboardView(client, cache)
 	// Set the state that will be restored after data loads
-	debug.LogToFilef("🔧 DASHBOARD: Creating dashboard with restored state - repo=%d, run=%d, detail=%d, column=%d 🔧\n", 
+	debug.LogToFilef("🔧 DASHBOARD: Creating dashboard with restored state - repo=%d, run=%d, detail=%d, column=%d 🔧\n",
 		selectedRepoIdx, selectedRunIdx, selectedDetailLine, focusedColumn)
 	dashboard.selectedRepoIdx = selectedRepoIdx
 	dashboard.selectedRunIdx = selectedRunIdx
@@ -229,7 +229,6 @@ func (d *DashboardView) Init() tea.Cmd {
 // syncFileHashes syncs file hashes from the API on startup
 func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
-
 
 	// Always handle quit keys regardless of loading state
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
@@ -434,7 +433,6 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return d, nil
 		}
 
-
 		// SPECIAL CASE: 'b' from dashboard should go to BULK view, not back
 		if msg.String() == "b" {
 			debug.LogToFilef("🎯 DASHBOARD: 'b' key detected - navigating to BULK view 🎯\n")
@@ -531,7 +529,7 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			// Save dashboard state before navigating
-			debug.LogToFilef("💾 DASHBOARD: Saving state before navigation - repo=%d, run=%d, detail=%d, column=%d 💾\n", 
+			debug.LogToFilef("💾 DASHBOARD: Saving state before navigation - repo=%d, run=%d, detail=%d, column=%d 💾\n",
 				d.selectedRepoIdx, d.selectedRunIdx, d.selectedDetailLine, d.focusedColumn)
 			d.cache.SetNavigationContext("dashboardState", map[string]interface{}{
 				"selectedRepoIdx":    d.selectedRepoIdx,
@@ -670,9 +668,9 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 								break
 							}
 						}
-						
+
 						// Save dashboard state before navigating
-						debug.LogToFilef("💾 DASHBOARD: Saving state before navigation (all runs) - repo=%d, run=%d, detail=%d, column=%d 💾\n", 
+						debug.LogToFilef("💾 DASHBOARD: Saving state before navigation (all runs) - repo=%d, run=%d, detail=%d, column=%d 💾\n",
 							d.selectedRepoIdx, d.selectedRunIdx, d.selectedDetailLine, d.focusedColumn)
 						d.cache.SetNavigationContext("dashboardState", map[string]interface{}{
 							"selectedRepoIdx":    d.selectedRepoIdx,
@@ -699,7 +697,6 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			d.allRunsList.Update(msg)
 		}
 	}
-
 
 	return d, tea.Batch(cmds...)
 }
