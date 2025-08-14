@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/repobird/repobird-cli/internal/api"
@@ -75,6 +76,7 @@ type BulkView struct {
 	keys         bulkKeyMap
 	width        int
 	height       int
+	viewport     viewport.Model // For scrollable content in RunList mode
 
 	// Layout systems
 	doubleColumnLayout *components.DoubleColumnLayout // For FZF file browser
@@ -127,6 +129,9 @@ func NewBulkView(client *api.Client) *BulkView {
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
+	vp := viewport.New(80, 20) // Default size, will be updated
+	vp.YPosition = 0
+
 	return &BulkView{
 		client:     client,
 		mode:       ModeInstructions, // Start with instructions, not file selector
@@ -136,6 +141,7 @@ func NewBulkView(client *api.Client) *BulkView {
 		runType:    "run",
 		runs:       []BulkRunItem{},
 		statusLine: components.NewStatusLine(),
+		viewport:   vp,
 	}
 }
 
@@ -241,6 +247,11 @@ func (v *BulkView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Create layout for proper sizing
 		v.layout = components.NewWindowLayout(msg.Width, msg.Height)
 
+		// Update viewport dimensions from layout
+		viewportWidth, viewportHeight := v.layout.GetViewportDimensions()
+		v.viewport.Width = viewportWidth
+		v.viewport.Height = viewportHeight - 7 // Account for header lines
+
 		// Update file selector dimensions
 		if v.fileSelector != nil {
 			v.fileSelector.SetDimensions(msg.Width, msg.Height)
@@ -328,6 +339,8 @@ func (v *BulkView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		v.batchTitle = msg.batchTitle
 		v.mode = ModeRunList
 		v.selectedRun = 0
+		// Update viewport content for run list
+		v.updateRunListViewport()
 		return v, nil
 
 	case bulkSubmittedMsg:
@@ -704,7 +717,7 @@ func (v *BulkView) renderStatusLine(layoutName string) string {
 			helpText = "↑↓/j/k:nav space:select i:input mode b/esc:back enter:confirm"
 		}
 	case ModeRunList:
-		helpText = "↑↓:navigate space:toggle f:files ctrl+s:submit q:quit"
+		helpText = "↑↓:navigate space:toggle enter:submit f:add-files pgup/pgdn:scroll q:back"
 	default:
 		helpText = "q:quit ?:help"
 	}
