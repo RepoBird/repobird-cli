@@ -2,8 +2,10 @@ package bulk
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -109,7 +111,7 @@ func TestParseBulkConfig_JSON(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name: "invalid JSON - missing repository",
+			name: "invalid JSON - missing repository and repoId",
 			content: `{
 				"runs": [
 					{"prompt": "Test prompt"}
@@ -129,22 +131,16 @@ func TestParseBulkConfig_JSON(t *testing.T) {
 		},
 		{
 			name: "invalid JSON - exceeds max batch size",
-			content: `{
-				"repository": "org/repo",
-				"runs": [
-					{"prompt": "Run 1"},
-					{"prompt": "Run 2"},
-					{"prompt": "Run 3"},
-					{"prompt": "Run 4"},
-					{"prompt": "Run 5"},
-					{"prompt": "Run 6"},
-					{"prompt": "Run 7"},
-					{"prompt": "Run 8"},
-					{"prompt": "Run 9"},
-					{"prompt": "Run 10"},
-					{"prompt": "Run 11"}
-				]
-			}`,
+			content: func() string {
+				runs := make([]string, 41) // Exceed MaxBulkBatchSize of 40
+				for i := 0; i < 41; i++ {
+					runs[i] = fmt.Sprintf(`{"prompt": "Run %d"}`, i+1)
+				}
+				return fmt.Sprintf(`{
+					"repository": "org/repo",
+					"runs": [%s]
+				}`, strings.Join(runs, ","))
+			}(),
 			expectError: true,
 		},
 	}
@@ -589,14 +585,16 @@ func TestValidateBulkConfig(t *testing.T) {
 		},
 		{
 			name: "exceeds max batch size",
-			config: &BulkConfig{
-				Repository: "org/repo",
-				Runs: []BulkRunConfig{
-					{Prompt: "1"}, {Prompt: "2"}, {Prompt: "3"}, {Prompt: "4"}, {Prompt: "5"},
-					{Prompt: "6"}, {Prompt: "7"}, {Prompt: "8"}, {Prompt: "9"}, {Prompt: "10"},
-					{Prompt: "11"},
-				},
-			},
+			config: func() *BulkConfig {
+				runs := make([]BulkRunConfig, 41) // Exceed MaxBulkBatchSize of 40
+				for i := 0; i < 41; i++ {
+					runs[i] = BulkRunConfig{Prompt: fmt.Sprintf("Run %d", i+1)}
+				}
+				return &BulkConfig{
+					Repository: "org/repo",
+					Runs:       runs,
+				}
+			}(),
 			expectError: true,
 			errorMsg:    "batch size exceeds maximum",
 		},
