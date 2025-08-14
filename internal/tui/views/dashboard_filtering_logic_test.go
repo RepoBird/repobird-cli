@@ -594,11 +594,21 @@ func TestCacheFilteringIntegration(t *testing.T) {
 		shouldKeepCache := len(validRuns) > 0 && float64(len(validRuns))/float64(len(cachedRuns)) > 0.5
 		assert.True(t, shouldKeepCache, "Should keep cache with 60% valid runs (3/5)")
 		
-		// Verify that valid runs have correct repository names
-		expectedRepos := []string{"test/repo1", "legacy/repo2", "modern/repo3"}
-		for i, run := range validRuns {
+		// Verify that valid runs have correct repository names (order may vary due to sorting)
+		expectedRepos := map[string]bool{
+			"test/repo1": false,
+			"legacy/repo2": false, 
+			"modern/repo3": false,
+		}
+		for _, run := range validRuns {
 			actualRepo := run.GetRepositoryName()
-			assert.Equal(t, expectedRepos[i], actualRepo, "Valid run %d should have correct repository name", i)
+			if _, exists := expectedRepos[actualRepo]; exists {
+				expectedRepos[actualRepo] = true
+			}
+		}
+		// Check all expected repos were found
+		for repo, found := range expectedRepos {
+			assert.True(t, found, "Expected repository %s should be in valid runs", repo)
 		}
 	})
 

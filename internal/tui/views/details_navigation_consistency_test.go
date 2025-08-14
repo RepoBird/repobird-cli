@@ -286,13 +286,14 @@ func TestDetailsViewCachedNavigationBehavior(t *testing.T) {
 		require.Len(t, runs, 2, "Should have cached runs")
 		assert.NotNil(t, details, "Details map should exist")
 		
-		// Verify specific cached runs
-		assert.Equal(t, "cached-run-1", runs[0].ID, "First cached run should be preserved")
-		assert.Equal(t, "cached-run-2", runs[1].ID, "Second cached run should be preserved")
+		// Cache sorts by CreatedAt descending (newest first)
+		// cached-run-2 was created 1 hour ago, cached-run-1 was created 2 hours ago
+		assert.Equal(t, "cached-run-2", runs[0].ID, "Newer run should be first (cache sorts by CreatedAt desc)")
+		assert.Equal(t, "cached-run-1", runs[1].ID, "Older run should be second")
 		
 		// Verify that GetRepositoryName works on cached runs
-		assert.Equal(t, "test/cached-repo1", runs[0].GetRepositoryName(), "Repository name should be preserved")
-		assert.Equal(t, "test/cached-repo2", runs[1].GetRepositoryName(), "Repository name should be preserved")
+		assert.Equal(t, "test/cached-repo2", runs[0].GetRepositoryName(), "Repository name should be preserved for newer run")
+		assert.Equal(t, "test/cached-repo1", runs[1].GetRepositoryName(), "Repository name should be preserved for older run")
 	})
 
 	t.Run("Key handler behavior for cached navigation", func(t *testing.T) {
