@@ -1,28 +1,102 @@
 package views
 
 import (
+	"context"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/repobird/repobird-cli/internal/tui/cache"
 	"github.com/repobird/repobird-cli/internal/tui/messages"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
-// MockAPIClient for testing
-type MockAPIClient struct {
+// MockHelpAPIClient for testing
+type MockHelpAPIClient struct {
 	mock.Mock
 }
 
-func (m *MockAPIClient) GetAPIEndpoint() string {
+func (m *MockHelpAPIClient) ListRuns(ctx context.Context, page, limit int) (*models.ListRunsResponse, error) {
+	args := m.Called(ctx, page, limit)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.ListRunsResponse), args.Error(1)
+}
+
+func (m *MockHelpAPIClient) ListRunsLegacy(limit, offset int) ([]*models.RunResponse, error) {
+	args := m.Called(limit, offset)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*models.RunResponse), args.Error(1)
+}
+
+func (m *MockHelpAPIClient) GetRun(id string) (*models.RunResponse, error) {
+	args := m.Called(id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.RunResponse), args.Error(1)
+}
+
+func (m *MockHelpAPIClient) GetUserInfo() (*models.UserInfo, error) {
+	args := m.Called()
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.UserInfo), args.Error(1)
+}
+
+func (m *MockHelpAPIClient) GetUserInfoWithContext(ctx context.Context) (*models.UserInfo, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.UserInfo), args.Error(1)
+}
+
+func (m *MockHelpAPIClient) ListRepositories(ctx context.Context) ([]models.APIRepository, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]models.APIRepository), args.Error(1)
+}
+
+func (m *MockHelpAPIClient) GetAPIEndpoint() string {
 	args := m.Called()
 	return args.String(0)
 }
 
+func (m *MockHelpAPIClient) VerifyAuth() (*models.UserInfo, error) {
+	args := m.Called()
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.UserInfo), args.Error(1)
+}
+
+func (m *MockHelpAPIClient) CreateRunAPI(request *models.APIRunRequest) (*models.RunResponse, error) {
+	args := m.Called(request)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.RunResponse), args.Error(1)
+}
+
+func (m *MockHelpAPIClient) GetFileHashes(ctx context.Context) ([]models.FileHashEntry, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]models.FileHashEntry), args.Error(1)
+}
+
 func TestHelpView_Creation(t *testing.T) {
 	// Setup
-	mockClient := new(MockAPIClient)
+	mockClient := new(MockHelpAPIClient)
 	testCache := cache.NewSimpleCache()
 
 	// Create help view
@@ -42,7 +116,7 @@ func TestHelpView_Creation(t *testing.T) {
 
 func TestHelpView_Init(t *testing.T) {
 	// Setup
-	mockClient := new(MockAPIClient)
+	mockClient := new(MockHelpAPIClient)
 	testCache := cache.NewSimpleCache()
 	helpView := NewHelpView(mockClient, testCache)
 
@@ -55,7 +129,7 @@ func TestHelpView_Init(t *testing.T) {
 
 func TestHelpView_WindowSizeMsg(t *testing.T) {
 	// Setup
-	mockClient := new(MockAPIClient)
+	mockClient := new(MockHelpAPIClient)
 	testCache := cache.NewSimpleCache()
 	helpView := NewHelpView(mockClient, testCache)
 
@@ -74,7 +148,7 @@ func TestHelpView_WindowSizeMsg(t *testing.T) {
 
 func TestHelpView_NavigationKeys(t *testing.T) {
 	// Setup
-	mockClient := new(MockAPIClient)
+	mockClient := new(MockHelpAPIClient)
 	testCache := cache.NewSimpleCache()
 	helpView := NewHelpView(mockClient, testCache)
 	
@@ -112,7 +186,7 @@ func TestHelpView_NavigationKeys(t *testing.T) {
 
 func TestHelpView_ForceQuit(t *testing.T) {
 	// Setup
-	mockClient := new(MockAPIClient)
+	mockClient := new(MockHelpAPIClient)
 	testCache := cache.NewSimpleCache()
 	helpView := NewHelpView(mockClient, testCache)
 	
@@ -124,12 +198,16 @@ func TestHelpView_ForceQuit(t *testing.T) {
 	
 	assert.NotNil(t, model)
 	assert.NotNil(t, cmd)
-	assert.Equal(t, tea.Quit(), cmd)
+	// Check that it's a quit command by executing it
+	if cmd != nil {
+		msg := cmd()
+		assert.IsType(t, tea.QuitMsg{}, msg)
+	}
 }
 
 func TestHelpView_ScrollingKeys(t *testing.T) {
 	// Setup
-	mockClient := new(MockAPIClient)
+	mockClient := new(MockHelpAPIClient)
 	testCache := cache.NewSimpleCache()
 	helpView := NewHelpView(mockClient, testCache)
 	
@@ -141,7 +219,7 @@ func TestHelpView_ScrollingKeys(t *testing.T) {
 
 	for _, key := range scrollKeys {
 		t.Run("Scroll key: "+key, func(t *testing.T) {
-			model, cmd := helpView.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(key)})
+			model, _ := helpView.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(key)})
 			
 			assert.NotNil(t, model)
 			// Scrolling keys might or might not return a command
@@ -152,7 +230,7 @@ func TestHelpView_ScrollingKeys(t *testing.T) {
 
 func TestHelpView_CopyKeys(t *testing.T) {
 	// Setup
-	mockClient := new(MockAPIClient)
+	mockClient := new(MockHelpAPIClient)
 	testCache := cache.NewSimpleCache()
 	helpView := NewHelpView(mockClient, testCache)
 	
@@ -164,7 +242,7 @@ func TestHelpView_CopyKeys(t *testing.T) {
 
 	for _, key := range copyKeys {
 		t.Run("Copy key: "+key, func(t *testing.T) {
-			model, cmd := helpView.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(key)})
+			model, _ := helpView.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(key)})
 			
 			assert.NotNil(t, model)
 			// Copy operations are handled by the help component
@@ -174,7 +252,7 @@ func TestHelpView_CopyKeys(t *testing.T) {
 
 func TestHelpView_ViewRendering(t *testing.T) {
 	// Setup
-	mockClient := new(MockAPIClient)
+	mockClient := new(MockHelpAPIClient)
 	testCache := cache.NewSimpleCache()
 	helpView := NewHelpView(mockClient, testCache)
 
@@ -193,7 +271,7 @@ func TestHelpView_ViewRendering(t *testing.T) {
 
 func TestHelpView_IsKeyDisabled(t *testing.T) {
 	// Setup
-	mockClient := new(MockAPIClient)
+	mockClient := new(MockHelpAPIClient)
 	testCache := cache.NewSimpleCache()
 	helpView := NewHelpView(mockClient, testCache)
 
@@ -206,7 +284,7 @@ func TestHelpView_IsKeyDisabled(t *testing.T) {
 
 func TestHelpView_HandleKey(t *testing.T) {
 	// Setup
-	mockClient := new(MockAPIClient)
+	mockClient := new(MockHelpAPIClient)
 	testCache := cache.NewSimpleCache()
 	helpView := NewHelpView(mockClient, testCache)
 

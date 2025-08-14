@@ -7,7 +7,6 @@ import (
 	"github.com/repobird/repobird-cli/internal/tui/cache"
 	"github.com/repobird/repobird-cli/internal/tui/components"
 	"github.com/repobird/repobird-cli/internal/tui/debug"
-	"github.com/repobird/repobird-cli/internal/tui/keymap"
 	"github.com/repobird/repobird-cli/internal/tui/messages"
 )
 
@@ -39,7 +38,7 @@ func NewHelpView(client APIClient, cache *cache.SimpleCache) *HelpView {
 		client:        client,
 		cache:         cache,
 		helpComponent: components.NewHelpView(),
-		keys:          components.DefaultKeyMap(),
+		keys:          components.DefaultKeyMap,
 		disabledKeys: map[string]bool{
 			// Help view doesn't need to disable any keys
 		},

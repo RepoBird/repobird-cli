@@ -95,6 +95,7 @@ type BulkView struct {
 	spinner    spinner.Model
 	statusLine *components.StatusLine
 	layout     *components.WindowLayout
+	
 }
 
 // bulkKeyMap defines key bindings for the bulk view
@@ -327,9 +328,6 @@ func (v *BulkView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case ModeRunList:
 			debug.LogToFilef("DEBUG: BulkView - delegating to handleRunListKeys, key='%s'\n", msg.String())
 			return v.handleRunListKeys(msg)
-		case ModeExamples:
-			debug.LogToFile("DEBUG: BulkView - delegating to handleExamplesKeys\n")
-			return v.handleExamplesKeys(msg)
 		}
 
 	case components.BulkFileSelectedMsg:
@@ -1416,4 +1414,36 @@ func (v *BulkView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Model, 
 	debug.LogToFilef("DEBUG: BulkView.HandleKey - not handling key '%s', returning false\n", keyString)
 	// Let the default Update method handle everything else
 	return false, v, nil
+}
+
+// renderExamples renders the examples view
+func (v *BulkView) renderExamples() string {
+	// Initialize layout if not done yet
+	if v.layout == nil {
+		v.layout = components.NewWindowLayout(v.width, v.height)
+	}
+
+	// Use WindowLayout system for consistent styling
+	boxStyle := v.layout.CreateStandardBox()
+	titleStyle := v.layout.CreateTitleStyle()
+	contentStyle := v.layout.CreateContentStyle()
+
+	title := titleStyle.Render("📚 Bulk Run Examples")
+
+	content := contentStyle.Render("Examples view not yet implemented.\nPress ESC or q to go back.")
+
+	// Get proper dimensions from layout
+	boxWidth, boxHeight := v.layout.GetBoxDimensions()
+
+	// Create the main container with proper dimensions
+	mainContainer := boxStyle.
+		Width(boxWidth).
+		Height(boxHeight).
+		Render(lipgloss.JoinVertical(lipgloss.Left, title, "", content))
+
+	// Status line
+	statusLine := v.renderStatusLine("BULK-EXAMPLES")
+
+	// Join with status line
+	return lipgloss.JoinVertical(lipgloss.Left, mainContainer, statusLine)
 }
