@@ -78,7 +78,7 @@ var DataPolicies = map[string]CachePolicy{
 	},
 	"active_runs": {
 		Layer:      MemoryLayer,
-		TTL:        5 * time.Minute,
+		TTL:        30 * time.Minute,
 		Persistent: false,
 	},
 	"repositories": {

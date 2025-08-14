@@ -42,6 +42,7 @@ man/
 **/repobird
 repobird
 
-# Debug logs
+# Debug logs (only in logs/ directory)
 logs/
+# Individual log files outside logs/ should not be committed
 *.log

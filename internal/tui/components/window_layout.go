@@ -2,7 +2,6 @@ package components
 
 import (
 	"github.com/charmbracelet/lipgloss"
-	"github.com/repobird/repobird-cli/internal/tui/debug"
 )
 
 // WindowLayout provides consistent window sizing and border calculations for all views
@@ -60,11 +59,6 @@ func (w *WindowLayout) calculateDimensions() {
 		w.contentHeight = 1
 	}
 
-	// Debug logging
-	debug.LogToFilef("🏗️ LAYOUT: Terminal %dx%d → Box %dx%d → Content %dx%d 🏗️\n",
-		w.terminalWidth, w.terminalHeight,
-		w.boxWidth, w.boxHeight,
-		w.contentWidth, w.contentHeight)
 }
 
 // GetBoxDimensions returns the box width and height for lipgloss container

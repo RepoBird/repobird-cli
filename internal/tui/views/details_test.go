@@ -448,3 +448,115 @@ func TestRunDetailsViewWithCacheAndDimensions_PreservesDimensions(t *testing.T) 
 		t.Error("viewport should be sized when dimensions are provided")
 	}
 }
+
+func TestNewRunDetailsViewWithData_NoLoading(t *testing.T) {
+	client := api.NewClient("test-key", "http://localhost:8080", false)
+	testCache := cache.NewSimpleCache()
+	
+	testRun := models.RunResponse{
+		ID:        "test-789",
+		Status:    "DONE",
+		CreatedAt: time.Now().Add(-1 * time.Hour),
+		Title:     "Test run from dashboard",
+	}
+	
+	// Create view with data (should not be loading)
+	view := NewRunDetailsViewWithData(client, testCache, testRun)
+	
+	// Should not be loading since data was provided
+	assert.False(t, view.loading, "View should not be loading when created with data")
+	
+	// Should have the correct run data
+	assert.Equal(t, testRun.ID, view.run.ID, "Should have correct run ID")
+	assert.Equal(t, testRun.Status, view.run.Status, "Should have correct run status") 
+	assert.Equal(t, testRun.Title, view.run.Title, "Should have correct run title")
+	
+	// Content should be populated (non-empty)
+	assert.NotEmpty(t, view.fullContent, "Content should be populated")
+	assert.Contains(t, view.fullContent, "Test run from dashboard", "Should contain run title in content")
+}
+
+func TestRunDetailsView_ShouldUseCacheOnly(t *testing.T) {
+	client := api.NewClient("test-key", "http://localhost:8080", false)
+	testCache := cache.NewSimpleCache()
+	view := NewRunDetailsView(client, testCache, "test-123")
+
+	tests := []struct {
+		name     string
+		run      models.RunResponse
+		expected bool
+	}{
+		{
+			name: "terminal status DONE",
+			run: models.RunResponse{
+				ID:        "test-123",
+				Status:    "DONE",
+				CreatedAt: time.Now().Add(-1 * time.Hour), // 1 hour ago
+			},
+			expected: true,
+		},
+		{
+			name: "terminal status FAILED",
+			run: models.RunResponse{
+				ID:        "test-124",
+				Status:    "FAILED",
+				CreatedAt: time.Now().Add(-30 * time.Minute), // 30 minutes ago
+			},
+			expected: true,
+		},
+		{
+			name: "active status but old run (>2h)",
+			run: models.RunResponse{
+				ID:        "test-125",
+				Status:    "PROCESSING",
+				CreatedAt: time.Now().Add(-3 * time.Hour), // 3 hours ago
+			},
+			expected: true,
+		},
+		{
+			name: "active status recent run (<2h)",
+			run: models.RunResponse{
+				ID:        "test-126",
+				Status:    "PROCESSING",
+				CreatedAt: time.Now().Add(-1 * time.Hour), // 1 hour ago
+			},
+			expected: false,
+		},
+		{
+			name: "queued status recent run",
+			run: models.RunResponse{
+				ID:        "test-127",
+				Status:    "QUEUED",
+				CreatedAt: time.Now().Add(-10 * time.Minute), // 10 minutes ago
+			},
+			expected: false,
+		},
+		{
+			name: "edge case just under 2 hours",
+			run: models.RunResponse{
+				ID:        "test-128",
+				Status:    "INITIALIZING",
+				CreatedAt: time.Now().Add(-2*time.Hour + time.Minute), // 1 hour 59 minutes ago
+			},
+			expected: false,
+		},
+		{
+			name: "edge case just over 2 hours",
+			run: models.RunResponse{
+				ID:        "test-129",
+				Status:    "INITIALIZING",
+				CreatedAt: time.Now().Add(-2*time.Hour - time.Minute), // 2 hours 1 minute ago
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := view.shouldUseCacheOnly(tt.run)
+			assert.Equal(t, tt.expected, result,
+				"shouldUseCacheOnly(%s, %v old) should return %v",
+				tt.run.Status, time.Since(tt.run.CreatedAt), tt.expected)
+		})
+	}
+}

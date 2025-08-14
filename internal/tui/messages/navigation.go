@@ -1,5 +1,7 @@
 package messages
 
+import "github.com/repobird/repobird-cli/internal/models"
+
 // NavigationMsg is the base interface for all navigation messages
 type NavigationMsg interface {
 	IsNavigation() bool
@@ -14,6 +16,7 @@ type NavigateToCreateMsg struct {
 type NavigateToDetailsMsg struct {
 	RunID      string
 	FromCreate bool // Optional context indicating source
+	RunData    *models.RunResponse // Optional: cached run data to avoid API call
 }
 
 // NavigateToDashboardMsg requests navigation to the dashboard view

@@ -106,18 +106,21 @@ type DashboardView struct {
 // Message types are defined in dashboard_messages.go
 
 // NewDashboardViewWithState creates a new dashboard view with restored state
-func NewDashboardViewWithState(client APIClient, selectedRepoIdx, selectedRunIdx, selectedDetailLine, focusedColumn int) *DashboardView {
-	dashboard := NewDashboardView(client)
+func NewDashboardViewWithState(client APIClient, cache *cache.SimpleCache, selectedRepoIdx, selectedRunIdx, selectedDetailLine, focusedColumn int) *DashboardView {
+	dashboard := NewDashboardView(client, cache)
 	// Set the state that will be restored after data loads
+	debug.LogToFilef("🔧 DASHBOARD: Creating dashboard with restored state - repo=%d, run=%d, detail=%d, column=%d 🔧\n", 
+		selectedRepoIdx, selectedRunIdx, selectedDetailLine, focusedColumn)
 	dashboard.selectedRepoIdx = selectedRepoIdx
 	dashboard.selectedRunIdx = selectedRunIdx
 	dashboard.selectedDetailLine = selectedDetailLine
 	dashboard.focusedColumn = focusedColumn
+	debug.LogToFilef("✅ DASHBOARD: State applied to new dashboard instance ✅\n")
 	return dashboard
 }
 
 // NewDashboardView creates a new dashboard view
-func NewDashboardView(client APIClient) *DashboardView {
+func NewDashboardView(client APIClient, cache *cache.SimpleCache) *DashboardView {
 	// Initialize spinner
 	s := spinner.New()
 	s.Spinner = spinner.Dot
@@ -125,6 +128,7 @@ func NewDashboardView(client APIClient) *DashboardView {
 
 	dashboard := &DashboardView{
 		client: client,
+		cache:  cache, // Set the cache
 		keys:   components.DefaultKeyMap,
 		help:   help.New(),
 		disabledKeys: map[string]bool{
@@ -146,11 +150,9 @@ func NewDashboardView(client APIClient) *DashboardView {
 		repoViewport:     viewport.New(0, 0), // Will be sized in Update
 		runsViewport:     viewport.New(0, 0),
 		detailsViewport:  viewport.New(0, 0),
-		cache:            cache.NewSimpleCache(), // Embedded cache
 	}
 
-	// Load persisted cache data if available
-	_ = dashboard.cache.LoadFromDisk()
+	// Note: cache is already set from parameter, no need to create a new one
 
 	// Initialize shared scrollable list component for all-runs layout
 	dashboard.allRunsList = components.NewScrollableList(
@@ -165,7 +167,6 @@ func NewDashboardView(client APIClient) *DashboardView {
 // IsKeyDisabled implements the CoreViewKeymap interface
 func (d *DashboardView) IsKeyDisabled(keyString string) bool {
 	disabled := d.disabledKeys[keyString]
-	debug.LogToFilef("🔍 IsKeyDisabled('%s'): map=%v, result=%t 🔍\n", keyString, d.disabledKeys, disabled)
 	return disabled
 }
 
@@ -222,15 +223,9 @@ func (d *DashboardView) Init() tea.Cmd {
 func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
-	// Debug log all incoming messages except spinner ticks (too spammy)
-	if _, isSpinner := msg.(spinner.TickMsg); !isSpinner {
-		debug.LogToFilef("\n[DASHBOARD UPDATE] Received message type: %T\n", msg)
-		debug.LogToFilef("  Loading: %v, Initializing: %v\n", d.loading, d.initializing)
-	}
 
 	// Always handle quit keys regardless of loading state
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
-		debug.LogToFilef("  Key pressed: %s (Type: %v)\n", keyMsg.String(), keyMsg.Type)
 		// Handle force quit regardless of state
 		if keyMsg.String() == "Q" || (keyMsg.Type == tea.KeyCtrlC) {
 			debug.LogToFilef("  FORCE QUIT requested\n")
@@ -416,8 +411,6 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return d, nil
 
 	case tea.KeyMsg:
-		debug.LogToFilef("🔑 DASHBOARD KEYMSG: key='%s' 🔑\n", msg.String())
-		debug.LogToFilef("🔒 IsKeyDisabled result: %t 🔒\n", d.IsKeyDisabled(msg.String()))
 
 		// If FZF mode is active, handle input there first
 		if d.fzfMode != nil && d.fzfMode.IsActive() {
@@ -434,7 +427,6 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return d, nil
 		}
 
-		debug.LogToFilef("✅ DASHBOARD: Key '%s' is NOT disabled, proceeding with local handling ✅\n", msg.String())
 
 		// SPECIAL CASE: 'b' from dashboard should go to BULK view, not back
 		if msg.String() == "b" {
@@ -531,10 +523,22 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 
+			// Save dashboard state before navigating
+			debug.LogToFilef("💾 DASHBOARD: Saving state before navigation - repo=%d, run=%d, detail=%d, column=%d 💾\n", 
+				d.selectedRepoIdx, d.selectedRunIdx, d.selectedDetailLine, d.focusedColumn)
+			d.cache.SetNavigationContext("dashboardState", map[string]interface{}{
+				"selectedRepoIdx":    d.selectedRepoIdx,
+				"selectedRunIdx":     d.selectedRunIdx,
+				"selectedDetailLine": d.selectedDetailLine,
+				"focusedColumn":      d.focusedColumn,
+			})
+			debug.LogToFilef("✅ DASHBOARD: State saved to navigation context ✅\n")
+
 			// Navigate to details view
 			return d, func() tea.Msg {
 				return messages.NavigateToDetailsMsg{
-					RunID: d.selectedRunData.GetIDString(),
+					RunID:   d.selectedRunData.GetIDString(),
+					RunData: d.selectedRunData, // Pass cached run data to avoid API call
 				}
 			}
 		case key.Matches(msg, d.keys.LayoutSwitch):
@@ -650,10 +654,32 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if key.Matches(msg, d.keys.Enter) {
 					selected := d.allRunsList.GetSelected()
 					if len(selected) > 0 && selected[0] != "" {
-						// Navigate to details view with selected run ID
+						// Find the run data for this run ID to avoid API call
+						runID := selected[0]
+						var runData *models.RunResponse
+						for _, run := range d.allRuns {
+							if run != nil && run.GetIDString() == runID {
+								runData = run
+								break
+							}
+						}
+						
+						// Save dashboard state before navigating
+						debug.LogToFilef("💾 DASHBOARD: Saving state before navigation (all runs) - repo=%d, run=%d, detail=%d, column=%d 💾\n", 
+							d.selectedRepoIdx, d.selectedRunIdx, d.selectedDetailLine, d.focusedColumn)
+						d.cache.SetNavigationContext("dashboardState", map[string]interface{}{
+							"selectedRepoIdx":    d.selectedRepoIdx,
+							"selectedRunIdx":     d.selectedRunIdx,
+							"selectedDetailLine": d.selectedDetailLine,
+							"focusedColumn":      d.focusedColumn,
+						})
+						debug.LogToFilef("✅ DASHBOARD: State saved to navigation context (all runs) ✅\n")
+
+						// Navigate to details view with run data if available
 						return d, func() tea.Msg {
 							return messages.NavigateToDetailsMsg{
-								RunID: selected[0], // First column is run ID
+								RunID:   runID,
+								RunData: runData, // Pass cached run data to avoid API call
 							}
 						}
 					}
@@ -667,12 +693,6 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	// CRITICAL: Check if this was a KeyMsg that wasn't handled by dashboard's local logic
-	if keyMsg, ok := msg.(tea.KeyMsg); ok {
-		debug.LogToFilef("🔍 DASHBOARD END: KeyMsg '%s' reached end of dashboard Update method 🔍\n", keyMsg.String())
-		debug.LogToFilef("⚠️ DASHBOARD END: This key was NOT handled by dashboard locally! ⚠️\n")
-		debug.LogToFilef("🚨 PROBLEM: Dashboard always returns here - key will NOT bubble up to App! 🚨\n")
-	}
 
 	return d, tea.Batch(cmds...)
 }

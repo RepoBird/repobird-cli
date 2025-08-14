@@ -19,14 +19,14 @@ import (
 )
 
 type App struct {
-	client        APIClient
-	viewStack     []tea.Model // Navigation history
-	current       tea.Model
-	cache         *cache.SimpleCache
-	keyRegistry   *keymap.CoreKeyRegistry // Central key processing
-	width         int                     // Current window width
-	height        int                     // Current window height
-	authenticated bool                    // Whether initial auth is complete
+	client         APIClient
+	viewStack      []tea.Model // Navigation history
+	current        tea.Model
+	cache          *cache.SimpleCache
+	keyRegistry    *keymap.CoreKeyRegistry // Central key processing
+	width          int                     // Current window width
+	height         int                     // Current window height
+	authenticated  bool                    // Whether initial auth is complete
 }
 
 // authCompleteMsg is sent when authentication and cache initialization is complete
@@ -64,7 +64,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		// Initialize dashboard view now that we have user context
-		a.current = views.NewDashboardView(a.client)
+		a.current = views.NewDashboardView(a.client, a.cache)
 
 		// Initialize the view with current window size if available
 		var cmds []tea.Cmd
@@ -72,7 +72,6 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// Only send window size if we have valid dimensions
 		if a.width > 0 && a.height > 0 {
-			debug.LogToFilef("📐 APP: Sending stored window size: %dx%d\n", a.width, a.height)
 			cmds = append(cmds, func() tea.Msg {
 				return tea.WindowSizeMsg{Width: a.width, Height: a.height}
 			})
@@ -95,13 +94,11 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// Handle navigation messages first
 	if navMsg, ok := msg.(messages.NavigationMsg); ok {
-		debug.LogToFilef("🚀 APP: Received NavigationMsg: %T 🚀\n", navMsg)
 		return a.handleNavigation(navMsg)
 	}
 
 	// Handle window size messages centrally
 	if wsMsg, ok := msg.(tea.WindowSizeMsg); ok {
-		debug.LogToFilef("📐 APP: Received WindowSizeMsg: width=%d, height=%d 📐\n", wsMsg.Width, wsMsg.Height)
 		// Store current dimensions
 		a.width = wsMsg.Width
 		a.height = wsMsg.Height
@@ -115,25 +112,19 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// Centralized key processing
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
-		debug.LogToFilef("⌨️ APP: Received KeyMsg: '%s' ⌨️\n", keyMsg.String())
 		if handled, model, cmd := a.processKeyWithFiltering(keyMsg); handled {
-			debug.LogToFilef("✋ APP: Key '%s' was HANDLED by centralized processor ✋\n", keyMsg.String())
-			debug.LogToFilef("🔍 APP: After processKey - model type=%T, cmd is nil=%v\n", model, cmd == nil)
 
 			// If the model is the app itself and we have a command, execute it
 			if appModel, isApp := model.(*App); isApp && cmd != nil {
-				debug.LogToFilef("📦 APP: Model is App, executing command\n")
 				return appModel, cmd
 			}
 			return model, cmd
 		}
-		debug.LogToFilef("➡️ APP: Key '%s' NOT handled by centralized processor, delegating to view ➡️\n", keyMsg.String())
 	}
 
 	// Otherwise delegate to current view
 	// Skip debug logging for spinner messages (too spammy)
 	if _, isSpinner := msg.(spinner.TickMsg); !isSpinner {
-		debug.LogToFilef("📤 APP: Delegating to current view: %T 📤\n", a.current)
 	}
 	newModel, cmd := a.current.Update(msg)
 
@@ -171,7 +162,6 @@ func (a *App) handleNavigation(msg messages.NavigationMsg) (tea.Model, tea.Cmd) 
 		var cmds []tea.Cmd
 		cmds = append(cmds, a.current.Init())
 		if a.width > 0 && a.height > 0 {
-			debug.LogToFilef("📐 CREATE NAV: Sending WindowSizeMsg to new CreateRunView: %dx%d 📐\n", a.width, a.height)
 			cmds = append(cmds, func() tea.Msg {
 				return tea.WindowSizeMsg{Width: a.width, Height: a.height}
 			})
@@ -183,14 +173,18 @@ func (a *App) handleNavigation(msg messages.NavigationMsg) (tea.Model, tea.Cmd) 
 	case messages.NavigateToDetailsMsg:
 		a.viewStack = append(a.viewStack, a.current)
 
-		// Create with new minimal constructor pattern
-		a.current = views.NewRunDetailsView(a.client, a.cache, msg.RunID)
+		// Create Details view - use cached run data if available to avoid API call
+		if msg.RunData != nil {
+			a.current = views.NewRunDetailsViewWithData(a.client, a.cache, *msg.RunData)
+		} else {
+			debug.LogToFile("📡 APP: Creating Details view with RunID only - will load from cache/API 📡\n")
+			a.current = views.NewRunDetailsView(a.client, a.cache, msg.RunID)
+		}
 
 		// Send current window dimensions to the new view if we have them
 		var cmds []tea.Cmd
 		cmds = append(cmds, a.current.Init())
 		if a.width > 0 && a.height > 0 {
-			debug.LogToFilef("📐 DETAILS NAV: Sending WindowSizeMsg to new DetailsView: %dx%d 📐\n", a.width, a.height)
 			cmds = append(cmds, func() tea.Msg {
 				return tea.WindowSizeMsg{Width: a.width, Height: a.height}
 			})
@@ -202,15 +196,37 @@ func (a *App) handleNavigation(msg messages.NavigationMsg) (tea.Model, tea.Cmd) 
 	case messages.NavigateToDashboardMsg:
 		// Clear stack - dashboard is home
 		a.viewStack = nil
-		a.current = views.NewDashboardView(a.client)
-		// Clear navigation context when going home
+		
+		// Check if we have saved dashboard state to restore
+		if stateData := a.cache.GetNavigationContext("dashboardState"); stateData != nil {
+			debug.LogToFilef("🔍 APP: Found dashboard state in navigation context: %+v 🔍\n", stateData)
+			if state, ok := stateData.(map[string]interface{}); ok {
+				// Extract state values with type assertions
+				selectedRepoIdx, _ := state["selectedRepoIdx"].(int)
+				selectedRunIdx, _ := state["selectedRunIdx"].(int)
+				selectedDetailLine, _ := state["selectedDetailLine"].(int)
+				focusedColumn, _ := state["focusedColumn"].(int)
+				
+				debug.LogToFilef("🏠 APP: Restoring Dashboard with saved state - repo=%d, run=%d, detail=%d, column=%d 🏠\n", 
+					selectedRepoIdx, selectedRunIdx, selectedDetailLine, focusedColumn)
+				a.current = views.NewDashboardViewWithState(a.client, a.cache, selectedRepoIdx, selectedRunIdx, selectedDetailLine, focusedColumn)
+			} else {
+				debug.LogToFile("🏠 APP: Invalid dashboard state format, creating fresh dashboard 🏠\n")
+				a.current = views.NewDashboardView(a.client, a.cache)
+			}
+		} else {
+			debug.LogToFile("🔍 APP: No dashboard state found in navigation context 🔍\n")
+			debug.LogToFile("🏠 APP: Creating Dashboard view - hybrid cache will handle data caching 🏠\n")
+			a.current = views.NewDashboardView(a.client, a.cache)
+		}
+		
+		// Clear navigation context when going home (after we've used it)
 		a.clearAllNavigationContext()
 
 		// Send current window dimensions to the dashboard if we have them
 		var cmds []tea.Cmd
 		cmds = append(cmds, a.current.Init())
 		if a.width > 0 && a.height > 0 {
-			debug.LogToFilef("📐 DASHBOARD NAV: Sending WindowSizeMsg to new Dashboard: %dx%d 📐\n", a.width, a.height)
 			cmds = append(cmds, func() tea.Msg {
 				return tea.WindowSizeMsg{Width: a.width, Height: a.height}
 			})
@@ -254,7 +270,6 @@ func (a *App) handleNavigation(msg messages.NavigationMsg) (tea.Model, tea.Cmd) 
 		var cmds []tea.Cmd
 		cmds = append(cmds, a.current.Init())
 		if a.width > 0 && a.height > 0 {
-			debug.LogToFilef("📐 STATUS NAV: Sending WindowSizeMsg to new StatusView: %dx%d 📐\n", a.width, a.height)
 			cmds = append(cmds, func() tea.Msg {
 				return tea.WindowSizeMsg{Width: a.width, Height: a.height}
 			})
@@ -278,7 +293,6 @@ func (a *App) handleNavigation(msg messages.NavigationMsg) (tea.Model, tea.Cmd) 
 			var cmds []tea.Cmd
 			cmds = append(cmds, a.current.Init())
 			if a.width > 0 && a.height > 0 {
-				debug.LogToFilef("📐 BULK NAV: Sending WindowSizeMsg to new BulkView: %dx%d 📐\n", a.width, a.height)
 				cmds = append(cmds, func() tea.Msg {
 					return tea.WindowSizeMsg{Width: a.width, Height: a.height}
 				})
@@ -314,7 +328,6 @@ func (a *App) handleNavigation(msg messages.NavigationMsg) (tea.Model, tea.Cmd) 
 		var cmds []tea.Cmd
 		cmds = append(cmds, a.current.Init())
 		if a.width > 0 && a.height > 0 {
-			debug.LogToFilef("📐 HELP NAV: Sending WindowSizeMsg to new HelpView: %dx%d 📐\n", a.width, a.height)
 			cmds = append(cmds, func() tea.Msg {
 				return tea.WindowSizeMsg{Width: a.width, Height: a.height}
 			})
@@ -365,14 +378,12 @@ func (a *App) View() string {
 	}
 
 	// Debug: Log app view rendering
-	debug.LogToFilef("🎭 APP VIEW: Rendering view %T with app dimensions w=%d h=%d 🎭\n",
-		a.current, a.width, a.height)
 
 	view := a.current.View()
 
 	// Debug: Log the length of the returned view string
 	lines := strings.Count(view, "\n") + 1
-	debug.LogToFilef("🎭 APP VIEW: Returned view has %d lines 🎭\n", lines)
+	_ = lines // Suppress unused variable warning
 
 	return view
 }
@@ -399,14 +410,13 @@ func (a *App) getNavigationContext(key string) interface{} {
 	return a.cache.GetNavigationContext(key)
 }
 
+
 // processKeyWithFiltering is the centralized key processor that handles all key filtering and routing
 func (a *App) processKeyWithFiltering(keyMsg tea.KeyMsg) (handled bool, model tea.Model, cmd tea.Cmd) {
 	keyString := keyMsg.String()
-	debug.LogToFilef("🔧 PROCESSOR: Processing key '%s' 🔧\n", keyString)
 
 	// Check if current view implements CoreViewKeymap
 	if viewKeymap, hasKeymap := a.current.(keymap.CoreViewKeymap); hasKeymap {
-		debug.LogToFilef("✅ PROCESSOR: View %T implements CoreViewKeymap ✅\n", a.current)
 
 		// First check if view wants to disable this key entirely
 		if viewKeymap.IsKeyDisabled(keyString) {
@@ -415,7 +425,6 @@ func (a *App) processKeyWithFiltering(keyMsg tea.KeyMsg) (handled bool, model te
 			// Return false so the key reaches the view's Update method
 			return false, a, nil
 		}
-		debug.LogToFilef("✅ PROCESSOR: Key '%s' is NOT disabled by view ✅\n", keyString)
 
 		// Check if view wants to handle this key with custom logic
 		if handled, model, cmd := viewKeymap.HandleKey(keyMsg); handled {
@@ -432,18 +441,14 @@ func (a *App) processKeyWithFiltering(keyMsg tea.KeyMsg) (handled bool, model te
 			// View provided custom handling - return the app as the model so commands work
 			return true, a, cmd
 		}
-		debug.LogToFilef("➡️ PROCESSOR: Key '%s' not handled by view's custom handler ➡️\n", keyString)
 	} else {
-		debug.LogToFilef("❌ PROCESSOR: View %T does NOT implement CoreViewKeymap ❌\n", a.current)
 	}
 
 	// Get the default action for this key from registry
 	action := a.keyRegistry.GetAction(keyString)
-	debug.LogToFilef("🗂️ PROCESSOR: Key '%s' maps to action: %v 🗂️\n", keyString, action)
 
 	// Handle global actions that should always work regardless of view state
 	if keymap.IsGlobalAction(action) {
-		debug.LogToFilef("🌍 PROCESSOR: Key '%s' is GLOBAL action - handling 🌍\n", keyString)
 		return a.handleGlobalAction(action, keyMsg)
 	}
 
@@ -453,7 +458,6 @@ func (a *App) processKeyWithFiltering(keyMsg tea.KeyMsg) (handled bool, model te
 		return a.handleNavigationAction(action, keyMsg)
 	}
 
-	debug.LogToFilef("📋 PROCESSOR: Key '%s' is VIEW-SPECIFIC - returning handled=false 📋\n", keyString)
 	// For ActionViewSpecific or unknown keys, let the view handle them
 	return false, a, nil
 }

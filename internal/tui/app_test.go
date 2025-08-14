@@ -21,7 +21,7 @@ func completeAuthentication(app *App) {
 	// and creating the dashboard view manually
 	app.authenticated = true
 	app.cache = cache.NewSimpleCache()
-	app.current = views.NewDashboardView(app.client)
+	app.current = views.NewDashboardView(app.client, app.cache)
 }
 
 // MockAPIClient for testing

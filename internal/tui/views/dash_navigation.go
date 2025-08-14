@@ -293,6 +293,7 @@ func (d *DashboardView) handleMillerColumnsNavigation(msg tea.KeyMsg) tea.Cmd {
 	case key.Matches(msg, d.keys.Right) || (msg.Type == tea.KeyRunes && (string(msg.Runes) == "l" || string(msg.Runes) == "L")):
 		// Move focus to the right (l/L keys or right arrow)
 		if d.focusedColumn < 2 {
+			debug.LogToFilef("➡️ COLUMN NAV: Moving RIGHT from column %d to %d ➡️\n", d.focusedColumn, d.focusedColumn+1)
 			d.focusedColumn++
 			// If moving to runs column and no run selected, select first
 			if d.focusedColumn == 1 && len(d.filteredRuns) > 0 && d.selectedRunData == nil {
@@ -301,6 +302,7 @@ func (d *DashboardView) handleMillerColumnsNavigation(msg tea.KeyMsg) tea.Cmd {
 				d.updateDetailLines()
 			} else if d.focusedColumn == 2 {
 				// Moving to details column, restore or init selection
+				debug.LogToFilef("🔄 COLUMN NAV: Moving to details column, calling restoreOrInitDetailSelection 🔄\n")
 				d.restoreOrInitDetailSelection()
 			}
 		}
@@ -312,9 +314,11 @@ func (d *DashboardView) handleMillerColumnsNavigation(msg tea.KeyMsg) tea.Cmd {
 			if d.focusedColumn == 2 && d.selectedRunData != nil {
 				runID := d.selectedRunData.GetIDString()
 				if runID != "" {
+					debug.LogToFilef("💾 COLUMN NAV: Saving detail position %d for run %s (LEFT movement) 💾\n", d.selectedDetailLine, runID)
 					d.detailLineMemory[runID] = d.selectedDetailLine
 				}
 			}
+			debug.LogToFilef("⬅️ COLUMN NAV: Moving LEFT from column %d to %d ⬅️\n", d.focusedColumn, d.focusedColumn-1)
 			d.focusedColumn--
 		}
 	}
@@ -436,18 +440,22 @@ func (d *DashboardView) restoreOrInitDetailSelection() {
 		runID := d.selectedRunData.GetIDString()
 		if runID != "" {
 			if savedLine, exists := d.detailLineMemory[runID]; exists && savedLine >= 0 && savedLine < len(d.detailLines) {
+				debug.LogToFilef("✅ DETAIL RESTORE: Found saved position %d for run %s, restoring ✅\n", savedLine, runID)
 				d.selectedDetailLine = savedLine
 				restored = true
+			} else {
+				debug.LogToFilef("🔍 DETAIL RESTORE: No saved position for run %s (exists=%v, bounds check if exists) 🔍\n", runID, exists)
 			}
 		}
 	}
 
 	// If not restored, initialize to first non-empty line
 	if !restored && len(d.detailLines) > 0 {
+		debug.LogToFilef("⚠️ DETAIL RESTORE: No position to restore, defaulting to line 0 ⚠️\n")
 		d.selectedDetailLine = 0
 		// Skip empty lines at the beginning
 		if d.isEmptyLine(d.detailLines[0]) {
-			newIdx := d.findNextNonEmptyLine(-1, 1)
+			newIdx := d.findNextNonEmptyLine(0, 1)
 			if newIdx >= 0 && newIdx < len(d.detailLines) {
 				d.selectedDetailLine = newIdx
 			}

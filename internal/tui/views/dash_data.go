@@ -184,11 +184,20 @@ func (d *DashboardView) loadDashboardData() tea.Cmd {
 			repositories = d.updateRepositoryStats(repositories, allRuns)
 			debug.LogToFilef("  updateRepositoryStats completed, got %d repos back\n", len(repositories))
 
-			// Skip caching for now to avoid deadlock - TEMPORARY FIX
-			debug.LogToFilef("  SKIPPING cache operations (temporary fix for deadlock)\n")
-
-			// Just set overview without individual repo caching
-			// d.cache.SetRepositoryOverview(repositories)
+			// Cache the loaded data for future use (using non-deadlock safe methods)
+			debug.LogToFilef("  Caching loaded data to avoid future API calls\n")
+			
+			// Convert []*models.RunResponse to []models.RunResponse for caching
+			runsForCache := make([]models.RunResponse, len(allRuns))
+			for i, run := range allRuns {
+				if run != nil {
+					runsForCache[i] = *run
+				}
+			}
+			
+			// Cache runs and repository overview
+			d.cache.SetCachedList(runsForCache, detailsCache)
+			d.cache.SetRepositoryOverview(repositories)
 
 			debug.LogToFilef("  Data loaded successfully, returning message\n")
 			return dashboardDataLoadedMsg{

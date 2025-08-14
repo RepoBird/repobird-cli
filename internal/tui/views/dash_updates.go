@@ -16,8 +16,11 @@ func (d *DashboardView) updateDetailLines() {
 	if d.focusedColumn == 2 && d.selectedRunData != nil {
 		runID := d.selectedRunData.GetIDString()
 		if runID != "" {
+			debug.LogToFilef("💾 DETAIL MEMORY: Saving position %d for run %s (focused column: %d) 💾\n", d.selectedDetailLine, runID, d.focusedColumn)
 			d.detailLineMemory[runID] = d.selectedDetailLine
 		}
+	} else {
+		debug.LogToFilef("⚠️ DETAIL MEMORY: NOT saving - focusedColumn=%d, selectedRunData=%v ⚠️\n", d.focusedColumn, d.selectedRunData != nil)
 	}
 
 	d.detailLines = []string{}
@@ -138,10 +141,16 @@ func (d *DashboardView) updateDetailLines() {
 	// Restore saved selection for this run if available
 	if runID := run.GetIDString(); runID != "" {
 		if savedLine, exists := d.detailLineMemory[runID]; exists {
+			debug.LogToFilef("🔄 DETAIL MEMORY: Found saved position %d for run %s (total lines: %d) 🔄\n", savedLine, runID, len(d.detailLines))
 			// Ensure the saved selection is within bounds
 			if savedLine >= 0 && savedLine < len(d.detailLines) {
 				d.selectedDetailLine = savedLine
+				debug.LogToFilef("✅ DETAIL MEMORY: Restored position %d for run %s ✅\n", savedLine, runID)
+			} else {
+				debug.LogToFilef("⚠️ DETAIL MEMORY: Saved position %d out of bounds for run %s (max: %d) ⚠️\n", savedLine, runID, len(d.detailLines)-1)
 			}
+		} else {
+			debug.LogToFilef("🔍 DETAIL MEMORY: No saved position found for run %s 🔍\n", runID)
 		}
 	}
 }

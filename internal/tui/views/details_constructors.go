@@ -49,6 +49,46 @@ func NewRunDetailsView(client APIClient, cache *cache.SimpleCache, runID string)
 	return v
 }
 
+// NewRunDetailsViewWithData creates a new RunDetailsView with pre-loaded run data (avoids API calls)
+func NewRunDetailsViewWithData(client APIClient, cache *cache.SimpleCache, run models.RunResponse) *RunDetailsView {
+	// Create spinner
+	s := spinner.New()
+	s.Spinner = spinner.Dot
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("63"))
+
+	// Create viewport
+	vp := viewport.New(80, 20)
+
+	// Create the view with the provided run data (no loading needed)
+	v := &RunDetailsView{
+		client:           client,
+		runID:            run.GetIDString(),
+		run:              run, // Use the provided run data
+		keys:             components.DefaultKeyMap,
+		help:             help.New(),
+		viewport:         vp,
+		spinner:          s,
+		loading:          false, // Data is already loaded!
+		showLogs:         false,
+		statusHistory:    make([]string, 0),
+		cacheRetryCount:  0,
+		maxCacheRetries:  3,
+		statusLine:       components.NewStatusLine(),
+		clipboardManager: components.NewClipboardManager(),
+		cache:            cache, // Shared cache from app level
+		width:            0,     // Don't set default width - wait for WindowSizeMsg
+		height:           0,     // Don't set default height - wait for WindowSizeMsg
+		navigationMode:   true,  // Start in navigation mode
+		layout:           nil,   // Don't initialize layout until we have dimensions
+	}
+
+	// Pre-populate the status history and content
+	v.updateStatusHistory(string(run.Status), false)
+	v.updateContent() // Initialize content with the run data
+	
+	return v
+}
+
 // Backward compatibility constructors - these delegate to the new minimal constructor
 
 // RunDetailsViewConfig holds configuration for creating a new RunDetailsView

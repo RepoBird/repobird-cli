@@ -7,6 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/repobird/repobird-cli/internal/tui/components"
+	"github.com/repobird/repobird-cli/internal/tui/messages"
 )
 
 // FileViewerView wraps the file viewer component as a full view
@@ -49,8 +50,10 @@ func (v *FileViewerView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "q", "ctrl+c":
-			// Return to dashboard
-			return NewDashboardView(v.client), nil
+			// Return to dashboard using navigation message
+			return v, func() tea.Msg {
+				return messages.NavigateToDashboardMsg{}
+			}
 
 		case "enter":
 			// Check if file was selected
@@ -59,10 +62,11 @@ func (v *FileViewerView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			selectedFile := v.fileViewer.GetSelectedFile()
 			if selectedFile != "" {
-				// Return to dashboard with selected file info
-				dashboard := NewDashboardView(v.client)
+				// Return to dashboard using navigation message
 				// Could set a message about the selected file if needed
-				return dashboard, nil
+				return v, func() tea.Msg {
+					return messages.NavigateToDashboardMsg{}
+				}
 			}
 			return v, cmd
 

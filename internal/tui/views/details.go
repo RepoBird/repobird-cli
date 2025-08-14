@@ -62,6 +62,24 @@ type RunDetailsView struct {
 
 // Constructors are defined in details_constructors.go
 
+// shouldUseCacheOnly determines if a run should use cache-only access
+// Returns true for terminal runs (DONE/FAILED) OR runs older than 2 hours (likely stuck)
+func (v *RunDetailsView) shouldUseCacheOnly(run models.RunResponse) bool {
+	status := string(run.Status)
+
+	// Always use cache for terminal statuses (no point updating from API)
+	if status == "DONE" || status == "FAILED" {
+		return true
+	}
+
+	// Use cache for runs older than 2 hours (likely stuck in weird state)
+	if time.Since(run.CreatedAt) > 2*time.Hour {
+		return true
+	}
+
+	return false
+}
+
 func (v *RunDetailsView) Init() tea.Cmd {
 	// Initialize clipboard (will detect CGO availability)
 	err := utils.InitClipboard()
@@ -85,12 +103,22 @@ func (v *RunDetailsView) Init() tea.Cmd {
 			runs, _, detailsCache := v.cache.GetCachedList()
 			if detailsCache != nil {
 				if cachedRun, exists := detailsCache[v.runID]; exists && cachedRun != nil {
-					// Cache hit!
-					debug.LogToFilef("DEBUG: Cache hit for runID='%s'\n", v.runID)
-					v.run = *cachedRun
-					v.loading = false
-					v.updateStatusHistory(string(cachedRun.Status), false)
-					v.updateContent()
+					// Cache hit! Check if we should use cache-only
+					if v.shouldUseCacheOnly(*cachedRun) {
+						debug.LogToFilef("DEBUG: Cache-only for run '%s' (status: %s, age: %v) - skipping API call\n",
+							v.runID, cachedRun.Status, time.Since(cachedRun.CreatedAt))
+						v.run = *cachedRun
+						v.loading = false
+						v.updateStatusHistory(string(cachedRun.Status), false)
+						v.updateContent()
+					} else {
+						debug.LogToFilef("DEBUG: Cache hit for run '%s' but making API call (active run, age: %v)\n",
+							v.runID, time.Since(cachedRun.CreatedAt))
+						// Still make API call for active runs, but use cached data as fallback
+						v.run = *cachedRun
+						cmds = append(cmds, v.loadRunDetails())
+						cmds = append(cmds, v.spinner.Tick)
+					}
 				} else {
 					// Cache miss, load from API
 					debug.LogToFilef("DEBUG: Cache miss - making API call for runID='%s'\n", v.runID)
@@ -130,14 +158,12 @@ func (v *RunDetailsView) handleWindowSizeMsg(msg tea.WindowSizeMsg) {
 	// Initialize layout if not already done
 	if v.layout == nil {
 		v.layout = components.NewWindowLayout(msg.Width, msg.Height)
-		debug.LogToFilef("📐 DETAILS INIT: Created new layout with %dx%d 📐\n", msg.Width, msg.Height)
 	} else {
 		// Update global layout with new dimensions
 		v.layout.Update(msg.Width, msg.Height)
 	}
 
 	// Debug: Log window size changes
-	debug.LogToFilef("📐 DETAILS RESIZE: Window resize %dx%d 📐\n", msg.Width, msg.Height)
 
 	// Get viewport dimensions from global layout
 	viewportWidth, viewportHeight := v.layout.GetViewportDimensions()
@@ -146,8 +172,6 @@ func (v *RunDetailsView) handleWindowSizeMsg(msg tea.WindowSizeMsg) {
 	v.help.Width = msg.Width
 
 	// Debug: Log viewport dimensions from layout
-	debug.LogToFilef("📐 DETAILS VIEWPORT: Layout-calculated %dx%d 📐\n",
-		viewportWidth, viewportHeight)
 
 	// Update content to reflow for new width
 	v.updateContent()
@@ -183,7 +207,7 @@ func (v *RunDetailsView) handleKeyInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, v.keys.Refresh):
 		v.loading = true
 		v.error = nil
-		cmds = append(cmds, v.loadRunDetails())
+		cmds = append(cmds, v.loadRunDetailsForced()) // Force API call for manual refresh
 		cmds = append(cmds, v.spinner.Tick)
 	// Removed logs functionality - not supported yet
 	// case msg.String() == "l":
@@ -274,7 +298,6 @@ func (v *RunDetailsView) View() string {
 	}
 
 	// Debug: Log rendering dimensions
-	debug.LogToFilef("🎨 DETAILS RENDER: Terminal dimensions - width=%d, height=%d 🎨\n", v.width, v.height)
 
 	// For very small terminals, render minimal content
 	if !v.layout.IsValidDimensions() {
@@ -282,10 +305,9 @@ func (v *RunDetailsView) View() string {
 	}
 
 	// Get dimensions from global layout
-	boxWidth, boxHeight := v.layout.GetBoxDimensions()
+	boxWidth, _ := v.layout.GetBoxDimensions()
 
 	// Debug: Log box dimensions from layout
-	debug.LogToFilef("📦 DETAILS BOX: Layout-calculated dimensions - width=%d, height=%d 📦\n", boxWidth, boxHeight)
 
 	// Create standard box using global layout
 	boxStyle := v.layout.CreateStandardBox()
@@ -352,8 +374,6 @@ func (v *RunDetailsView) View() string {
 		v.viewport.Height = viewportHeight
 
 		// Debug: Log viewport dimensions during rendering
-		debug.LogToFilef("🔍 DETAILS VIEWPORT: During render - width=%d, height=%d 🔍\n",
-			viewportWidth, viewportHeight)
 
 		// Get content with highlighting
 		contentLines := v.renderContentWithCursor()
@@ -372,16 +392,11 @@ func (v *RunDetailsView) View() string {
 	statusLine := v.renderStatusBar()
 
 	// Debug: Log final layout dimensions
-	debug.LogToFilef("🏁 DETAILS FINAL: Box height=%d, statusline height=1, total=%d 🏁\n", boxHeight, boxHeight+1)
 
 	// Ensure the final view doesn't exceed terminal height
 	finalView := lipgloss.JoinVertical(lipgloss.Left, boxedContent, statusLine)
 
 	// Debug: Check if the final view height matches expected
-	finalLines := strings.Count(finalView, "\n") + 1
-	debug.LogToFilef("🔍 DETAILS FINAL CHECK: Final view has %d lines, terminal height=%d 🔍\n",
-		finalLines, v.height)
-
 	return finalView
 }
 
@@ -555,6 +570,14 @@ func (v *RunDetailsView) updateContent() {
 // Status history and highlighting methods are defined in details_rendering.go
 
 func (v *RunDetailsView) loadRunDetails() tea.Cmd {
+	return v.loadRunDetailsWithCacheCheck(false) // Default behavior: use cache check
+}
+
+func (v *RunDetailsView) loadRunDetailsForced() tea.Cmd {
+	return v.loadRunDetailsWithCacheCheck(true) // Force API call (for refresh)
+}
+
+func (v *RunDetailsView) loadRunDetailsWithCacheCheck(forceAPI bool) tea.Cmd {
 	// Use the stored runID directly
 	runID := v.runID
 
@@ -565,8 +588,22 @@ func (v *RunDetailsView) loadRunDetails() tea.Cmd {
 			return runDetailsLoadedMsg{run: v.run, err: fmt.Errorf("invalid run ID: empty string")}
 		}
 
+		// Check cache first if not forcing API call
+		if !forceAPI && v.cache != nil {
+			_, _, detailsCache := v.cache.GetCachedList()
+			if detailsCache != nil {
+				if cachedRun, exists := detailsCache[runID]; exists && cachedRun != nil {
+					if v.shouldUseCacheOnly(*cachedRun) {
+						debug.LogToFilef("DEBUG: LoadRunDetails using cache-only for run '%s' (status: %s, age: %v)\n",
+							runID, cachedRun.Status, time.Since(cachedRun.CreatedAt))
+						return runDetailsLoadedMsg{run: *cachedRun, err: nil}
+					}
+				}
+			}
+		}
+
 		// Debug: Log API call for run details
-		debug.LogToFilef("DEBUG: LoadRunDetails calling GetRun for runID='%s'\n", runID)
+		debug.LogToFilef("DEBUG: LoadRunDetails calling GetRun for runID='%s' (forced=%t)\n", runID, forceAPI)
 
 		runPtr, err := v.client.GetRun(runID)
 		if err != nil {

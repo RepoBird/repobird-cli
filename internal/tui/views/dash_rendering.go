@@ -465,12 +465,7 @@ func (d *DashboardView) renderStatusLine(layoutName string) string {
 
 	// Data freshness indicator - removed to clean up status line
 	dataInfo := ""
-	isLoadingData := false
-
-	if d.loading || d.initializing {
-		isLoadingData = true
-		// Don't show any text when loading, just the spinner
-	}
+	isLoadingData := d.loading || d.initializing
 
 	// Format left content consistently
 	leftContent := formatter.FormatViewName()
@@ -501,10 +496,16 @@ func (d *DashboardView) renderStatusLine(layoutName string) string {
 		shortHelp = "o:open-url " + shortHelp
 	}
 
-	// Use the unified status line with temporary message support
-	// Create using formatter for consistency
-	statusLine := formatter.StandardStatusLine(leftContent, dataInfo, shortHelp)
-	return statusLine.
+	// Use the existing status line instance that receives spinner updates
+	// Format help text based on available space (like StandardStatusLine does)
+	formattedHelp := formatter.FormatHelp(leftContent, dataInfo, shortHelp)
+	
+	return d.statusLine.
+		SetWidth(d.width).
+		SetLeft(leftContent).
+		SetRight(dataInfo).
+		SetHelp(formattedHelp).
 		SetLoading(isLoadingData).
+		ResetStyle().
 		Render()
 }
