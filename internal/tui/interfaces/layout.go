@@ -6,7 +6,7 @@ import "github.com/repobird/repobird-cli/internal/tui/components"
 type LayoutAware interface {
 	// GetLayout returns the view's layout instance
 	GetLayout() *components.WindowLayout
-	
+
 	// UpdateLayout updates the view's layout with new dimensions
 	UpdateLayout(width, height int)
 }
@@ -14,7 +14,7 @@ type LayoutAware interface {
 // ViewWithConsistentSizing represents views that should have consistent borders and sizing
 type ViewWithConsistentSizing interface {
 	LayoutAware
-	
+
 	// ApplyStandardSizing applies consistent box, title, and content sizing
 	ApplyStandardSizing()
 }

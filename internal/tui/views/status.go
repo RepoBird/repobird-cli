@@ -16,29 +16,29 @@ import (
 
 // StatusView displays user account information and system status
 type StatusView struct {
-	client   APIClient
-	layout   *components.WindowLayout
-	keys     components.KeyMap
-	
+	client APIClient
+	layout *components.WindowLayout
+	keys   components.KeyMap
+
 	// State
-	width           int
-	height          int
-	userInfo        *models.UserInfo
-	systemInfo      StatusSystemInfo
-	loading         bool
-	error           error
-	
+	width      int
+	height     int
+	userInfo   *models.UserInfo
+	systemInfo StatusSystemInfo
+	loading    bool
+	error      error
+
 	// Navigation state for scrollable list
-	selectedRow      int
-	keyOffset        int    // Horizontal scroll for keys
-	valueOffset      int    // Horizontal scroll for values
-	focusColumn      int    // 0: keys, 1: values
-	
+	selectedRow int
+	keyOffset   int // Horizontal scroll for keys
+	valueOffset int // Horizontal scroll for values
+	focusColumn int // 0: keys, 1: values
+
 	// Data for display
-	statusFields     []string   // Display values
-	statusKeys       []string   // Display keys
-	fieldLines       []int      // Line numbers for each field
-	
+	statusFields []string // Display values
+	statusKeys   []string // Display keys
+	fieldLines   []int    // Line numbers for each field
+
 	// Copy feedback
 	copiedMessage     string
 	copiedMessageTime time.Time
@@ -82,35 +82,35 @@ func (s *StatusView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		return s.handleWindowSizeMsg(msg)
-		
+
 	case tea.KeyMsg:
 		return s.handleKeyMsg(msg)
-		
+
 	case statusUserInfoLoadedMsg:
 		return s.handleUserInfoLoaded(msg)
-		
+
 	case systemInfoLoadedMsg:
 		return s.handleSystemInfoLoaded(msg)
-		
+
 	case statusErrorMsg:
 		s.loading = false
 		s.error = msg.error
 		return s, nil
-		
+
 	case copySuccessMsg:
 		return s.handleCopySuccess(msg)
-		
+
 	case components.ClipboardBlinkMsg:
 		// Handle clipboard blink animation
 		var clipCmd tea.Cmd
 		s.clipboardManager, clipCmd = s.clipboardManager.Update(msg)
 		return s, clipCmd
-		
+
 	case clearMessageMsg:
 		s.copiedMessage = ""
 		return s, nil
 	}
-	
+
 	return s, nil
 }
 
@@ -119,15 +119,15 @@ func (s *StatusView) View() string {
 	if !s.layout.IsValidDimensions() {
 		return s.layout.GetMinimalView("Status - Terminal too small")
 	}
-	
+
 	if s.loading {
 		return s.renderLoading()
 	}
-	
+
 	if s.error != nil {
 		return s.renderError()
 	}
-	
+
 	return s.renderStatus()
 }
 
@@ -136,7 +136,7 @@ func (s *StatusView) handleWindowSizeMsg(msg tea.WindowSizeMsg) (tea.Model, tea.
 	s.width = msg.Width
 	s.height = msg.Height
 	s.layout.Update(msg.Width, msg.Height)
-	
+
 	debug.LogToFilef("🔄 STATUS: Window resized to %dx%d\n", msg.Width, msg.Height)
 	return s, nil
 }
@@ -150,7 +150,7 @@ func (s *StatusView) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return s, func() tea.Msg {
 			return messages.NavigateBackMsg{}
 		}
-		
+
 	case "r":
 		// Refresh data
 		debug.LogToFilef("🔄 STATUS: Refreshing status data\n")
@@ -160,33 +160,33 @@ func (s *StatusView) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			s.loadUserInfo(),
 			s.loadSystemInfo(),
 		)
-		
+
 	case "j", "down":
 		if s.selectedRow < len(s.statusFields)-1 {
 			s.selectedRow++
 			s.resetHorizontalScroll()
 		}
 		return s, nil
-		
+
 	case "k", "up":
 		if s.selectedRow > 0 {
 			s.selectedRow--
 			s.resetHorizontalScroll()
 		}
 		return s, nil
-		
+
 	case "g":
 		s.selectedRow = 0
 		s.resetHorizontalScroll()
 		return s, nil
-		
+
 	case "G":
 		if len(s.statusFields) > 0 {
 			s.selectedRow = len(s.statusFields) - 1
 			s.resetHorizontalScroll()
 		}
 		return s, nil
-		
+
 	case "h", "left":
 		if s.focusColumn == 1 {
 			s.focusColumn = 0
@@ -196,7 +196,7 @@ func (s *StatusView) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return s, nil
-		
+
 	case "l", "right":
 		if s.focusColumn == 0 {
 			s.focusColumn = 1
@@ -204,14 +204,14 @@ func (s *StatusView) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			s.scrollValueRight()
 		}
 		return s, nil
-		
+
 	case "y":
 		return s.copyCurrentField()
-		
+
 	case "Y":
 		return s.copyAllFields()
 	}
-	
+
 	return s, nil
 }
 
@@ -226,7 +226,7 @@ func (s *StatusView) scrollValueRight() {
 	if s.selectedRow >= 0 && s.selectedRow < len(s.statusFields) {
 		value := s.statusFields[s.selectedRow]
 		valueMaxWidth := 40 // Available width for value column
-		
+
 		if len(value) > s.valueOffset+valueMaxWidth {
 			s.valueOffset++
 			debug.LogToFilef("🔄 STATUS: Scrolling value to offset %d\n", s.valueOffset)
@@ -239,10 +239,10 @@ func (s *StatusView) renderLoading() string {
 	boxStyle := s.layout.CreateStandardBox()
 	titleStyle := s.layout.CreateTitleStyle()
 	contentStyle := s.layout.CreateContentStyle()
-	
+
 	title := titleStyle.Render("Status Information")
 	content := contentStyle.Render("Loading status information...")
-	
+
 	return boxStyle.Render(lipgloss.JoinVertical(lipgloss.Left, title, content))
 }
 
@@ -251,12 +251,12 @@ func (s *StatusView) renderError() string {
 	boxStyle := s.layout.CreateStandardBox()
 	titleStyle := s.layout.CreateTitleStyle()
 	contentStyle := s.layout.CreateContentStyle()
-	
+
 	title := titleStyle.Render("Status Information - Error")
-	
+
 	errorText := fmt.Sprintf("Error loading status: %v\n\nPress 'r' to retry or 'q' to go back", s.error)
 	content := contentStyle.Render(errorText)
-	
+
 	return boxStyle.Render(lipgloss.JoinVertical(lipgloss.Left, title, content))
 }
 
@@ -265,21 +265,21 @@ func (s *StatusView) renderStatus() string {
 	if len(s.statusFields) == 0 {
 		s.initializeStatusFields()
 	}
-	
+
 	boxStyle := s.layout.CreateStandardBox()
 	titleStyle := s.layout.CreateTitleStyle()
-	
+
 	title := titleStyle.Render("System Status & Account Information")
-	
+
 	content := s.renderStatusContent()
-	
+
 	// Create status line at bottom
 	statusLine := s.renderStatusLine()
-	
+
 	mainContent := lipgloss.JoinVertical(lipgloss.Left, title, content)
-	
-	return lipgloss.JoinVertical(lipgloss.Left, 
-		boxStyle.Render(mainContent), 
+
+	return lipgloss.JoinVertical(lipgloss.Left,
+		boxStyle.Render(mainContent),
 		statusLine)
 }
 
@@ -288,20 +288,20 @@ func (s *StatusView) renderStatusContent() string {
 	if len(s.statusFields) == 0 {
 		return "No status information available"
 	}
-	
+
 	contentWidth, contentHeight := s.layout.GetContentDimensions()
-	
+
 	var lines []string
-	
+
 	// Add section headers and fields
 	currentSection := ""
 	for i, key := range s.statusKeys {
 		if i >= len(s.statusFields) {
 			break
 		}
-		
+
 		value := s.statusFields[i]
-		
+
 		// Add section breaks
 		if key == "Account Tier:" && currentSection != "account" {
 			if currentSection != "" {
@@ -318,21 +318,21 @@ func (s *StatusView) renderStatusContent() string {
 			lines = append(lines, s.renderSectionHeader("Connection Information"))
 			currentSection = "connection"
 		}
-		
+
 		// Render the field line
 		fieldLine := s.renderFieldLine(i, key, value, contentWidth)
 		lines = append(lines, fieldLine)
 	}
-	
+
 	// Join lines and ensure it fits within content height
 	allContent := strings.Join(lines, "\n")
 	contentLines := strings.Split(allContent, "\n")
-	
+
 	// Truncate if too many lines
 	if len(contentLines) > contentHeight {
 		contentLines = contentLines[:contentHeight]
 	}
-	
+
 	return strings.Join(contentLines, "\n")
 }
 
@@ -342,22 +342,22 @@ func (s *StatusView) renderSectionHeader(title string) string {
 		Bold(true).
 		Foreground(lipgloss.Color("63")).
 		Underline(true)
-	
+
 	return headerStyle.Render(title)
 }
 
 // renderFieldLine renders a single field line with key-value pair
 func (s *StatusView) renderFieldLine(index int, key, value string, maxWidth int) string {
 	isSelected := index == s.selectedRow
-	
+
 	// Calculate column widths
 	keyWidth := 20
 	valueWidth := maxWidth - keyWidth - 3 // 3 for spacing
-	
+
 	if valueWidth < 10 {
 		valueWidth = 10
 	}
-	
+
 	// Apply horizontal scrolling
 	displayKey := key
 	if len(displayKey) > s.keyOffset {
@@ -366,7 +366,7 @@ func (s *StatusView) renderFieldLine(index int, key, value string, maxWidth int)
 	if len(displayKey) > keyWidth {
 		displayKey = displayKey[:keyWidth-3] + "..."
 	}
-	
+
 	displayValue := value
 	if len(displayValue) > s.valueOffset {
 		displayValue = displayValue[s.valueOffset:]
@@ -374,10 +374,10 @@ func (s *StatusView) renderFieldLine(index int, key, value string, maxWidth int)
 	if len(displayValue) > valueWidth {
 		displayValue = displayValue[:valueWidth-3] + "..."
 	}
-	
+
 	// Style based on selection and focus
 	var keyStyle, valueStyle lipgloss.Style
-	
+
 	if isSelected {
 		if s.focusColumn == 0 {
 			// Key column focused
@@ -398,7 +398,7 @@ func (s *StatusView) renderFieldLine(index int, key, value string, maxWidth int)
 				Foreground(lipgloss.Color("255")).
 				Width(valueWidth)
 		}
-		
+
 		// Add yank blink effect
 		if s.clipboardManager.ShouldHighlight() {
 			if s.focusColumn == 0 {
@@ -415,35 +415,35 @@ func (s *StatusView) renderFieldLine(index int, key, value string, maxWidth int)
 			Foreground(lipgloss.Color("252")).
 			Width(valueWidth)
 	}
-	
+
 	formattedKey := keyStyle.Render(displayKey)
 	formattedValue := valueStyle.Render(displayValue)
-	
+
 	return lipgloss.JoinHorizontal(lipgloss.Left, formattedKey, " ", formattedValue)
 }
 
 // renderStatusLine renders the status line at the bottom
 func (s *StatusView) renderStatusLine() string {
 	helpText := "[j/k]navigate [h/l]columns [y]copy [Y]copy all [r]refresh [q/ESC/b]back"
-	
+
 	// Show copy message if active
 	if s.copiedMessage != "" && time.Since(s.copiedMessageTime) < 2*time.Second {
 		helpText = s.copiedMessage
 	}
-	
+
 	statusStyle := lipgloss.NewStyle().
 		Background(lipgloss.Color("237")).
 		Foreground(lipgloss.Color("255")).
 		Width(s.width).
 		Padding(0, 1)
-	
+
 	leftContent := "[STATUS]"
 	rightContent := fmt.Sprintf("Line %d/%d", s.selectedRow+1, len(s.statusFields))
-	
+
 	// Calculate spacing
 	totalContentWidth := len(leftContent) + len(rightContent) + len(helpText)
 	availableWidth := s.width - 2 // Account for padding
-	
+
 	var centerContent string
 	if totalContentWidth < availableWidth {
 		centerPadding := availableWidth - len(leftContent) - len(rightContent) - len(helpText)
@@ -456,10 +456,10 @@ func (s *StatusView) renderStatusLine() string {
 	} else {
 		centerContent = helpText
 	}
-	
-	statusContent := leftContent + centerContent + strings.Repeat(" ", 
+
+	statusContent := leftContent + centerContent + strings.Repeat(" ",
 		max(0, availableWidth-len(leftContent)-len(centerContent)-len(rightContent))) + rightContent
-	
+
 	return statusStyle.Render(statusContent)
 }
 
@@ -476,9 +476,9 @@ func (s *StatusView) initializeStatusFields() {
 	s.statusFields = []string{}
 	s.statusKeys = []string{}
 	s.fieldLines = []int{}
-	
+
 	lineNum := 0
-	
+
 	// User Info fields
 	if s.userInfo != nil {
 		if s.userInfo.Name != "" {
@@ -499,7 +499,7 @@ func (s *StatusView) initializeStatusFields() {
 			s.fieldLines = append(s.fieldLines, lineNum)
 			lineNum++
 		}
-		
+
 		// Account tier
 		tierDisplay := strings.Title(strings.ToLower(s.userInfo.Tier))
 		if tierDisplay == "" {
@@ -509,9 +509,10 @@ func (s *StatusView) initializeStatusFields() {
 		s.statusFields = append(s.statusFields, tierDisplay)
 		s.fieldLines = append(s.fieldLines, lineNum)
 		lineNum++
-		
+
 		// Usage information
-		if s.userInfo.Tier == "FREE" || s.userInfo.Tier == "BASIC" {
+		switch s.userInfo.Tier {
+		case "FREE", "BASIC":
 			var runsRemaining string
 			if s.userInfo.TotalRuns > 0 {
 				remaining := s.userInfo.RemainingRuns
@@ -526,12 +527,12 @@ func (s *StatusView) initializeStatusFields() {
 			s.statusFields = append(s.statusFields, runsRemaining)
 			s.fieldLines = append(s.fieldLines, lineNum)
 			lineNum++
-			
+
 			// Usage percentage
 			if s.userInfo.TotalRuns > 0 {
 				usedRuns := s.userInfo.TotalRuns - s.userInfo.RemainingRuns
 				percentage := float64(usedRuns) / float64(s.userInfo.TotalRuns) * 100
-				
+
 				var usageValue string
 				if percentage >= 90 {
 					usageValue = fmt.Sprintf("%.1f%% ⚠️", percentage)
@@ -540,13 +541,13 @@ func (s *StatusView) initializeStatusFields() {
 				} else {
 					usageValue = fmt.Sprintf("%.1f%% ✅", percentage)
 				}
-				
+
 				s.statusKeys = append(s.statusKeys, "Usage:")
 				s.statusFields = append(s.statusFields, usageValue)
 				s.fieldLines = append(s.fieldLines, lineNum)
 				lineNum++
 			}
-		} else if s.userInfo.Tier == "PRO" {
+		case "PRO":
 			if s.userInfo.TotalRuns > 0 {
 				usedRuns := s.userInfo.TotalRuns - s.userInfo.RemainingRuns
 				percentage := float64(usedRuns) / float64(s.userInfo.TotalRuns) * 100
@@ -562,25 +563,25 @@ func (s *StatusView) initializeStatusFields() {
 			}
 		}
 	}
-	
+
 	// System info
 	s.statusKeys = append(s.statusKeys, "Repositories:")
 	s.statusFields = append(s.statusFields, fmt.Sprintf("%d", s.systemInfo.RepositoryCount))
 	s.fieldLines = append(s.fieldLines, lineNum)
 	lineNum++
-	
+
 	s.statusKeys = append(s.statusKeys, "Total Runs:")
 	s.statusFields = append(s.statusFields, fmt.Sprintf("%d", s.systemInfo.TotalRuns))
 	s.fieldLines = append(s.fieldLines, lineNum)
 	lineNum++
-	
+
 	s.statusKeys = append(s.statusKeys, "Run Status:")
-	statusBreakdown := fmt.Sprintf("🔄 %d  ✅ %d  ❌ %d", 
+	statusBreakdown := fmt.Sprintf("🔄 %d  ✅ %d  ❌ %d",
 		s.systemInfo.RunningRuns, s.systemInfo.CompletedRuns, s.systemInfo.FailedRuns)
 	s.statusFields = append(s.statusFields, statusBreakdown)
 	s.fieldLines = append(s.fieldLines, lineNum)
 	lineNum++
-	
+
 	// Last refresh time
 	if !s.systemInfo.LastRefresh.IsZero() {
 		refreshText := fmt.Sprintf("%s ago", time.Since(s.systemInfo.LastRefresh).Truncate(time.Second))
@@ -589,13 +590,13 @@ func (s *StatusView) initializeStatusFields() {
 		s.fieldLines = append(s.fieldLines, lineNum)
 		lineNum++
 	}
-	
+
 	// API connection info
 	s.statusKeys = append(s.statusKeys, "API Endpoint:")
 	s.statusFields = append(s.statusFields, s.systemInfo.APIEndpoint)
 	s.fieldLines = append(s.fieldLines, lineNum)
 	lineNum++
-	
+
 	s.statusKeys = append(s.statusKeys, "Status:")
 	connectionStatus := "Connected ✅"
 	if !s.systemInfo.Connected {
@@ -603,7 +604,7 @@ func (s *StatusView) initializeStatusFields() {
 	}
 	s.statusFields = append(s.statusFields, connectionStatus)
 	s.fieldLines = append(s.fieldLines, lineNum)
-	
+
 	// Ensure we have at least one field selected
 	if len(s.statusFields) > 0 && s.selectedRow >= len(s.statusFields) {
 		s.selectedRow = 0
@@ -627,7 +628,6 @@ type copySuccessMsg struct {
 	text string
 }
 
-
 type clearMessageMsg struct{}
 
 // loadUserInfo loads user information from the API
@@ -645,25 +645,25 @@ func (s *StatusView) loadUserInfo() tea.Cmd {
 func (s *StatusView) loadSystemInfo() tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
-		
+
 		// Load repositories
 		repositories, repoErr := s.client.ListRepositories(ctx)
 		repositoryCount := 0
 		if repoErr == nil {
 			repositoryCount = len(repositories)
 		}
-		
+
 		// Load runs to calculate statistics
 		runsResp, runsErr := s.client.ListRuns(ctx, 1, 1000) // Get up to 1000 runs for stats
 		var allRuns []*models.RunResponse
 		if runsErr == nil && runsResp != nil {
 			allRuns = runsResp.Data
 		}
-		
+
 		// Calculate run statistics
 		totalRuns := len(allRuns)
 		var runningRuns, completedRuns, failedRuns int
-		
+
 		for _, run := range allRuns {
 			switch run.Status {
 			case "RUNNING", "PENDING":
@@ -674,10 +674,10 @@ func (s *StatusView) loadSystemInfo() tea.Cmd {
 				failedRuns++
 			}
 		}
-		
+
 		// Determine connection status
 		connected := repoErr == nil || runsErr == nil
-		
+
 		systemInfo := StatusSystemInfo{
 			RepositoryCount: repositoryCount,
 			TotalRuns:       totalRuns,
@@ -688,12 +688,12 @@ func (s *StatusView) loadSystemInfo() tea.Cmd {
 			APIEndpoint:     s.client.GetAPIEndpoint(),
 			Connected:       connected,
 		}
-		
+
 		// If there were errors, report them
 		if repoErr != nil && runsErr != nil {
 			return statusErrorMsg{error: fmt.Errorf("failed to load system info: %v", repoErr)}
 		}
-		
+
 		return systemInfoLoadedMsg{systemInfo: systemInfo}
 	}
 }
@@ -704,7 +704,7 @@ func (s *StatusView) handleUserInfoLoaded(msg statusUserInfoLoadedMsg) (tea.Mode
 	s.loading = false
 	s.error = nil
 	s.initializeStatusFields()
-	
+
 	debug.LogToFilef("✅ STATUS: User info loaded for %s\n", s.userInfo.Email)
 	return s, nil
 }
@@ -715,7 +715,7 @@ func (s *StatusView) handleSystemInfoLoaded(msg systemInfoLoadedMsg) (tea.Model,
 	s.loading = false
 	s.error = nil
 	s.initializeStatusFields()
-	
+
 	debug.LogToFilef("✅ STATUS: System info loaded\n")
 	return s, nil
 }
@@ -731,7 +731,7 @@ func (s *StatusView) copyCurrentField() (tea.Model, tea.Cmd) {
 			// Copy the value
 			textToCopy = s.statusFields[s.selectedRow]
 		}
-		
+
 		return s, s.copyToClipboard(textToCopy)
 	}
 	return s, nil
@@ -742,13 +742,13 @@ func (s *StatusView) copyAllFields() (tea.Model, tea.Cmd) {
 	var allText strings.Builder
 	allText.WriteString("Status Information\n")
 	allText.WriteString("==================\n\n")
-	
+
 	for i, key := range s.statusKeys {
 		if i < len(s.statusFields) {
 			allText.WriteString(fmt.Sprintf("%s %s\n", key, s.statusFields[i]))
 		}
 	}
-	
+
 	return s, s.copyToClipboard(allText.String())
 }
 
@@ -768,21 +768,20 @@ func (s *StatusView) handleCopySuccess(msg copySuccessMsg) (tea.Model, tea.Cmd) 
 		s.copiedMessage = s.copiedMessage[:47] + "..."
 	}
 	s.copiedMessageTime = time.Now()
-	
+
 	// Start blink animation using clipboard manager
 	cmd, err := s.clipboardManager.CopyWithBlink(msg.text, "")
 	if err != nil {
 		// Error already handled by clipboard operation, just show message
-		return s, s.startMessageClearTimer(2*time.Second)
+		return s, s.startMessageClearTimer(2 * time.Second)
 	}
-	
+
 	// Start blink animation and clear timer
 	return s, tea.Batch(
 		cmd,
 		s.startMessageClearTimer(2*time.Second),
 	)
 }
-
 
 // startMessageClearTimer starts a timer to clear the copied message
 func (s *StatusView) startMessageClearTimer(duration time.Duration) tea.Cmd {

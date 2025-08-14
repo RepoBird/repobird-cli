@@ -44,7 +44,7 @@ func getCurrentUserID() string {
 	if stringID != "" {
 		return stringID
 	}
-	
+
 	// Fallback to integer ID if string ID not available (backward compatibility)
 	userIDPtr := services.GetCurrentUserID()
 	if userIDPtr != nil && *userIDPtr > 0 {

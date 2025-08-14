@@ -67,7 +67,7 @@ func (d *DoubleColumnLayout) recalculateDimensions() {
 	// Each box with border renders 2 chars wider than set width (1 left + 1 right border)
 	// So we need to subtract 2 per column (4 total for 2 columns)
 	borderOverhead := 4 // 2 columns * 2 border chars each
-	
+
 	// Calculate usable width (subtract gap and border overhead)
 	usableWidth := d.width - d.gap - borderOverhead
 	if usableWidth < 10 {

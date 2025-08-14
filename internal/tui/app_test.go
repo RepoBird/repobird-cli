@@ -125,7 +125,7 @@ func TestAppInit(t *testing.T) {
 
 	// After Init, authentication starts but current is still nil
 	assert.Nil(t, app.current) // Dashboard created after authentication completes
-	assert.NotNil(t, cmd) // Should return authentication command
+	assert.NotNil(t, cmd)      // Should return authentication command
 }
 
 func TestAppViewMethod(t *testing.T) {
@@ -185,7 +185,7 @@ func TestAppNavigationMessages(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockClient := &MockAPIClient{}
 			app := NewApp(mockClient)
-			_ = app.Init() // Initialize with authentication
+			_ = app.Init()              // Initialize with authentication
 			completeAuthentication(app) // Complete authentication to enable navigation
 
 			// Handle navigation
@@ -372,7 +372,7 @@ func TestAppErrorNavigation(t *testing.T) {
 		app := NewApp(mockClient)
 		_ = app.Init()
 		completeAuthentication(app)
-		
+
 		initialView := app.current
 
 		msg := messages.NavigateToErrorMsg{
@@ -394,7 +394,7 @@ func TestAppErrorNavigation(t *testing.T) {
 		app := NewApp(mockClient)
 		_ = app.Init()
 		completeAuthentication(app)
-		
+
 		// First navigate somewhere
 		app.handleNavigation(messages.NavigateToCreateMsg{})
 		assert.Len(t, app.viewStack, 1)

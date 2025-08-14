@@ -862,7 +862,7 @@ func (b *BulkFileSelector) GetFileListContent(width, height int) string {
 			Render("⟳ Loading configuration files..."))
 		return strings.Join(content, "\n")
 	}
-	
+
 	if b.loadError != nil {
 		content = append(content, "")
 		content = append(content, lipgloss.NewStyle().
@@ -870,7 +870,7 @@ func (b *BulkFileSelector) GetFileListContent(width, height int) string {
 			Render(fmt.Sprintf("Error loading files: %v", b.loadError)))
 		return strings.Join(content, "\n")
 	}
-	
+
 	if len(b.files) == 0 {
 		content = append(content, "")
 		content = append(content, lipgloss.NewStyle().
@@ -885,7 +885,7 @@ func (b *BulkFileSelector) GetFileListContent(width, height int) string {
 			Render("in current directory and subdirectories."))
 		return strings.Join(content, "\n")
 	}
-	
+
 	if len(b.filteredFiles) == 0 && b.filterInput != "" {
 		content = append(content, "")
 		content = append(content, lipgloss.NewStyle().
@@ -893,7 +893,7 @@ func (b *BulkFileSelector) GetFileListContent(width, height int) string {
 			Render(fmt.Sprintf("No files match filter: '%s'", b.filterInput)))
 		return strings.Join(content, "\n")
 	}
-	
+
 	// File list
 	visibleFiles := height - 4 // Account for filter, spacing, and header
 	if visibleFiles < 1 {
@@ -940,9 +940,9 @@ func (b *BulkFileSelector) GetFileListContent(width, height int) string {
 			displayName = displayName[:maxNameWidth-3] + "..."
 		}
 
-		line := fmt.Sprintf("%s %s %s", 
-			checkboxStyle.Render(checkbox), 
-			typeIcon, 
+		line := fmt.Sprintf("%s %s %s",
+			checkboxStyle.Render(checkbox),
+			typeIcon,
 			displayName)
 
 		// Highlight current cursor position
@@ -985,7 +985,7 @@ func (b *BulkFileSelector) GetPreviewContent(width, height int) string {
 	if b.previewContent != "" {
 		lines := strings.Split(b.previewContent, "\n")
 		start := b.previewOffset
-		
+
 		for i := 0; i < previewLines && start+i < len(lines); i++ {
 			line := lines[start+i]
 			// Truncate long lines

@@ -91,7 +91,7 @@ func (v *RunDetailsView) handleClipboardOperations(key string) tea.Cmd {
 				v.statusLine.SetTemporaryMessageWithType(fmt.Sprintf("✗ Failed to open URL: %v", err), components.MessageError, 1*time.Second)
 			}
 			// No blink for URL opening, just message clear timer
-			return v.startMessageClearTimer(1*time.Second)
+			return v.startMessageClearTimer(1 * time.Second)
 		}
 	}
 	return nil
@@ -108,8 +108,6 @@ func (v *RunDetailsView) getCurrentLine() string {
 	}
 	return ""
 }
-
-
 
 // startMessageClearTimer starts a timer to clear temporary messages
 func (v *RunDetailsView) startMessageClearTimer(duration time.Duration) tea.Cmd {

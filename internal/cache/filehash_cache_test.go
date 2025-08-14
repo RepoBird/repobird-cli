@@ -390,7 +390,7 @@ func TestFileHashCache_EnsureLoaded(t *testing.T) {
 	oldCacheHome := os.Getenv("XDG_CACHE_HOME")
 	os.Setenv("XDG_CACHE_HOME", tmpDir)
 	defer os.Setenv("XDG_CACHE_HOME", oldCacheHome)
-	
+
 	// Create cache with a test user ID to ensure isolation
 	testUserID := -9999 // Negative ID for test/debug mode
 	cache := NewFileHashCacheForUser(&testUserID)

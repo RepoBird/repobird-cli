@@ -1,0 +1,15 @@
+- id: 12345
+  status: DONE
+  repositoryName: test/repo
+  title: Test Run
+  runType: run
+  createdAt: 2024-01-15T10:00:00Z
+  updatedAt: 2024-01-15T10:30:00Z
+  prUrl: https://github.com/test/repo/pull/1
+- id: 67890
+  status: RUNNING
+  repositoryName: test/another-repo
+  title: Another Test Run
+  runType: plan
+  createdAt: 2024-01-15T11:50:00Z
+  updatedAt: 2024-01-15T12:00:00Z

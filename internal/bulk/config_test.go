@@ -497,7 +497,7 @@ func TestParseBulkConfig_SingleToMultiConversion(t *testing.T) {
 	// The function should successfully convert single config to bulk
 	require.NoError(t, err)
 	require.NotNil(t, config)
-	
+
 	// Verify the conversion
 	assert.Equal(t, "org/repo", config.Repository)
 	assert.Equal(t, "main", config.Source)

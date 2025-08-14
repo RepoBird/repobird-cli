@@ -26,14 +26,14 @@ type CustomFormField struct {
 
 // CustomCreateForm is a specialized form for the Create Run view
 type CustomCreateForm struct {
-	fields        []CustomFormField
-	focusIndex    int
-	insertMode    bool
-	width         int
-	height        int
-	errors        map[string]string
-	runTypeIndex  int // 0 for "run", 1 for "plan"
-	
+	fields       []CustomFormField
+	focusIndex   int
+	insertMode   bool
+	width        int
+	height       int
+	errors       map[string]string
+	runTypeIndex int // 0 for "run", 1 for "plan"
+
 	// Styling
 	labelStyle    lipgloss.Style
 	focusedStyle  lipgloss.Style
@@ -55,7 +55,7 @@ func NewCustomCreateForm() *CustomCreateForm {
 		buttonStyle:   lipgloss.NewStyle().Background(lipgloss.Color("62")).Foreground(lipgloss.Color("230")).Padding(0, 2),
 		toggleStyle:   lipgloss.NewStyle().Background(lipgloss.Color("237")).Foreground(lipgloss.Color("252")).Padding(0, 1),
 	}
-	
+
 	// Initialize fields with emojis
 	f.fields = []CustomFormField{
 		{
@@ -108,12 +108,12 @@ func NewCustomCreateForm() *CustomCreateForm {
 			Icon:        "📋",
 		},
 		{
-			Name:     "runtype",
-			Label:    "Run Type",
-			Type:     "toggle",
-			Options:  []string{"run", "plan"},
-			Value:    "run",
-			Icon:     "⚙️",
+			Name:    "runtype",
+			Label:   "Run Type",
+			Type:    "toggle",
+			Options: []string{"run", "plan"},
+			Value:   "run",
+			Icon:    "⚙️",
 		},
 		{
 			Name:  "submit",
@@ -123,7 +123,7 @@ func NewCustomCreateForm() *CustomCreateForm {
 			Icon:  "🚀",
 		},
 	}
-	
+
 	// Initialize text inputs and areas
 	for i := range f.fields {
 		switch f.fields[i].Type {
@@ -132,7 +132,7 @@ func NewCustomCreateForm() *CustomCreateForm {
 			ti.Placeholder = f.fields[i].Placeholder
 			ti.SetValue(f.fields[i].Value)
 			f.fields[i].textInput = ti
-			
+
 		case "textarea":
 			ta := textarea.New()
 			ta.Placeholder = f.fields[i].Placeholder
@@ -141,7 +141,7 @@ func NewCustomCreateForm() *CustomCreateForm {
 			f.fields[i].textArea = ta
 		}
 	}
-	
+
 	return f
 }
 
@@ -153,16 +153,16 @@ func (f *CustomCreateForm) Init() tea.Cmd {
 // Update handles messages for the custom form
 func (f *CustomCreateForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
-	
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		f.width = msg.Width
 		f.height = msg.Height
-		
+
 	case tea.KeyMsg:
 		return f.handleKeyMsg(msg)
 	}
-	
+
 	return f, tea.Batch(cmds...)
 }
 
@@ -170,9 +170,9 @@ func (f *CustomCreateForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (f *CustomCreateForm) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	keyString := msg.String()
 	debug.LogToFilef("🎨 CUSTOM FORM handleKeyMsg: key='%s', insertMode=%v, focusIndex=%d", keyString, f.insertMode, f.focusIndex)
-	
+
 	currentField := &f.fields[f.focusIndex]
-	
+
 	// Handle insert mode
 	if f.insertMode {
 		debug.LogToFilef("📝 CUSTOM FORM: Processing key '%s' in INSERT mode", keyString)
@@ -185,7 +185,7 @@ func (f *CustomCreateForm) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			f.insertMode = false
 			f.blurCurrentField()
 			return f, nil
-			
+
 		case "tab":
 			f.insertMode = false
 			f.nextField()
@@ -195,7 +195,7 @@ func (f *CustomCreateForm) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				f.focusCurrentField()
 			}
 			return f, nil
-			
+
 		case "shift+tab":
 			f.insertMode = false
 			f.prevField()
@@ -205,14 +205,14 @@ func (f *CustomCreateForm) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				f.focusCurrentField()
 			}
 			return f, nil
-			
+
 		case "ctrl+s":
 			// Submit form
 			if f.validate() {
 				return f, f.submitCmd()
 			}
 			return f, nil
-			
+
 		default:
 			// Pass to the focused field if it's a text input
 			if currentField.Type == "text" || currentField.Type == "textarea" {
@@ -231,7 +231,7 @@ func (f *CustomCreateForm) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	} else {
 		// Normal mode navigation
 		debug.LogToFilef("🔑 CUSTOM FORM: Normal mode key: '%s'", msg.String())
-		
+
 		switch msg.String() {
 		case "q", "b":
 			// These should be handled by the keymap registry for navigation
@@ -239,7 +239,7 @@ func (f *CustomCreateForm) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			debug.LogToFilef("🔑 CUSTOM FORM: Navigation key '%s' in normal mode - passing through", msg.String())
 			// Don't process - let keymap registry handle navigation
 			return f, nil
-			
+
 		case "i":
 			// Enter insert mode for text fields
 			if currentField.Type == "text" || currentField.Type == "textarea" {
@@ -249,7 +249,7 @@ func (f *CustomCreateForm) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return f, textinput.Blink
 			}
 			return f, nil
-			
+
 		case "d":
 			// Delete current field's text (vim-like)
 			if currentField.Type == "text" || currentField.Type == "textarea" {
@@ -257,7 +257,7 @@ func (f *CustomCreateForm) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				debug.LogToFilef("✂️ CUSTOM FORM: Deleted field '%s' content", currentField.Name)
 			}
 			return f, nil
-			
+
 		case "c":
 			// Change - delete current field and enter insert mode (vim-like)
 			if currentField.Type == "text" || currentField.Type == "textarea" {
@@ -268,17 +268,17 @@ func (f *CustomCreateForm) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return f, textinput.Blink
 			}
 			return f, nil
-			
+
 		case "j", "down":
 			f.nextField()
 			debug.LogToFilef("⬇️ CUSTOM FORM: Moving to next field")
 			return f, nil
-			
+
 		case "k", "up":
 			f.prevField()
 			debug.LogToFilef("⬆️ CUSTOM FORM: Moving to previous field")
 			return f, nil
-			
+
 		case "enter", " ":
 			// Handle special field types
 			switch currentField.Type {
@@ -303,7 +303,7 @@ func (f *CustomCreateForm) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return f, textinput.Blink
 			}
 			return f, nil
-			
+
 		case "ctrl+s":
 			// Submit from any field
 			if f.validate() {
@@ -312,12 +312,12 @@ func (f *CustomCreateForm) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			debug.LogToFilef("⚠️ CUSTOM FORM: CTRL+S pressed but validation failed")
 			return f, nil
-			
+
 		default:
 			debug.LogToFilef("❓ CUSTOM FORM: Unhandled key in normal mode: '%s'", msg.String())
 		}
 	}
-	
+
 	return f, nil
 }
 
@@ -326,13 +326,13 @@ func (f *CustomCreateForm) View() string {
 	if f.width == 0 || f.height == 0 {
 		return ""
 	}
-	
+
 	var sections []string
-	
+
 	for i, field := range f.fields {
 		sections = append(sections, f.renderField(field, i == f.focusIndex))
 	}
-	
+
 	// Add mode indicator at the bottom
 	modeStr := "Normal Mode (i to edit, j/k to navigate)"
 	if f.insertMode {
@@ -342,7 +342,7 @@ func (f *CustomCreateForm) View() string {
 		Foreground(lipgloss.Color("242")).
 		Italic(true)
 	sections = append(sections, "", modeStyle.Render(modeStr))
-	
+
 	return lipgloss.JoinVertical(lipgloss.Left, sections...)
 }
 
@@ -354,15 +354,15 @@ func (f *CustomCreateForm) renderField(field CustomFormField, focused bool) stri
 		label = field.Icon + " "
 	}
 	label += field.Label
-	
+
 	if field.Required {
 		label = f.labelStyle.Render(label) + f.requiredStyle.Render(" *")
 	} else {
 		label = f.labelStyle.Render(label)
 	}
-	
+
 	var input string
-	
+
 	switch field.Type {
 	case "text":
 		if focused && f.insertMode {
@@ -380,7 +380,7 @@ func (f *CustomCreateForm) renderField(field CustomFormField, focused bool) stri
 				input = "  " + value
 			}
 		}
-		
+
 	case "textarea":
 		if focused && f.insertMode {
 			input = field.textArea.View()
@@ -404,7 +404,7 @@ func (f *CustomCreateForm) renderField(field CustomFormField, focused bool) stri
 				input = "  " + value
 			}
 		}
-		
+
 	case "toggle":
 		// Render toggle button
 		options := []string{}
@@ -416,13 +416,13 @@ func (f *CustomCreateForm) renderField(field CustomFormField, focused bool) stri
 			options = append(options, style.Render(opt))
 		}
 		toggleStr := strings.Join(options, " ")
-		
+
 		if focused {
 			input = f.focusedStyle.Render("▶ ") + toggleStr + lipgloss.NewStyle().Foreground(lipgloss.Color("239")).Render(" (ENTER to toggle)")
 		} else {
 			input = "  " + toggleStr
 		}
-		
+
 	case "button":
 		// Render submit button
 		buttonStyle := f.buttonStyle
@@ -430,22 +430,22 @@ func (f *CustomCreateForm) renderField(field CustomFormField, focused bool) stri
 			buttonStyle = buttonStyle.Background(lipgloss.Color("205"))
 		}
 		button := buttonStyle.Render(field.Value)
-		
+
 		if focused {
 			input = f.focusedStyle.Render("▶ ") + button
 		} else {
 			input = "  " + button
 		}
-		
+
 		// Don't show label for button
 		return input
 	}
-	
+
 	// Add error message if present
 	if errMsg, ok := f.errors[field.Name]; ok {
 		input += "\n" + f.errorStyle.Render("  ↳ "+errMsg)
 	}
-	
+
 	return label + "\n" + input
 }
 
@@ -497,7 +497,7 @@ func (f *CustomCreateForm) blurCurrentField() {
 func (f *CustomCreateForm) validate() bool {
 	valid := true
 	f.errors = make(map[string]string)
-	
+
 	for _, field := range f.fields {
 		if field.Required && field.Type != "button" && field.Type != "toggle" {
 			if strings.TrimSpace(field.Value) == "" {
@@ -506,7 +506,7 @@ func (f *CustomCreateForm) validate() bool {
 			}
 		}
 	}
-	
+
 	return valid
 }
 

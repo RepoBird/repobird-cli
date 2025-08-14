@@ -15,7 +15,7 @@ func TestUserSpecificCache(t *testing.T) {
 	oldXDG := os.Getenv("XDG_CONFIG_HOME")
 	os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Setenv("XDG_CONFIG_HOME", oldXDG)
-	
+
 	// Clean start
 	ClearCache()
 	defer ClearCache()
@@ -99,7 +99,7 @@ func TestUserInfoCache(t *testing.T) {
 	oldXDG := os.Getenv("XDG_CONFIG_HOME")
 	os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Setenv("XDG_CONFIG_HOME", oldXDG)
-	
+
 	// Clean start
 	ClearCache()
 	defer ClearCache()
@@ -148,7 +148,7 @@ func TestUserInfoCacheExpiry(t *testing.T) {
 	oldXDG := os.Getenv("XDG_CONFIG_HOME")
 	os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Setenv("XDG_CONFIG_HOME", oldXDG)
-	
+
 	// Clean start
 	ClearCache()
 	defer ClearCache()

@@ -305,7 +305,7 @@ func InitializeCacheForUser(userID *int) {
 
 	if globalCache != nil {
 		globalCache.mu.RLock()
-		
+
 		if globalCache.userInfo != nil && userID != nil && globalCache.userInfo.ID == *userID {
 			// Save user info, form data, and terminal details if it's the same user
 			savedUserInfo = globalCache.userInfo

@@ -48,7 +48,7 @@ func TestNewBulkView(t *testing.T) {
 	assert.NotNil(t, view)
 	assert.Equal(t, client, view.client)
 	assert.Equal(t, ModeInstructions, view.mode) // Now starts with instructions
-	assert.Nil(t, view.fileSelector) // File selector not created until user presses 'f'
+	assert.Nil(t, view.fileSelector)             // File selector not created until user presses 'f'
 	assert.NotNil(t, view.help)
 	assert.NotNil(t, view.keys)
 	assert.NotNil(t, view.spinner)
@@ -126,7 +126,7 @@ func TestBulkViewGlobalQuitKeys(t *testing.T) {
 		model, cmd := view.Update(keyMsg)
 		assert.Equal(t, view, model)
 		assert.NotNil(t, cmd)
-		
+
 		// Execute the command to check if it returns quit message
 		msg := cmd()
 		_, isQuitMsg := msg.(tea.QuitMsg)
@@ -280,7 +280,7 @@ func TestBulkViewRunListKeys(t *testing.T) {
 			{Title: "Run 3", Selected: true},
 		}
 		view.selectedRun = 1
-		
+
 		keyMsg := tea.KeyMsg{Type: tea.KeyCtrlS}
 		model, cmd := view.Update(keyMsg)
 
@@ -640,10 +640,10 @@ func TestBulkViewNavigationMessages(t *testing.T) {
 		view.mode = ModeFileBrowser
 		view.fileSelector = components.NewBulkFileSelector(80, 24)
 		keyMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}}
-		
+
 		model, cmd := view.Update(keyMsg)
 		updatedView := model.(*BulkView)
-		
+
 		assert.Equal(t, ModeInstructions, updatedView.mode)
 		assert.Nil(t, updatedView.fileSelector)
 		assert.Nil(t, cmd)
@@ -652,10 +652,10 @@ func TestBulkViewNavigationMessages(t *testing.T) {
 	t.Run("Run list quit returns NavigateBackMsg", func(t *testing.T) {
 		view.mode = ModeRunList
 		keyMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}}
-		
+
 		_, cmd := view.Update(keyMsg)
 		assert.NotNil(t, cmd)
-		
+
 		navMsg := cmd()
 		_, ok := navMsg.(messages.NavigateBackMsg)
 		assert.True(t, ok)

@@ -91,13 +91,13 @@ func TestCoreKeymapSystemIntegration(t *testing.T) {
 		assert.Equal(t, app, model)
 		// Note: cmd will be nil because MockAPIClient can't be cast to *api.Client
 		// which is required for BulkView. This is a limitation of the current implementation.
-		assert.Nil(t, cmd) 
+		assert.Nil(t, cmd)
 	})
 
 	t.Run("app handles global actions regardless of view state", func(t *testing.T) {
 		mockClient := &MockAPIClient{}
 		app := NewApp(mockClient)
-		
+
 		// Initialize cache to avoid nil pointer dereference
 		tempDir := t.TempDir()
 		t.Setenv("XDG_CONFIG_HOME", tempDir)

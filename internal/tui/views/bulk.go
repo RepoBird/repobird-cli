@@ -3,7 +3,7 @@ package views
 import (
 	"fmt"
 	"strings"
-	
+
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
@@ -20,11 +20,11 @@ type BulkMode int
 
 const (
 	ModeInstructions BulkMode = iota // Initial screen with instructions
-	ModeFileBrowser               // FZF file browser (full screen)
-	ModeRunList                   // Run validation list
-	ModeRunEdit                   // Individual run editing
-	ModeProgress                  // Submission progress
-	ModeResults                   // Final results
+	ModeFileBrowser                  // FZF file browser (full screen)
+	ModeRunList                      // Run validation list
+	ModeRunEdit                      // Individual run editing
+	ModeProgress                     // Submission progress
+	ModeResults                      // Final results
 )
 
 // BulkRunItem represents a single run in the bulk collection
@@ -50,7 +50,6 @@ const (
 	StatusFailed
 	StatusCancelled
 )
-
 
 // BulkView represents the bulk runs TUI view
 type BulkView struct {
@@ -238,7 +237,7 @@ func (v *BulkView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		v.width = msg.Width
 		v.height = msg.Height
 		v.help.Width = msg.Width
-		
+
 		// Create layout for proper sizing
 		v.layout = components.NewWindowLayout(msg.Width, msg.Height)
 
@@ -258,19 +257,19 @@ func (v *BulkView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		debug.LogToFilef("DEBUG: BulkView - handling KeyMsg: '%s', mode=%d\n", msg.String(), v.mode)
-		
+
 		// Handle global quit keys regardless of mode
 		if msg.String() == "Q" || msg.Type == tea.KeyCtrlC {
 			return v, tea.Quit
 		}
-		
+
 		// FIRST: Handle components that need raw key input (like FZF)
 		switch v.mode {
 		case ModeFileBrowser:
 			if v.fileSelector != nil {
 				// The CoreViewKeymap.HandleKey will handle INPUT mode keys like 'q', 'b', 'backspace'
 				// So here we only need to handle the remaining keys
-				
+
 				// In NAV mode, check if this is a navigation key we should handle
 				if !v.fileSelector.GetInputMode() {
 					if msg.Type == tea.KeyEsc || msg.String() == "q" || msg.String() == "L" {
@@ -279,7 +278,7 @@ func (v *BulkView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						return v.handleFileBrowserKeys(msg)
 					}
 				}
-				
+
 				// For all other keys, pass to file selector
 				// Note: Keys handled by HandleKey() won't reach here
 				debug.LogToFilef("DEBUG: BulkView.Update - passing key '%s' to file selector\n", msg.String())
@@ -289,7 +288,7 @@ func (v *BulkView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return v, tea.Batch(cmds...)
 			}
 		}
-		
+
 		// SECOND: Handle view-specific navigation keys
 		switch v.mode {
 		case ModeInstructions:
@@ -470,12 +469,12 @@ func (v *BulkView) handleRunListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // View renders the bulk view
 func (v *BulkView) View() string {
 	debug.LogToFilef("DEBUG: BulkView.View() called - mode=%d, width=%d, height=%d\n", v.mode, v.width, v.height)
-	
+
 	if v.width <= 0 || v.height <= 0 {
 		debug.LogToFile("DEBUG: BulkView - no dimensions, returning initializing message\n")
 		return "⟳ Initializing Bulk View..."
 	}
-	
+
 	switch v.mode {
 	case ModeInstructions:
 		debug.LogToFile("DEBUG: BulkView - rendering instructions\n")
@@ -507,17 +506,17 @@ func (v *BulkView) renderInstructions() string {
 	if v.layout == nil {
 		v.layout = components.NewWindowLayout(v.width, v.height)
 	}
-	
+
 	// Instructions content
 	var instructionLines []string
-	
+
 	// Show error if there is one
 	if v.error != nil {
 		errorStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("196")).
 			Bold(true)
-		
-		instructionLines = append(instructionLines, 
+
+		instructionLines = append(instructionLines,
 			errorStyle.Render("❌ Error loading configuration files:"),
 			"",
 			fmt.Sprintf("%v", v.error),
@@ -528,7 +527,7 @@ func (v *BulkView) renderInstructions() string {
 			"",
 		)
 	}
-	
+
 	instructionLines = append(instructionLines,
 		"Welcome to the Bulk Operations interface.",
 		"",
@@ -555,10 +554,10 @@ func (v *BulkView) renderInstructions() string {
 
 	title := titleStyle.Render("Bulk Operations")
 	styledContent := contentStyle.Render(content)
-	
+
 	// Get proper dimensions from layout
 	boxWidth, boxHeight := v.layout.GetBoxDimensions()
-	
+
 	// Create the main container with proper dimensions
 	mainContainer := boxStyle.
 		Width(boxWidth).
@@ -590,7 +589,7 @@ func (v *BulkView) renderFileBrowser() string {
 	if v.fileSelector != nil {
 		// Get content dimensions for each column
 		leftWidth, leftHeight, rightWidth, rightHeight := v.doubleColumnLayout.GetContentDimensions()
-		
+
 		// Get file list and preview content from selector
 		leftContent = v.fileSelector.GetFileListContent(leftWidth, leftHeight)
 		rightContent = v.fileSelector.GetPreviewContent(rightWidth, rightHeight)
@@ -692,7 +691,7 @@ func (v *BulkView) renderStatusLine(layoutName string) string {
 	// Simple help text based on current mode
 	var helpText string
 	var modeIndicator string
-	
+
 	switch v.mode {
 	case ModeInstructions:
 		helpText = "f:browse files q:quit ?:help"
@@ -908,11 +907,11 @@ func (v *BulkView) IsKeyDisabled(keyString string) bool {
 func (v *BulkView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Model, cmd tea.Cmd) {
 	keyString := keyMsg.String()
 	debug.LogToFilef("DEBUG: BulkView.HandleKey - received key '%s', mode=%d\n", keyString, v.mode)
-	
+
 	// Handle 'q' key for all modes - should go back, not quit app
 	if keyString == "q" {
 		debug.LogToFilef("DEBUG: BulkView.HandleKey - handling 'q' key for navigation\n")
-		
+
 		// In ModeInstructions, 'q' goes back to dashboard
 		if v.mode == ModeInstructions {
 			debug.LogToFilef("DEBUG: BulkView.HandleKey - 'q' in instructions mode, going back to dashboard\n")
@@ -920,7 +919,7 @@ func (v *BulkView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Model, 
 				return messages.NavigateBackMsg{}
 			}
 		}
-		
+
 		// In ModeFileBrowser with INPUT mode, 'q' is text input
 		if v.mode == ModeFileBrowser && v.fileSelector != nil && v.fileSelector.GetInputMode() {
 			debug.LogToFilef("DEBUG: BulkView.HandleKey - passing 'q' to file selector as text input\n")
@@ -928,14 +927,14 @@ func (v *BulkView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Model, 
 			v.fileSelector = newFileSelector
 			return true, v, cmd
 		}
-		
+
 		// In other modes, delegate to mode-specific handlers
 	}
-	
+
 	// When in ModeFileBrowser with FZF INPUT mode, handle keys specially
 	if v.mode == ModeFileBrowser && v.fileSelector != nil && v.fileSelector.GetInputMode() {
 		debug.LogToFilef("DEBUG: BulkView.HandleKey - in FZF INPUT mode, handling key '%s'\n", keyString)
-		
+
 		// In INPUT mode, we need to intercept navigation keys and pass them to file selector
 		switch keyString {
 		case "backspace":
@@ -944,7 +943,7 @@ func (v *BulkView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Model, 
 			newFileSelector, cmd := v.fileSelector.Update(keyMsg)
 			v.fileSelector = newFileSelector
 			return true, v, cmd
-			
+
 		case "b":
 			debug.LogToFilef("DEBUG: BulkView.HandleKey - passing 'b' to file selector as text input\n")
 			// In INPUT mode, 'b' is just a character to type, not back!
@@ -953,7 +952,7 @@ func (v *BulkView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Model, 
 			return true, v, cmd
 		}
 	}
-	
+
 	debug.LogToFilef("DEBUG: BulkView.HandleKey - not handling key '%s', returning false\n", keyString)
 	// Let the default Update method handle everything else
 	return false, v, nil

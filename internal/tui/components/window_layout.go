@@ -157,4 +157,3 @@ func (w *WindowLayout) GetLayoutForType(layoutType LayoutType) *WindowLayout {
 		return w
 	}
 }
-

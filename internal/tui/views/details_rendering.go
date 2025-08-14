@@ -123,7 +123,7 @@ func (v *RunDetailsView) renderContentWithCursor() []string {
 	}
 
 	// Debug: Log viewport rendering details
-	debug.LogToFilef("DEBUG: renderContentWithCursor - viewportHeight=%d, contentWidth=%d, offset=%d\n", 
+	debug.LogToFilef("DEBUG: renderContentWithCursor - viewportHeight=%d, contentWidth=%d, offset=%d\n",
 		viewportHeight, contentWidth, viewportOffset)
 
 	for i := viewportOffset; i < len(allLines) && i < viewportOffset+viewportHeight; i++ {

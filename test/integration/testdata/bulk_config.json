@@ -1,0 +1,31 @@
+{
+  "runs": [
+    {
+      "prompt": "Update dependencies to latest versions",
+      "repository": "org/service-a",
+      "source": "main",
+      "target": "chore/update-deps",
+      "runType": "run",
+      "title": "Update dependencies"
+    },
+    {
+      "prompt": "Add comprehensive logging to API endpoints",
+      "repository": "org/service-b",
+      "source": "main",
+      "target": "feat/add-logging",
+      "runType": "plan",
+      "title": "Add API logging"
+    },
+    {
+      "prompt": "Fix memory leak in background worker",
+      "repository": "org/service-c",
+      "source": "main",
+      "target": "fix/memory-leak",
+      "runType": "run",
+      "title": "Fix memory leak",
+      "files": ["src/worker.js"]
+    }
+  ],
+  "parallel": true,
+  "continueOnError": false
+}

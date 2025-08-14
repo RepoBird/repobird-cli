@@ -16,7 +16,7 @@ func TestCompleteNavigationFlow(t *testing.T) {
 	t.Run("Dashboard -> Create -> Details -> Back to Dashboard", func(t *testing.T) {
 		mockClient := &MockAPIClient{}
 		app := NewApp(mockClient)
-		
+
 		// Initialize cache
 		tempDir := t.TempDir()
 		t.Setenv("XDG_CONFIG_HOME", tempDir)
@@ -65,7 +65,7 @@ func TestCompleteNavigationFlow(t *testing.T) {
 	t.Run("Deep navigation stack", func(t *testing.T) {
 		mockClient := &MockAPIClient{}
 		app := NewApp(mockClient)
-		
+
 		// Initialize cache
 		tempDir := t.TempDir()
 		t.Setenv("XDG_CONFIG_HOME", tempDir)
@@ -119,7 +119,7 @@ func TestCompleteNavigationFlow(t *testing.T) {
 	t.Run("Navigate to Dashboard clears stack", func(t *testing.T) {
 		mockClient := &MockAPIClient{}
 		app := NewApp(mockClient)
-		
+
 		// Initialize cache
 		tempDir := t.TempDir()
 		t.Setenv("XDG_CONFIG_HOME", tempDir)
@@ -154,7 +154,7 @@ func TestNavigationWithContext(t *testing.T) {
 	t.Run("Context persists during navigation", func(t *testing.T) {
 		mockClient := &MockAPIClient{}
 		app := NewApp(mockClient)
-		
+
 		// Initialize cache
 		tempDir := t.TempDir()
 		t.Setenv("XDG_CONFIG_HOME", tempDir)
@@ -203,7 +203,7 @@ func TestErrorNavigation(t *testing.T) {
 		mockClient := &MockAPIClient{}
 		app := NewApp(mockClient)
 		_ = app.Init()
-		
+
 		// Simulate authentication completion and create cache
 		app.cache = cache.NewSimpleCache()
 		model, _ := app.Update(authCompleteMsg{})
@@ -238,7 +238,7 @@ func TestErrorNavigation(t *testing.T) {
 		mockClient := &MockAPIClient{}
 		app := NewApp(mockClient)
 		_ = app.Init()
-		
+
 		// Simulate authentication completion and create cache
 		app.cache = cache.NewSimpleCache()
 		model, _ := app.Update(authCompleteMsg{})
@@ -275,7 +275,7 @@ func TestNavigationEdgeCases(t *testing.T) {
 		mockClient := &MockAPIClient{}
 		app := NewApp(mockClient)
 		_ = app.Init()
-		
+
 		// Simulate authentication completion and create cache
 		app.cache = cache.NewSimpleCache()
 		model, _ := app.Update(authCompleteMsg{})
@@ -296,7 +296,7 @@ func TestNavigationEdgeCases(t *testing.T) {
 		mockClient := &MockAPIClient{}
 		app := NewApp(mockClient)
 		_ = app.Init()
-		
+
 		// Simulate authentication completion and create cache
 		app.cache = cache.NewSimpleCache()
 		model, _ := app.Update(authCompleteMsg{})
@@ -328,7 +328,7 @@ func TestNavigationEdgeCases(t *testing.T) {
 		mockClient := &MockAPIClient{}
 		app := NewApp(mockClient)
 		_ = app.Init()
-		
+
 		// Simulate authentication completion and create cache
 		app.cache = cache.NewSimpleCache()
 		model, _ := app.Update(authCompleteMsg{})
@@ -351,7 +351,7 @@ func TestNavigationMessageDelegation(t *testing.T) {
 		mockClient := &MockAPIClient{}
 		app := NewApp(mockClient)
 		_ = app.Init()
-		
+
 		// Simulate authentication completion and create cache
 		app.cache = cache.NewSimpleCache()
 		model, _ := app.Update(authCompleteMsg{})
@@ -379,7 +379,7 @@ func TestListWithSelectedIndex(t *testing.T) {
 	mockClient := &MockAPIClient{}
 	app := NewApp(mockClient)
 	_ = app.Init()
-	
+
 	// Simulate authentication completion and create cache
 	app.cache = cache.NewSimpleCache()
 	model, _ := app.Update(authCompleteMsg{})
@@ -402,7 +402,7 @@ func TestDetailsViewCreation(t *testing.T) {
 	mockClient := &MockAPIClient{}
 	app := NewApp(mockClient)
 	_ = app.Init()
-	
+
 	// Simulate authentication completion and create cache
 	app.cache = cache.NewSimpleCache()
 	model, _ := app.Update(authCompleteMsg{})
@@ -427,7 +427,7 @@ func TestNavigationMemoryManagement(t *testing.T) {
 		mockClient := &MockAPIClient{}
 		app := NewApp(mockClient)
 		_ = app.Init()
-		
+
 		// Simulate authentication completion and create cache
 		app.cache = cache.NewSimpleCache()
 		model, _ := app.Update(authCompleteMsg{})

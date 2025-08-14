@@ -34,7 +34,7 @@ func NewPermanentCache(userID string) (*PermanentCache, error) {
 	} else {
 		baseDir = filepath.Join(configDir, "repobird", "cache", "users", userID)
 	}
-	
+
 	if err := os.MkdirAll(baseDir, 0700); err != nil {
 		return nil, fmt.Errorf("failed to create cache directory: %w", err)
 	}
@@ -44,7 +44,6 @@ func NewPermanentCache(userID string) (*PermanentCache, error) {
 		userID:  userID,
 	}, nil
 }
-
 
 // GetRun retrieves a cached run from disk (terminal states or old stuck runs)
 func (p *PermanentCache) GetRun(id string) (*models.RunResponse, bool) {

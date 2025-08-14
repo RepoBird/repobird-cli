@@ -138,10 +138,10 @@ func NewDashboardView(client APIClient) *DashboardView {
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("63"))
 
 	dashboard := &DashboardView{
-		client:           client,
-		keys:             components.DefaultKeyMap,
-		help:             help.New(),
-		disabledKeys:     map[string]bool{
+		client: client,
+		keys:   components.DefaultKeyMap,
+		help:   help.New(),
+		disabledKeys: map[string]bool{
 			"esc": true, // Disable escape key on dashboard (b is for bulk navigation)
 			"q":   true, // Disable q key navigation so dashboard can handle quit locally
 		},
@@ -712,13 +712,13 @@ func (d *DashboardView) View() string {
 		if !layout.IsValidDimensions() {
 			return layout.GetMinimalView("Dashboard Error")
 		}
-		
+
 		boxStyle := layout.CreateStandardBox()
 		contentStyle := layout.CreateContentStyle()
-		
+
 		// Create error content
 		errorContent := fmt.Sprintf("Error loading dashboard data: %s\n\nPress 'r' to retry, 'q' to quit", d.error.Error())
-		
+
 		// Get viewport dimensions for proper centering (no room reduction needed - status line is outside)
 		viewportWidth, viewportHeight := layout.GetViewportDimensions()
 		centeredContent := contentStyle.
@@ -726,10 +726,10 @@ func (d *DashboardView) View() string {
 			Height(viewportHeight).
 			Align(lipgloss.Center, lipgloss.Center).
 			Render(errorContent)
-		
+
 		// Create status line separately (outside the box)
 		statusLine := d.renderStatusLine("ERROR")
-		
+
 		// Follow StatusView pattern: render box content separately, then join with status line outside
 		// No empty line - the box height already accounts for proper spacing
 		boxedContent := boxStyle.Render(centeredContent)
@@ -737,7 +737,7 @@ func (d *DashboardView) View() string {
 		statusLines := strings.Count(statusLine, "\n") + 1
 		result := lipgloss.JoinVertical(lipgloss.Left, boxedContent, statusLine)
 		totalLines := strings.Count(result, "\n") + 1
-		debug.LogToFilef("🔴 DASHBOARD ERROR: Box=%d lines, Status=%d lines, Total=%d lines (should be %d) 🔴\n", 
+		debug.LogToFilef("🔴 DASHBOARD ERROR: Box=%d lines, Status=%d lines, Total=%d lines (should be %d) 🔴\n",
 			boxLines, statusLines, totalLines, d.height)
 		return result
 	}

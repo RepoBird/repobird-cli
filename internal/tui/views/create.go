@@ -37,7 +37,7 @@ func NewCreateRunView(client APIClient, cache *tuicache.SimpleCache) *CreateRunV
 		client: client,
 		cache:  cache,
 		layout: components.NewWindowLayout(80, 24), // Default dimensions
-		form:   NewCustomCreateForm(),               // Use custom form
+		form:   NewCustomCreateForm(),              // Use custom form
 	}
 
 	return v
@@ -80,13 +80,13 @@ func (v *CreateRunView) Init() tea.Cmd {
 		v.form.SetValue("target", savedFormData.Target)
 		v.form.SetValue("prompt", savedFormData.Prompt)
 		v.form.SetValue("context", savedFormData.Context)
-		
+
 		// Restore the runtype
 		if savedFormData.RunType != "" {
 			v.form.SetValue("runtype", savedFormData.RunType)
 			debug.LogToFilef("⚙️ CREATE VIEW: Restored runtype: %s", savedFormData.RunType)
 		}
-		
+
 		// Restore the focus index if available in Fields map
 		if savedFormData.Fields != nil {
 			if focusIndexStr, ok := savedFormData.Fields["_focusIndex"]; ok {
@@ -106,7 +106,7 @@ func (v *CreateRunView) Init() tea.Cmd {
 func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Log message type for debugging
 	debug.LogToFilef("📨 CREATE VIEW Update: received %T", msg)
-	
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		return v.handleWindowSizeMsg(msg)
@@ -116,10 +116,10 @@ func (v *CreateRunView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case components.FormSubmitMsg:
 		return v.handleFormSubmit(msg)
-		
+
 	case CustomFormSubmitMsg:
 		return v.handleCustomFormSubmit(msg)
-	
+
 	case CustomFormNavigateBackMsg:
 		debug.LogToFilef("🔙 CREATE VIEW: Received navigation back message from form")
 		// Save form data before navigating away
@@ -153,7 +153,7 @@ func (v *CreateRunView) handleWindowSizeMsg(msg tea.WindowSizeMsg) (tea.Model, t
 	})
 	v.form = newForm.(*CustomCreateForm)
 
-	debug.LogToFilef("📐 CREATE VIEW: Updated dimensions: terminal=%dx%d, content=%dx%d", 
+	debug.LogToFilef("📐 CREATE VIEW: Updated dimensions: terminal=%dx%d, content=%dx%d",
 		msg.Width, msg.Height, contentWidth, contentHeight)
 
 	return v, nil
@@ -163,17 +163,17 @@ func (v *CreateRunView) handleWindowSizeMsg(msg tea.WindowSizeMsg) (tea.Model, t
 func (v *CreateRunView) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	keyString := msg.String()
 	debug.LogToFilef("🎹 CREATE VIEW handleKeyMsg: key='%s', insertMode=%v", keyString, v.form.IsInsertMode())
-	
+
 	// Note: Most key handling is done in HandleKey() via CoreViewKeymap
 	// HandleKey returns handled=true for keys it processes
 	// Those keys should NOT reach here, but if they do, we handle them
-	
+
 	// Handle force quit
 	if keyString == "ctrl+c" {
 		debug.LogToFilef("⛔ CREATE VIEW: Force quit requested")
 		return v, tea.Quit
 	}
-	
+
 	// Skip keys that should have been handled by HandleKey
 	// This prevents double processing
 	switch keyString {
@@ -188,17 +188,17 @@ func (v *CreateRunView) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return v, nil
 		}
 	}
-	
+
 	// Delegate to the form for updating its internal state
 	newForm, cmd := v.form.Update(msg)
 	v.form = newForm.(*CustomCreateForm)
-	
+
 	// Auto-save form data when values change
 	if v.form.IsInsertMode() || keyString == "d" || keyString == "c" || keyString == "i" {
 		// Save when typing, deleting, changing, or entering insert mode
 		v.saveFormData()
 	}
-	
+
 	return v, cmd
 }
 
@@ -322,10 +322,10 @@ func (v *CreateRunView) View() string {
 
 	// Wrap in styled box
 	boxedContent := boxStyle.Render(contentStyle.Render(content.String()))
-	
+
 	// Add statusline
 	statusLine := v.renderStatusLine("CREATE")
-	
+
 	// Join box and statusline
 	return lipgloss.JoinVertical(lipgloss.Left, boxedContent, statusLine)
 }
@@ -335,7 +335,7 @@ func (v *CreateRunView) renderStatusLine(layoutName string) string {
 	// Add mode indicator
 	var modeIndicator string
 	var helpText string
-	
+
 	if v.form.IsInsertMode() {
 		modeIndicator = " [INPUT]"
 		helpText = "[esc]normal [tab]next [shift+tab]prev [ctrl+s]submit"
@@ -343,10 +343,10 @@ func (v *CreateRunView) renderStatusLine(layoutName string) string {
 		modeIndicator = ""
 		helpText = "[i]insert [d]delete [c]change [j/k/↑↓]nav [b/q]back [ctrl+s]submit"
 	}
-	
+
 	// Compose the left side with layout name and mode indicator
 	leftText := fmt.Sprintf("[%s]%s", layoutName, modeIndicator)
-	
+
 	// Create statusline component
 	statusLine := components.NewStatusLine().
 		SetWidth(v.width).
@@ -355,24 +355,24 @@ func (v *CreateRunView) renderStatusLine(layoutName string) string {
 		SetHelp(helpText).
 		ResetStyle().
 		SetLoading(v.submitting)
-	
+
 	return statusLine.Render()
 }
 
 // saveFormData saves the current form state to cache
 func (v *CreateRunView) saveFormData() {
 	values := v.form.GetValues()
-	
+
 	// Create fields map to store additional state
 	fields := make(map[string]string)
 	fields["_focusIndex"] = fmt.Sprintf("%d", v.form.GetFocusIndex())
-	
+
 	// Get runtype from form values
 	runType := values["runtype"]
 	if runType == "" {
 		runType = "run" // Default
 	}
-	
+
 	formData := &tuicache.FormData{
 		Title:      values["title"],
 		Repository: values["repository"],
@@ -381,9 +381,9 @@ func (v *CreateRunView) saveFormData() {
 		Prompt:     values["prompt"],
 		Context:    values["context"],
 		RunType:    runType, // Save the selected run type
-		Fields:     fields, // Store focus index and other metadata
+		Fields:     fields,  // Store focus index and other metadata
 	}
-	
+
 	v.cache.SetFormData(formData)
 	debug.LogToFilef("💾 CREATE VIEW: Form data saved to cache (focus: %d, runtype: %s)", v.form.GetFocusIndex(), runType)
 }
@@ -401,7 +401,6 @@ type runCreatedMsg struct {
 	run *models.RunResponse
 	err error
 }
-
 
 // Backward compatibility constructor - redirects to proper constructor
 func NewCreateRunViewWithCache(
@@ -441,7 +440,7 @@ func (v *CreateRunView) IsKeyDisabled(keyString string) bool {
 func (v *CreateRunView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Model, cmd tea.Cmd) {
 	keyString := keyMsg.String()
 	debug.LogToFilef("🔑 CREATE VIEW HandleKey: key='%s', insertMode=%v", keyString, v.form.IsInsertMode())
-	
+
 	// IMPORTANT: Handle ESC specially to prevent navigation
 	if keyString == "esc" {
 		if v.form.IsInsertMode() {
@@ -456,13 +455,13 @@ func (v *CreateRunView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Mo
 			return true, v, nil // Return handled=true to prevent navigation
 		}
 	}
-	
+
 	// In normal mode, block backspace navigation
 	if keyString == "backspace" && !v.form.IsInsertMode() {
 		debug.LogToFilef("🚫 CREATE VIEW HandleKey: Blocking backspace navigation in normal mode")
 		return true, v, nil
 	}
-	
+
 	// Let everything else go through - the keymap registry will handle navigation keys in normal mode
 	// In insert mode, returning false means the key goes to Update() for typing
 	// In normal mode, returning false means the keymap registry handles navigation
@@ -474,11 +473,11 @@ func (v *CreateRunView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Mo
 func (v *CreateRunView) clearCurrentField() {
 	// Clear the current field using the form's new method
 	v.form.ClearCurrentField()
-	
+
 	// Log which field was cleared
 	fieldName := v.form.GetCurrentFieldName()
 	debug.LogToFilef("🗑️ CREATE VIEW: Cleared field '%s'", fieldName)
-	
+
 	// Auto-save the form state after clearing
 	v.saveFormData()
 }

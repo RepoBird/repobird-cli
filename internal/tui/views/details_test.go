@@ -236,7 +236,7 @@ func TestRunDetailsView_HandleWindowSizeMsg(t *testing.T) {
 
 			// Test that view renders and is not empty (prevents black screen)
 			viewOutput := detailsView.View()
-			
+
 			// View should be empty when dimensions are 0
 			if tt.width == 0 || tt.height == 0 {
 				if strings.TrimSpace(viewOutput) != "" {
@@ -246,7 +246,7 @@ func TestRunDetailsView_HandleWindowSizeMsg(t *testing.T) {
 				if strings.TrimSpace(viewOutput) == "" {
 					t.Errorf("view is empty at size %dx%d", tt.width, tt.height)
 				}
-				
+
 				// Should contain basic UI elements at non-zero sizes
 				if !strings.Contains(viewOutput, "Run") && !strings.Contains(viewOutput, "ID") {
 					t.Errorf("view missing basic UI elements at size %dx%d\nView:\n%s",

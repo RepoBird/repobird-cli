@@ -115,7 +115,7 @@ func TestWindowLayout_GetContentDimensions(t *testing.T) {
 func TestWindowLayout_GetViewportDimensions(t *testing.T) {
 	// Viewport dimensions should be the same as content dimensions
 	layout := NewWindowLayout(80, 24)
-	
+
 	contentWidth, contentHeight := layout.GetContentDimensions()
 	viewportWidth, viewportHeight := layout.GetViewportDimensions()
 
@@ -155,7 +155,7 @@ func TestWindowLayout_Update(t *testing.T) {
 	}
 
 	// Verify new calculations are correct
-	expectedBoxWidth := newWidth - 2  // border margin
+	expectedBoxWidth := newWidth - 2   // border margin
 	expectedBoxHeight := newHeight - 3 // statusline + top margin
 	if newBoxWidth != expectedBoxWidth {
 		t.Errorf("After Update, box width = %d, want %d", newBoxWidth, expectedBoxWidth)
@@ -264,8 +264,8 @@ func TestWindowLayout_CreateStandardBox(t *testing.T) {
 
 	// Test that the box has the correct dimensions
 	boxWidth, boxHeight := layout.GetBoxDimensions()
-	
-	// Note: We can't directly compare lipgloss styles, but we can verify 
+
+	// Note: We can't directly compare lipgloss styles, but we can verify
 	// the style has the expected dimensions
 	if boxStyle.GetWidth() == 0 && boxStyle.GetHeight() == 0 {
 		t.Error("CreateStandardBox() returned style with zero dimensions")
@@ -367,13 +367,13 @@ func TestWindowLayout_GetLayoutForType(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			resultLayout := layout.GetLayoutForType(tt.layoutType)
-			
+
 			// For now, all layout types return the same layout
 			// This test ensures the method works and can be extended
 			if resultLayout == nil {
 				t.Errorf("GetLayoutForType(%v) returned nil", tt.layoutType)
 			}
-			
+
 			// Should return the same layout object for now
 			if resultLayout != layout {
 				t.Errorf("GetLayoutForType(%v) should return same layout for now", tt.layoutType)
@@ -388,11 +388,11 @@ func TestWindowLayout_BorderCalculations(t *testing.T) {
 	layout := NewWindowLayout(terminalWidth, 24)
 
 	boxWidth, _ := layout.GetBoxDimensions()
-	
+
 	// Box should be 2 pixels narrower than terminal (lipgloss expansion)
 	expectedBoxWidth := terminalWidth - 2
 	if boxWidth != expectedBoxWidth {
-		t.Errorf("Box width = %d, want %d (terminal %d - 2 for lipgloss expansion)", 
+		t.Errorf("Box width = %d, want %d (terminal %d - 2 for lipgloss expansion)",
 			boxWidth, expectedBoxWidth, terminalWidth)
 	}
 
@@ -400,7 +400,7 @@ func TestWindowLayout_BorderCalculations(t *testing.T) {
 	contentWidth, _ := layout.GetContentDimensions()
 	expectedContentWidth := boxWidth - 4
 	if contentWidth != expectedContentWidth {
-		t.Errorf("Content width = %d, want %d (box %d - 4 for border+padding)", 
+		t.Errorf("Content width = %d, want %d (box %d - 4 for border+padding)",
 			contentWidth, expectedContentWidth, boxWidth)
 	}
 }
@@ -411,11 +411,11 @@ func TestWindowLayout_HeightCalculations(t *testing.T) {
 	layout := NewWindowLayout(80, terminalHeight)
 
 	boxHeight := layout.boxHeight
-	
+
 	// Box height should account for statusline (1) + top margin (2)
 	expectedBoxHeight := terminalHeight - 1 - 2
 	if boxHeight != expectedBoxHeight {
-		t.Errorf("Box height = %d, want %d (terminal %d - 3 for statusline+margins)", 
+		t.Errorf("Box height = %d, want %d (terminal %d - 3 for statusline+margins)",
 			boxHeight, expectedBoxHeight, terminalHeight)
 	}
 
@@ -423,7 +423,7 @@ func TestWindowLayout_HeightCalculations(t *testing.T) {
 	_, contentHeight := layout.GetContentDimensions()
 	expectedContentHeight := boxHeight - 3
 	if contentHeight != expectedContentHeight {
-		t.Errorf("Content height = %d, want %d (box %d - 3 for title+padding)", 
+		t.Errorf("Content height = %d, want %d (box %d - 3 for title+padding)",
 			contentHeight, expectedContentHeight, boxHeight)
 	}
 }

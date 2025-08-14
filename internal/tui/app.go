@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 	"time"
-	
+
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -19,14 +19,14 @@ import (
 )
 
 type App struct {
-	client         APIClient
-	viewStack      []tea.Model // Navigation history
-	current        tea.Model
-	cache          *cache.SimpleCache
-	keyRegistry    *keymap.CoreKeyRegistry // Central key processing
-	width          int                      // Current window width
-	height         int                      // Current window height
-	authenticated  bool                     // Whether initial auth is complete
+	client        APIClient
+	viewStack     []tea.Model // Navigation history
+	current       tea.Model
+	cache         *cache.SimpleCache
+	keyRegistry   *keymap.CoreKeyRegistry // Central key processing
+	width         int                     // Current window width
+	height        int                     // Current window height
+	authenticated bool                    // Whether initial auth is complete
 }
 
 // authCompleteMsg is sent when authentication and cache initialization is complete
@@ -57,19 +57,19 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if authMsg, ok := msg.(authCompleteMsg); ok {
 		debug.LogToFile("🔐 APP: Authentication complete, initializing dashboard 🔐\n")
 		a.authenticated = true
-		
+
 		// Log any authentication issues (but continue anyway)
 		if authMsg.err != nil {
 			debug.LogToFilef("⚠️ APP: Auth had error (continuing anyway): %v\n", authMsg.err)
 		}
-		
+
 		// Initialize dashboard view now that we have user context
 		a.current = views.NewDashboardView(a.client)
-		
+
 		// Initialize the view with current window size if available
 		var cmds []tea.Cmd
 		cmds = append(cmds, a.current.Init())
-		
+
 		// Only send window size if we have valid dimensions
 		if a.width > 0 && a.height > 0 {
 			debug.LogToFilef("📐 APP: Sending stored window size: %dx%d\n", a.width, a.height)
@@ -82,7 +82,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return a, tea.Batch(cmds...)
 	}
-	
+
 	// Don't process other messages until authenticated
 	if !a.authenticated {
 		// Still handle window size to store dimensions
@@ -92,7 +92,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return a, nil
 	}
-	
+
 	// Handle navigation messages first
 	if navMsg, ok := msg.(messages.NavigationMsg); ok {
 		debug.LogToFilef("🚀 APP: Received NavigationMsg: %T 🚀\n", navMsg)
@@ -119,7 +119,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if handled, model, cmd := a.processKeyWithFiltering(keyMsg); handled {
 			debug.LogToFilef("✋ APP: Key '%s' was HANDLED by centralized processor ✋\n", keyMsg.String())
 			debug.LogToFilef("🔍 APP: After processKey - model type=%T, cmd is nil=%v\n", model, cmd == nil)
-			
+
 			// If the model is the app itself and we have a command, execute it
 			if appModel, isApp := model.(*App); isApp && cmd != nil {
 				debug.LogToFilef("📦 APP: Model is App, executing command\n")
@@ -263,7 +263,7 @@ func (a *App) handleNavigation(msg messages.NavigationMsg) (tea.Model, tea.Cmd) 
 		if apiClient, ok := a.client.(*api.Client); ok {
 			debug.LogToFilef("✅ BULK NAV: Client type is correct, creating BulkView ✅\n")
 			a.current = views.NewBulkView(apiClient)
-			
+
 			// Send current window dimensions to the new view if we have them
 			var cmds []tea.Cmd
 			cmds = append(cmds, a.current.Init())
@@ -316,21 +316,21 @@ func (a *App) View() string {
 	if !a.authenticated {
 		return a.renderAuthLoadingView()
 	}
-	
+
 	if a.current == nil {
 		return a.renderInitializingView()
 	}
-	
+
 	// Debug: Log app view rendering
-	debug.LogToFilef("🎭 APP VIEW: Rendering view %T with app dimensions w=%d h=%d 🎭\n", 
+	debug.LogToFilef("🎭 APP VIEW: Rendering view %T with app dimensions w=%d h=%d 🎭\n",
 		a.current, a.width, a.height)
-	
+
 	view := a.current.View()
-	
+
 	// Debug: Log the length of the returned view string
 	lines := strings.Count(view, "\n") + 1
 	debug.LogToFilef("🎭 APP VIEW: Returned view has %d lines 🎭\n", lines)
-	
+
 	return view
 }
 
@@ -364,7 +364,7 @@ func (a *App) processKeyWithFiltering(keyMsg tea.KeyMsg) (handled bool, model te
 	// Check if current view implements CoreViewKeymap
 	if viewKeymap, hasKeymap := a.current.(keymap.CoreViewKeymap); hasKeymap {
 		debug.LogToFilef("✅ PROCESSOR: View %T implements CoreViewKeymap ✅\n", a.current)
-		
+
 		// First check if view wants to disable this key entirely
 		if viewKeymap.IsKeyDisabled(keyString) {
 			debug.LogToFilef("🚫 PROCESSOR: Key '%s' is DISABLED by view - passing to Update for typing 🚫\n", keyString)
@@ -378,14 +378,14 @@ func (a *App) processKeyWithFiltering(keyMsg tea.KeyMsg) (handled bool, model te
 		if handled, model, cmd := viewKeymap.HandleKey(keyMsg); handled {
 			debug.LogToFilef("🎯 PROCESSOR: Key '%s' handled by view's custom handler 🎯\n", keyString)
 			debug.LogToFilef("🔍 PROCESSOR: handled=%v, model type=%T, cmd is nil=%v\n", handled, model, cmd == nil)
-			
+
 			// IMPORTANT: If the view returns itself as the model, we need to update a.current
 			// This ensures the view's state changes are preserved
 			if model != nil && model != a {
 				debug.LogToFilef("📝 PROCESSOR: Updating a.current from %T to %T\n", a.current, model)
 				a.current = model
 			}
-			
+
 			// View provided custom handling - return the app as the model so commands work
 			return true, a, cmd
 		}
@@ -483,7 +483,7 @@ func (a *App) renderAuthLoadingView() string {
 	if a.width <= 0 || a.height <= 0 {
 		return "🔐 Authenticating..."
 	}
-	
+
 	// Simple centered message without creating a layout (follows critical pattern)
 	return lipgloss.NewStyle().
 		Width(a.width).
@@ -497,7 +497,7 @@ func (a *App) renderInitializingView() string {
 	if a.width <= 0 || a.height <= 0 {
 		return "Initializing..."
 	}
-	
+
 	// Simple centered message without creating a layout (follows critical pattern)
 	return lipgloss.NewStyle().
 		Width(a.width).
@@ -511,37 +511,37 @@ func (a *App) authenticateAndInitCache() tea.Cmd {
 	return func() tea.Msg {
 		// First try to authenticate to get user ID
 		debug.LogToFile("🔐 AUTH: Starting authentication process...\n")
-		
+
 		// Use a shorter timeout to prevent hanging
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		
+
 		// Check if we have a method to get user info
 		type userInfoGetter interface {
 			GetUserInfoWithContext(ctx context.Context) (*models.UserInfo, error)
 		}
-		
+
 		var userInfo *models.UserInfo
 		var err error
 		var needsAuth = true
-		
+
 		// Try to get user info first (to set context before creating cache)
 		if getter, ok := a.client.(userInfoGetter); ok {
 			// First, try a quick check if we have cached auth by creating temp cache
 			tempCache := cache.NewSimpleCache()
 			_ = tempCache.LoadFromDisk()
-			
+
 			if tempCache.IsAuthCacheValid() {
 				if authCache, found := tempCache.GetAuthCache(); found && authCache.UserInfo != nil {
 					// Use cached user info
 					services.SetCurrentUser(authCache.UserInfo)
 					userInfo = authCache.UserInfo
 					needsAuth = false
-					debug.LogToFilef("🔐 AUTH: Using cached auth (valid for %v) - user ID=%d, email=%s 🔐\n", 
+					debug.LogToFilef("🔐 AUTH: Using cached auth (valid for %v) - user ID=%d, email=%s 🔐\n",
 						authCache.CacheDuration, authCache.UserInfo.ID, authCache.UserInfo.Email)
 				}
 			}
-			
+
 			if needsAuth {
 				debug.LogToFile("🔐 AUTH: No valid cached auth, authenticating with API...\n")
 				userInfo, err = getter.GetUserInfoWithContext(ctx)
@@ -559,13 +559,13 @@ func (a *App) authenticateAndInitCache() tea.Cmd {
 		} else {
 			debug.LogToFile("⚠️ AUTH: Client doesn't support GetUserInfoWithContext, using anonymous cache ⚠️\n")
 		}
-		
+
 		// Now create the cache with the correct user context
 		debug.LogToFile("📦 AUTH: Creating cache with user context...\n")
 		a.cache = cache.NewSimpleCache()
 		_ = a.cache.LoadFromDisk()
 		debug.LogToFile("✅ AUTH: Cache created and loaded\n")
-		
+
 		// If we just authenticated (not from cache), save the auth info
 		if needsAuth && userInfo != nil {
 			// Cache the auth info for 2 weeks
@@ -575,11 +575,11 @@ func (a *App) authenticateAndInitCache() tea.Cmd {
 				debug.LogToFile("✅ AUTH: Cached auth info for 2 weeks\n")
 			}
 		}
-		
+
 		if !needsAuth {
 			debug.LogToFile("🔄 AUTH: Refreshing cache data (runs, repos, etc)...\n")
 		}
-		
+
 		return authCompleteMsg{
 			userInfo: userInfo,
 			err:      err,

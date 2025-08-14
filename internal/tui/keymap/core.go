@@ -58,7 +58,7 @@ func NewCoreKeyRegistry() *CoreKeyRegistry {
 	registry.Register("B", ActionNavigateBulk, "bulk operations")
 	registry.Register("n", ActionNavigateNew, "new run")
 	registry.Register("r", ActionNavigateRefresh, "refresh")
-	registry.Register("q", ActionNavigateBack, "go back")  // Changed to back navigation
+	registry.Register("q", ActionNavigateBack, "go back") // Changed to back navigation
 	registry.Register("Q", ActionGlobalQuit, "force quit")
 	registry.Register("?", ActionNavigateHelp, "help")
 	registry.Register("ctrl+c", ActionGlobalQuit, "force quit")

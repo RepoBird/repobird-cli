@@ -1,0 +1,5 @@
+Version: X.X.X
+Git Commit: XXXXX
+Build Date: XXXXX
+Go Version: X.X.X
+OS/Arch: X/X

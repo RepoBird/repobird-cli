@@ -43,7 +43,7 @@ func NewRunDetailsView(client APIClient, cache *cache.SimpleCache, runID string)
 		width:            0,     // Don't set default width - wait for WindowSizeMsg
 		height:           0,     // Don't set default height - wait for WindowSizeMsg
 		navigationMode:   true,  // Start in navigation mode
-		layout:           nil,    // Don't initialize layout until we have dimensions
+		layout:           nil,   // Don't initialize layout until we have dimensions
 	}
 
 	return v

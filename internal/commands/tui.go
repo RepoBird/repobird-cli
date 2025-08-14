@@ -36,7 +36,7 @@ func runTUI(cmd *cobra.Command, args []string) error {
 		// Use mock client for testing
 		client := api.NewClient("mock-api-key", api.DefaultAPIURL, debug)
 		mockClient := mock.NewMockClient(client)
-		
+
 		// Set the debug user immediately for cache initialization
 		debugUserInfo := &models.UserInfo{
 			Email:          "debug-user@repobird.ai",
@@ -48,10 +48,10 @@ func runTUI(cmd *cobra.Command, args []string) error {
 			Tier:           "premium",
 		}
 		services.SetCurrentUser(debugUserInfo)
-		
+
 		// Log debug mode activation
 		tuiDebug.LogToFilef("🎮 DEBUG MODE: Activated with mock client and debug user ID=%d 🎮\n", debugUserInfo.ID)
-		
+
 		app := tui.NewApp(mockClient)
 		return app.Run()
 	}

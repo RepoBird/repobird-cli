@@ -146,7 +146,7 @@ func (v *RunDetailsView) handleWindowSizeMsg(msg tea.WindowSizeMsg) {
 	v.help.Width = msg.Width
 
 	// Debug: Log viewport dimensions from layout
-	debug.LogToFilef("📐 DETAILS VIEWPORT: Layout-calculated %dx%d 📐\n", 
+	debug.LogToFilef("📐 DETAILS VIEWPORT: Layout-calculated %dx%d 📐\n",
 		viewportWidth, viewportHeight)
 
 	// Update content to reflow for new width
@@ -352,7 +352,7 @@ func (v *RunDetailsView) View() string {
 		v.viewport.Height = viewportHeight
 
 		// Debug: Log viewport dimensions during rendering
-		debug.LogToFilef("🔍 DETAILS VIEWPORT: During render - width=%d, height=%d 🔍\n", 
+		debug.LogToFilef("🔍 DETAILS VIEWPORT: During render - width=%d, height=%d 🔍\n",
 			viewportWidth, viewportHeight)
 
 		// Get content with highlighting
@@ -371,17 +371,17 @@ func (v *RunDetailsView) View() string {
 	// Place the box at the top without centering, statusline at bottom
 	statusLine := v.renderStatusBar()
 
-	// Debug: Log final layout dimensions  
+	// Debug: Log final layout dimensions
 	debug.LogToFilef("🏁 DETAILS FINAL: Box height=%d, statusline height=1, total=%d 🏁\n", boxHeight, boxHeight+1)
 
 	// Ensure the final view doesn't exceed terminal height
 	finalView := lipgloss.JoinVertical(lipgloss.Left, boxedContent, statusLine)
-	
+
 	// Debug: Check if the final view height matches expected
 	finalLines := strings.Count(finalView, "\n") + 1
-	debug.LogToFilef("🔍 DETAILS FINAL CHECK: Final view has %d lines, terminal height=%d 🔍\n", 
+	debug.LogToFilef("🔍 DETAILS FINAL CHECK: Final view has %d lines, terminal height=%d 🔍\n",
 		finalLines, v.height)
-	
+
 	return finalView
 }
 

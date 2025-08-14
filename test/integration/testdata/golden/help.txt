@@ -1,0 +1,25 @@
+RepoBird CLI allows you to run AI-powered tasks on your repositories,
+manage runs, and integrate with the RepoBird platform.
+
+Usage:
+  repobird [command]
+
+Available Commands:
+  auth        Manage authentication and API keys
+  bulk        Submit multiple runs in parallel from configuration files
+  completion  Generate shell completion scripts
+  config      Manage RepoBird configuration
+  docs        Generate documentation
+  help        Help about any command
+  run         Create a new run from a JSON, YAML, or Markdown file
+  status      Check the status of runs
+  tui         Launch the interactive Terminal User Interface
+  version     Print version information
+
+Flags:
+      --config string   config file (default is $HOME/.repobird/config.yaml)
+      --debug           enable debug output
+      --debug-user      enable debug user mode with mock data
+  -h, --help            help for repobird
+
+Use "repobird [command] --help" for more information about a command.

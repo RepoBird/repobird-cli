@@ -64,7 +64,7 @@ func (c *ClipboardManager) ShouldHighlight() bool {
 	if !c.isBlinking || c.blinkStartTime.IsZero() {
 		return false
 	}
-	
+
 	// Highlight for exactly 200ms from start time
 	return time.Since(c.blinkStartTime) < 200*time.Millisecond
 }

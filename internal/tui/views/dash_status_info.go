@@ -53,7 +53,8 @@ func (d *DashboardView) initializeStatusInfoFields() {
 
 		// Usage info based on plan type
 		upperTier := strings.ToUpper(d.userInfo.Tier)
-		if upperTier == "FREE" || upperTier == "BASIC" {
+		switch upperTier {
+		case "FREE", "BASIC":
 			// Show runs remaining for usage-based plans
 			var runsRemaining string
 			if d.userInfo.TotalRuns > 0 {
@@ -89,7 +90,7 @@ func (d *DashboardView) initializeStatusInfoFields() {
 				d.statusInfoFieldLines = append(d.statusInfoFieldLines, lineNum)
 				lineNum++
 			}
-		} else if upperTier == "PRO" {
+		case "PRO":
 			// Show percentage for PRO plans
 			if d.userInfo.TotalRuns > 0 {
 				usedRuns := d.userInfo.TotalRuns - d.userInfo.RemainingRuns
@@ -219,7 +220,7 @@ func (d *DashboardView) handleStatusInfoNavigation(msg tea.KeyMsg) (tea.Model, t
 							d.startMessageClearTimer(2*time.Second),
 						)
 					}
-					return d, d.startMessageClearTimer(2*time.Second)
+					return d, d.startMessageClearTimer(2 * time.Second)
 				}
 			}
 		}

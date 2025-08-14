@@ -96,28 +96,28 @@ func (m *MockCreateAPIClient) GetFileHashes(ctx context.Context) ([]models.FileH
 
 func TestCreateRunView_HandleKey_ESC(t *testing.T) {
 	tests := []struct {
-		name         string
-		insertMode   bool
-		key          string
-		wantHandled  bool
+		name           string
+		insertMode     bool
+		key            string
+		wantHandled    bool
 		wantInsertMode bool
-		wantCmd      bool
+		wantCmd        bool
 	}{
 		{
-			name:         "ESC in insert mode exits to normal mode",
-			insertMode:   true,
-			key:          "esc",
-			wantHandled:  true,
+			name:           "ESC in insert mode exits to normal mode",
+			insertMode:     true,
+			key:            "esc",
+			wantHandled:    true,
 			wantInsertMode: false,
-			wantCmd:      false,
+			wantCmd:        false,
 		},
 		{
-			name:         "ESC in normal mode does nothing",
-			insertMode:   false,
-			key:          "esc",
-			wantHandled:  true,
+			name:           "ESC in normal mode does nothing",
+			insertMode:     false,
+			key:            "esc",
+			wantHandled:    true,
 			wantInsertMode: false,
-			wantCmd:      false,
+			wantCmd:        false,
 		},
 	}
 
@@ -127,10 +127,10 @@ func TestCreateRunView_HandleKey_ESC(t *testing.T) {
 			client := &MockCreateAPIClient{}
 			cache := cache.NewSimpleCache()
 			view := NewCreateRunView(client, cache)
-			
+
 			// Set initial mode
 			view.form.SetInsertMode(tt.insertMode)
-			
+
 			// Create key message
 			keyMsg := tea.KeyMsg{
 				Type:  tea.KeyRunes,
@@ -139,10 +139,10 @@ func TestCreateRunView_HandleKey_ESC(t *testing.T) {
 			if tt.key == "esc" {
 				keyMsg = tea.KeyMsg{Type: tea.KeyEsc}
 			}
-			
+
 			// Call HandleKey
 			handled, _, cmd := view.HandleKey(keyMsg)
-			
+
 			// Check results
 			assert.Equal(t, tt.wantHandled, handled, "handled mismatch")
 			assert.Equal(t, tt.wantInsertMode, view.form.IsInsertMode(), "insert mode mismatch")
@@ -195,22 +195,22 @@ func TestCreateRunView_HandleKey_Navigation(t *testing.T) {
 			client := &MockCreateAPIClient{}
 			cache := cache.NewSimpleCache()
 			view := NewCreateRunView(client, cache)
-			
+
 			// Set initial mode
 			view.form.SetInsertMode(tt.insertMode)
-			
+
 			// Create key message
 			keyMsg := tea.KeyMsg{
 				Type:  tea.KeyRunes,
 				Runes: []rune(tt.key),
 			}
-			
+
 			// Call HandleKey
 			handled, _, cmd := view.HandleKey(keyMsg)
-			
+
 			// Check results
 			assert.Equal(t, tt.wantHandled, handled, "handled mismatch")
-			
+
 			if tt.wantNavMsg {
 				assert.NotNil(t, cmd, "expected navigation command")
 				// Execute the command to get the message
@@ -236,13 +236,13 @@ func TestCreateRunView_HandleKey_Backspace(t *testing.T) {
 	client := &MockCreateAPIClient{}
 	cache := cache.NewSimpleCache()
 	view := NewCreateRunView(client, cache)
-	
+
 	// Test backspace in normal mode (should be blocked)
 	view.form.SetInsertMode(false)
 	keyMsg := tea.KeyMsg{Type: tea.KeyBackspace}
-	
+
 	handled, _, cmd := view.HandleKey(keyMsg)
-	
+
 	assert.True(t, handled, "backspace in normal mode should be handled")
 	assert.Nil(t, cmd, "backspace in normal mode should not produce command")
 }
@@ -252,26 +252,26 @@ func TestCreateRunView_FormStatePersistence(t *testing.T) {
 	client := &MockCreateAPIClient{}
 	cacheInstance := cache.NewSimpleCache()
 	view := NewCreateRunView(client, cacheInstance)
-	
+
 	// Set some form data
 	view.form.SetValue("title", "Test Title")
 	view.form.SetValue("repository", "test/repo")
 	view.form.SetValue("prompt", "Test prompt")
-	
+
 	// Save form data
 	view.saveFormData()
-	
+
 	// Check that data was saved to cache
 	formData := cacheInstance.GetFormData()
 	assert.NotNil(t, formData)
 	assert.Equal(t, "Test Title", formData.Title)
 	assert.Equal(t, "test/repo", formData.Repository)
 	assert.Equal(t, "Test prompt", formData.Prompt)
-	
+
 	// Create a new view with the same cache
 	view2 := NewCreateRunView(client, cacheInstance)
 	view2.Init()
-	
+
 	// Check that data was restored
 	values := view2.form.GetValues()
 	assert.Equal(t, "Test Title", values["title"])

@@ -220,15 +220,15 @@ func (d *DashboardView) handleMillerColumnsNavigation(msg tea.KeyMsg) tea.Cmd {
 			if len(displayText) > maxLen {
 				displayText = displayText[:maxLen-3] + "..."
 			}
-			
+
 			if cmd != nil {
 				message := fmt.Sprintf("📋 Copied \"%s\"", displayText)
-				d.copiedMessage = message  // Set for backward compatibility with tests
+				d.copiedMessage = message // Set for backward compatibility with tests
 				d.copiedMessageTime = time.Now()
 				d.statusLine.SetTemporaryMessageWithType(message, components.MessageSuccess, 150*time.Millisecond)
 				return cmd
 			} else {
-				d.copiedMessage = "✗ Failed to copy"  // Set for backward compatibility with tests
+				d.copiedMessage = "✗ Failed to copy" // Set for backward compatibility with tests
 				d.copiedMessageTime = time.Now()
 				d.statusLine.SetTemporaryMessageWithType("✗ Failed to copy", components.MessageError, 150*time.Millisecond)
 			}

@@ -175,9 +175,12 @@ clean:
 	@rm -f coverage.out coverage.html
 	@echo "Clean complete"
 
-## test: Run all tests with summary (development)
+## test: Run unit tests with summary (excludes integration tests)
 test:
 	@./scripts/test-summary.sh go test -v -race -timeout 30s ./...
+
+## test-all: Run all tests including integration tests
+test-all: test test-integration
 
 ## test-no-summary: Run all tests without summary (raw output)
 test-no-summary:
@@ -200,7 +203,7 @@ test-unit:
 
 ## test-integration: Run integration tests only (development)
 test-integration:
-	$(DEV_ENV) $(GOTEST) -v -race -timeout 2m -tags=integration ./tests/integration/...
+	$(DEV_ENV) $(GOTEST) -v -race -timeout 2m -tags=integration ./test/integration/...
 
 ## test-commands: Run command tests only (development)
 test-commands:
@@ -228,6 +231,13 @@ coverage:
 	$(GOCMD) tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report: coverage.html"
 	@$(GOCMD) tool cover -func=coverage.out | grep total | awk '{print "Total coverage: " $$3}'
+
+## coverage-integration: Generate coverage for integration tests (development)
+coverage-integration:
+	$(DEV_ENV) $(GOTEST) -v -race -coverprofile=coverage-integration.out -covermode=atomic -tags=integration ./test/integration/...
+	$(GOCMD) tool cover -html=coverage-integration.out -o coverage-integration.html
+	@echo "Integration test coverage report: coverage-integration.html"
+	@$(GOCMD) tool cover -func=coverage-integration.out | grep total | awk '{print "Integration test coverage: " $$3}'
 
 ## coverage-unit: Generate coverage for unit tests only (development)
 coverage-unit:
