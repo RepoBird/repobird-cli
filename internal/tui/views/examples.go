@@ -167,23 +167,29 @@ func (v *ExamplesView) handleWindowSizeMsg(msg tea.WindowSizeMsg) {
 		v.layout.Update(msg.Width, msg.Height)
 	}
 
-	// Top row: List (left) + Preview (right) 
+	// Top row: List (left) + Preview (right)
 	// Bottom row: Description (full width, compact)
-	
-	totalHeight := msg.Height - 1 // Account for status line (1 line)
-	leftWidth := msg.Width / 3    // Left side takes 1/3 of width
-	rightWidth := msg.Width - leftWidth // Right side takes remaining space (no gap)
-	
-	// Description gets very compact height, top row gets the rest
-	descHeight := 2 // Minimal height for description (back to 2)
-	topRowHeight := totalHeight - descHeight
-	
-	// Update preview viewport dimensions - account for borders properly
-	v.previewViewport.Width = rightWidth - 2     // Account for border (2 not 4)
-	v.previewViewport.Height = topRowHeight - 2  // Account for border (2 not 4)
 
-	debug.LogToFilef("📐 EXAMPLES LAYOUT: Left=%d, Right=%d, TopRow=%d, Desc=%d, Preview=%dx%d 📐\n",
-		leftWidth, rightWidth, topRowHeight, descHeight, v.previewViewport.Width, v.previewViewport.Height)
+	// Apply same calculations as View method (TUI layout guide)
+	statusLineHeight := 1 // Status line takes 1 line
+	topMargin := 2        // Top margin to prevent cutoff
+	descBoxHeight := 1    // Minimal description - just 1 line
+
+	// Account for border width overhead
+	totalUsableWidth := msg.Width - 4 // -4 for 2 bordered boxes
+	leftWidth := totalUsableWidth / 3
+	rightWidth := totalUsableWidth - leftWidth
+
+	// Top row height calculation
+	usableHeight := msg.Height - statusLineHeight - topMargin - descBoxHeight
+	topRowHeight := usableHeight
+
+	// Update preview viewport dimensions - account for borders and title/scroll info
+	v.previewViewport.Width = rightWidth - 2    // Account for border
+	v.previewViewport.Height = topRowHeight - 4 // Account for border + title + scroll info
+
+	debug.LogToFilef("📐 EXAMPLES LAYOUT: Terminal=%dx%d, Usable=%dx%d, Left=%d, Right=%d, TopRow=%d, Preview=%dx%d 📐\n",
+		msg.Width, msg.Height, totalUsableWidth, usableHeight, leftWidth, rightWidth, topRowHeight, v.previewViewport.Width, v.previewViewport.Height)
 
 	// Update preview content for new dimensions
 	v.updatePreviewContent()
@@ -297,17 +303,32 @@ func (v *ExamplesView) View() string {
 		return v.layout.GetMinimalView("Examples - Loading...")
 	}
 
-	// Layout: Top row (list left + preview right), Bottom row (description full width)
-	totalHeight := v.height - 1 // Account for status line (1 line)
-	leftWidth := v.width / 3    // Left side takes 1/3
-	rightWidth := v.width - leftWidth // Right side takes remaining space (no gap)
-	
-	// Heights
-	descHeight := 2 // Minimal description height
-	topRowHeight := totalHeight - descHeight
+	// Use proper layout system like other views
+	debug.LogToFilef("🎨 EXAMPLES VIEW: Terminal dimensions w=%d h=%d 🎨\n", v.width, v.height)
+
+	// Apply TUI layout guide: account for border overhead and top margin
+	statusLineHeight := 1 // Status line takes 1 line
+	topMargin := 2        // Top margin to prevent cutoff (per TUI guide)
+	descBoxHeight := 1    // MINIMAL: Just 1 line total (no separate content)
+
+	// Account for border width overhead - 2 boxes with borders = -4 total width
+	totalUsableWidth := v.width - 4            // Per TUI guide: subtract 2 per bordered box
+	leftWidth := totalUsableWidth / 3          // Left column 1/3 of usable width
+	rightWidth := totalUsableWidth - leftWidth // Right gets remaining usable width
+
+	// Top row height calculation per TUI guide
+	usableHeight := v.height - statusLineHeight - topMargin - descBoxHeight
+	topRowHeight := usableHeight
+
+	debug.LogToFilef("📏 EXAMPLES CALC: terminal=%d, usable=%d, topMargin=%d, descBox=%d → topRow=%d 📏\n",
+		v.height, usableHeight, topMargin, descBoxHeight, topRowHeight)
+	debug.LogToFilef("📏 EXAMPLES WIDTH: terminal=%d, usable=%d, left=%d, right=%d 📏\n",
+		v.width, totalUsableWidth, leftWidth, rightWidth)
 
 	// Top row: List (left) + Preview (right)
-	listContent := v.renderExamplesList(leftWidth, topRowHeight)
+	listContentW, listContentH := leftWidth-2, topRowHeight-2
+	debug.LogToFilef("📝 EXAMPLES LIST: content dimensions w=%d h=%d 📝\n", listContentW, listContentH)
+	listContent := v.renderExamplesList(listContentW, listContentH)
 	listBox := lipgloss.NewStyle().
 		Width(leftWidth).
 		Height(topRowHeight).
@@ -315,7 +336,9 @@ func (v *ExamplesView) View() string {
 		BorderForeground(lipgloss.Color("63")).
 		Render(listContent)
 
-	previewContent := v.renderPreview(rightWidth, topRowHeight)
+	previewContentW, previewContentH := rightWidth-2, topRowHeight-2
+	debug.LogToFilef("🖼️ EXAMPLES PREVIEW: content dimensions w=%d h=%d 🖼️\n", previewContentW, previewContentH)
+	previewContent := v.renderPreview(previewContentW, previewContentH)
 	previewBox := lipgloss.NewStyle().
 		Width(rightWidth).
 		Height(topRowHeight).
@@ -325,32 +348,51 @@ func (v *ExamplesView) View() string {
 
 	topRow := lipgloss.JoinHorizontal(lipgloss.Top, listBox, previewBox)
 
-	// Bottom row: Description (full width, minimal spacing)
-	descContent := v.renderDescription(v.width, descHeight)
+	// Bottom row: MINIMAL description (just 1 line total, no borders for space)
+	descContentW := totalUsableWidth + 4 // Use full terminal width for description
+	debug.LogToFilef("📄 EXAMPLES DESC: content dimensions w=%d h=%d, box height=%d 📄\n",
+		descContentW, descBoxHeight, descBoxHeight)
+	descContent := v.renderDescription(descContentW, descBoxHeight)
+	// MINIMAL: Just 1 line, no borders to save space
 	descBox := lipgloss.NewStyle().
 		Width(v.width).
-		Height(descHeight).
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("141")).
-		Margin(0).         // Remove all margins
-		Padding(0).        // Remove all padding
+		Height(descBoxHeight). // Just 1 line total
+		Foreground(lipgloss.Color("240")).
 		Render(descContent)
 
-	// Combine top and bottom rows with minimal spacing
-	mainView := lipgloss.JoinVertical(lipgloss.Left, topRow, descBox)
+	// Combine with NO extra spacing
+	mainContent := lipgloss.JoinVertical(lipgloss.Left, topRow, descBox)
+	debug.LogToFilef("🏗️ EXAMPLES FINAL: topRow+descBox combined 🏗️\n")
+
+	// Apply top margin to prevent cutoff (per TUI guide)
+	contentWithMargin := lipgloss.NewStyle().
+		MarginTop(topMargin).
+		Render(mainContent)
 
 	// Use global status line like other views
 	statusLine := v.renderGlobalStatusLine()
 
-	return lipgloss.JoinVertical(lipgloss.Left, mainView, statusLine)
+	finalView := lipgloss.JoinVertical(lipgloss.Left, contentWithMargin, statusLine)
+
+	// Debug: Check final line count
+	finalLines := strings.Count(finalView, "\n") + 1
+	debug.LogToFilef("🎯 EXAMPLES FINAL CHECK: view has %d lines, terminal height=%d (should match!) 🎯\n",
+		finalLines, v.height)
+
+	return finalView
 }
 
 func (v *ExamplesView) renderExamplesList(width, height int) string {
 	var content strings.Builder
 
-	// Title
+	// Title with copy instruction
 	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("63"))
 	content.WriteString(titleStyle.Render("📚 Configuration Examples"))
+	content.WriteString("\n")
+
+	// Add copy instruction
+	instructionStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Italic(true)
+	content.WriteString(instructionStyle.Render("(y) Copy File"))
 	content.WriteString("\n\n")
 
 	// Example list - no descriptions here, they go in the bottom section
@@ -380,8 +422,10 @@ func (v *ExamplesView) renderExamplesList(width, height int) string {
 
 	// Add padding for consistent height
 	contentLines := strings.Count(content.String(), "\n")
-	maxLines := height - 2 // Account for borders (reduced from 4 to 2)
-	for i := contentLines; i < maxLines; i++ {
+	maxLines := height - 3 // Account for title (2 lines) + some padding
+	debug.LogToFilef("📋 EXAMPLES LIST PADDING: height=%d, contentLines=%d, maxLines=%d 📋\n",
+		height, contentLines, maxLines)
+	for i := contentLines; i < maxLines && maxLines > 0; i++ {
 		content.WriteString("\n")
 	}
 
@@ -439,10 +483,10 @@ func (v *ExamplesView) renderDescription(width, height int) string {
 	// No title, no padding - just compact content
 	if v.selectedExample >= 0 && v.selectedExample < len(v.examples) {
 		selectedConfig := v.examples[v.selectedExample]
-		
+
 		// Single line combining description + usage
 		descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("250"))
-		
+
 		var usageText string
 		switch {
 		case strings.Contains(selectedConfig.Name, "Simple"):
@@ -464,11 +508,11 @@ func (v *ExamplesView) renderDescription(width, height int) string {
 		default:
 			usageText = "• Customizable"
 		}
-		
+
 		// Single compact line
 		return descStyle.Render(selectedConfig.Description + " " + usageText)
 	}
-	
+
 	return "Select an example to view description"
 }
 

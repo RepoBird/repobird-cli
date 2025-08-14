@@ -139,7 +139,7 @@ func TestHelpView_WindowSizeMsg(t *testing.T) {
 	// Assertions
 	assert.NotNil(t, model)
 	assert.Nil(t, cmd)
-	
+
 	updatedView := model.(*HelpView)
 	assert.Equal(t, 100, updatedView.width)
 	assert.Equal(t, 30, updatedView.height)
@@ -151,7 +151,7 @@ func TestHelpView_NavigationKeys(t *testing.T) {
 	mockClient := new(MockHelpAPIClient)
 	testCache := cache.NewSimpleCache()
 	helpView := NewHelpView(mockClient, testCache)
-	
+
 	// Initialize with window size
 	helpView.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 
@@ -168,10 +168,10 @@ func TestHelpView_NavigationKeys(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			model, cmd := helpView.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(tt.key)})
-			
+
 			assert.NotNil(t, model)
 			assert.NotNil(t, cmd)
-			
+
 			// Execute the command to get the message
 			if cmd != nil {
 				msg := cmd()
@@ -186,13 +186,13 @@ func TestHelpView_ForceQuit(t *testing.T) {
 	mockClient := new(MockHelpAPIClient)
 	testCache := cache.NewSimpleCache()
 	helpView := NewHelpView(mockClient, testCache)
-	
+
 	// Initialize with window size
 	helpView.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 
 	// Test force quit
 	model, cmd := helpView.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("Q")})
-	
+
 	assert.NotNil(t, model)
 	assert.NotNil(t, cmd)
 	// Check that it's a quit command by executing it
@@ -207,7 +207,7 @@ func TestHelpView_ScrollingKeys(t *testing.T) {
 	mockClient := new(MockHelpAPIClient)
 	testCache := cache.NewSimpleCache()
 	helpView := NewHelpView(mockClient, testCache)
-	
+
 	// Initialize with window size
 	helpView.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 
@@ -217,7 +217,7 @@ func TestHelpView_ScrollingKeys(t *testing.T) {
 	for _, key := range scrollKeys {
 		t.Run("Scroll key: "+key, func(t *testing.T) {
 			model, _ := helpView.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(key)})
-			
+
 			assert.NotNil(t, model)
 			// Scrolling keys might or might not return a command
 			// The important thing is they don't trigger navigation
@@ -230,7 +230,7 @@ func TestHelpView_CopyKeys(t *testing.T) {
 	mockClient := new(MockHelpAPIClient)
 	testCache := cache.NewSimpleCache()
 	helpView := NewHelpView(mockClient, testCache)
-	
+
 	// Initialize with window size
 	helpView.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 
@@ -240,7 +240,7 @@ func TestHelpView_CopyKeys(t *testing.T) {
 	for _, key := range copyKeys {
 		t.Run("Copy key: "+key, func(t *testing.T) {
 			model, _ := helpView.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(key)})
-			
+
 			assert.NotNil(t, model)
 			// Copy operations are handled by the help component
 		})
@@ -262,7 +262,7 @@ func TestHelpView_ViewRendering(t *testing.T) {
 
 	// Test after window size is set
 	view = helpView.View()
-	assert.NotEqual(t, "", view) // Should render content
+	assert.NotEqual(t, "", view)         // Should render content
 	assert.Contains(t, view, "RepoBird") // Should contain help content
 }
 
@@ -287,7 +287,7 @@ func TestHelpView_HandleKey(t *testing.T) {
 
 	// Test that HandleKey returns false for all keys (delegates to Update)
 	handled, model, cmd := helpView.HandleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
-	
+
 	assert.False(t, handled)
 	assert.Equal(t, helpView, model)
 	assert.Nil(t, cmd)
@@ -298,7 +298,7 @@ func TestHelpView_GlobalDashboardKeys(t *testing.T) {
 	mockClient := new(MockHelpAPIClient)
 	testCache := cache.NewSimpleCache()
 	helpView := NewHelpView(mockClient, testCache)
-	
+
 	// Initialize with window size
 	helpView.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 
@@ -309,7 +309,7 @@ func TestHelpView_GlobalDashboardKeys(t *testing.T) {
 	for _, key := range dashboardKeys {
 		t.Run("Dashboard key: "+key, func(t *testing.T) {
 			model, cmd := helpView.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(key)})
-			
+
 			// These keys should NOT trigger any navigation from the view
 			// They will be handled by the global system
 			assert.Equal(t, helpView, model)

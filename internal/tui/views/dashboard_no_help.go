@@ -1,6 +1,6 @@
 // dashboard_no_help.go - Example modifications to remove help overlay
 // This file shows the key changes needed to remove help overlay functionality
-// from dashboard.go. The actual implementation would require modifying 
+// from dashboard.go. The actual implementation would require modifying
 // the original dashboard.go file.
 
 /*
@@ -14,7 +14,7 @@ Key changes to make in dashboard.go:
 2. Update handleKeyInput method (around line 246):
    Change:
    if keyMsg.String() == "q" && !d.showDocs && !d.showURLSelectionPrompt && d.fzfMode == nil {
-   
+
    To:
    if keyMsg.String() == "q" && !d.showURLSelectionPrompt && d.fzfMode == nil {
 
@@ -29,7 +29,7 @@ Key changes to make in dashboard.go:
        d.showDocs = true
        d.docsCurrentPage = 0
        d.docsSelectedRow = 0
-   
+
    With:
    case "?":
        // Navigate to help view

@@ -39,7 +39,7 @@ func NewHelpView(client APIClient, cache *cache.SimpleCache) *HelpView {
 		cache:         cache,
 		helpComponent: components.NewHelpView(),
 		keys:          components.DefaultKeyMap,
-		disabledKeys: map[string]bool{
+		disabledKeys:  map[string]bool{
 			// Help view doesn't need to disable any keys
 		},
 		// Don't initialize layout here - wait for WindowSizeMsg
@@ -190,4 +190,3 @@ func (h *HelpView) startMessageClearTimer(duration time.Duration) tea.Cmd {
 
 // helpClearMessageMsg is used to clear temporary messages in help view
 type helpClearMessageMsg struct{}
-

@@ -83,10 +83,12 @@ type BulkView struct {
 	doubleColumnLayout *components.DoubleColumnLayout // For FZF file browser
 
 	// Submission state
-	submitting bool
-	batchID    string
-	results    []BulkRunResult
-	error      error
+	submitting             bool
+	batchID                string
+	results                []BulkRunResult
+	error                  error
+	showSubmissionPrompt   bool // Show submission confirmation prompt in status line
+	submissionPromptActive bool // Whether the submission prompt is active
 
 	// Components
 	spinner    spinner.Model
@@ -134,17 +136,19 @@ func NewBulkView(client *api.Client) *BulkView {
 	vp.YPosition = 0
 
 	return &BulkView{
-		client:         client,
-		mode:           ModeInstructions, // Start with instructions, not file selector
-		help:           help.New(),
-		keys:           defaultBulkKeyMap(),
-		spinner:        s,
-		runType:        "run",
-		runs:           []BulkRunItem{},
-		statusLine:     components.NewStatusLine(),
-		viewport:       vp,
-		selectedButton: 1, // Start with first button selected
-		focusMode:      "runs", // Start focused on runs
+		client:                 client,
+		mode:                   ModeInstructions, // Start with instructions, not file selector
+		help:                   help.New(),
+		keys:                   defaultBulkKeyMap(),
+		spinner:                s,
+		runType:                "run",
+		runs:                   []BulkRunItem{},
+		showSubmissionPrompt:   false,
+		submissionPromptActive: false,
+		statusLine:             components.NewStatusLine(),
+		viewport:               vp,
+		selectedButton:         1,      // Start with first button selected
+		focusMode:              "runs", // Start focused on runs
 	}
 }
 
@@ -175,8 +179,8 @@ func defaultBulkKeyMap() bulkKeyMap {
 			key.WithHelp("pgdn/ctrl+d", "page down"),
 		),
 		Select: key.NewBinding(
-			key.WithKeys(" ", "enter"),
-			key.WithHelp("space/enter", "select"),
+			key.WithKeys(" "),
+			key.WithHelp("space", "select"),
 		),
 		Submit: key.NewBinding(
 			key.WithKeys("ctrl+s"),
@@ -285,6 +289,27 @@ func (v *BulkView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Handle global quit keys regardless of mode
 		if msg.String() == "Q" || msg.Type == tea.KeyCtrlC {
 			return v, tea.Quit
+		}
+
+		// Handle submission confirmation prompt first
+		if v.showSubmissionPrompt {
+			switch msg.String() {
+			case "y":
+				// Confirmed submission
+				v.showSubmissionPrompt = false
+				v.submissionPromptActive = false
+				v.statusLine.ResetStyle() // Reset status line style
+				return v, v.submitBulkRuns()
+			case "n", "esc":
+				// Cancel submission
+				v.showSubmissionPrompt = false
+				v.submissionPromptActive = false
+				v.statusLine.ResetStyle() // Reset status line style
+				return v, nil
+			default:
+				// Block all other keys when prompt is active
+				return v, nil
+			}
 		}
 
 		// FIRST: Handle components that need raw key input (like FZF)
@@ -540,8 +565,8 @@ func (v *BulkView) handleFileBrowserKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (v *BulkView) handleRunListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
-	
-	debug.LogToFilef("DEBUG: handleRunListKeys called with key='%s', focusMode='%s', selectedButton=%d\n", 
+
+	debug.LogToFilef("DEBUG: handleRunListKeys called with key='%s', focusMode='%s', selectedButton=%d\n",
 		msg.String(), v.focusMode, v.selectedButton)
 
 	switch {
@@ -561,7 +586,7 @@ func (v *BulkView) handleRunListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			} else {
 				// At top of runs, switch to buttons
 				v.focusMode = "buttons"
-				v.selectedButton = 6 // Select last button
+				v.selectedButton = v.getMaxButtonNum() // Select last button
 				v.ensureButtonsVisible()
 			}
 		} else {
@@ -572,7 +597,11 @@ func (v *BulkView) handleRunListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			} else {
 				// At top button, wrap to runs
 				v.focusMode = "runs"
-				v.selectedRun = len(v.runs) - 1
+				if len(v.runs) > 0 {
+					v.selectedRun = len(v.runs) - 1
+				} else {
+					v.selectedRun = 0
+				}
 				v.ensureSelectedVisible()
 			}
 		}
@@ -591,8 +620,9 @@ func (v *BulkView) handleRunListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				v.ensureButtonsVisible()
 			}
 		} else {
-			// In buttons mode, navigate down through all 6 buttons
-			if v.selectedButton < 6 {
+			// In buttons mode, navigate down through buttons
+			maxButton := v.getMaxButtonNum()
+			if v.selectedButton < maxButton {
 				v.selectedButton++
 				v.ensureButtonsVisible()
 			} else {
@@ -611,8 +641,10 @@ func (v *BulkView) handleRunListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			v.ensureButtonsVisible()
 		} else {
 			v.focusMode = "runs"
-			if v.selectedRun >= len(v.runs) {
+			if len(v.runs) == 0 {
 				v.selectedRun = 0
+			} else if v.selectedRun >= len(v.runs) {
+				v.selectedRun = len(v.runs) - 1
 			}
 			v.ensureSelectedVisible()
 		}
@@ -633,49 +665,79 @@ func (v *BulkView) handleRunListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case msg.String() == "enter":
 		debug.LogToFile("DEBUG: Enter key pressed in handleRunListKeys\n")
 		debug.LogToFilef("DEBUG: focusMode=%s, selectedButton=%d\n", v.focusMode, v.selectedButton)
-		
+
 		if v.focusMode == "buttons" {
-			// Handle button selection
+			// Handle button selection with dynamic layout
 			debug.LogToFile("DEBUG: In buttons mode\n")
-			
-			switch v.selectedButton {
-			case 1:
-				// [FILES] button
-				debug.LogToFile("DEBUG: Button 1 selected - switching to file browser\n")
-				v.mode = ModeFileBrowser
-				if v.fileSelector == nil {
-					v.fileSelector = components.NewBulkFileSelector(v.width, v.height)
+
+			// Count selected runs to determine button layout
+			selectedRunCount := 0
+			for _, run := range v.runs {
+				if run.Selected {
+					selectedRunCount++
 				}
-				return v, v.fileSelector.Activate()
-			
-			case 2:
-				// [EXAMPLES] button
-				debug.LogToFile("DEBUG: Button 2 selected - navigating to examples view\n")
-				return v, func() tea.Msg {
-					return messages.NavigateToExamplesMsg{}
-				}
-			
-			case 3:
-				// [DASH] button
-				debug.LogToFile("DEBUG: Button 3 selected - navigating to dashboard\n")
-				return v, func() tea.Msg {
-					return messages.NavigateToDashboardMsg{}
-				}
-			
-			case 4, 5, 6:
-				// Test buttons - do nothing but log
-				debug.LogToFilef("DEBUG: Test button %d selected - no action\n", v.selectedButton)
-				return v, nil
-			
-			default:
-				debug.LogToFile("DEBUG: Unknown button selected\n")
-				return v, nil
 			}
+
+			// Button layout depends on whether we have selected runs
+			if selectedRunCount > 0 {
+				// Layout: [SUBMIT] [FILES] [EXAMPLES] [DASH]
+				switch v.selectedButton {
+				case 1:
+					// [SUBMIT] button - show confirmation prompt
+					debug.LogToFile("DEBUG: Submit button selected - showing confirmation prompt\n")
+					v.showSubmissionPrompt = true
+					v.submissionPromptActive = true
+					return v, nil
+				case 2:
+					// [FILES] button
+					debug.LogToFile("DEBUG: Files button selected\n")
+					v.mode = ModeFileBrowser
+					if v.fileSelector == nil {
+						v.fileSelector = components.NewBulkFileSelector(v.width, v.height)
+					}
+					return v, v.fileSelector.Activate()
+				case 3:
+					// [EXAMPLES] button
+					return v, func() tea.Msg {
+						return messages.NavigateToExamplesMsg{}
+					}
+				case 4:
+					// [DASH] button
+					return v, func() tea.Msg {
+						return messages.NavigateToDashboardMsg{}
+					}
+				}
+			} else {
+				// Layout: [FILES] [EXAMPLES] [DASH] (no submit)
+				switch v.selectedButton {
+				case 1:
+					// [FILES] button
+					debug.LogToFile("DEBUG: Files button selected\n")
+					v.mode = ModeFileBrowser
+					if v.fileSelector == nil {
+						v.fileSelector = components.NewBulkFileSelector(v.width, v.height)
+					}
+					return v, v.fileSelector.Activate()
+				case 2:
+					// [EXAMPLES] button
+					return v, func() tea.Msg {
+						return messages.NavigateToExamplesMsg{}
+					}
+				case 3:
+					// [DASH] button
+					return v, func() tea.Msg {
+						return messages.NavigateToDashboardMsg{}
+					}
+				}
+			}
+			return v, nil
 		}
-		
-		// In runs mode - submit selected bulk runs
-		debug.LogToFile("DEBUG: In runs mode, submitting bulk runs\n")
-		return v, v.submitBulkRuns()
+
+		// In runs mode - show submission confirmation prompt
+		debug.LogToFile("DEBUG: In runs mode, showing submission confirmation prompt\n")
+		v.showSubmissionPrompt = true
+		v.submissionPromptActive = true
+		return v, nil
 
 	case key.Matches(msg, v.keys.FZF), msg.String() == "f":
 		// Switch back to file browser mode
@@ -710,6 +772,25 @@ func (v *BulkView) updateRunListViewport() {
 	// This method is kept for compatibility with existing calls
 }
 
+// getMaxButtonNum returns the maximum button number based on current state
+func (v *BulkView) getMaxButtonNum() int {
+	// Count selected runs to determine button layout
+	selectedRunCount := 0
+	for _, run := range v.runs {
+		if run.Selected {
+			selectedRunCount++
+		}
+	}
+
+	if selectedRunCount > 0 {
+		// Layout: [SUBMIT] [FILES] [EXAMPLES] [DASH] = 4 buttons
+		return 4
+	} else {
+		// Layout: [FILES] [EXAMPLES] [DASH] = 3 buttons
+		return 3
+	}
+}
+
 // ensureSelectedVisible ensures the selected item is visible in the viewport
 func (v *BulkView) ensureSelectedVisible() {
 	if v.focusMode == "buttons" {
@@ -742,37 +823,38 @@ func (v *BulkView) ensureSelectedVisible() {
 // ensureButtonsVisible scrolls the viewport to show the buttons
 func (v *BulkView) ensureButtonsVisible() {
 	// Calculate where buttons are in the content
-	// Format: Title (1 line) + separator (1 line) + blank (1 line) + 
+	// Format: Title (1 line) + separator (1 line) + blank (1 line) +
 	// instructions (1 line) + blank (1 line) + header (1 line) + blank (1 line) +
-	// all runs + blank (2 lines) + buttons (6 lines for 6 buttons)
+	// all runs + blank (2 lines) + buttons (dynamic number)
 	buttonStartLine := 7 + len(v.runs) + 2 // Header lines + runs + spacing
-	debug.LogToFilef("🔘 BUTTONS: start line=%d, total buttons=6\n", buttonStartLine)
-	
+	maxButtons := v.getMaxButtonNum()
+	debug.LogToFilef("🔘 BUTTONS: start line=%d, total buttons=%d\n", buttonStartLine, maxButtons)
+
 	// Get current viewport position
 	viewportTop := v.viewport.YOffset
 	viewportBottom := viewportTop + v.viewport.Height - 1
-	
+
 	// Check if buttons are visible
-	// Calculate button end line (start + 6 buttons)
-	buttonEndLine := buttonStartLine + 6
-	
+	// Calculate button end line (start + number of buttons)
+	buttonEndLine := buttonStartLine + maxButtons
+
 	if buttonStartLine > viewportBottom {
 		// Buttons are below viewport, scroll down to show them
 		// Position so buttons are visible in the viewport
-		newOffset := buttonStartLine - v.viewport.Height + 8 // Show buttons with context
+		newOffset := buttonStartLine - v.viewport.Height + maxButtons + 1 // Show buttons with minimal context
 		if newOffset < 0 {
 			newOffset = 0
 		}
 		v.viewport.SetYOffset(newOffset)
-		debug.LogToFilef("🔘 SCROLL DOWN: buttons at %d-%d, viewport %d-%d, new offset=%d\n", 
+		debug.LogToFilef("🔘 SCROLL DOWN: buttons at %d-%d, viewport %d-%d, new offset=%d\n",
 			buttonStartLine, buttonEndLine, viewportTop, viewportBottom, newOffset)
 	} else if buttonEndLine < viewportTop {
 		// Buttons are above viewport (rare case when scrolled too far down)
 		v.viewport.SetYOffset(buttonStartLine - 2) // Show with some context above
-		debug.LogToFilef("🔘 SCROLL UP: buttons at %d-%d, viewport %d-%d\n", 
+		debug.LogToFilef("🔘 SCROLL UP: buttons at %d-%d, viewport %d-%d\n",
 			buttonStartLine, buttonEndLine, viewportTop, viewportBottom)
 	} else {
-		debug.LogToFilef("🔘 VISIBLE: buttons at %d-%d already in viewport %d-%d\n", 
+		debug.LogToFilef("🔘 VISIBLE: buttons at %d-%d already in viewport %d-%d\n",
 			buttonStartLine, buttonEndLine, viewportTop, viewportBottom)
 	}
 }
@@ -873,7 +955,7 @@ func (v *BulkView) renderInstructions() string {
 	} else {
 		fullContent.WriteString(normalStyle.Render("  📚 Examples") + "\n")
 	}
-	
+
 	// Button 3: Dashboard (always shown)
 	buttonNum++
 	if v.selectedButton == buttonNum {
@@ -881,7 +963,7 @@ func (v *BulkView) renderInstructions() string {
 	} else {
 		fullContent.WriteString(normalStyle.Render("  🏠 [DASH]") + "\n")
 	}
-	
+
 	// Button 4: View Runs (only if runs loaded)
 	if len(v.runs) > 0 {
 		buttonNum++
@@ -1083,48 +1165,53 @@ func (v *BulkView) renderRunList() string {
 		Foreground(lipgloss.Color("205")).
 		Bold(true)
 
+	// Count selected runs for Submit button
+	selectedRunCount := 0
+	for _, run := range v.runs {
+		if run.Selected {
+			selectedRunCount++
+		}
+	}
+
 	// Navigation buttons with selection highlight
-	// Button 1: FILES with emoji
-	if v.focusMode == "buttons" && v.selectedButton == 1 {
+	// Button 1: SUBMIT with selected count (only show if runs are selected)
+	if selectedRunCount > 0 {
+		submitText := fmt.Sprintf("🚀 [SUBMIT %d]", selectedRunCount)
+		if v.focusMode == "buttons" && v.selectedButton == 1 {
+			content.WriteString(selectedBtnStyle.Render("▸ "+submitText) + "\n")
+		} else {
+			content.WriteString(normalBtnStyle.Render("  "+submitText) + "\n")
+		}
+	}
+
+	// Button 2: FILES with emoji
+	buttonNum := 2
+	if selectedRunCount == 0 {
+		buttonNum = 1 // If no submit button, FILES becomes button 1
+	}
+	if v.focusMode == "buttons" && v.selectedButton == buttonNum {
 		content.WriteString(selectedBtnStyle.Render("▸ 📁 [FILES]") + "\n")
 	} else {
 		content.WriteString(normalBtnStyle.Render("  📁 [FILES]") + "\n")
 	}
-	
-	// Button 2: EXAMPLES with emoji
-	if v.focusMode == "buttons" && v.selectedButton == 2 {
+
+	// Button 3: EXAMPLES with emoji
+	buttonNum++
+	if v.focusMode == "buttons" && v.selectedButton == buttonNum {
 		content.WriteString(selectedBtnStyle.Render("▸ 📚 [EXAMPLES]") + "\n")
 	} else {
 		content.WriteString(normalBtnStyle.Render("  📚 [EXAMPLES]") + "\n")
 	}
-	
-	// Button 3: DASH with emoji
-	if v.focusMode == "buttons" && v.selectedButton == 3 {
+
+	// Button 4: DASH with emoji
+	buttonNum++
+	if v.focusMode == "buttons" && v.selectedButton == buttonNum {
 		content.WriteString(selectedBtnStyle.Render("▸ 🏠 [DASH]") + "\n")
 	} else {
 		content.WriteString(normalBtnStyle.Render("  🏠 [DASH]") + "\n")
 	}
-	
-	// Button 4: TEST1
-	if v.focusMode == "buttons" && v.selectedButton == 4 {
-		content.WriteString(selectedBtnStyle.Render("▸ [TEST1]") + "\n")
-	} else {
-		content.WriteString(normalBtnStyle.Render("  [TEST1]") + "\n")
-	}
-	
-	// Button 5: TEST2
-	if v.focusMode == "buttons" && v.selectedButton == 5 {
-		content.WriteString(selectedBtnStyle.Render("▸ [TEST2]") + "\n")
-	} else {
-		content.WriteString(normalBtnStyle.Render("  [TEST2]") + "\n")
-	}
-	
-	// Button 6: TEST3
-	if v.focusMode == "buttons" && v.selectedButton == 6 {
-		content.WriteString(selectedBtnStyle.Render("▸ [TEST3]") + "\n")
-	} else {
-		content.WriteString(normalBtnStyle.Render("  [TEST3]") + "\n")
-	}
+
+	// Remove test buttons for cleaner interface
 
 	// Set viewport content
 	v.viewport.SetContent(content.String())
@@ -1141,10 +1228,10 @@ func (v *BulkView) renderRunList() string {
 	var scrollIndicator string
 	totalLines := strings.Count(content.String(), "\n")
 	viewportCanShow := v.viewport.Height
-	
-	debug.LogToFilef("📊 VIEWPORT: content=%d lines, viewport height=%d, can show all=%t\n", 
+
+	debug.LogToFilef("📊 VIEWPORT: content=%d lines, viewport height=%d, can show all=%t\n",
 		totalLines, viewportCanShow, totalLines <= viewportCanShow)
-	
+
 	if totalLines > viewportCanShow {
 		// Content overflows, show scroll indicator
 		if v.viewport.AtTop() {
@@ -1155,7 +1242,7 @@ func (v *BulkView) renderRunList() string {
 			percentScrolled := v.viewport.ScrollPercent()
 			scrollIndicator = fmt.Sprintf("[↑ %d%% ↓]", int(percentScrolled*100))
 		}
-		debug.LogToFilef("📊 SCROLL: position=%s, offset=%d, total=%d\n", 
+		debug.LogToFilef("📊 SCROLL: position=%s, offset=%d, total=%d\n",
 			scrollIndicator, v.viewport.YOffset, totalLines)
 	}
 
@@ -1176,6 +1263,32 @@ func (v *BulkView) renderStatusLine(layoutName string) string {
 
 // renderStatusLineWithScroll renders the status line with optional scroll indicator
 func (v *BulkView) renderStatusLineWithScroll(layoutName string, scrollIndicator string) string {
+	// Handle submission confirmation prompt with yellow background (like dashboard URL prompt)
+	if v.showSubmissionPrompt {
+		// Count selected runs for prompt
+		selectedRunCount := 0
+		for _, run := range v.runs {
+			if run.Selected {
+				selectedRunCount++
+			}
+		}
+
+		promptText := fmt.Sprintf("Submit %d runs for processing?", selectedRunCount)
+		promptHelp := "(y)es (n)o [ESC]cancel"
+		yellowStyle := lipgloss.NewStyle().
+			Background(lipgloss.Color("220")). // Yellow background like dashboard
+			Foreground(lipgloss.Color("232")). // Dark text on yellow
+			Padding(0, 1)
+
+		return v.statusLine.
+			SetWidth(v.width).
+			SetLeft(promptText).
+			SetRight("").
+			SetHelp(promptHelp).
+			SetStyle(yellowStyle).
+			Render()
+	}
+
 	// Create formatter for consistent formatting
 	formatter := components.NewStatusFormatter(layoutName, v.width)
 

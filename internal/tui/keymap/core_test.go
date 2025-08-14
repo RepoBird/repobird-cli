@@ -12,9 +12,9 @@ func TestCoreKeyRegistry(t *testing.T) {
 		registry := NewCoreKeyRegistry()
 
 		// Test navigation actions (updated for new mappings)
-		assert.Equal(t, ActionNavigateToDashboard, registry.GetAction("h"))  // h goes to dashboard
-		assert.Equal(t, ActionNavigateToDashboard, registry.GetAction("H"))  // H goes to dashboard (same as h)
-		assert.Equal(t, ActionNavigateToDashboard, registry.GetAction("q"))  // q goes to dashboard
+		assert.Equal(t, ActionNavigateToDashboard, registry.GetAction("h")) // h goes to dashboard
+		assert.Equal(t, ActionNavigateToDashboard, registry.GetAction("H")) // H goes to dashboard (same as h)
+		assert.Equal(t, ActionNavigateToDashboard, registry.GetAction("q")) // q goes to dashboard
 		assert.Equal(t, ActionNavigateBulk, registry.GetAction("B"))
 		assert.Equal(t, ActionNavigateNew, registry.GetAction("n"))
 		assert.Equal(t, ActionNavigateRefresh, registry.GetAction("r"))

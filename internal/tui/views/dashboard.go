@@ -91,7 +91,6 @@ type DashboardView struct {
 	lastGPressTime time.Time // Time when 'g' was last pressed
 	waitingForG    bool      // Whether we're waiting for second 'g' in 'gg' command
 
-
 	// New scrollable help view
 	helpView *components.HelpView
 
