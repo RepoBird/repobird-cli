@@ -255,8 +255,8 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if d.loading || d.initializing {
 			var cmd tea.Cmd
 			d.spinner, cmd = d.spinner.Update(msg)
-			// Also update the status line spinner
-			d.statusLine.UpdateSpinner()
+			// Also update the status line spinner with the actual tick message
+			d.statusLine.UpdateSpinnerWithTick(msg)
 			// Don't return early - continue processing other messages
 			cmds = append(cmds, cmd)
 		}

@@ -88,6 +88,16 @@ func (s *StatusLine) UpdateSpinner() *StatusLine {
 	return s
 }
 
+// UpdateSpinnerWithTick updates the loading spinner with the actual tick message
+func (s *StatusLine) UpdateSpinnerWithTick(msg spinner.TickMsg) *StatusLine {
+	if s.isLoading {
+		var cmd tea.Cmd
+		s.loadingSpinner, cmd = s.loadingSpinner.Update(msg)
+		_ = cmd // Ignore the command since we're just updating the view
+	}
+	return s
+}
+
 // SetHelp sets the help content of the status line
 func (s *StatusLine) SetHelp(content string) *StatusLine {
 	s.helpContent = content
