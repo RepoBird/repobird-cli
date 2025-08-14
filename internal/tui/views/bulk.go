@@ -252,9 +252,11 @@ func (v *BulkView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		v.layout = components.NewWindowLayout(msg.Width, msg.Height)
 
 		// Update viewport dimensions from layout
-		viewportWidth, viewportHeight := v.layout.GetViewportDimensions()
-		v.viewport.Width = viewportWidth
-		v.viewport.Height = viewportHeight - 7 // Account for header lines
+		// The viewport needs the content area dimensions
+		viewportWidth, viewportHeight := v.layout.GetContentDimensions()
+		// Subtract space for border and padding
+		v.viewport.Width = viewportWidth - 2  // Account for padding
+		v.viewport.Height = viewportHeight - 2 // Account for title and padding
 
 		// Update file selector dimensions
 		if v.fileSelector != nil {
@@ -686,10 +688,8 @@ func (v *BulkView) renderInstructions() string {
 		v.layout = components.NewWindowLayout(v.width, v.height)
 	}
 
-	// Use WindowLayout system for consistent styling
-	boxStyle := v.layout.CreateStandardBox()
-	titleStyle := v.layout.CreateTitleStyle()
-	
+	// Build title
+	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("63"))
 	title := titleStyle.Render("📋 Bulk Operations")
 	
 	// Build complete content
@@ -761,23 +761,23 @@ func (v *BulkView) renderInstructions() string {
 	// Set viewport content
 	v.viewport.SetContent(fullContent.String())
 	
-	// Get proper dimensions from layout
-	boxWidth, boxHeight := v.layout.GetBoxDimensions()
+	// Create box for the viewport
+	boxStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("63")).
+		Padding(0, 1).
+		Width(v.width - 2).
+		Height(v.height - 2) // Account for status line
 	
-	// Render the viewport
-	viewportRendered := v.viewport.View()
-	
-	// Create the main container
-	mainContainer := boxStyle.
-		Width(boxWidth).
-		Height(boxHeight).
-		Render(viewportRendered)
+	// Render viewport in box
+	viewportView := v.viewport.View()
+	boxedContent := boxStyle.Render(viewportView)
 	
 	// Status line
 	statusLine := v.renderStatusLine("BULK")
 	
 	// Join with status line
-	return lipgloss.JoinVertical(lipgloss.Left, mainContainer, statusLine)
+	return lipgloss.JoinVertical(lipgloss.Left, boxedContent, statusLine)
 }
 
 // renderFileBrowser renders the dedicated file browser page with proper double-column layout
@@ -825,12 +825,8 @@ func (v *BulkView) renderRunList() string {
 	if v.layout == nil {
 		v.layout = components.NewWindowLayout(v.width, v.height)
 	}
-
-	// Use WindowLayout system for consistent styling
-	boxStyle := v.layout.CreateStandardBox()
-	titleStyle := v.layout.CreateTitleStyle()
 	
-	// Create header with repository info and instructions
+	// Count selected runs
 	selectedCount := 0
 	for _, run := range v.runs {
 		if run.Selected {
@@ -838,59 +834,70 @@ func (v *BulkView) renderRunList() string {
 		}
 	}
 	
-	// Title with counts
-	title := titleStyle.Render(fmt.Sprintf("📋 Bulk Runs (%d total, %d selected)", len(v.runs), selectedCount))
+	// Build the complete content for viewport
+	var content strings.Builder
 	
-	// Build the complete content including runs and buttons
-	var fullContent strings.Builder
+	// Title
+	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("63"))
+	content.WriteString(titleStyle.Render(fmt.Sprintf("📋 Bulk Runs (%d total, %d selected)", len(v.runs), selectedCount)))
+	content.WriteString("\n")
+	content.WriteString(strings.Repeat("─", 50) + "\n\n")
 	
-	// Add header
-	fullContent.WriteString(title + "\n\n")
-	
-	// Add concise instructions
+	// Instructions
 	instructionStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Italic(true)
-	fullContent.WriteString(instructionStyle.Render("Navigate with ↑↓, select with space, Tab to switch to buttons") + "\n\n")
+	content.WriteString(instructionStyle.Render("Navigate with ↑↓, select with space, Tab to switch to buttons"))
+	content.WriteString("\n\n")
 	
-	// Add required params info
+	// Required params info
 	paramStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("243"))
-	fullContent.WriteString(paramStyle.Render("Required: repository, source branch, run type, prompts") + "\n")
-	fullContent.WriteString(paramStyle.Render(fmt.Sprintf("Current: %s | %s | %s", v.repository, v.sourceBranch, v.runType)) + "\n\n")
+	content.WriteString(paramStyle.Render("Required: repository, source branch, run type, prompts") + "\n")
+	if v.repository != "" {
+		content.WriteString(paramStyle.Render(fmt.Sprintf("Current: %s | %s | %s", v.repository, v.sourceBranch, v.runType)) + "\n")
+	}
+	content.WriteString("\n")
 	
-	// Add run items
+	// Run items
 	selectedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true)
 	normalStyle := lipgloss.NewStyle()
 	
-	for i, run := range v.runs {
-		statusIcon := "[ ]"
-		if run.Selected {
-			statusIcon = "[✓]"
+	if len(v.runs) == 0 {
+		content.WriteString(lipgloss.NewStyle().Italic(true).Foreground(lipgloss.Color("243")).Render("No runs loaded yet. Press f to add files."))
+		content.WriteString("\n")
+	} else {
+		for i, run := range v.runs {
+			statusIcon := "[ ]"
+			if run.Selected {
+				statusIcon = "[✓]"
+			}
+			
+			runTitle := run.Title
+			if runTitle == "" {
+				runTitle = fmt.Sprintf("Run %d", i+1)
+			}
+			
+			// Truncate title if too long
+			maxTitleLen := v.viewport.Width - 10
+			if maxTitleLen > 0 && len(runTitle) > maxTitleLen {
+				runTitle = runTitle[:maxTitleLen-3] + "..."
+			}
+			
+			line := fmt.Sprintf("%s %s", statusIcon, runTitle)
+			
+			if v.navigationFocus == "runs" && i == v.selectedRun {
+				content.WriteString(selectedStyle.Render("▸ " + line))
+			} else {
+				content.WriteString(normalStyle.Render("  " + line))
+			}
+			content.WriteString("\n")
 		}
-		
-		runTitle := run.Title
-		if runTitle == "" {
-			runTitle = fmt.Sprintf("Run %d", i+1)
-		}
-		
-		// Truncate title if too long
-		maxTitleLen := v.width - 15 // Account for icon and padding
-		if len(runTitle) > maxTitleLen && maxTitleLen > 3 {
-			runTitle = runTitle[:maxTitleLen-3] + "..."
-		}
-		
-		line := fmt.Sprintf("%s %s", statusIcon, runTitle)
-		
-		if v.navigationFocus == "runs" && i == v.selectedRun {
-			fullContent.WriteString(selectedStyle.Render("▸ " + line))
-		} else {
-			fullContent.WriteString(normalStyle.Render("  " + line))
-		}
-		fullContent.WriteString("\n")
 	}
 	
 	// Add spacing before buttons
-	fullContent.WriteString("\n")
+	content.WriteString("\n")
+	content.WriteString(strings.Repeat("─", 50) + "\n")
+	content.WriteString("Actions:\n\n")
 	
-	// Create action buttons with selection indicator
+	// Create action buttons
 	buttonStyle := lipgloss.NewStyle().
 		Padding(0, 1).
 		MarginRight(1).
@@ -906,14 +913,14 @@ func (v *BulkView) renderRunList() string {
 		BorderForeground(lipgloss.Color("205")).
 		Foreground(lipgloss.Color("205"))
 	
-	// Render buttons based on selection
-	var addButton, submitButton, dashButton string
+	// Build button row
+	var buttons []string
 	
 	// Add Files button
 	if v.navigationFocus == "buttons" && v.selectedButton == 1 {
-		addButton = focusedButtonStyle.Render("▸ [f] Add Files")
+		buttons = append(buttons, focusedButtonStyle.Render("▸ [f] Add Files"))
 	} else {
-		addButton = buttonStyle.Render("[f] Add Files")
+		buttons = append(buttons, buttonStyle.Render("[f] Add Files"))
 	}
 	
 	// Submit button
@@ -924,47 +931,71 @@ func (v *BulkView) renderRunList() string {
 	
 	if v.navigationFocus == "buttons" && v.selectedButton == 2 {
 		if selectedCount > 0 {
-			submitButton = selectedButtonStyle.Copy().
+			buttons = append(buttons, selectedButtonStyle.Copy().
 				BorderForeground(lipgloss.Color("205")).
-				Render("▸ " + submitText)
+				Render("▸ " + submitText))
 		} else {
-			submitButton = focusedButtonStyle.Render("▸ " + submitText)
+			buttons = append(buttons, focusedButtonStyle.Render("▸ " + submitText))
 		}
 	} else if selectedCount > 0 {
-		submitButton = selectedButtonStyle.Render(submitText)
+		buttons = append(buttons, selectedButtonStyle.Render(submitText))
 	} else {
-		submitButton = buttonStyle.Render(submitText)
+		buttons = append(buttons, buttonStyle.Render(submitText))
 	}
 	
 	// Dashboard button
 	if v.navigationFocus == "buttons" && v.selectedButton == 3 {
-		dashButton = focusedButtonStyle.Render("▸ [d] Dashboard")
+		buttons = append(buttons, focusedButtonStyle.Render("▸ [d] Dashboard"))
 	} else {
-		dashButton = buttonStyle.Render("[d] Dashboard")
+		buttons = append(buttons, buttonStyle.Render("[d] Dashboard"))
 	}
 	
-	buttonsRow := lipgloss.JoinHorizontal(lipgloss.Left, addButton, submitButton, dashButton)
-	fullContent.WriteString(buttonsRow)
+	content.WriteString(lipgloss.JoinHorizontal(lipgloss.Left, buttons...))
 	
-	// Set the complete content in viewport
-	v.viewport.SetContent(fullContent.String())
+	// Set viewport content
+	v.viewport.SetContent(content.String())
 	
-	// Get proper dimensions from layout
-	boxWidth, boxHeight := v.layout.GetBoxDimensions()
+	// Create box for the viewport
+	boxStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("63")).
+		Padding(0, 1).
+		Width(v.width - 2).
+		Height(v.height - 2) // Account for status line
 	
-	// Render the viewport
-	viewportRendered := v.viewport.View()
+	// Get scroll indicator
+	scrollIndicator := ""
+	if !v.viewport.AtTop() || !v.viewport.AtBottom() {
+		percentScrolled := v.viewport.ScrollPercent()
+		position := "TOP"
+		if v.viewport.AtBottom() {
+			position = "BOTTOM"
+		} else if percentScrolled > 0 {
+			position = fmt.Sprintf("%d%%", int(percentScrolled*100))
+		}
+		scrollIndicator = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("240")).
+			Render(fmt.Sprintf(" [%s]", position))
+	}
 	
-	// Create the main container
-	mainContainer := boxStyle.
-		Width(boxWidth).
-		Height(boxHeight).
-		Render(viewportRendered)
+	// Render viewport in box
+	viewportView := v.viewport.View()
+	boxedContent := boxStyle.Render(viewportView)
 	
-	// Status line with better help text
+	// Add scroll indicator to title if needed
+	if scrollIndicator != "" {
+		lines := strings.Split(boxedContent, "\n")
+		if len(lines) > 0 {
+			// Add scroll indicator to the top-right corner
+			lines[0] = lines[0][:len(lines[0])-len(scrollIndicator)-1] + scrollIndicator + lines[0][len(lines[0])-1:]
+			boxedContent = strings.Join(lines, "\n")
+		}
+	}
+	
+	// Status line
 	statusLine := v.renderStatusLine("BULK")
 	
-	return lipgloss.JoinVertical(lipgloss.Left, mainContainer, statusLine)
+	return lipgloss.JoinVertical(lipgloss.Left, boxedContent, statusLine)
 }
 
 // renderStatusLine renders the status line
