@@ -30,7 +30,8 @@ type MockServer struct {
 type MockRun struct {
 	ID             int       `json:"id"`
 	Status         string    `json:"status"`
-	RepositoryName string    `json:"repositoryName"`
+	Repository     string    `json:"repository,omitempty"`     // Legacy field
+	RepositoryName string    `json:"repositoryName,omitempty"` // New API field
 	Title          string    `json:"title"`
 	RunType        string    `json:"runType"`
 	CreatedAt      time.Time `json:"createdAt"`
@@ -38,6 +39,8 @@ type MockRun struct {
 	PrURL          string    `json:"prUrl,omitempty"`
 	CommandLogURL  string    `json:"commandLogUrl,omitempty"`
 	Errors         []string  `json:"errors,omitempty"`
+	Source         string    `json:"source,omitempty"`
+	Target         string    `json:"target,omitempty"`
 }
 
 // MockBulkRun represents a mock bulk run batch
@@ -83,9 +86,12 @@ func NewMockServer(t *testing.T) *MockServer {
 	ms.runs["12345"] = &MockRun{
 		ID:             12345,
 		Status:         "DONE",
+		Repository:     "test/repo",  // Include both for compatibility
 		RepositoryName: "test/repo",
 		Title:          "Test Run",
 		RunType:        "run",
+		Source:         "main",
+		Target:         "feature/test",
 		CreatedAt:      time.Now().Add(-1 * time.Hour),
 		UpdatedAt:      time.Now().Add(-30 * time.Minute),
 		PrURL:          "https://github.com/test/repo/pull/1",
@@ -94,9 +100,12 @@ func NewMockServer(t *testing.T) *MockServer {
 	ms.runs["67890"] = &MockRun{
 		ID:             67890,
 		Status:         "RUNNING",
+		Repository:     "test/another-repo",  // Include both for compatibility
 		RepositoryName: "test/another-repo",
 		Title:          "Another Test Run",
 		RunType:        "plan",
+		Source:         "main",
+		Target:         "feature/plan",
 		CreatedAt:      time.Now().Add(-10 * time.Minute),
 		UpdatedAt:      time.Now(),
 	}
@@ -214,12 +223,19 @@ func (ms *MockServer) handleCreateRun(w http.ResponseWriter, r *http.Request) {
 
 	// Create a new mock run
 	runID := fmt.Sprintf("%d", time.Now().Unix())
+	repoName := getStringField(payload, "repository")
+	if repoName == "" {
+		repoName = getStringField(payload, "repositoryName")
+	}
 	run := &MockRun{
 		ID:             int(time.Now().Unix()),
 		Status:         "QUEUED",
-		RepositoryName: getStringField(payload, "repository"),
+		Repository:     repoName,  // Include both for compatibility
+		RepositoryName: repoName,
 		Title:          getStringField(payload, "title"),
 		RunType:        getStringField(payload, "runType"),
+		Source:         getStringField(payload, "source"),
+		Target:         getStringField(payload, "target"),
 		CreatedAt:      time.Now(),
 		UpdatedAt:      time.Now(),
 	}
