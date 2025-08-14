@@ -562,6 +562,7 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, d.keys.Refresh):
 			d.loading = true
 			cmds = append(cmds, d.loadDashboardData())
+			cmds = append(cmds, d.spinner.Tick) // Restart spinner animation
 			return d, tea.Batch(cmds...)
 		case msg.Type == tea.KeyRunes && string(msg.Runes) == "f":
 			// Activate FZF mode for current column in dashboard
@@ -746,8 +747,8 @@ func (d *DashboardView) View() string {
 		default:
 			content = d.renderTripleColumnLayout()
 		}
-		statusline := d.renderStatusLine("DASH")
-		return lipgloss.JoinVertical(lipgloss.Left, title, content, statusline)
+		// Layout functions already include status line - don't add another one
+		return lipgloss.JoinVertical(lipgloss.Left, title, content)
 	}
 
 	if d.loading || d.initializing {

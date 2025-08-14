@@ -3,7 +3,6 @@ package views
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/repobird/repobird-cli/internal/models"
@@ -464,20 +463,13 @@ func (d *DashboardView) renderStatusLine(layoutName string) string {
 	// Create formatter for consistent formatting
 	formatter := components.NewStatusFormatter(layoutName, d.width)
 
-	// Data freshness indicator - keep it very short
+	// Data freshness indicator - removed to clean up status line
 	dataInfo := ""
 	isLoadingData := false
 
 	if d.loading || d.initializing {
 		isLoadingData = true
 		// Don't show any text when loading, just the spinner
-	} else if !d.lastDataRefresh.IsZero() {
-		elapsed := time.Since(d.lastDataRefresh)
-		if elapsed < time.Minute {
-			dataInfo = "fresh"
-		} else {
-			dataInfo = fmt.Sprintf("%dm ago", int(elapsed.Minutes()))
-		}
 	}
 
 	// Format left content consistently
