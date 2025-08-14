@@ -63,6 +63,10 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			debug.LogToFilef("⚠️ APP: Auth had error (continuing anyway): %v\n", authMsg.err)
 		}
 
+		// Clear cache on initial startup to ensure fresh data
+		debug.LogToFile("🔄 APP: Initial startup - clearing cache to fetch fresh data 🔄\n")
+		a.cache.Clear()
+		
 		// Initialize dashboard view now that we have user context
 		a.current = views.NewDashboardView(a.client, a.cache)
 

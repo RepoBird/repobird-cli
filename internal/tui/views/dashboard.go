@@ -569,6 +569,9 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			d.cache.Stop()
 			return d, tea.Quit
 		case key.Matches(msg, d.keys.Refresh):
+			// Clear cache to force fresh data from API
+			debug.LogToFilef("  REFRESH: User pressed 'r' - clearing cache and refreshing from API\n")
+			d.cache.Clear()
 			d.loading = true
 			cmds = append(cmds, d.loadDashboardData())
 			cmds = append(cmds, d.spinner.Tick) // Restart spinner animation

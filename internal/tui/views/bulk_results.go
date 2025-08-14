@@ -229,6 +229,10 @@ func (v *BulkResultsView) handleRunKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case key.Matches(msg, v.keys.Dashboard), key.Matches(msg, v.keys.Quit):
+		// Invalidate dashboard cache to force refresh with new runs
+		debug.LogToFilef("📊 RESULTS: Invalidating dashboard cache before navigation\n")
+		v.cache.InvalidateActiveRuns()
+		
 		// Go to dashboard
 		return v, func() tea.Msg {
 			return messages.NavigateToDashboardMsg{}
@@ -297,7 +301,10 @@ func (v *BulkResultsView) handleButtonKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	case key.Matches(msg, v.keys.Enter):
 		// Activate selected button
 		if v.selectedButton == 1 {
-			// DASH button
+			// DASH button - invalidate cache before navigation
+			debug.LogToFilef("📊 RESULTS: Invalidating dashboard cache before navigation (button)\n")
+			v.cache.InvalidateActiveRuns()
+			
 			return v, func() tea.Msg {
 				return messages.NavigateToDashboardMsg{}
 			}
@@ -311,6 +318,10 @@ func (v *BulkResultsView) handleButtonKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		return v, nil
 
 	case key.Matches(msg, v.keys.Dashboard), key.Matches(msg, v.keys.Quit):
+		// Invalidate dashboard cache to force refresh with new runs
+		debug.LogToFilef("📊 RESULTS: Invalidating dashboard cache before navigation\n")
+		v.cache.InvalidateActiveRuns()
+		
 		// Go to dashboard
 		return v, func() tea.Msg {
 			return messages.NavigateToDashboardMsg{}

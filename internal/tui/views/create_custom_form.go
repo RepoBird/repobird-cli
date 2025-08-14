@@ -63,7 +63,7 @@ func NewCustomCreateForm() *CustomCreateForm {
 			Label:       "Title",
 			Type:        "text",
 			Placeholder: "Brief description of the task",
-			Required:    true,
+			Required:    false,  // Not required per user request
 			Icon:        "📝",
 		},
 		{
@@ -80,7 +80,7 @@ func NewCustomCreateForm() *CustomCreateForm {
 			Type:        "text",
 			Placeholder: "main",
 			Value:       "main",
-			Required:    true,
+			Required:    false,  // Not required per user request
 			Icon:        "🌿",
 		},
 		{

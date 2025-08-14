@@ -135,6 +135,13 @@ func (c *SimpleCache) Clear() {
 	_ = c.hybrid.Clear()
 }
 
+// InvalidateActiveRuns clears only active (non-terminal) runs from cache
+// This forces the dashboard to fetch fresh data on next access
+func (c *SimpleCache) InvalidateActiveRuns() {
+	// No lock needed - HybridCache handles thread safety
+	_ = c.hybrid.InvalidateActiveRuns()
+}
+
 // Stop gracefully stops the cache's background goroutines
 func (c *SimpleCache) Stop() {
 	_ = c.hybrid.Close()
