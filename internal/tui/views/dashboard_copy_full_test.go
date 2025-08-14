@@ -3,6 +3,8 @@ package views
 import (
 	"strings"
 	"testing"
+
+	"github.com/repobird/repobird-cli/internal/tui/cache"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -11,7 +13,7 @@ import (
 
 func TestDashboardViewCopyFullTextFromDetails(t *testing.T) {
 	// Create a new dashboard view
-	view := NewDashboardView(nil)
+	view := NewDashboardView(nil, cache.NewSimpleCache())
 	view.width = 100
 	view.height = 30
 	view.focusedColumn = 2 // Focus on details column
@@ -82,7 +84,7 @@ func TestDashboardViewCopyFullTextFromDetails(t *testing.T) {
 
 func TestDashboardViewCopyLongPrompt(t *testing.T) {
 	// Create a new dashboard view
-	view := NewDashboardView(nil)
+	view := NewDashboardView(nil, cache.NewSimpleCache())
 	view.width = 100
 	view.height = 30
 	view.focusedColumn = 2 // Focus on details column

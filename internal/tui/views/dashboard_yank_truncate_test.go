@@ -4,13 +4,15 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/repobird/repobird-cli/internal/tui/cache"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/repobird/repobird-cli/internal/models"
 )
 
 func TestDashboardViewYankTruncation(t *testing.T) {
 	// Create a new dashboard view
-	view := NewDashboardView(nil)
+	view := NewDashboardView(nil, cache.NewSimpleCache())
 	view.width = 100
 	view.height = 30
 
@@ -61,7 +63,7 @@ func TestDashboardViewYankTruncation(t *testing.T) {
 
 func TestDashboardViewYankShortText(t *testing.T) {
 	// Create a new dashboard view
-	view := NewDashboardView(nil)
+	view := NewDashboardView(nil, cache.NewSimpleCache())
 	view.width = 100
 	view.height = 30
 

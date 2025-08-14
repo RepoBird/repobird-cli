@@ -181,13 +181,22 @@ func (d *DashboardView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Mo
 		}
 	case "h", "H":
 		// Handle 'h' and 'H' for column navigation (move left)
-		// Both keys behave identically on dashboard
+		// Override centralized system behavior for dashboard-specific column navigation
 		if d.focusedColumn > 0 {
+			// Save detail line selection if leaving details column
+			if d.focusedColumn == 2 && d.selectedRunData != nil {
+				runID := d.selectedRunData.GetIDString()
+				if runID != "" {
+					debug.LogToFilef("💾 DASHBOARD H: Saving detail position %d for run %s 💾\n", d.selectedDetailLine, runID)
+					d.detailLineMemory[runID] = d.selectedDetailLine
+				}
+			}
 			// Move to the left column
+			debug.LogToFilef("⬅️ DASHBOARD H: Moving LEFT from column %d to %d ⬅️\n", d.focusedColumn, d.focusedColumn-1)
 			d.focusedColumn--
 			return true, d, nil
 		}
-		// If already in leftmost column, don't trigger back navigation (nowhere to go)
+		// If already in leftmost column, don't trigger back navigation
 		return true, d, nil
 	case "q":
 		// On dashboard, 'q' quits the app (with confirmation would be nice, but simple for now)

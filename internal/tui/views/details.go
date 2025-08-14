@@ -177,12 +177,33 @@ func (v *RunDetailsView) handleWindowSizeMsg(msg tea.WindowSizeMsg) {
 	v.updateContent()
 }
 
+// IsKeyDisabled implements CoreViewKeymap interface 
+func (v *RunDetailsView) IsKeyDisabled(keyString string) bool {
+	// Disable 'b' and backspace to prevent inconsistent back navigation
+	// User should use 'h' for dashboard navigation (uses cached data)
+	switch keyString {
+	case "b", "backspace":
+		return true
+	}
+	return false
+}
+
+// HandleKey implements CoreViewKeymap interface for custom key handling
+func (v *RunDetailsView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Model, cmd tea.Cmd) {
+	// We don't need custom handling since we disabled the problematic keys
+	// and let the centralized system handle 'h' → ActionNavigateToDashboard
+	return false, v, nil
+}
+
 // handleKeyInput handles all key input events
 func (v *RunDetailsView) handleKeyInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
 	switch {
-	case msg.String() == "q", key.Matches(msg, v.keys.Back), msg.Type == tea.KeyEsc, msg.Type == tea.KeyBackspace:
+	case msg.String() == "q", msg.Type == tea.KeyEsc:
+		// Removed: key.Matches(msg, v.keys.Back) - 'b' is now disabled via IsKeyDisabled  
+		// Removed: msg.Type == tea.KeyBackspace - now disabled via IsKeyDisabled
+		// Only 'q' and 'esc' trigger back navigation now
 		v.stopPolling()
 		// Navigate back or to dashboard
 		return v, func() tea.Msg {

@@ -3,6 +3,8 @@ package views
 import (
 	"strings"
 	"testing"
+
+	"github.com/repobird/repobird-cli/internal/tui/cache"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -11,7 +13,7 @@ import (
 
 func TestDashboardViewStatusLineShowsActualCopiedText(t *testing.T) {
 	// Create a new dashboard view
-	view := NewDashboardView(nil)
+	view := NewDashboardView(nil, cache.NewSimpleCache())
 	view.width = 100
 	view.height = 30
 	view.focusedColumn = 2 // Focus on details column
@@ -106,7 +108,7 @@ func TestDashboardViewStatusLineShowsActualCopiedText(t *testing.T) {
 
 func TestDashboardViewStatusLineNoEllipsisForShortText(t *testing.T) {
 	// Create a new dashboard view
-	view := NewDashboardView(nil)
+	view := NewDashboardView(nil, cache.NewSimpleCache())
 	view.width = 100
 	view.height = 30
 	view.focusedColumn = 2
