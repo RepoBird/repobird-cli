@@ -254,9 +254,15 @@ func (v *BulkView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Update viewport dimensions from layout
 		// The viewport needs the content area dimensions
 		viewportWidth, viewportHeight := v.layout.GetContentDimensions()
+		debug.LogToFilef("🎯 BULK WindowSize: terminal=%dx%d, content=%dx%d\n", 
+			msg.Width, msg.Height, viewportWidth, viewportHeight)
+		
 		// Subtract space for border and padding
 		v.viewport.Width = viewportWidth - 2  // Account for padding
 		v.viewport.Height = viewportHeight - 2 // Account for title and padding
+		
+		debug.LogToFilef("🎯 BULK WindowSize: viewport set to %dx%d\n", 
+			v.viewport.Width, v.viewport.Height)
 
 		// Update file selector dimensions
 		if v.fileSelector != nil {
@@ -324,14 +330,17 @@ func (v *BulkView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		debug.LogToFilef("DEBUG: BulkView - files selected: %v, canceled: %v\n", msg.Files, msg.Canceled)
 		if msg.Canceled {
 			// User canceled file selection
-			debug.LogToFile("DEBUG: BulkView - file selection canceled\n")
+			debug.LogToFile("DEBUG: BulkView - file selection canceled, returning to parent BULK mode\n")
 			v.fileSelector = nil // Clear file selector
 			
-			// If we have runs already, go back to run list, otherwise instructions
+			// Always go back to the parent view (where we came from)
+			// If we have runs already, we came from run list, otherwise from instructions
 			if len(v.runs) > 0 {
+				debug.LogToFile("DEBUG: BulkView - returning to ModeRunList (has runs)\n")
 				v.mode = ModeRunList
 				v.updateRunListViewport()
 			} else {
+				debug.LogToFile("DEBUG: BulkView - returning to ModeInstructions (no runs)\n")
 				v.mode = ModeInstructions
 			}
 			return v, nil
@@ -659,6 +668,7 @@ func (v *BulkView) View() string {
 	switch v.mode {
 	case ModeInstructions:
 		debug.LogToFile("DEBUG: BulkView - rendering instructions\n")
+		debug.LogToFilef("🎯🎯🎯 ENTERING renderInstructions mode=0\n")
 		return v.renderInstructions()
 	case ModeFileBrowser:
 		debug.LogToFile("DEBUG: BulkView - rendering file browser\n")
@@ -683,6 +693,8 @@ func (v *BulkView) View() string {
 
 // renderInstructions renders the initial instructions screen with scrollable content
 func (v *BulkView) renderInstructions() string {
+	debug.LogToFilef("🎯 BULK renderInstructions: width=%d, height=%d\n", v.width, v.height)
+	
 	// Initialize layout if not done yet
 	if v.layout == nil {
 		v.layout = components.NewWindowLayout(v.width, v.height)
@@ -752,32 +764,51 @@ func (v *BulkView) renderInstructions() string {
 	if len(v.runs) > 0 {
 		reviewButton := buttonStyle.Render("[L] View Runs")
 		buttons = lipgloss.JoinHorizontal(lipgloss.Left, selectButton, reviewButton, dashButton)
+		debug.LogToFilef("🎯 BULK buttons (with runs): %s\n", buttons)
 	} else {
 		buttons = lipgloss.JoinHorizontal(lipgloss.Left, selectButton, dashButton)
+		debug.LogToFilef("🎯 BULK buttons (no runs): %s\n", buttons)
 	}
 	
 	fullContent.WriteString(buttons)
+	debug.LogToFilef("🎯 BULK total content built: %d lines\n", strings.Count(fullContent.String(), "\n"))
 	
 	// Set viewport content
-	v.viewport.SetContent(fullContent.String())
+	contentStr := fullContent.String()
+	debug.LogToFilef("🎯 BULK instructions content length: %d chars, %d lines\n", len(contentStr), strings.Count(contentStr, "\n"))
+	v.viewport.SetContent(contentStr)
 	
-	// Create box for the viewport
+	debug.LogToFilef("🎯 BULK viewport dimensions: width=%d, height=%d\n", v.viewport.Width, v.viewport.Height)
+	debug.LogToFilef("🎯 BULK terminal dimensions: width=%d, height=%d\n", v.width, v.height)
+	
+	// Create box for the viewport - leave room for borders and status line
+	boxWidth := v.width - 2
+	boxHeight := v.height - 2 // Account for status line
+	
+	debug.LogToFilef("🎯 BULK box dimensions: width=%d, height=%d\n", boxWidth, boxHeight)
+	
 	boxStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("63")).
 		Padding(0, 1).
-		Width(v.width - 2).
-		Height(v.height - 2) // Account for status line
+		Width(boxWidth).
+		Height(boxHeight)
 	
 	// Render viewport in box
 	viewportView := v.viewport.View()
+	debug.LogToFilef("🎯 BULK viewport view lines: %d\n", strings.Count(viewportView, "\n"))
+	
 	boxedContent := boxStyle.Render(viewportView)
+	debug.LogToFilef("🎯 BULK boxed content lines: %d\n", strings.Count(boxedContent, "\n"))
 	
 	// Status line
 	statusLine := v.renderStatusLine("BULK")
 	
 	// Join with status line
-	return lipgloss.JoinVertical(lipgloss.Left, boxedContent, statusLine)
+	final := lipgloss.JoinVertical(lipgloss.Left, boxedContent, statusLine)
+	debug.LogToFilef("🎯 BULK final output lines: %d\n", strings.Count(final, "\n"))
+	
+	return final
 }
 
 // renderFileBrowser renders the dedicated file browser page with proper double-column layout
@@ -1223,6 +1254,23 @@ func (v *BulkView) IsKeyDisabled(keyString string) bool {
 func (v *BulkView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Model, cmd tea.Cmd) {
 	keyString := keyMsg.String()
 	debug.LogToFilef("DEBUG: BulkView.HandleKey - received key '%s', mode=%d\n", keyString, v.mode)
+
+	// Handle ESC key specially in ModeFileBrowser
+	if keyString == "esc" && v.mode == ModeFileBrowser {
+		debug.LogToFilef("DEBUG: BulkView.HandleKey - handling 'esc' in FileBrowser mode\n")
+		
+		// Pass ESC to the file selector to handle the two-stage exit
+		// First ESC: exit INPUT mode to NAV mode
+		// Second ESC: cancel file selection and return to parent BULK mode
+		if v.fileSelector != nil {
+			newFileSelector, cmd := v.fileSelector.Update(keyMsg)
+			v.fileSelector = newFileSelector
+			
+			// The file selector will send BulkFileSelectedMsg{Canceled: true}
+			// when it wants to exit, which we handle in Update()
+			return true, v, cmd
+		}
+	}
 
 	// Handle 'q' key for all modes - should go back, not quit app
 	if keyString == "q" {
