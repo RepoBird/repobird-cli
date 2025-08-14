@@ -257,9 +257,9 @@ func (v *BulkView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		debug.LogToFilef("🎯 BULK WindowSize: terminal=%dx%d, content=%dx%d\n", 
 			msg.Width, msg.Height, viewportWidth, viewportHeight)
 		
-		// Subtract space for border, padding, and title
+		// Subtract space for border and padding (no extra for title since it's in content)
 		v.viewport.Width = viewportWidth - 2  // Account for padding
-		v.viewport.Height = viewportHeight - 3 // Account for title, padding, and margin
+		v.viewport.Height = viewportHeight - 2 // Account for padding
 		
 		debug.LogToFilef("🎯 BULK WindowSize: viewport set to %dx%d\n", 
 			v.viewport.Width, v.viewport.Height)
@@ -700,9 +700,10 @@ func (v *BulkView) renderInstructions() string {
 		v.layout = components.NewWindowLayout(v.width, v.height)
 	}
 
-	// Build complete content (title will be in box border)
+	// Build complete content with clear title
 	var fullContent strings.Builder
-	fullContent.WriteString("📋 Bulk Operations\n")
+	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("63"))
+	fullContent.WriteString(titleStyle.Render("📋 Bulk Operations") + "\n")
 	fullContent.WriteString(strings.Repeat("─", 50) + "\n\n")
 	
 	if v.error != nil {
@@ -741,33 +742,62 @@ func (v *BulkView) renderInstructions() string {
 		fullContent.WriteString("  • JSONL (.jsonl) - Line-delimited JSON\n")
 		fullContent.WriteString("  • Markdown (.md) - With embedded configs\n\n")
 		
-		fullContent.WriteString("Press f to select configuration files\n")
+		fullContent.WriteString("Get started by selecting configuration files below\n")
 	}
 	
-	// Add buttons
+	// Add buttons section with clear separation
 	fullContent.WriteString("\n")
+	fullContent.WriteString(strings.Repeat("─", 50) + "\n")
+	fullContent.WriteString(lipgloss.NewStyle().Bold(true).Render("Actions:") + "\n\n")
 	
-	// Create button indicators
+	// Create button styles
 	buttonStyle := lipgloss.NewStyle().
-		Padding(0, 1).
-		MarginRight(1).
+		Padding(0, 2).
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("63"))
+		BorderForeground(lipgloss.Color("63")).
+		Width(35) // Fixed width for consistency
 	
-	selectButton := buttonStyle.Render("[f] Select Files")
-	dashButton := buttonStyle.Render("[d] Dashboard")
+	selectedButtonStyle := buttonStyle.Copy().
+		BorderForeground(lipgloss.Color("205")).
+		Foreground(lipgloss.Color("205")).
+		Bold(true)
 	
-	var buttons string
-	if len(v.runs) > 0 {
-		reviewButton := buttonStyle.Render("[L] View Runs")
-		buttons = lipgloss.JoinHorizontal(lipgloss.Left, selectButton, reviewButton, dashButton)
-		debug.LogToFilef("🎯 BULK buttons (with runs): %s\n", buttons)
+	// Always show buttons vertically with navigation indicator
+	// Button 1: Select Files (always visible)
+	if v.selectedButton == 1 {
+		fullContent.WriteString("▸ " + selectedButtonStyle.Render("📁 [f] Select Files") + "\n")
 	} else {
-		buttons = lipgloss.JoinHorizontal(lipgloss.Left, selectButton, dashButton)
-		debug.LogToFilef("🎯 BULK buttons (no runs): %s\n", buttons)
+		fullContent.WriteString("  " + buttonStyle.Render("📁 [f] Select Files") + "\n")
 	}
 	
-	fullContent.WriteString(buttons)
+	// Button 2: View Runs (if runs loaded) or Dashboard
+	if len(v.runs) > 0 {
+		if v.selectedButton == 2 {
+			fullContent.WriteString("▸ " + selectedButtonStyle.Render("📋 [L] View Runs") + "\n")
+		} else {
+			fullContent.WriteString("  " + buttonStyle.Render("📋 [L] View Runs") + "\n")
+		}
+		// Button 3: Dashboard
+		if v.selectedButton == 3 {
+			fullContent.WriteString("▸ " + selectedButtonStyle.Render("🏠 [d] Dashboard") + "\n")
+		} else {
+			fullContent.WriteString("  " + buttonStyle.Render("🏠 [d] Dashboard") + "\n")
+		}
+		debug.LogToFilef("🎯 BULK: 3 vertical buttons shown, selected=%d\n", v.selectedButton)
+	} else {
+		// Button 2: Dashboard (when no runs)
+		if v.selectedButton == 2 {
+			fullContent.WriteString("▸ " + selectedButtonStyle.Render("🏠 [d] Dashboard") + "\n")
+		} else {
+			fullContent.WriteString("  " + buttonStyle.Render("🏠 [d] Dashboard") + "\n")
+		}
+		debug.LogToFilef("🎯 BULK: 2 vertical buttons shown, selected=%d\n", v.selectedButton)
+	}
+	
+	// Add navigation hint
+	fullContent.WriteString("\n")
+	fullContent.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Italic(true).Render("Use ↑↓/j/k to navigate, Enter to select") + "\n")
+	
 	debug.LogToFilef("🎯 BULK total content built: %d lines\n", strings.Count(fullContent.String(), "\n"))
 	
 	// Set viewport content
