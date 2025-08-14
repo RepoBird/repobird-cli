@@ -13,6 +13,7 @@ import (
 	"github.com/repobird/repobird-cli/internal/tui/cache"
 	"github.com/repobird/repobird-cli/internal/tui/components"
 	"github.com/repobird/repobird-cli/internal/tui/debug"
+	"github.com/repobird/repobird-cli/internal/tui/keymap"
 	"github.com/repobird/repobird-cli/internal/tui/messages"
 	"github.com/repobird/repobird-cli/internal/utils"
 )
@@ -23,6 +24,9 @@ type ExampleConfiguration struct {
 	Description string // Short description
 	Content     string // Full file content with ANSI highlighting
 }
+
+// Ensure ExamplesView implements the CoreViewKeymap interface
+var _ keymap.CoreViewKeymap = (*ExamplesView)(nil)
 
 // ExamplesView displays bulk run configuration examples with preview
 type ExamplesView struct {
@@ -785,4 +789,29 @@ All changes should maintain backward compatibility with existing sessions.`,
 }`,
 		},
 	}
+}
+
+// CoreViewKeymap interface implementation to override global key behavior
+
+// IsKeyDisabled implements keymap.CoreViewKeymap
+func (v *ExamplesView) IsKeyDisabled(keyString string) bool {
+	// Don't disable any keys - we want to handle 'h' ourselves
+	return false
+}
+
+// HandleKey implements keymap.CoreViewKeymap
+func (v *ExamplesView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Model, cmd tea.Cmd) {
+	keyString := keyMsg.String()
+	debug.LogToFilef("🔧 EXAMPLES KEY: Handling key '%s' 🔧\n", keyString)
+	
+	// Override the global 'h' key behavior to go back instead of to dashboard
+	if keyString == "h" {
+		debug.LogToFilef("🔙 EXAMPLES KEY: Intercepting 'h' key for back navigation 🔙\n")
+		return true, v, func() tea.Msg {
+			return messages.NavigateBackMsg{}
+		}
+	}
+	
+	// Let other keys be handled by the normal Update flow
+	return false, v, nil
 }

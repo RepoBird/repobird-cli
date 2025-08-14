@@ -460,19 +460,29 @@ func (v *BulkView) handleInstructionsKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return messages.NavigateBackMsg{}
 		}
 	case key.Matches(msg, v.keys.Up):
-		// Navigate buttons up
+		// Navigate buttons up with cycling
+		maxButton := 3 // Files, Examples, Dashboard
+		if len(v.runs) > 0 {
+			maxButton = 4 // Files, Examples, Dashboard, Runs
+		}
 		if v.selectedButton > 1 {
 			v.selectedButton--
+		} else {
+			// Cycle to last button
+			v.selectedButton = maxButton
 		}
 		return v, nil
 	case key.Matches(msg, v.keys.Down):
-		// Navigate buttons down
+		// Navigate buttons down with cycling
 		maxButton := 3 // Files, Examples, Dashboard
 		if len(v.runs) > 0 {
 			maxButton = 4 // Files, Examples, Dashboard, Runs
 		}
 		if v.selectedButton < maxButton {
 			v.selectedButton++
+		} else {
+			// Cycle to first button
+			v.selectedButton = 1
 		}
 		return v, nil
 	case key.Matches(msg, v.keys.PageUp):
@@ -590,19 +600,15 @@ func (v *BulkView) handleRunListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				v.ensureButtonsVisible()
 			}
 		} else {
-			// In buttons mode, navigate up
+			// In buttons mode, navigate up with cycling
+			maxButton := v.getMaxButtonNum()
 			if v.selectedButton > 1 {
 				v.selectedButton--
 				v.ensureButtonsVisible()
 			} else {
-				// At top button, wrap to runs
-				v.focusMode = "runs"
-				if len(v.runs) > 0 {
-					v.selectedRun = len(v.runs) - 1
-				} else {
-					v.selectedRun = 0
-				}
-				v.ensureSelectedVisible()
+				// Cycle to last button
+				v.selectedButton = maxButton
+				v.ensureButtonsVisible()
 			}
 		}
 
@@ -620,16 +626,15 @@ func (v *BulkView) handleRunListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				v.ensureButtonsVisible()
 			}
 		} else {
-			// In buttons mode, navigate down through buttons
+			// In buttons mode, navigate down through buttons with cycling
 			maxButton := v.getMaxButtonNum()
 			if v.selectedButton < maxButton {
 				v.selectedButton++
 				v.ensureButtonsVisible()
 			} else {
-				// At bottom button, wrap to runs
-				v.focusMode = "runs"
-				v.selectedRun = 0
-				v.ensureSelectedVisible()
+				// Cycle to first button
+				v.selectedButton = 1
+				v.ensureButtonsVisible()
 			}
 		}
 
@@ -660,6 +665,12 @@ func (v *BulkView) handleRunListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if v.focusMode == "runs" && v.selectedRun < len(v.runs) {
 			v.runs[v.selectedRun].Selected = !v.runs[v.selectedRun].Selected
 			v.updateRunListViewport()
+
+			// Automatically move to next run after toggling
+			if v.selectedRun < len(v.runs)-1 {
+				v.selectedRun++
+				v.ensureSelectedVisible()
+			}
 		}
 
 	case msg.String() == "enter":
@@ -943,17 +954,17 @@ func (v *BulkView) renderInstructions() string {
 	// Show buttons vertically (one per row)
 	// Button 1: Files
 	if v.selectedButton == 1 {
-		fullContent.WriteString(selectedStyle.Render("▸ 📁 Files") + "\n")
+		fullContent.WriteString(selectedStyle.Render("▸ 📁 [FILES]") + "\n")
 	} else {
-		fullContent.WriteString(normalStyle.Render("  📁 Files") + "\n")
+		fullContent.WriteString(normalStyle.Render("  📁 [FILES]") + "\n")
 	}
 
 	// Button 2: Examples (always shown)
 	buttonNum := 2
 	if v.selectedButton == buttonNum {
-		fullContent.WriteString(selectedStyle.Render("▸ 📚 Examples") + "\n")
+		fullContent.WriteString(selectedStyle.Render("▸ 📚 [EXAMPLES]") + "\n")
 	} else {
-		fullContent.WriteString(normalStyle.Render("  📚 Examples") + "\n")
+		fullContent.WriteString(normalStyle.Render("  📚 [EXAMPLES]") + "\n")
 	}
 
 	// Button 3: Dashboard (always shown)
@@ -968,9 +979,9 @@ func (v *BulkView) renderInstructions() string {
 	if len(v.runs) > 0 {
 		buttonNum++
 		if v.selectedButton == buttonNum {
-			fullContent.WriteString(selectedStyle.Render("▸ 📋 Runs") + "\n")
+			fullContent.WriteString(selectedStyle.Render("▸ 📋 [RUNS]") + "\n")
 		} else {
-			fullContent.WriteString(normalStyle.Render("  📋 Runs") + "\n")
+			fullContent.WriteString(normalStyle.Render("  📋 [RUNS]") + "\n")
 		}
 	}
 
@@ -1174,9 +1185,9 @@ func (v *BulkView) renderRunList() string {
 	}
 
 	// Navigation buttons with selection highlight
-	// Button 1: SUBMIT with selected count (only show if runs are selected)
+	// Button 1: SUBMIT (only show if runs are selected)
 	if selectedRunCount > 0 {
-		submitText := fmt.Sprintf("🚀 [SUBMIT %d]", selectedRunCount)
+		submitText := "🚀 [SUBMIT]"
 		if v.focusMode == "buttons" && v.selectedButton == 1 {
 			content.WriteString(selectedBtnStyle.Render("▸ "+submitText) + "\n")
 		} else {
@@ -1273,7 +1284,12 @@ func (v *BulkView) renderStatusLineWithScroll(layoutName string, scrollIndicator
 			}
 		}
 
-		promptText := fmt.Sprintf("Submit %d runs for processing?", selectedRunCount)
+		var promptText string
+		if selectedRunCount == 1 {
+			promptText = "Submit 1 run for processing?"
+		} else {
+			promptText = fmt.Sprintf("Submit %d runs for processing?", selectedRunCount)
+		}
 		promptHelp := "(y)es (n)o [ESC]cancel"
 		yellowStyle := lipgloss.NewStyle().
 			Background(lipgloss.Color("220")). // Yellow background like dashboard
