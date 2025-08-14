@@ -19,10 +19,11 @@ import (
 // BulkResultsView displays the results of a bulk run submission
 type BulkResultsView struct {
 	// Core components
-	client   *api.Client
-	cache    *cache.SimpleCache
-	layout   *components.WindowLayout
-	viewport viewport.Model
+	client     *api.Client
+	cache      *cache.SimpleCache
+	layout     *components.WindowLayout
+	viewport   viewport.Model
+	statusLine *components.StatusLine
 
 	// Dimensions
 	width  int
@@ -39,9 +40,11 @@ type BulkResultsView struct {
 	// Original run configurations (for failed runs)
 	originalRuns map[int]BulkRunItem // Indexed by requestIndex
 
-	// UI state
-	showDetails bool
-	selectedTab int // 0 = successful, 1 = failed
+	// Navigation state
+	selectedTab    int    // 0 = successful, 1 = failed
+	selectedRow    int    // Currently selected row in the active tab
+	selectedButton int    // Currently selected button (0 = none, 1 = DASH)
+	focusMode      string // "runs" or "buttons"
 
 	// Key bindings
 	keys BulkResultsKeyMap
@@ -51,8 +54,10 @@ type BulkResultsView struct {
 type BulkResultsKeyMap struct {
 	Up       key.Binding
 	Down     key.Binding
+	PageUp   key.Binding
+	PageDown key.Binding
 	Tab      key.Binding
-	Details  key.Binding
+	Enter    key.Binding
 	Back     key.Binding
 	Dashboard key.Binding
 	Quit     key.Binding
@@ -69,17 +74,25 @@ func DefaultBulkResultsKeyMap() BulkResultsKeyMap {
 			key.WithKeys("down", "j"),
 			key.WithHelp("↓/j", "down"),
 		),
+		PageUp: key.NewBinding(
+			key.WithKeys("pgup", "ctrl+u"),
+			key.WithHelp("pgup", "page up"),
+		),
+		PageDown: key.NewBinding(
+			key.WithKeys("pgdown", "ctrl+d"),
+			key.WithHelp("pgdn", "page down"),
+		),
 		Tab: key.NewBinding(
 			key.WithKeys("tab"),
 			key.WithHelp("tab", "switch tab"),
 		),
-		Details: key.NewBinding(
-			key.WithKeys("d"),
-			key.WithHelp("d", "toggle details"),
+		Enter: key.NewBinding(
+			key.WithKeys("enter", " "),
+			key.WithHelp("enter", "select"),
 		),
 		Back: key.NewBinding(
-			key.WithKeys("b", "esc"),
-			key.WithHelp("b/esc", "back"),
+			key.WithKeys("h", "esc"),
+			key.WithHelp("h/esc", "back"),
 		),
 		Dashboard: key.NewBinding(
 			key.WithKeys("q"),
@@ -96,13 +109,19 @@ func DefaultBulkResultsKeyMap() BulkResultsKeyMap {
 func NewBulkResultsView(client *api.Client, cache *cache.SimpleCache) *BulkResultsView {
 	debug.LogToFilef("📊 Creating new BulkResultsView\n")
 	
+	vp := viewport.New(80, 20) // Default size, will be updated
+	vp.YPosition = 0
+	
 	v := &BulkResultsView{
 		client:       client,
 		cache:        cache,
 		keys:         DefaultBulkResultsKeyMap(),
 		originalRuns: make(map[int]BulkRunItem),
 		selectedTab:  0,
-		showDetails:  true,
+		selectedRow:  0,
+		focusMode:    "runs",
+		viewport:     vp,
+		statusLine:   components.NewStatusLine(),
 	}
 
 	// Load results from navigation context
@@ -182,10 +201,9 @@ func (v *BulkResultsView) handleWindowSizeMsg(msg tea.WindowSizeMsg) {
 		v.layout.Update(msg.Width, msg.Height)
 	}
 
-	// Update viewport dimensions
-	viewportWidth, viewportHeight := v.layout.GetViewportDimensions()
-	v.viewport.Width = viewportWidth
-	v.viewport.Height = viewportHeight - 4 // Account for tabs and status line
+	// Update viewport dimensions - account for box border and status line
+	v.viewport.Width = v.width - 4  // Account for border and padding
+	v.viewport.Height = v.height - 5 // Account for border, status line, and tabs
 
 	// Update viewport content
 	v.updateViewportContent()
@@ -193,6 +211,16 @@ func (v *BulkResultsView) handleWindowSizeMsg(msg tea.WindowSizeMsg) {
 
 // handleKeyMsg handles keyboard input
 func (v *BulkResultsView) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Handle navigation between runs and buttons
+	if v.focusMode == "runs" {
+		return v.handleRunKeys(msg)
+	} else {
+		return v.handleButtonKeys(msg)
+	}
+}
+
+// handleRunKeys handles keys when focused on runs
+func (v *BulkResultsView) handleRunKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, v.keys.Back):
 		// Go back to bulk view
@@ -206,17 +234,46 @@ func (v *BulkResultsView) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return messages.NavigateToDashboardMsg{}
 		}
 
+	case key.Matches(msg, v.keys.Up):
+		v.navigateUp()
+		v.ensureSelectedVisible()
+		v.updateViewportContent()
+		return v, nil
+
+	case key.Matches(msg, v.keys.Down):
+		v.navigateDown()
+		v.ensureSelectedVisible()
+		v.updateViewportContent()
+		return v, nil
+
+	case key.Matches(msg, v.keys.PageUp):
+		v.viewport.HalfViewUp()
+		return v, nil
+
+	case key.Matches(msg, v.keys.PageDown):
+		v.viewport.HalfViewDown()
+		return v, nil
+
 	case key.Matches(msg, v.keys.Tab):
 		// Switch between successful and failed tabs
 		if len(v.failed) > 0 {
 			v.selectedTab = (v.selectedTab + 1) % 2
+			v.selectedRow = 0
 			v.updateViewportContent()
 		}
 		return v, nil
 
-	case key.Matches(msg, v.keys.Details):
-		// Toggle details view
-		v.showDetails = !v.showDetails
+	case key.Matches(msg, v.keys.Enter):
+		// Switch to button mode or activate current item
+		if v.getItemCount() == 0 {
+			// No items, switch to button mode directly
+			v.focusMode = "buttons"
+			v.selectedButton = 1
+		} else {
+			// Has items, switch to button mode
+			v.focusMode = "buttons"
+			v.selectedButton = 1
+		}
 		v.updateViewportContent()
 		return v, nil
 
@@ -228,9 +285,84 @@ func (v *BulkResultsView) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 }
 
+// handleButtonKeys handles keys when focused on buttons
+func (v *BulkResultsView) handleButtonKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, v.keys.Up):
+		// Go back to runs list
+		v.focusMode = "runs"
+		v.updateViewportContent()
+		return v, nil
+
+	case key.Matches(msg, v.keys.Enter):
+		// Activate selected button
+		if v.selectedButton == 1 {
+			// DASH button
+			return v, func() tea.Msg {
+				return messages.NavigateToDashboardMsg{}
+			}
+		}
+		return v, nil
+
+	case key.Matches(msg, v.keys.Back), msg.Type == tea.KeyEsc:
+		// Go back to runs list
+		v.focusMode = "runs"
+		v.updateViewportContent()
+		return v, nil
+
+	case key.Matches(msg, v.keys.Dashboard), key.Matches(msg, v.keys.Quit):
+		// Go to dashboard
+		return v, func() tea.Msg {
+			return messages.NavigateToDashboardMsg{}
+		}
+
+	default:
+		return v, nil
+	}
+}
+
+// navigateUp moves selection up
+func (v *BulkResultsView) navigateUp() {
+	if v.selectedRow > 0 {
+		v.selectedRow--
+	}
+}
+
+// navigateDown moves selection down
+func (v *BulkResultsView) navigateDown() {
+	maxRow := v.getItemCount() - 1
+	if v.selectedRow < maxRow {
+		v.selectedRow++
+	}
+}
+
+// getItemCount returns the number of items in the current tab
+func (v *BulkResultsView) getItemCount() int {
+	if v.selectedTab == 0 {
+		return len(v.successful)
+	}
+	return len(v.failed)
+}
+
+// ensureSelectedVisible ensures the selected item is visible in the viewport
+func (v *BulkResultsView) ensureSelectedVisible() {
+	// Calculate line position of selected item
+	linePos := v.selectedRow * 3 // Each item takes ~3 lines
+
+	// Ensure the selected item is visible
+	if linePos < v.viewport.YOffset {
+		v.viewport.SetYOffset(linePos)
+	} else if linePos >= v.viewport.YOffset+v.viewport.Height-3 {
+		v.viewport.SetYOffset(linePos - v.viewport.Height + 4)
+	}
+}
+
 // updateViewportContent updates the content displayed in the viewport
 func (v *BulkResultsView) updateViewportContent() {
 	var content strings.Builder
+
+	// Add tabs
+	content.WriteString(v.renderTabs() + "\n\n")
 
 	if v.selectedTab == 0 {
 		// Show successful runs
@@ -240,138 +372,13 @@ func (v *BulkResultsView) updateViewportContent() {
 		content.WriteString(v.renderFailedRuns())
 	}
 
+	// Add navigation button if in button mode
+	if v.focusMode == "buttons" {
+		content.WriteString("\n\n")
+		content.WriteString(v.renderButtons())
+	}
+
 	v.viewport.SetContent(content.String())
-}
-
-// renderSuccessfulRuns renders the list of successful runs
-func (v *BulkResultsView) renderSuccessfulRuns() string {
-	if len(v.successful) == 0 {
-		return "\n  No successful runs"
-	}
-
-	var content strings.Builder
-	
-	for i, run := range v.successful {
-		icon := "✅"
-		status := lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Render(run.Status)
-		
-		if v.showDetails {
-			content.WriteString(fmt.Sprintf("\n  %s Run #%d\n", icon, run.ID))
-			content.WriteString(fmt.Sprintf("     Title: %s\n", run.Title))
-			content.WriteString(fmt.Sprintf("     Status: %s\n", status))
-			content.WriteString(fmt.Sprintf("     Repository: %s\n", run.RepositoryName))
-			if i < len(v.successful)-1 {
-				content.WriteString("\n")
-			}
-		} else {
-			content.WriteString(fmt.Sprintf("  %s #%d: %s [%s]\n", icon, run.ID, run.Title, status))
-		}
-	}
-
-	return content.String()
-}
-
-// renderFailedRuns renders the list of failed runs
-func (v *BulkResultsView) renderFailedRuns() string {
-	if len(v.failed) == 0 {
-		return "\n  No failed runs"
-	}
-
-	var content strings.Builder
-	
-	for i, runErr := range v.failed {
-		icon := "❌"
-		
-		if v.showDetails {
-			content.WriteString(fmt.Sprintf("\n  %s Failed Run (Index: %d)\n", icon, runErr.RequestIndex))
-			
-			// Show original configuration if available
-			if original, ok := v.originalRuns[runErr.RequestIndex]; ok {
-				if original.Title != "" {
-					content.WriteString(fmt.Sprintf("     Title: %s\n", original.Title))
-				}
-				if original.Target != "" {
-					content.WriteString(fmt.Sprintf("     Target: %s\n", original.Target))
-				}
-			}
-			
-			// Show prompt (truncated if too long)
-			prompt := runErr.Prompt
-			if len(prompt) > 100 {
-				prompt = prompt[:97] + "..."
-			}
-			content.WriteString(fmt.Sprintf("     Prompt: %s\n", prompt))
-			
-			// Show error message
-			errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
-			content.WriteString(fmt.Sprintf("     Error: %s\n", errorStyle.Render(runErr.Message)))
-			
-			// Show existing run ID if duplicate
-			if runErr.ExistingRunId > 0 {
-				content.WriteString(fmt.Sprintf("     Existing Run ID: #%d\n", runErr.ExistingRunId))
-			}
-			
-			if i < len(v.failed)-1 {
-				content.WriteString("\n")
-			}
-		} else {
-			// Compact view
-			title := "Untitled"
-			if original, ok := v.originalRuns[runErr.RequestIndex]; ok && original.Title != "" {
-				title = original.Title
-			}
-			errorMsg := runErr.Message
-			if len(errorMsg) > 50 {
-				errorMsg = errorMsg[:47] + "..."
-			}
-			content.WriteString(fmt.Sprintf("  %s %s: %s\n", icon, title, errorMsg))
-		}
-	}
-
-	return content.String()
-}
-
-// View renders the view
-func (v *BulkResultsView) View() string {
-	if v.layout == nil || v.width == 0 || v.height == 0 {
-		return ""
-	}
-
-	if !v.layout.IsValidDimensions() {
-		return v.layout.GetMinimalView("Bulk Results - Terminal too small")
-	}
-
-	// Create the main box
-	boxStyle := v.layout.CreateStandardBox()
-	titleStyle := v.layout.CreateTitleStyle()
-
-	// Create title with statistics
-	title := "📊 Bulk Run Results"
-	if v.batchTitle != "" {
-		title = fmt.Sprintf("📊 %s - Results", v.batchTitle)
-	}
-
-	// Create tabs
-	tabs := v.renderTabs()
-
-	// Create status line
-	statusLine := v.renderStatusLine()
-
-	// Combine all elements
-	content := lipgloss.JoinVertical(
-		lipgloss.Left,
-		titleStyle.Render(title),
-		tabs,
-		v.viewport.View(),
-		statusLine,
-	)
-
-	// Apply box styling
-	boxWidth, boxHeight := v.layout.GetBoxDimensions()
-	return boxStyle.
-		Width(boxWidth).
-		Height(boxHeight).
-		Render(content)
 }
 
 // renderTabs renders the tab bar
@@ -409,47 +416,219 @@ func (v *BulkResultsView) renderTabs() string {
 	return lipgloss.JoinHorizontal(lipgloss.Top, tabs...)
 }
 
-// renderStatusLine renders the status line with help text
-func (v *BulkResultsView) renderStatusLine() string {
-	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+// renderSuccessfulRuns renders the list of successful runs
+func (v *BulkResultsView) renderSuccessfulRuns() string {
+	if len(v.successful) == 0 {
+		return "  No successful runs"
+	}
 
-	// Build help text
-	var helpItems []string
+	var content strings.Builder
 	
-	if len(v.failed) > 0 {
-		helpItems = append(helpItems, "tab: switch")
+	// Style for selected row
+	selectedStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("205")).
+		Bold(true)
+	
+	normalStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("252"))
+	
+	for i, run := range v.successful {
+		isSelected := v.focusMode == "runs" && i == v.selectedRow
+		
+		var line strings.Builder
+		if isSelected {
+			line.WriteString("▸ ")
+		} else {
+			line.WriteString("  ")
+		}
+		
+		icon := "✅"
+		status := lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Render(run.Status)
+		
+		line.WriteString(fmt.Sprintf("%s Run #%d - %s [%s]", icon, run.ID, run.Title, status))
+		
+		if isSelected {
+			content.WriteString(selectedStyle.Render(line.String()))
+		} else {
+			content.WriteString(normalStyle.Render(line.String()))
+		}
+		content.WriteString("\n")
+		
+		// Add details under selected item
+		if isSelected {
+			detailStyle := lipgloss.NewStyle().
+				Foreground(lipgloss.Color("244")).
+				PaddingLeft(5)
+			content.WriteString(detailStyle.Render(fmt.Sprintf("Repository: %s", run.RepositoryName)))
+			content.WriteString("\n")
+		}
+	}
+
+	return content.String()
+}
+
+// renderFailedRuns renders the list of failed runs
+func (v *BulkResultsView) renderFailedRuns() string {
+	if len(v.failed) == 0 {
+		return "  No failed runs"
+	}
+
+	var content strings.Builder
+	
+	// Style for selected row
+	selectedStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("205")).
+		Bold(true)
+	
+	normalStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("252"))
+	
+	for i, runErr := range v.failed {
+		isSelected := v.focusMode == "runs" && i == v.selectedRow
+		
+		var line strings.Builder
+		if isSelected {
+			line.WriteString("▸ ")
+		} else {
+			line.WriteString("  ")
+		}
+		
+		icon := "❌"
+		
+		// Get title from original run if available
+		title := "Untitled"
+		if original, ok := v.originalRuns[runErr.RequestIndex]; ok && original.Title != "" {
+			title = original.Title
+		}
+		
+		line.WriteString(fmt.Sprintf("%s %s - Failed", icon, title))
+		
+		if isSelected {
+			content.WriteString(selectedStyle.Render(line.String()))
+		} else {
+			content.WriteString(normalStyle.Render(line.String()))
+		}
+		content.WriteString("\n")
+		
+		// Add details under selected item
+		if isSelected {
+			detailStyle := lipgloss.NewStyle().
+				Foreground(lipgloss.Color("244")).
+				PaddingLeft(5)
+			
+			errorStyle := lipgloss.NewStyle().
+				Foreground(lipgloss.Color("196")).
+				PaddingLeft(5)
+			
+			content.WriteString(errorStyle.Render(fmt.Sprintf("Error: %s", runErr.Message)))
+			content.WriteString("\n")
+			
+			if runErr.ExistingRunId > 0 {
+				content.WriteString(detailStyle.Render(fmt.Sprintf("Existing Run: #%d", runErr.ExistingRunId)))
+				content.WriteString("\n")
+			}
+		}
+	}
+
+	return content.String()
+}
+
+// renderButtons renders navigation buttons
+func (v *BulkResultsView) renderButtons() string {
+	var content strings.Builder
+	
+	selectedBtnStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("205")).
+		Bold(true)
+	
+	normalBtnStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("240"))
+	
+	// DASH button
+	if v.selectedButton == 1 {
+		content.WriteString(selectedBtnStyle.Render("▸ ← [DASH]"))
+	} else {
+		content.WriteString(normalBtnStyle.Render("  ← [DASH]"))
 	}
 	
-	helpItems = append(helpItems,
-		fmt.Sprintf("d: %s details", map[bool]string{true: "hide", false: "show"}[v.showDetails]),
-		"b: back",
-		"q: dashboard",
-	)
+	return content.String()
+}
 
-	help := helpStyle.Render(strings.Join(helpItems, " • "))
+// View renders the view
+func (v *BulkResultsView) View() string {
+	if v.width == 0 || v.height == 0 {
+		return ""
+	}
 
+	// Create box for the viewport
+	boxStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("63")).
+		Padding(0, 1).
+		Width(v.width).
+		Height(v.height - 3) // Account for status line
+
+	// Check if content overflows and needs scrolling
+	var scrollIndicator string
+	content := v.viewport.View()
+	totalLines := strings.Count(content, "\n")
+	viewportCanShow := v.viewport.Height
+
+	if totalLines > viewportCanShow {
+		// Content overflows, show scroll indicator
+		if v.viewport.AtTop() {
+			scrollIndicator = "[TOP ↓]"
+		} else if v.viewport.AtBottom() {
+			scrollIndicator = "[↑ BOTTOM]"
+		} else {
+			percentScrolled := v.viewport.ScrollPercent()
+			scrollIndicator = fmt.Sprintf("[↑ %d%% ↓]", int(percentScrolled*100))
+		}
+	}
+
+	// Render viewport in box
+	boxedContent := boxStyle.Render(v.viewport.View())
+
+	// Status line with proper [RESULTS] format
+	statusLine := v.renderStatusLine(scrollIndicator)
+
+	return lipgloss.JoinVertical(lipgloss.Left, boxedContent, statusLine)
+}
+
+// renderStatusLine renders the status line with [RESULTS] format
+func (v *BulkResultsView) renderStatusLine(scrollIndicator string) string {
+	// Create formatter for consistent formatting
+	formatter := components.NewStatusFormatter("RESULTS", v.width)
+	
+	// Help text based on current mode
+	var helpText string
+	if v.focusMode == "runs" {
+		if len(v.failed) > 0 {
+			helpText = "↑↓ nav • tab: switch • enter: buttons • h: back • q: dash"
+		} else {
+			helpText = "↑↓ nav • enter: buttons • h: back • q: dash"
+		}
+	} else {
+		helpText = "enter: select [DASH] • ↑: back to list • esc: cancel • q: dash"
+	}
+	
 	// Statistics summary
-	statsStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("62"))
 	stats := fmt.Sprintf("Total: %d | Success: %d | Failed: %d",
 		v.statistics.Total,
 		len(v.successful),
-		len(v.failed),
-	)
-
-	// Combine with proper spacing
-	width, _ := v.layout.GetViewportDimensions()
-	statusLeft := statsStyle.Render(stats)
-	statusRight := help
-
-	gap := width - lipgloss.Width(statusLeft) - lipgloss.Width(statusRight)
-	if gap < 0 {
-		gap = 0
-	}
-
-	return lipgloss.JoinHorizontal(
-		lipgloss.Top,
-		statusLeft,
-		strings.Repeat(" ", gap),
-		statusRight,
-	)
+		len(v.failed))
+	
+	// Combine left content with view name
+	leftContent := formatter.FormatViewName() + " " + stats
+	
+	// Right content is scroll indicator
+	rightContent := scrollIndicator
+	
+	// Use status line directly
+	return v.statusLine.
+		SetWidth(v.width).
+		SetLeft(leftContent).
+		SetRight(rightContent).
+		SetHelp(helpText).
+		Render()
 }
