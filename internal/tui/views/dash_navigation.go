@@ -290,8 +290,8 @@ func (d *DashboardView) handleMillerColumnsNavigation(msg tea.KeyMsg) tea.Cmd {
 			return d.startMessageClearTimer(1 * time.Second)
 		}
 
-	case key.Matches(msg, d.keys.Right) || (msg.Type == tea.KeyRunes && string(msg.Runes) == "l"):
-		// Move focus to the right
+	case key.Matches(msg, d.keys.Right) || (msg.Type == tea.KeyRunes && (string(msg.Runes) == "l" || string(msg.Runes) == "L")):
+		// Move focus to the right (l/L keys or right arrow)
 		if d.focusedColumn < 2 {
 			d.focusedColumn++
 			// If moving to runs column and no run selected, select first
