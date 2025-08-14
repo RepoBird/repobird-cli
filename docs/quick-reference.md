@@ -17,9 +17,9 @@ repobird config set api-key KEY     # Set API key
 |-----|--------|
 | `Tab` | Next column |
 | `↑/↓` or `j/k` | Move up/down |
-| `←/→` or `h/l` | Move left/right |
+| `←/→` or `l` | Move right |
+| `h` | Go back (vim/ranger style) |
 | `Enter` | Select & advance |
-| `Backspace` | Go back |
 
 ### Fuzzy Search (FZF)
 | Key | Action |
@@ -39,7 +39,7 @@ repobird config set api-key KEY     # Set API key
 | `y` | Copy selection/field |
 | `Y` | Copy all content |
 | `?` | Help |
-| `q` | Go back / Quit (from dashboard) |
+| `q` | Dashboard (from child views) / Quit (from dashboard) |
 | `Q` | Force quit (from anywhere) |
 
 ## Create Run View

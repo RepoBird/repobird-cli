@@ -152,12 +152,13 @@ The dashboard view is split across multiple files for maintainability:
 - `Ctrl+F` - Activate FZF mode (create view, insert mode)
 - `↑↓` or `j/k` - Navigate items
 - `Enter` - Select item
-- `ESC` - Cancel FZF mode
+- `ESC` - Cancel FZF mode/overlays
 - `Tab` - Next field/column
+- `h` - Go back (vim/ranger style navigation)
 - `n` - New run
 - `s` - Status info
 - `r` - Refresh
-- `q` - Quit
+- `q` - Dashboard (from child views) / Quit (from dashboard)
 
 ## Common Commands
 

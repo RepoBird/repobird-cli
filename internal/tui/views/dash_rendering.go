@@ -7,6 +7,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/repobird/repobird-cli/internal/models"
+	"github.com/repobird/repobird-cli/internal/tui/components"
 	"github.com/repobird/repobird-cli/internal/utils"
 )
 
@@ -458,9 +459,11 @@ func (d *DashboardView) renderDetailsColumn(width, height int) string {
 	return lipgloss.JoinVertical(lipgloss.Left, title, contentStyle.Render(d.detailsViewport.View()))
 }
 
-
 // renderStatusLine renders the universal status line
 func (d *DashboardView) renderStatusLine(layoutName string) string {
+	// Create formatter for consistent formatting
+	formatter := components.NewStatusFormatter(layoutName, d.width)
+
 	// Data freshness indicator - keep it very short
 	dataInfo := ""
 	isLoadingData := false
@@ -477,6 +480,9 @@ func (d *DashboardView) renderStatusLine(layoutName string) string {
 		}
 	}
 
+	// Format left content consistently
+	leftContent := formatter.FormatViewName()
+
 	// Handle URL selection prompt with yellow background
 	if d.showURLSelectionPrompt {
 		promptHelp := "Open URL: (o)RepoBird (g)GitHub [ESC]cancel"
@@ -487,7 +493,7 @@ func (d *DashboardView) renderStatusLine(layoutName string) string {
 
 		return d.statusLine.
 			SetWidth(d.width).
-			SetLeft(fmt.Sprintf("[%s]", layoutName)).
+			SetLeft(leftContent).
 			SetRight(dataInfo).
 			SetHelp(promptHelp).
 			SetStyle(yellowStyle).
@@ -504,13 +510,9 @@ func (d *DashboardView) renderStatusLine(layoutName string) string {
 	}
 
 	// Use the unified status line with temporary message support
-	// Reset to default style (not URL prompt)
-	return d.statusLine.
-		SetWidth(d.width).
-		SetLeft(fmt.Sprintf("[%s]", layoutName)).
-		SetRight(dataInfo).
-		SetHelp(shortHelp).
-		ResetStyle().
+	// Create using formatter for consistency
+	statusLine := formatter.StandardStatusLine(leftContent, dataInfo, shortHelp)
+	return statusLine.
 		SetLoading(isLoadingData).
 		Render()
 }

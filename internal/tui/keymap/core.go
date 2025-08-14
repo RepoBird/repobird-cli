@@ -23,6 +23,7 @@ const (
 	ActionNavigateRefresh
 	ActionNavigateQuit
 	ActionNavigateHelp
+	ActionNavigateToDashboard // Navigate directly to dashboard
 
 	// View actions
 	ActionViewSpecific // Let the view handle it
@@ -52,18 +53,17 @@ func NewCoreKeyRegistry() *CoreKeyRegistry {
 	}
 
 	// Register default key mappings
-	// NOTE: 'b' is handled specially by dashboard to go to bulk view
-	// Other views should use 'q' or backspace for back navigation
-	registry.Register("b", ActionNavigateBack, "go back")
+	// Primary navigation: h for back (vim/ranger style), q for dashboard/quit
+	registry.Register("h", ActionNavigateBack, "go back")
 	registry.Register("B", ActionNavigateBulk, "bulk operations")
 	registry.Register("n", ActionNavigateNew, "new run")
 	registry.Register("r", ActionNavigateRefresh, "refresh")
-	registry.Register("q", ActionNavigateBack, "go back") // Changed to back navigation
+	registry.Register("q", ActionNavigateToDashboard, "dashboard") // Goes to dashboard from child views
 	registry.Register("Q", ActionGlobalQuit, "force quit")
 	registry.Register("?", ActionNavigateHelp, "help")
 	registry.Register("ctrl+c", ActionGlobalQuit, "force quit")
-	registry.Register("esc", ActionNavigateBack, "go back")
-	registry.Register("backspace", ActionNavigateBack, "go back")
+	registry.Register("esc", ActionViewSpecific, "cancel modal/overlay") // Only for modals, not navigation
+	// Removed: backspace and b for back navigation
 
 	// View-specific keys that should be handled by views
 	registry.Register("s", ActionViewSpecific, "status info")
@@ -72,9 +72,11 @@ func NewCoreKeyRegistry() *CoreKeyRegistry {
 	registry.Register("enter", ActionViewSpecific, "select/enter")
 	registry.Register("tab", ActionViewSpecific, "next field")
 	registry.Register("shift+tab", ActionViewSpecific, "previous field")
+	registry.Register("backspace", ActionViewSpecific, "typing")
+	registry.Register("b", ActionViewSpecific, "view specific") // Let views handle 'b' (dashboard uses for bulk)
 
-	// Navigation keys
-	registry.Register("h", ActionViewSpecific, "left")
+	// Navigation keys (for column/list navigation within views)
+	// Note: 'h' is registered above as back navigation
 	registry.Register("j", ActionViewSpecific, "down")
 	registry.Register("k", ActionViewSpecific, "up")
 	registry.Register("l", ActionViewSpecific, "right")
@@ -122,7 +124,8 @@ func (r *CoreKeyRegistry) GetAllMappings() map[string]KeyMapping {
 func IsNavigationAction(action KeyAction) bool {
 	switch action {
 	case ActionNavigateBack, ActionNavigateBulk, ActionNavigateNew,
-		ActionNavigateRefresh, ActionNavigateQuit, ActionNavigateHelp:
+		ActionNavigateRefresh, ActionNavigateQuit, ActionNavigateHelp,
+		ActionNavigateToDashboard:
 		return true
 	default:
 		return false

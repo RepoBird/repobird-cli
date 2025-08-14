@@ -441,7 +441,7 @@ func (d *DashboardView) restoreOrInitDetailSelection() {
 			}
 		}
 	}
-	
+
 	// If not restored, initialize to first non-empty line
 	if !restored && len(d.detailLines) > 0 {
 		d.selectedDetailLine = 0

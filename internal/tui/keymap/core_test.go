@@ -11,13 +11,18 @@ func TestCoreKeyRegistry(t *testing.T) {
 	t.Run("default registry has correct mappings", func(t *testing.T) {
 		registry := NewCoreKeyRegistry()
 
-		// Test navigation actions
-		assert.Equal(t, ActionNavigateBack, registry.GetAction("b"))
+		// Test navigation actions (updated for new mappings)
+		assert.Equal(t, ActionNavigateBack, registry.GetAction("h"))        // h is now back
+		assert.Equal(t, ActionNavigateToDashboard, registry.GetAction("q")) // q goes to dashboard
 		assert.Equal(t, ActionNavigateBulk, registry.GetAction("B"))
 		assert.Equal(t, ActionNavigateNew, registry.GetAction("n"))
 		assert.Equal(t, ActionNavigateRefresh, registry.GetAction("r"))
-		assert.Equal(t, ActionNavigateBack, registry.GetAction("q")) // q is now mapped to back navigation
 		assert.Equal(t, ActionNavigateHelp, registry.GetAction("?"))
+
+		// Test that old back keys are now view-specific
+		assert.Equal(t, ActionViewSpecific, registry.GetAction("b"))         // b is now view-specific
+		assert.Equal(t, ActionViewSpecific, registry.GetAction("backspace")) // backspace is typing
+		assert.Equal(t, ActionViewSpecific, registry.GetAction("esc"))       // esc is for modals
 
 		// Test global actions
 		assert.Equal(t, ActionGlobalQuit, registry.GetAction("Q"))
@@ -58,6 +63,7 @@ func TestKeyActionClassification(t *testing.T) {
 		assert.True(t, IsNavigationAction(ActionNavigateRefresh))
 		assert.True(t, IsNavigationAction(ActionNavigateQuit))
 		assert.True(t, IsNavigationAction(ActionNavigateHelp))
+		assert.True(t, IsNavigationAction(ActionNavigateToDashboard)) // New action
 
 		assert.False(t, IsNavigationAction(ActionViewSpecific))
 		assert.False(t, IsNavigationAction(ActionIgnore))

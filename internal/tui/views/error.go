@@ -166,19 +166,20 @@ func (e *ErrorView) View() string {
 
 // renderStatusLine renders the status line with appropriate help text
 func (e *ErrorView) renderStatusLine() string {
+	// Create formatter for consistent formatting
+	formatter := components.NewStatusFormatter("ERROR", e.width)
+
 	var helpText string
 	if e.recoverable {
-		helpText = "[enter/esc]go back [q]quit"
+		helpText = "[h]back [enter/esc]back [q]dashboard"
 	} else {
-		helpText = "[enter]dashboard [q]quit"
+		helpText = "[enter]dashboard [q]dashboard"
 	}
 
-	statusLine := components.NewStatusLine().
-		SetWidth(e.width).
-		SetLeft("[ERROR]").
-		SetRight("").
-		SetHelp(helpText).
-		ResetStyle()
+	// Format left content consistently
+	leftContent := formatter.FormatViewName()
 
+	// Create status line using formatter
+	statusLine := formatter.StandardStatusLine(leftContent, "", helpText)
 	return statusLine.Render()
 }

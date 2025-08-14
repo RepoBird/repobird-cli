@@ -86,7 +86,7 @@ func NewMockServer(t *testing.T) *MockServer {
 	ms.runs["12345"] = &MockRun{
 		ID:             12345,
 		Status:         "DONE",
-		Repository:     "test/repo",  // Include both for compatibility
+		Repository:     "test/repo", // Include both for compatibility
 		RepositoryName: "test/repo",
 		Title:          "Test Run",
 		RunType:        "run",
@@ -100,7 +100,7 @@ func NewMockServer(t *testing.T) *MockServer {
 	ms.runs["67890"] = &MockRun{
 		ID:             67890,
 		Status:         "RUNNING",
-		Repository:     "test/another-repo",  // Include both for compatibility
+		Repository:     "test/another-repo", // Include both for compatibility
 		RepositoryName: "test/another-repo",
 		Title:          "Another Test Run",
 		RunType:        "plan",
@@ -134,7 +134,7 @@ func (ms *MockServer) handler(w http.ResponseWriter, r *http.Request) {
 		ms.failNext = false
 	}
 	ms.mu.Unlock()
-	
+
 	if shouldFail {
 		http.Error(w, "Forced failure", http.StatusInternalServerError)
 		return
@@ -237,7 +237,7 @@ func (ms *MockServer) handleCreateRun(w http.ResponseWriter, r *http.Request) {
 	run := &MockRun{
 		ID:             int(time.Now().Unix()),
 		Status:         "QUEUED",
-		Repository:     repoName,  // Include both for compatibility
+		Repository:     repoName, // Include both for compatibility
 		RepositoryName: repoName,
 		Title:          getStringField(payload, "title"),
 		RunType:        getStringField(payload, "runType"),

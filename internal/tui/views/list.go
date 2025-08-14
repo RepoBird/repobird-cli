@@ -534,6 +534,9 @@ func (v *RunListView) filterRuns() {
 }
 
 func (v *RunListView) renderStatusBar() string {
+	// Create formatter for consistent formatting
+	formatter := components.NewStatusFormatter("LIST", v.width)
+
 	// Determine if we're loading
 	isLoadingData := v.loading
 
@@ -602,14 +605,14 @@ func (v *RunListView) renderStatusBar() string {
 	}
 
 	// Help text
-	helpText := "[n]ew [r]efresh [/]search [?]help [q]back [Q]uit"
+	helpText := "[n]ew [r]efresh [/]search [?]help [h]back [q]dashboard [Q]uit"
 
-	// Use unified status line system
-	return v.statusLine.
-		SetWidth(v.width).
-		SetLeft("[LIST]").
-		SetRight(dataInfo).
-		SetHelp(helpText).
+	// Format left content consistently
+	leftContent := formatter.FormatViewName()
+
+	// Create status line using formatter
+	statusLine := formatter.StandardStatusLine(leftContent, dataInfo, helpText)
+	return statusLine.
 		SetLoading(isLoadingData).
 		Render()
 }

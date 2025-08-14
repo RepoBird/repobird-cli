@@ -110,23 +110,23 @@ func RunCommandWithEnv(t *testing.T, env map[string]string, args ...string) *Com
 // RunCommandWithInput executes the repobird CLI with stdin input
 func RunCommandWithInput(t *testing.T, input string, args ...string) *CommandResult {
 	t.Helper()
-	
+
 	binary := BuildBinary(t)
 	cmd := exec.Command(binary, args...)
-	
+
 	// Set up stdin
 	cmd.Stdin = strings.NewReader(input)
-	
+
 	// Capture output
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	
+
 	// Run command
 	start := time.Now()
 	err := runWithTimeout(cmd, 30*time.Second)
 	duration := time.Since(start)
-	
+
 	// Get exit code
 	exitCode := 0
 	if err != nil {
@@ -136,7 +136,7 @@ func RunCommandWithInput(t *testing.T, input string, args ...string) *CommandRes
 			exitCode = -1
 		}
 	}
-	
+
 	return &CommandResult{
 		Stdout:   stdout.String(),
 		Stderr:   stderr.String(),
@@ -295,22 +295,22 @@ func AssertEquals(t *testing.T, actual, expected string) {
 // AssertJSONEquals checks that two JSON strings are equivalent
 func AssertJSONEquals(t *testing.T, actual, expected string) {
 	t.Helper()
-	
+
 	var actualJSON, expectedJSON interface{}
-	
+
 	if err := json.Unmarshal([]byte(actual), &actualJSON); err != nil {
 		t.Errorf("Failed to parse actual JSON: %v\nJSON: %s", err, actual)
 		return
 	}
-	
+
 	if err := json.Unmarshal([]byte(expected), &expectedJSON); err != nil {
 		t.Errorf("Failed to parse expected JSON: %v\nJSON: %s", err, expected)
 		return
 	}
-	
+
 	actualBytes, _ := json.Marshal(actualJSON)
 	expectedBytes, _ := json.Marshal(expectedJSON)
-	
+
 	if string(actualBytes) != string(expectedBytes) {
 		t.Errorf("JSON values are not equal.\nExpected: %s\nActual: %s",
 			string(expectedBytes), string(actualBytes))
@@ -336,16 +336,16 @@ func CreateTestFile(t *testing.T, dir, name, content string) string {
 // CreateTestDirectory creates a test directory structure
 func CreateTestDirectory(t *testing.T, base string, structure map[string]string) {
 	t.Helper()
-	
+
 	for path, content := range structure {
 		fullPath := filepath.Join(base, path)
 		dir := filepath.Dir(fullPath)
-		
+
 		// Create parent directories
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			t.Fatalf("Failed to create directory %s: %v", dir, err)
 		}
-		
+
 		// Create file with content
 		if content != "" {
 			if err := os.WriteFile(fullPath, []byte(content), 0644); err != nil {
@@ -396,18 +396,18 @@ func WaitForCondition(timeout time.Duration, check func() bool) bool {
 func RetryWithBackoff(attempts int, initial time.Duration, f func() error) error {
 	var err error
 	delay := initial
-	
+
 	for i := 0; i < attempts; i++ {
 		if err = f(); err == nil {
 			return nil
 		}
-		
+
 		if i < attempts-1 {
 			time.Sleep(delay)
 			delay *= 2
 		}
 	}
-	
+
 	return fmt.Errorf("failed after %d attempts: %w", attempts, err)
 }
 
@@ -439,30 +439,30 @@ func CaptureOutput(f func()) (string, string) {
 	// Save original stdout and stderr
 	oldStdout := os.Stdout
 	oldStderr := os.Stderr
-	
+
 	// Create pipes
 	rOut, wOut, _ := os.Pipe()
 	rErr, wErr, _ := os.Pipe()
-	
+
 	// Redirect stdout and stderr
 	os.Stdout = wOut
 	os.Stderr = wErr
-	
+
 	// Run function
 	f()
-	
+
 	// Restore original stdout and stderr
 	os.Stdout = oldStdout
 	os.Stderr = oldStderr
-	
+
 	// Close write ends
 	wOut.Close()
 	wErr.Close()
-	
+
 	// Read captured output
 	outBytes, _ := io.ReadAll(rOut)
 	errBytes, _ := io.ReadAll(rErr)
-	
+
 	return string(outBytes), string(errBytes)
 }
 

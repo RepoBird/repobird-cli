@@ -169,7 +169,7 @@ func (s *StatusLine) Render() string {
 		// Keep the same layout structure but replace help text with temporary message
 		leftContent := s.leftContent
 		tempMessage := s.tempMessage
-		
+
 		// Truncate parts if needed
 		maxPartWidth := s.width / 3
 		if lipgloss.Width(leftContent) > maxPartWidth {
@@ -178,10 +178,10 @@ func (s *StatusLine) Render() string {
 		if lipgloss.Width(rightContent) > maxPartWidth {
 			rightContent = truncateWithEllipsis(rightContent, maxPartWidth)
 		}
-		
+
 		leftLen := lipgloss.Width(leftContent)
 		rightLen := lipgloss.Width(rightContent)
-		
+
 		// Calculate available space for the temporary message (in place of help text)
 		availableForMessage := s.width - leftLen - rightLen - 4 // Account for padding
 		if availableForMessage > 10 {
@@ -191,19 +191,19 @@ func (s *StatusLine) Render() string {
 			}
 			messageLen := lipgloss.Width(tempMessage)
 			middlePadding := strings.Repeat(" ", availableForMessage-messageLen)
-			
+
 			// Create colored message with the temporary message color
 			coloredMessage := lipgloss.NewStyle().
 				Foreground(s.tempMessageColor).
 				Render(tempMessage)
-			
+
 			// Build status content maintaining the same layout
 			statusContent := fmt.Sprintf("%s  %s%s  %s",
 				leftContent,
 				coloredMessage,
 				middlePadding,
 				rightContent)
-			
+
 			// Apply the base style (background)
 			return lipgloss.NewStyle().
 				Background(lipgloss.Color("235")).
@@ -220,11 +220,11 @@ func (s *StatusLine) Render() string {
 			if lipgloss.Width(tempMessage) > availableForMessage {
 				tempMessage = truncateWithEllipsis(tempMessage, availableForMessage)
 			}
-			
+
 			coloredMessage := lipgloss.NewStyle().
 				Foreground(s.tempMessageColor).
 				Render(tempMessage)
-			
+
 			padding := s.width - leftLen - lipgloss.Width(tempMessage) - rightLen
 			if padding < 0 {
 				padding = 0
@@ -234,7 +234,7 @@ func (s *StatusLine) Render() string {
 				coloredMessage,
 				strings.Repeat(" ", padding),
 				rightContent)
-			
+
 			return lipgloss.NewStyle().
 				Background(lipgloss.Color("235")).
 				Width(s.width).

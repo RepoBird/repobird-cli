@@ -28,15 +28,14 @@ type DashboardView struct {
 
 	// Dashboard state
 	currentLayout      models.LayoutType
-	showStatusInfo     bool // Show status/user info overlay
 	showDocs           bool // Show documentation overlay
 	selectedRepo       *models.Repository
 	selectedRepoIdx    int
 	selectedRunIdx     int
-	focusedColumn      int               // 0: repositories, 1: runs, 2: details
-	selectedDetailLine int               // Selected line in details column
-	detailLines        []string          // Lines in details column for selection
-	detailLineMemory   map[string]int    // Remember selected detail line per run ID
+	focusedColumn      int            // 0: repositories, 1: runs, 2: details
+	selectedDetailLine int            // Selected line in details column
+	detailLines        []string       // Lines in details column for selection
+	detailLineMemory   map[string]int // Remember selected detail line per run ID
 
 	// All-runs layout using shared component
 	allRunsList *components.ScrollableList
@@ -83,15 +82,6 @@ type DashboardView struct {
 
 	// Store original untruncated detail lines for copying
 	detailLinesOriginal []string
-
-	// Status info overlay navigation
-	statusInfoSelectedRow int      // Currently selected row in status info
-	statusInfoFields      []string // Field values that can be copied
-	statusInfoFieldLines  []int    // Line numbers for each field
-	statusInfoKeyOffset   int      // Horizontal scroll offset for keys
-	statusInfoValueOffset int      // Horizontal scroll offset for values
-	statusInfoFocusColumn int      // 0 = key column, 1 = value column
-	statusInfoKeys        []string // Full key text for each field
 
 	// URL selection for repositories
 	showURLSelectionPrompt bool                  // Show URL selection prompt in status line
@@ -143,8 +133,9 @@ func NewDashboardView(client APIClient) *DashboardView {
 		keys:   components.DefaultKeyMap,
 		help:   help.New(),
 		disabledKeys: map[string]bool{
-			"esc": true, // Disable escape key on dashboard (b is for bulk navigation)
-			"q":   true, // Disable q key navigation so dashboard can handle quit locally
+			"esc": true, // Disable escape key on dashboard (used for overlays/modals)
+			// 'h' is NOT disabled - used for column navigation (move left)
+			// 'q' is not disabled - HandleKey handles it for quit
 		},
 		currentLayout:    models.LayoutTripleColumn,
 		loading:          true,
@@ -152,7 +143,7 @@ func NewDashboardView(client APIClient) *DashboardView {
 		refreshInterval:  30 * time.Second,
 		apiRepositories:  make(map[int]models.APIRepository),
 		detailLineMemory: make(map[string]int), // Initialize detail line memory
-		fzfColumn:        -1, // No FZF mode initially
+		fzfColumn:        -1,                   // No FZF mode initially
 		spinner:          s,
 		statusLine:       components.NewStatusLine(),
 		helpView:         components.NewHelpView(),
@@ -185,12 +176,26 @@ func (d *DashboardView) IsKeyDisabled(keyString string) bool {
 
 // HandleKey implements the CoreViewKeymap interface
 func (d *DashboardView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Model, cmd tea.Cmd) {
-	// Dashboard handles 'b' specially for bulk view navigation (overrides back navigation)
-	if keyMsg.String() == "b" {
+	switch keyMsg.String() {
+	case "b":
+		// Dashboard handles 'b' specially for bulk view navigation (overrides back navigation)
 		// Navigate to bulk view
 		return true, d, func() tea.Msg {
 			return messages.NavigateToBulkMsg{}
 		}
+	case "h":
+		// Handle 'h' for column navigation (move left)
+		// Only allow back navigation if we're already in the leftmost column
+		if d.focusedColumn > 0 {
+			// Move to the left column
+			d.focusedColumn--
+			return true, d, nil
+		}
+		// If already in leftmost column, don't trigger back navigation (nowhere to go)
+		return true, d, nil
+	case "q":
+		// On dashboard, 'q' quits the app (with confirmation would be nice, but simple for now)
+		return true, d, tea.Quit
 	}
 	// Let the centralized system handle everything else
 	return false, d, nil
@@ -238,7 +243,7 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return d, tea.Quit
 		}
 		// Handle normal quit when not in special modes
-		if keyMsg.String() == "q" && !d.showStatusInfo && !d.showDocs && !d.showURLSelectionPrompt && d.fzfMode == nil {
+		if keyMsg.String() == "q" && !d.showDocs && !d.showURLSelectionPrompt && d.fzfMode == nil {
 			debug.LogToFilef("  Normal quit requested\n")
 			d.cache.SaveToDisk()
 			return d, tea.Quit
@@ -501,13 +506,9 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			// Block all other keys by returning early
 			return d, nil
-		case msg.Type == tea.KeyEsc && d.showStatusInfo:
-			// Close status info overlay with ESC
-			d.showStatusInfo = false
-			return d, nil
-		case msg.Type == tea.KeyRunes && string(msg.Runes) == "s" && !d.showStatusInfo:
-			// Navigate to status view
-			debug.LogToFilef("🏥 DASHBOARD: 's' key detected - navigating to STATUS view 🏥\n")
+		case msg.Type == tea.KeyRunes && string(msg.Runes) == "s":
+			// 's' navigates to the full Status View
+			debug.LogToFilef("🏥 DASHBOARD: 's' key detected - navigating to STATUS VIEW 🏥\n")
 			cmds = append(cmds, func() tea.Msg {
 				return messages.NavigateToStatusMsg{}
 			})
@@ -515,9 +516,6 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case d.showDocs:
 			// Handle navigation in help overlay
 			return d.handleHelpNavigation(msg)
-		case d.showStatusInfo:
-			// Handle navigation in status info overlay
-			return d.handleStatusInfoNavigation(msg)
 		case msg.Type == tea.KeyRunes && string(msg.Runes) == "n":
 			// Navigate to create new run view
 			var selectedRepository string
@@ -831,11 +829,6 @@ func (d *DashboardView) View() string {
 	// Overlay help if requested
 	if d.showDocs {
 		return d.renderHelp()
-	}
-
-	// Overlay status info if requested
-	if d.showStatusInfo {
-		return d.renderStatusInfo()
 	}
 
 	// Status line is already included in the layout-specific rendering functions

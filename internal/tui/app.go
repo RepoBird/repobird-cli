@@ -205,7 +205,7 @@ func (a *App) handleNavigation(msg messages.NavigationMsg) (tea.Model, tea.Cmd) 
 		a.current = views.NewDashboardView(a.client)
 		// Clear navigation context when going home
 		a.clearAllNavigationContext()
-		
+
 		// Send current window dimensions to the dashboard if we have them
 		var cmds []tea.Cmd
 		cmds = append(cmds, a.current.Init())
@@ -450,6 +450,9 @@ func (a *App) handleNavigationAction(action keymap.KeyAction, keyMsg tea.KeyMsg)
 	case keymap.ActionNavigateBack:
 		debug.LogToFilef("⬅️ NAV ACTION: Creating NavigateBackMsg ⬅️\n")
 		navMsg = messages.NavigateBackMsg{}
+	case keymap.ActionNavigateToDashboard:
+		debug.LogToFilef("🏠 NAV ACTION: Creating NavigateToDashboardMsg 🏠\n")
+		navMsg = messages.NavigateToDashboardMsg{}
 	case keymap.ActionNavigateBulk:
 		debug.LogToFilef("📦 NAV ACTION: Creating NavigateToBulkMsg 📦\n")
 		navMsg = messages.NavigateToBulkMsg{}

@@ -7,6 +7,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/repobird/repobird-cli/internal/models"
+	"github.com/repobird/repobird-cli/internal/tui/components"
 	"github.com/repobird/repobird-cli/internal/tui/debug"
 	"github.com/repobird/repobird-cli/internal/tui/styles"
 	"github.com/repobird/repobird-cli/internal/utils"
@@ -57,28 +58,24 @@ func (v *RunDetailsView) renderHeader() string {
 
 // renderStatusBar renders the status bar at the bottom of the view
 func (v *RunDetailsView) renderStatusBar() string {
+	// Create formatter for consistent formatting
+	formatter := components.NewStatusFormatter("DETAILS", v.width)
+
 	// Shorter options to fit better (removed logs functionality)
-	options := "q:back j/k:nav y:copy Y:all r:refresh ?:help Q:quit"
+	options := "[h]back [q]dashboard j/k:nav y:copy Y:all r:refresh ?:help Q:quit"
 
 	// Add URL opening hint if current selection has a URL
 	if v.hasCurrentSelectionURL() {
-		options = "o:url q:back j/k:nav y:copy Y:all r:refresh ?:help Q:quit"
+		options = "o:url [h]back [q]dashboard j/k:nav y:copy Y:all r:refresh ?:help Q:quit"
 	}
 
-	// Determine if we're loading
-	isLoadingData := v.loading
+	// Format left content consistently
+	leftContent := formatter.FormatViewName()
 
-	// Set right content based on loading state
-	rightContent := ""
-	// Don't show any text when loading, just the spinner
-
-	// Use unified status line system
-	return v.statusLine.
-		SetWidth(v.width).
-		SetLeft("[DETAILS]").
-		SetRight(rightContent).
-		SetHelp(options).
-		SetLoading(isLoadingData).
+	// Create status line using formatter
+	statusLine := formatter.StandardStatusLine(leftContent, "", options)
+	return statusLine.
+		SetLoading(v.loading).
 		Render()
 }
 

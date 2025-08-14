@@ -432,43 +432,24 @@ func (s *StatusView) renderFieldLine(index int, key, value string, maxWidth int)
 
 // renderStatusLine renders the status line at the bottom
 func (s *StatusView) renderStatusLine() string {
-	helpText := "[j/k]navigate [h/l]columns [y]copy [Y]copy all [r]refresh [q/ESC/b]back"
+	helpText := "[j/k]navigate [y]copy [Y]copy all [r]refresh [h]back [q]dashboard"
 
-	// Show copy message if active
-	if s.copiedMessage != "" && time.Since(s.copiedMessageTime) < 2*time.Second {
-		helpText = s.copiedMessage
-	}
+	// Create formatter for consistent formatting
+	formatter := components.NewStatusFormatter("STATUS", s.width)
 
-	statusStyle := lipgloss.NewStyle().
-		Background(lipgloss.Color("237")).
-		Foreground(lipgloss.Color("255")).
-		Width(s.width).
-		Padding(0, 1)
-
-	leftContent := "[STATUS]"
+	// Format left and right content
+	leftContent := formatter.FormatViewName()
 	rightContent := fmt.Sprintf("Line %d/%d", s.selectedRow+1, len(s.statusFields))
 
-	// Calculate spacing
-	totalContentWidth := len(leftContent) + len(rightContent) + len(helpText)
-	availableWidth := s.width - 2 // Account for padding
+	// Create status line using consistent component
+	statusLine := formatter.StandardStatusLine(leftContent, rightContent, helpText)
 
-	var centerContent string
-	if totalContentWidth < availableWidth {
-		centerPadding := availableWidth - len(leftContent) - len(rightContent) - len(helpText)
-		if centerPadding > 0 {
-			leftPadding := centerPadding / 2
-			centerContent = strings.Repeat(" ", leftPadding) + helpText
-		} else {
-			centerContent = helpText
-		}
-	} else {
-		centerContent = helpText
+	// Handle copy message if active
+	if s.copiedMessage != "" && time.Since(s.copiedMessageTime) < 2*time.Second {
+		statusLine.SetTemporaryMessage(s.copiedMessage, components.GetMessageColor(components.MessageSuccess), 2*time.Second)
 	}
 
-	statusContent := leftContent + centerContent + strings.Repeat(" ",
-		max(0, availableWidth-len(leftContent)-len(centerContent)-len(rightContent))) + rightContent
-
-	return statusStyle.Render(statusContent)
+	return statusLine.Render()
 }
 
 // max returns the maximum of two integers

@@ -332,31 +332,29 @@ func (v *CreateRunView) View() string {
 
 // renderStatusLine renders the status line with help text based on form mode
 func (v *CreateRunView) renderStatusLine(layoutName string) string {
-	// Add mode indicator
-	var modeIndicator string
+	// Create formatter for consistent formatting
+	formatter := components.NewStatusFormatter(layoutName, v.width)
+
+	// Determine mode and help text
+	var mode string
 	var helpText string
 
 	if v.form.IsInsertMode() {
-		modeIndicator = " [INPUT]"
+		mode = "INPUT"
 		helpText = "[esc]normal [tab]next [shift+tab]prev [ctrl+s]submit"
 	} else {
-		modeIndicator = ""
-		helpText = "[i]insert [d]delete [c]change [j/k/↑↓]nav [b/q]back [ctrl+s]submit"
+		mode = ""
+		helpText = "[i]insert [d]delete [c]change [j/k/↑↓]nav [h]back [q]dashboard [ctrl+s]submit"
 	}
 
-	// Compose the left side with layout name and mode indicator
-	leftText := fmt.Sprintf("[%s]%s", layoutName, modeIndicator)
+	// Format left content consistently
+	leftContent := formatter.FormatViewNameWithMode(mode)
 
-	// Create statusline component
-	statusLine := components.NewStatusLine().
-		SetWidth(v.width).
-		SetLeft(leftText).
-		SetRight("").
-		SetHelp(helpText).
-		ResetStyle().
-		SetLoading(v.submitting)
-
-	return statusLine.Render()
+	// Create status line using formatter
+	statusLine := formatter.StandardStatusLine(leftContent, "", helpText)
+	return statusLine.
+		SetLoading(v.submitting).
+		Render()
 }
 
 // saveFormData saves the current form state to cache

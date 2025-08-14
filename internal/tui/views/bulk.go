@@ -70,15 +70,15 @@ type BulkView struct {
 	selectedRun int
 
 	// UI state
-	mode             BulkMode
-	fileSelector     *components.BulkFileSelector // Only used in ModeFileBrowser
-	help             help.Model
-	keys             bulkKeyMap
-	width            int
-	height           int
-	viewport         viewport.Model // For scrollable content in RunList mode
-	selectedButton   int            // 0=none/runs, 1=add files, 2=submit, 3=dashboard
-	navigationFocus  string         // "runs" or "buttons"
+	mode           BulkMode
+	fileSelector   *components.BulkFileSelector // Only used in ModeFileBrowser
+	help           help.Model
+	keys           bulkKeyMap
+	width          int
+	height         int
+	viewport       viewport.Model // For scrollable content in RunList mode
+	selectedButton int            // For button navigation
+	focusMode      string         // "runs" or "buttons" for run list navigation
 
 	// Layout systems
 	doubleColumnLayout *components.DoubleColumnLayout // For FZF file browser
@@ -135,17 +135,17 @@ func NewBulkView(client *api.Client) *BulkView {
 	vp.YPosition = 0
 
 	return &BulkView{
-		client:          client,
-		mode:            ModeInstructions, // Start with instructions, not file selector
-		help:            help.New(),
-		keys:            defaultBulkKeyMap(),
-		spinner:         s,
-		runType:         "run",
-		runs:            []BulkRunItem{},
-		statusLine:      components.NewStatusLine(),
-		viewport:        vp,
-		selectedButton:  1, // Start with first button selected
-		navigationFocus: "runs",
+		client:         client,
+		mode:           ModeInstructions, // Start with instructions, not file selector
+		help:           help.New(),
+		keys:           defaultBulkKeyMap(),
+		spinner:        s,
+		runType:        "run",
+		runs:           []BulkRunItem{},
+		statusLine:     components.NewStatusLine(),
+		viewport:       vp,
+		selectedButton: 1, // Start with first button selected
+		focusMode:      "runs", // Start focused on runs
 	}
 }
 
@@ -254,14 +254,16 @@ func (v *BulkView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Update viewport dimensions from layout
 		// The viewport needs the content area dimensions
 		viewportWidth, viewportHeight := v.layout.GetContentDimensions()
-		debug.LogToFilef("🎯 BULK WindowSize: terminal=%dx%d, content=%dx%d\n", 
+		debug.LogToFilef("🎯 BULK WindowSize: terminal=%dx%d, content=%dx%d\n",
 			msg.Width, msg.Height, viewportWidth, viewportHeight)
-		
-		// Subtract space for border and padding (no extra for title since it's in content)
-		v.viewport.Width = viewportWidth - 2  // Account for padding
-		v.viewport.Height = viewportHeight - 2 // Account for padding
-		
-		debug.LogToFilef("🎯 BULK WindowSize: viewport set to %dx%d\n", 
+
+		// The viewport needs to fit inside the box's content area
+		// Box has border (2 chars) and horizontal padding (2 chars)
+		v.viewport.Width = viewportWidth - 2 // Account for horizontal padding
+		// Reduce height to prevent content overflow
+		v.viewport.Height = viewportHeight - 2 // Account for border expansion
+
+		debug.LogToFilef("🎯 BULK WindowSize: viewport set to %dx%d\n",
 			v.viewport.Width, v.viewport.Height)
 
 		// Update file selector dimensions
@@ -332,7 +334,7 @@ func (v *BulkView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// User canceled file selection
 			debug.LogToFile("DEBUG: BulkView - file selection canceled, returning to parent BULK mode\n")
 			v.fileSelector = nil // Clear file selector
-			
+
 			// Always go back to the parent view (where we came from)
 			// If we have runs already, we came from run list, otherwise from instructions
 			if len(v.runs) > 0 {
@@ -397,7 +399,7 @@ func (v *BulkView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		debug.LogToFilef("DEBUG: BulkView - error occurred: %v\n", msg.err)
 		v.error = msg.err
 		v.fileSelector = nil // Clear file selector
-		
+
 		// If we have runs already loaded, stay in run list mode
 		// Otherwise go to instructions to show the error
 		if len(v.runs) > 0 {
@@ -430,6 +432,54 @@ func (v *BulkView) handleInstructionsKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return v, func() tea.Msg {
 			return messages.NavigateBackMsg{}
 		}
+	case key.Matches(msg, v.keys.Up):
+		// Navigate buttons up
+		if v.selectedButton > 1 {
+			v.selectedButton--
+		}
+		return v, nil
+	case key.Matches(msg, v.keys.Down):
+		// Navigate buttons down
+		maxButton := 2
+		if len(v.runs) > 0 {
+			maxButton = 3
+		}
+		if v.selectedButton < maxButton {
+			v.selectedButton++
+		}
+		return v, nil
+	case key.Matches(msg, v.keys.PageUp):
+		v.viewport.HalfViewUp()
+		return v, nil
+	case key.Matches(msg, v.keys.PageDown):
+		v.viewport.HalfViewDown()
+		return v, nil
+	case msg.String() == "enter" || msg.String() == " ":
+		// Handle button activation
+		switch v.selectedButton {
+		case 1: // Select Files
+			v.mode = ModeFileBrowser
+			if v.fileSelector == nil {
+				v.fileSelector = components.NewBulkFileSelector(v.width, v.height)
+			}
+			return v, v.fileSelector.Activate()
+		case 2: // Dashboard or View Runs
+			if len(v.runs) == 0 {
+				// Dashboard button when no runs
+				return v, func() tea.Msg {
+					return messages.NavigateToDashboardMsg{}
+				}
+			} else {
+				// View Runs button when runs exist
+				v.mode = ModeRunList
+				v.updateRunListViewport()
+			}
+		case 3: // Dashboard (when runs exist)
+			return v, func() tea.Msg {
+				return messages.NavigateToDashboardMsg{}
+			}
+		}
+		return v, nil
 	case key.Matches(msg, v.keys.FZF) || msg.String() == "f":
 		// Switch to file browser mode and initialize file selector
 		v.mode = ModeFileBrowser
@@ -449,8 +499,10 @@ func (v *BulkView) handleInstructionsKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return messages.NavigateToDashboardMsg{}
 		}
 	default:
-		// Ignore other keys in instructions mode
-		return v, nil
+		// Pass other keys to viewport for scrolling
+		var cmd tea.Cmd
+		v.viewport, cmd = v.viewport.Update(msg)
+		return v, cmd
 	}
 }
 
@@ -461,7 +513,7 @@ func (v *BulkView) handleFileBrowserKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, v.keys.Quit) || msg.Type == tea.KeyEsc:
 		// Clear file selector
 		v.fileSelector = nil
-		
+
 		// If we have runs, go to run list, otherwise instructions
 		if len(v.runs) > 0 {
 			v.mode = ModeRunList
@@ -486,99 +538,53 @@ func (v *BulkView) handleFileBrowserKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (v *BulkView) handleRunListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
-	
+
 	switch {
 	case key.Matches(msg, v.keys.Quit):
 		// Navigate back to dashboard instead of quitting directly
 		return v, func() tea.Msg {
 			return messages.NavigateBackMsg{}
 		}
-	case msg.String() == "tab":
-		// Switch focus between runs and buttons
-		if v.navigationFocus == "runs" {
-			v.navigationFocus = "buttons"
-			v.selectedButton = 1 // Start with first button
-		} else {
-			v.navigationFocus = "runs"
-			v.selectedButton = 0
-		}
-		v.updateRunListViewport()
-		
-	case key.Matches(msg, v.keys.Up):
-		if v.navigationFocus == "runs" {
-			if v.selectedRun > 0 {
-				v.selectedRun--
-			} else {
-				// Wrap to buttons at bottom
-				v.navigationFocus = "buttons"
-				v.selectedButton = 3 // Dashboard button
-			}
+
+	case key.Matches(msg, v.keys.Up), msg.String() == "k":
+		// Navigate up in runs or scroll viewport
+		if v.selectedRun > 0 {
+			v.selectedRun--
 			v.updateRunListViewport()
 			v.ensureSelectedVisible()
 		} else {
-			// In button navigation, up goes back to runs
-			v.navigationFocus = "runs"
-			v.selectedButton = 0
-			v.selectedRun = len(v.runs) - 1 // Select last run
-			v.updateRunListViewport()
-			v.ensureSelectedVisible()
+			// At top, scroll viewport up
+			v.viewport.LineUp(1)
 		}
-		
-	case key.Matches(msg, v.keys.Down):
-		if v.navigationFocus == "runs" {
-			if v.selectedRun < len(v.runs)-1 {
-				v.selectedRun++
-			} else {
-				// Wrap to buttons at top
-				v.navigationFocus = "buttons"
-				v.selectedButton = 1 // Add files button
-			}
+
+	case key.Matches(msg, v.keys.Down), msg.String() == "j":
+		// Navigate down in runs or scroll viewport
+		if v.selectedRun < len(v.runs)-1 {
+			v.selectedRun++
 			v.updateRunListViewport()
 			v.ensureSelectedVisible()
 		} else {
-			// In button navigation, down goes to first run
-			v.navigationFocus = "runs"
-			v.selectedButton = 0
-			v.selectedRun = 0
-			v.updateRunListViewport()
-			v.ensureSelectedVisible()
+			// At bottom, scroll viewport down
+			v.viewport.LineDown(1)
 		}
-		
-	case key.Matches(msg, v.keys.Left):
-		if v.navigationFocus == "buttons" && v.selectedButton > 1 {
-			v.selectedButton--
-		}
-		
-	case key.Matches(msg, v.keys.Right):
-		if v.navigationFocus == "buttons" && v.selectedButton < 3 {
-			v.selectedButton++
-		}
-		
+
 	case key.Matches(msg, v.keys.PageUp):
 		v.viewport.HalfViewUp()
+
 	case key.Matches(msg, v.keys.PageDown):
 		v.viewport.HalfViewDown()
-		
+
 	case key.Matches(msg, v.keys.Select), msg.String() == " ":
-		if v.navigationFocus == "runs" {
-			if v.selectedRun < len(v.runs) {
-				v.runs[v.selectedRun].Selected = !v.runs[v.selectedRun].Selected
-				v.updateRunListViewport()
-			}
-		} else {
-			// Handle button selection with space
-			return v.handleButtonPress()
+		// Toggle selection for current run
+		if v.selectedRun < len(v.runs) {
+			v.runs[v.selectedRun].Selected = !v.runs[v.selectedRun].Selected
+			v.updateRunListViewport()
 		}
-		
+
 	case msg.String() == "enter":
-		if v.navigationFocus == "buttons" {
-			// Handle button selection with enter
-			return v.handleButtonPress()
-		} else {
-			// Submit selected bulk runs
-			return v, v.submitBulkRuns()
-		}
-		
+		// Submit selected bulk runs
+		return v, v.submitBulkRuns()
+
 	case key.Matches(msg, v.keys.FZF), msg.String() == "f":
 		// Switch back to file browser mode
 		v.mode = ModeFileBrowser
@@ -586,13 +592,13 @@ func (v *BulkView) handleRunListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			v.fileSelector = components.NewBulkFileSelector(v.width, v.height)
 		}
 		return v, v.fileSelector.Activate()
-		
+
 	case msg.String() == "d":
 		// Quick dashboard navigation
 		return v, func() tea.Msg {
 			return messages.NavigateToDashboardMsg{}
 		}
-		
+
 	case key.Matches(msg, v.keys.Submit):
 		// Submit selected bulk runs
 		return v, v.submitBulkRuns()
@@ -602,28 +608,8 @@ func (v *BulkView) handleRunListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		v.viewport, vpCmd = v.viewport.Update(msg)
 		cmds = append(cmds, vpCmd)
 	}
-	
-	return v, tea.Batch(cmds...)
-}
 
-// handleButtonPress handles button activation
-func (v *BulkView) handleButtonPress() (tea.Model, tea.Cmd) {
-	switch v.selectedButton {
-	case 1: // Add Files
-		v.mode = ModeFileBrowser
-		if v.fileSelector == nil {
-			v.fileSelector = components.NewBulkFileSelector(v.width, v.height)
-		}
-		return v, v.fileSelector.Activate()
-	case 2: // Submit
-		return v, v.submitBulkRuns()
-	case 3: // Dashboard
-		return v, func() tea.Msg {
-			return messages.NavigateToDashboardMsg{}
-		}
-	default:
-		return v, nil
-	}
+	return v, tea.Batch(cmds...)
 }
 
 // updateRunListViewport is now called from renderRunList to update content
@@ -637,11 +623,11 @@ func (v *BulkView) ensureSelectedVisible() {
 	// Calculate the line position of the selected item
 	lineHeight := 1 // Each item takes 1 line
 	selectedLine := v.selectedRun * lineHeight
-	
+
 	// Get current viewport position
 	viewportTop := v.viewport.YOffset
 	viewportBottom := viewportTop + v.viewport.Height - 1
-	
+
 	// Adjust viewport if selected item is not visible
 	if selectedLine < viewportTop {
 		// Selected item is above viewport
@@ -694,7 +680,7 @@ func (v *BulkView) View() string {
 // renderInstructions renders the initial instructions screen with scrollable content
 func (v *BulkView) renderInstructions() string {
 	debug.LogToFilef("🎯 BULK renderInstructions: width=%d, height=%d\n", v.width, v.height)
-	
+
 	// Initialize layout if not done yet
 	if v.layout == nil {
 		v.layout = components.NewWindowLayout(v.width, v.height)
@@ -705,13 +691,13 @@ func (v *BulkView) renderInstructions() string {
 	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("63"))
 	fullContent.WriteString(titleStyle.Render("📋 Bulk Operations") + "\n")
 	fullContent.WriteString(strings.Repeat("─", 50) + "\n\n")
-	
+
 	if v.error != nil {
 		// Show error message
 		errorStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("196")).
 			Bold(true)
-		
+
 		fullContent.WriteString(errorStyle.Render("❌ Error loading files:") + "\n")
 		fullContent.WriteString(fmt.Sprintf("%v", v.error) + "\n\n")
 		fullContent.WriteString("Press f to try again.\n\n")
@@ -721,119 +707,91 @@ func (v *BulkView) renderInstructions() string {
 		fullContent.WriteString(fmt.Sprintf("✓ %d runs loaded\n\n", len(v.runs)))
 		fullContent.WriteString("Press L to view runs\n\n")
 	} else {
-		// Initial state - detailed instructions
-		fullContent.WriteString("Process multiple runs simultaneously\n\n")
-		
-		fullContent.WriteString(lipgloss.NewStyle().Bold(true).Render("Required fields for each run:") + "\n")
-		fullContent.WriteString("  • prompt - The task instructions\n")
-		fullContent.WriteString("  • repository - Target repository (org/repo format)\n")
-		fullContent.WriteString("  • source - Base branch to work from\n")
-		fullContent.WriteString("  • target - New branch for changes\n")
-		fullContent.WriteString("  • runType - 'run' or 'approval'\n\n")
-		
-		fullContent.WriteString(lipgloss.NewStyle().Bold(true).Render("Optional fields:") + "\n")
-		fullContent.WriteString("  • title - Display name for the run\n")
-		fullContent.WriteString("  • context - Additional context\n")
-		fullContent.WriteString("  • files - Specific files to focus on\n\n")
-		
-		fullContent.WriteString(lipgloss.NewStyle().Bold(true).Render("Supported formats:") + "\n")
-		fullContent.WriteString("  • JSON (.json) - Standard configuration\n")
-		fullContent.WriteString("  • YAML (.yaml, .yml) - Alternative format\n")
-		fullContent.WriteString("  • JSONL (.jsonl) - Line-delimited JSON\n")
-		fullContent.WriteString("  • Markdown (.md) - With embedded configs\n\n")
-		
-		fullContent.WriteString("Get started by selecting configuration files below\n")
+		// Simple introduction
+		fullContent.WriteString("Submit multiple AI tasks from configuration files\n\n")
+		fullContent.WriteString("Select configuration files to get started\n")
 	}
-	
+
 	// Add buttons section with clear separation
 	fullContent.WriteString("\n")
 	fullContent.WriteString(strings.Repeat("─", 50) + "\n")
 	fullContent.WriteString(lipgloss.NewStyle().Bold(true).Render("Actions:") + "\n\n")
-	
-	// Create button styles
-	buttonStyle := lipgloss.NewStyle().
-		Padding(0, 2).
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("63")).
-		Width(35) // Fixed width for consistency
-	
-	selectedButtonStyle := buttonStyle.Copy().
-		BorderForeground(lipgloss.Color("205")).
+
+	// Simple button styles - no borders, just text
+	normalStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("240"))
+
+	selectedStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("205")).
 		Bold(true)
-	
-	// Always show buttons vertically with navigation indicator
-	// Button 1: Select Files (always visible)
+
+	// Show buttons vertically (one per row)
+	// Button 1: Files
 	if v.selectedButton == 1 {
-		fullContent.WriteString("▸ " + selectedButtonStyle.Render("📁 [f] Select Files") + "\n")
+		fullContent.WriteString(selectedStyle.Render("▸ 📁 Files") + "\n")
 	} else {
-		fullContent.WriteString("  " + buttonStyle.Render("📁 [f] Select Files") + "\n")
+		fullContent.WriteString(normalStyle.Render("  📁 Files") + "\n")
 	}
-	
-	// Button 2: View Runs (if runs loaded) or Dashboard
+
+	// Button 2: View Runs (only if runs loaded)
 	if len(v.runs) > 0 {
 		if v.selectedButton == 2 {
-			fullContent.WriteString("▸ " + selectedButtonStyle.Render("📋 [L] View Runs") + "\n")
+			fullContent.WriteString(selectedStyle.Render("▸ 📋 Runs") + "\n")
 		} else {
-			fullContent.WriteString("  " + buttonStyle.Render("📋 [L] View Runs") + "\n")
+			fullContent.WriteString(normalStyle.Render("  📋 Runs") + "\n")
 		}
-		// Button 3: Dashboard
-		if v.selectedButton == 3 {
-			fullContent.WriteString("▸ " + selectedButtonStyle.Render("🏠 [d] Dashboard") + "\n")
-		} else {
-			fullContent.WriteString("  " + buttonStyle.Render("🏠 [d] Dashboard") + "\n")
-		}
-		debug.LogToFilef("🎯 BULK: 3 vertical buttons shown, selected=%d\n", v.selectedButton)
-	} else {
-		// Button 2: Dashboard (when no runs)
-		if v.selectedButton == 2 {
-			fullContent.WriteString("▸ " + selectedButtonStyle.Render("🏠 [d] Dashboard") + "\n")
-		} else {
-			fullContent.WriteString("  " + buttonStyle.Render("🏠 [d] Dashboard") + "\n")
-		}
-		debug.LogToFilef("🎯 BULK: 2 vertical buttons shown, selected=%d\n", v.selectedButton)
 	}
-	
+
+	// Button 3 (or 2): Dashboard
+	if (len(v.runs) == 0 && v.selectedButton == 2) || (len(v.runs) > 0 && v.selectedButton == 3) {
+		fullContent.WriteString(selectedStyle.Render("▸ [DASH]") + "\n")
+	} else {
+		fullContent.WriteString(normalStyle.Render("  [DASH]") + "\n")
+	}
+
+	debug.LogToFilef("🎯 BULK: buttons shown vertically, selected=%d\n", v.selectedButton)
+
 	// Add navigation hint
 	fullContent.WriteString("\n")
-	fullContent.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Italic(true).Render("Use ↑↓/j/k to navigate, Enter to select") + "\n")
-	
+	fullContent.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Italic(true).Render("↑↓ nav • Enter select") + "\n")
+
 	debug.LogToFilef("🎯 BULK total content built: %d lines\n", strings.Count(fullContent.String(), "\n"))
-	
+
 	// Set viewport content
 	contentStr := fullContent.String()
 	debug.LogToFilef("🎯 BULK instructions content length: %d chars, %d lines\n", len(contentStr), strings.Count(contentStr, "\n"))
 	v.viewport.SetContent(contentStr)
-	
+
 	debug.LogToFilef("🎯 BULK viewport dimensions: width=%d, height=%d\n", v.viewport.Width, v.viewport.Height)
 	debug.LogToFilef("🎯 BULK terminal dimensions: width=%d, height=%d\n", v.width, v.height)
-	
+
 	// Create box for the viewport - leave room for borders and status line
+	// Need extra space to prevent border cutoff
 	boxWidth := v.width - 2
-	boxHeight := v.height - 2 // Account for status line
-	
+	boxHeight := v.height - 4 // Extra space to prevent top border cutoff
+
 	debug.LogToFilef("🎯 BULK box dimensions: width=%d, height=%d\n", boxWidth, boxHeight)
 	debug.LogToFilef("🎯 BULK content lines: %d, viewport can show: %d lines\n", strings.Count(contentStr, "\n"), v.viewport.Height)
-	
+
 	// Check if content overflows viewport
 	contentLines := strings.Count(contentStr, "\n")
 	if contentLines > v.viewport.Height {
 		debug.LogToFilef("⚠️ BULK OVERFLOW: Content has %d lines but viewport only shows %d lines\n", contentLines, v.viewport.Height)
 	}
-	
+
 	boxStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("63")).
-		Padding(0, 1).
+		Padding(0, 1). // Horizontal padding only
 		Width(boxWidth).
 		Height(boxHeight)
-	
+
 	// Render viewport in box
 	viewportView := v.viewport.View()
 	debug.LogToFilef("🎯 BULK viewport view lines: %d\n", strings.Count(viewportView, "\n"))
-	
-	// Add scroll indicator if content overflows
-	scrollIndicator := ""
+
+	// Check if content overflows and needs scrolling
+	var scrollIndicator string
 	if !v.viewport.AtTop() || !v.viewport.AtBottom() {
 		scrollPercent := int(float64(v.viewport.YOffset) / float64(v.viewport.TotalLineCount()-v.viewport.Height) * 100)
 		if scrollPercent < 0 {
@@ -842,22 +800,22 @@ func (v *BulkView) renderInstructions() string {
 		if scrollPercent > 100 {
 			scrollPercent = 100
 		}
-		scrollIndicator = fmt.Sprintf(" [%d%%]", scrollPercent)
-		debug.LogToFilef("🎯 BULK scroll: offset=%d, total=%d, height=%d, percent=%d%%\n", 
+		scrollIndicator = fmt.Sprintf("[%d%%]", scrollPercent)
+		debug.LogToFilef("🎯 BULK scroll: offset=%d, total=%d, height=%d, percent=%d%%\n",
 			v.viewport.YOffset, v.viewport.TotalLineCount(), v.viewport.Height, scrollPercent)
 	}
-	
+
 	boxedContent := boxStyle.Render(viewportView)
 	debug.LogToFilef("🎯 BULK boxed content lines: %d\n", strings.Count(boxedContent, "\n"))
-	
-	// Status line with scroll indicator
-	statusLine := v.renderStatusLine("BULK" + scrollIndicator)
-	
+
+	// Status line with scroll indicator on the right
+	statusLine := v.renderStatusLineWithScroll("BULK", scrollIndicator)
+
 	// Join with status line
 	final := lipgloss.JoinVertical(lipgloss.Left, boxedContent, statusLine)
 	debug.LogToFilef("🎯 BULK final output lines: %d\n", strings.Count(final, "\n"))
 	debug.LogToFilef("🎯 BULK final height should be: %d (terminal height)\n", v.height)
-	
+
 	return final
 }
 
@@ -906,7 +864,7 @@ func (v *BulkView) renderRunList() string {
 	if v.layout == nil {
 		v.layout = components.NewWindowLayout(v.width, v.height)
 	}
-	
+
 	// Count selected runs
 	selectedCount := 0
 	for _, run := range v.runs {
@@ -914,33 +872,29 @@ func (v *BulkView) renderRunList() string {
 			selectedCount++
 		}
 	}
-	
+
 	// Build the complete content for viewport
 	var content strings.Builder
-	
+
 	// Title
 	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("63"))
 	content.WriteString(titleStyle.Render(fmt.Sprintf("📋 Bulk Runs (%d total, %d selected)", len(v.runs), selectedCount)))
 	content.WriteString("\n")
 	content.WriteString(strings.Repeat("─", 50) + "\n\n")
-	
+
 	// Instructions
 	instructionStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Italic(true)
-	content.WriteString(instructionStyle.Render("Navigate with ↑↓, select with space, Tab to switch to buttons"))
+	content.WriteString(instructionStyle.Render("↑↓/j/k navigate, space select, enter submit"))
 	content.WriteString("\n\n")
-	
-	// Required params info
-	paramStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("243"))
-	content.WriteString(paramStyle.Render("Required: repository, source branch, run type, prompts") + "\n")
-	if v.repository != "" {
-		content.WriteString(paramStyle.Render(fmt.Sprintf("Current: %s | %s | %s", v.repository, v.sourceBranch, v.runType)) + "\n")
-	}
-	content.WriteString("\n")
-	
+
+	// Add header for runs
+	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("205"))
+	content.WriteString(headerStyle.Render("Agentic Runs Extracted from Files:") + "\n\n")
+
 	// Run items
 	selectedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true)
 	normalStyle := lipgloss.NewStyle()
-	
+
 	if len(v.runs) == 0 {
 		content.WriteString(lipgloss.NewStyle().Italic(true).Foreground(lipgloss.Color("243")).Render("No runs loaded yet. Press f to add files."))
 		content.WriteString("\n")
@@ -950,21 +904,21 @@ func (v *BulkView) renderRunList() string {
 			if run.Selected {
 				statusIcon = "[✓]"
 			}
-			
+
 			runTitle := run.Title
 			if runTitle == "" {
 				runTitle = fmt.Sprintf("Run %d", i+1)
 			}
-			
+
 			// Truncate title if too long
 			maxTitleLen := v.viewport.Width - 10
 			if maxTitleLen > 0 && len(runTitle) > maxTitleLen {
 				runTitle = runTitle[:maxTitleLen-3] + "..."
 			}
-			
+
 			line := fmt.Sprintf("%s %s", statusIcon, runTitle)
-			
-			if v.navigationFocus == "runs" && i == v.selectedRun {
+
+			if i == v.selectedRun {
 				content.WriteString(selectedStyle.Render("▸ " + line))
 			} else {
 				content.WriteString(normalStyle.Render("  " + line))
@@ -972,80 +926,39 @@ func (v *BulkView) renderRunList() string {
 			content.WriteString("\n")
 		}
 	}
-	
-	// Add spacing before buttons
-	content.WriteString("\n")
-	content.WriteString(strings.Repeat("─", 50) + "\n")
-	content.WriteString("Actions:\n\n")
-	
-	// Create action buttons
-	buttonStyle := lipgloss.NewStyle().
-		Padding(0, 1).
-		MarginRight(1).
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("63"))
-	
-	selectedButtonStyle := buttonStyle.Copy().
-		Background(lipgloss.Color("63")).
-		Foreground(lipgloss.Color("0")).
-		Bold(true)
-	
-	focusedButtonStyle := buttonStyle.Copy().
-		BorderForeground(lipgloss.Color("205")).
-		Foreground(lipgloss.Color("205"))
-	
-	// Build button row
-	var buttons []string
-	
-	// Add Files button
-	if v.navigationFocus == "buttons" && v.selectedButton == 1 {
-		buttons = append(buttons, focusedButtonStyle.Render("▸ [f] Add Files"))
-	} else {
-		buttons = append(buttons, buttonStyle.Render("[f] Add Files"))
-	}
-	
-	// Submit button
-	submitText := "[Enter] Submit"
+
+	// Add spacing
+	content.WriteString("\n\n")
+
+	// Submit info
+	submitStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("243"))
 	if selectedCount > 0 {
-		submitText = fmt.Sprintf("[Enter] Submit %d", selectedCount)
-	}
-	
-	if v.navigationFocus == "buttons" && v.selectedButton == 2 {
-		if selectedCount > 0 {
-			buttons = append(buttons, selectedButtonStyle.Copy().
-				BorderForeground(lipgloss.Color("205")).
-				Render("▸ " + submitText))
-		} else {
-			buttons = append(buttons, focusedButtonStyle.Render("▸ " + submitText))
-		}
-	} else if selectedCount > 0 {
-		buttons = append(buttons, selectedButtonStyle.Render(submitText))
+		content.WriteString(submitStyle.Render(fmt.Sprintf("Press Enter to submit %d selected runs", selectedCount)) + "\n\n")
 	} else {
-		buttons = append(buttons, buttonStyle.Render(submitText))
+		content.WriteString(submitStyle.Render("Select runs with space, then Enter to submit") + "\n\n")
 	}
-	
-	// Dashboard button
-	if v.navigationFocus == "buttons" && v.selectedButton == 3 {
-		buttons = append(buttons, focusedButtonStyle.Render("▸ [d] Dashboard"))
-	} else {
-		buttons = append(buttons, buttonStyle.Render("[d] Dashboard"))
-	}
-	
-	content.WriteString(lipgloss.JoinHorizontal(lipgloss.Left, buttons...))
-	
+
+	// Simple button styles - no borders, just text
+	normalBtnStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("240"))
+
+	// Navigation buttons
+	content.WriteString(normalBtnStyle.Render("  [FZF-FILES]") + "\n")
+	content.WriteString(normalBtnStyle.Render("  [DASH]") + "\n")
+
 	// Set viewport content
 	v.viewport.SetContent(content.String())
-	
-	// Create box for the viewport
+
+	// Create box for the viewport - adjust for border cutoff
 	boxStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("63")).
 		Padding(0, 1).
 		Width(v.width - 2).
-		Height(v.height - 2) // Account for status line
-	
-	// Get scroll indicator
-	scrollIndicator := ""
+		Height(v.height - 3) // Account for status line and prevent border cutoff
+
+	// Check if content overflows and needs scrolling
+	var scrollIndicator string
 	if !v.viewport.AtTop() || !v.viewport.AtBottom() {
 		percentScrolled := v.viewport.ScrollPercent()
 		position := "TOP"
@@ -1054,69 +967,56 @@ func (v *BulkView) renderRunList() string {
 		} else if percentScrolled > 0 {
 			position = fmt.Sprintf("%d%%", int(percentScrolled*100))
 		}
-		scrollIndicator = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("240")).
-			Render(fmt.Sprintf(" [%s]", position))
+		scrollIndicator = fmt.Sprintf("[%s]", position)
 	}
-	
+
 	// Render viewport in box
 	viewportView := v.viewport.View()
 	boxedContent := boxStyle.Render(viewportView)
-	
-	// Add scroll indicator to title if needed
-	if scrollIndicator != "" {
-		lines := strings.Split(boxedContent, "\n")
-		if len(lines) > 0 {
-			// Add scroll indicator to the top-right corner
-			lines[0] = lines[0][:len(lines[0])-len(scrollIndicator)-1] + scrollIndicator + lines[0][len(lines[0])-1:]
-			boxedContent = strings.Join(lines, "\n")
-		}
-	}
-	
-	// Status line
-	statusLine := v.renderStatusLine("BULK")
-	
+
+	// Status line with scroll indicator on the right
+	statusLine := v.renderStatusLineWithScroll("BULK", scrollIndicator)
+
 	return lipgloss.JoinVertical(lipgloss.Left, boxedContent, statusLine)
 }
 
 // renderStatusLine renders the status line
 func (v *BulkView) renderStatusLine(layoutName string) string {
+	return v.renderStatusLineWithScroll(layoutName, "")
+}
+
+// renderStatusLineWithScroll renders the status line with optional scroll indicator
+func (v *BulkView) renderStatusLineWithScroll(layoutName string, scrollIndicator string) string {
+	// Create formatter for consistent formatting
+	formatter := components.NewStatusFormatter(layoutName, v.width)
+
 	// Simple help text based on current mode
 	var helpText string
-	var modeIndicator string
+	var mode string
 
 	switch v.mode {
 	case ModeInstructions:
-		helpText = "f:browse files q:quit ?:help"
+		helpText = "↑↓:nav enter:select f:files [h]back [q]dashboard"
 	case ModeFileBrowser:
 		if v.fileSelector != nil && v.fileSelector.GetInputMode() {
-			modeIndicator = " [INPUT]"
+			mode = "INPUT"
 			helpText = "↑↓:nav space:select type:filter esc:nav mode enter:confirm ctrl+a:all"
 		} else {
-			modeIndicator = " [NAV]"
-			helpText = "↑↓/j/k:nav space:select i:input mode b/esc:back enter:confirm"
+			mode = "NAV"
+			helpText = "↑↓/j/k:nav space:select i:input mode esc:back enter:confirm"
 		}
 	case ModeRunList:
-		if v.navigationFocus == "buttons" {
-			helpText = "←→:select-button enter/space:activate tab:switch-to-runs q:back"
-		} else {
-			helpText = "↑↓:navigate space:toggle tab:switch-to-buttons enter:submit q:back"
-		}
+		helpText = "↑↓/j/k:nav space:select enter:submit f:files [h]back [q]dashboard"
 	default:
-		helpText = "q:quit ?:help"
+		helpText = "[h]back [q]dashboard ?:help"
 	}
 
-	// Compose the left side with layout name and mode indicator
-	leftText := fmt.Sprintf("[%s]%s", layoutName, modeIndicator)
+	// Format left content consistently
+	leftContent := formatter.FormatViewNameWithMode(mode)
 
-	return v.statusLine.
-		SetWidth(v.width).
-		SetLeft(leftText).
-		SetRight("").
-		SetHelp(helpText).
-		ResetStyle().
-		SetLoading(false).
-		Render()
+	// Create status line using formatter
+	statusLine := formatter.StandardStatusLine(leftContent, scrollIndicator, helpText)
+	return statusLine.Render()
 }
 
 // renderRunEdit renders the run editing view
@@ -1308,14 +1208,14 @@ func (v *BulkView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Model, 
 	// Handle ESC key specially in ModeFileBrowser
 	if keyString == "esc" && v.mode == ModeFileBrowser {
 		debug.LogToFilef("DEBUG: BulkView.HandleKey - handling 'esc' in FileBrowser mode\n")
-		
+
 		// Pass ESC to the file selector to handle the two-stage exit
 		// First ESC: exit INPUT mode to NAV mode
 		// Second ESC: cancel file selection and return to parent BULK mode
 		if v.fileSelector != nil {
 			newFileSelector, cmd := v.fileSelector.Update(keyMsg)
 			v.fileSelector = newFileSelector
-			
+
 			// The file selector will send BulkFileSelectedMsg{Canceled: true}
 			// when it wants to exit, which we handle in Update()
 			return true, v, cmd
