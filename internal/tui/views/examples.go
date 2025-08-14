@@ -803,7 +803,7 @@ func (v *ExamplesView) IsKeyDisabled(keyString string) bool {
 func (v *ExamplesView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Model, cmd tea.Cmd) {
 	keyString := keyMsg.String()
 	debug.LogToFilef("🔧 EXAMPLES KEY: Handling key '%s' 🔧\n", keyString)
-	
+
 	// Override the global 'h' key behavior to go back instead of to dashboard
 	if keyString == "h" {
 		debug.LogToFilef("🔙 EXAMPLES KEY: Intercepting 'h' key for back navigation 🔙\n")
@@ -811,7 +811,7 @@ func (v *ExamplesView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Mod
 			return messages.NavigateBackMsg{}
 		}
 	}
-	
+
 	// Let other keys be handled by the normal Update flow
 	return false, v, nil
 }

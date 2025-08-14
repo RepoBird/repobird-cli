@@ -263,8 +263,8 @@ func (v *BulkView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// The viewport needs to fit inside the box's content area
 		// Box has border (2 chars) and horizontal padding (2 chars)
 		v.viewport.Width = viewportWidth - 2 // Account for horizontal padding
-		// Increase viewport height to show more content
-		v.viewport.Height = viewportHeight + 2 // Give more space for content
+		// Set viewport height properly - account for status line
+		v.viewport.Height = msg.Height - 4 // Terminal height minus borders and status line
 
 		debug.LogToFilef("🎯 BULK WindowSize: viewport set to %dx%d\n",
 			v.viewport.Width, v.viewport.Height)
@@ -594,21 +594,34 @@ func (v *BulkView) handleRunListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				v.updateRunListViewport()
 				v.ensureSelectedVisible()
 			} else {
-				// At top of runs, switch to buttons
+				// At top of runs, switch to buttons - select last available button
 				v.focusMode = "buttons"
-				v.selectedButton = v.getMaxButtonNum() // Select last button
+				// Count selected runs to determine max button
+				selectedRunCount := 0
+				for _, run := range v.runs {
+					if run.Selected {
+						selectedRunCount++
+					}
+				}
+				if selectedRunCount > 0 {
+					v.selectedButton = 4 // DASH is button 4 when SUBMIT exists
+				} else {
+					v.selectedButton = 3 // DASH is button 3 when no SUBMIT
+				}
 				v.ensureButtonsVisible()
 			}
 		} else {
-			// In buttons mode, navigate up with cycling
-			maxButton := v.getMaxButtonNum()
+			// In buttons mode, navigate up
 			if v.selectedButton > 1 {
 				v.selectedButton--
 				v.ensureButtonsVisible()
 			} else {
-				// Cycle to last button
-				v.selectedButton = maxButton
-				v.ensureButtonsVisible()
+				// At top button, wrap to runs if available
+				if len(v.runs) > 0 {
+					v.focusMode = "runs"
+					v.selectedRun = len(v.runs) - 1
+					v.ensureSelectedVisible()
+				}
 			}
 		}
 
@@ -626,15 +639,29 @@ func (v *BulkView) handleRunListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				v.ensureButtonsVisible()
 			}
 		} else {
-			// In buttons mode, navigate down through buttons with cycling
-			maxButton := v.getMaxButtonNum()
+			// In buttons mode, navigate down
+			// Calculate max button based on current layout
+			selectedRunCount := 0
+			for _, run := range v.runs {
+				if run.Selected {
+					selectedRunCount++
+				}
+			}
+			maxButton := 3 // Default: FILES, EXAMPLES, DASH
+			if selectedRunCount > 0 {
+				maxButton = 4 // With SUBMIT: SUBMIT, FILES, EXAMPLES, DASH
+			}
+
 			if v.selectedButton < maxButton {
 				v.selectedButton++
 				v.ensureButtonsVisible()
 			} else {
-				// Cycle to first button
-				v.selectedButton = 1
-				v.ensureButtonsVisible()
+				// At bottom button, wrap to runs if available
+				if len(v.runs) > 0 {
+					v.focusMode = "runs"
+					v.selectedRun = 0
+					v.ensureSelectedVisible()
+				}
 			}
 		}
 
@@ -690,52 +717,56 @@ func (v *BulkView) handleRunListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 
 			// Button layout depends on whether we have selected runs
-			if selectedRunCount > 0 {
-				// Layout: [SUBMIT] [FILES] [EXAMPLES] [DASH]
-				switch v.selectedButton {
-				case 1:
+			// Handle buttons based on what's actually displayed
+			switch v.selectedButton {
+			case 1:
+				// Button 1: SUBMIT (if runs selected) or FILES (if no runs)
+				if selectedRunCount > 0 {
 					// [SUBMIT] button - show confirmation prompt
 					debug.LogToFile("DEBUG: Submit button selected - showing confirmation prompt\n")
 					v.showSubmissionPrompt = true
 					v.submissionPromptActive = true
 					return v, nil
-				case 2:
-					// [FILES] button
+				} else {
+					// [FILES] button when no runs
 					debug.LogToFile("DEBUG: Files button selected\n")
 					v.mode = ModeFileBrowser
 					if v.fileSelector == nil {
 						v.fileSelector = components.NewBulkFileSelector(v.width, v.height)
 					}
 					return v, v.fileSelector.Activate()
-				case 3:
-					// [EXAMPLES] button
+				}
+			case 2:
+				// Button 2: FILES (if runs selected) or EXAMPLES (if no runs)
+				if selectedRunCount > 0 {
+					// [FILES] button when runs selected
+					v.mode = ModeFileBrowser
+					if v.fileSelector == nil {
+						v.fileSelector = components.NewBulkFileSelector(v.width, v.height)
+					}
+					return v, v.fileSelector.Activate()
+				} else {
+					// [EXAMPLES] button when no runs
 					return v, func() tea.Msg {
 						return messages.NavigateToExamplesMsg{}
 					}
-				case 4:
-					// [DASH] button
+				}
+			case 3:
+				// Button 3: EXAMPLES (if runs selected) or DASH (if no runs)
+				if selectedRunCount > 0 {
+					// [EXAMPLES] button when runs selected
+					return v, func() tea.Msg {
+						return messages.NavigateToExamplesMsg{}
+					}
+				} else {
+					// [DASH] button when no runs
 					return v, func() tea.Msg {
 						return messages.NavigateToDashboardMsg{}
 					}
 				}
-			} else {
-				// Layout: [FILES] [EXAMPLES] [DASH] (no submit)
-				switch v.selectedButton {
-				case 1:
-					// [FILES] button
-					debug.LogToFile("DEBUG: Files button selected\n")
-					v.mode = ModeFileBrowser
-					if v.fileSelector == nil {
-						v.fileSelector = components.NewBulkFileSelector(v.width, v.height)
-					}
-					return v, v.fileSelector.Activate()
-				case 2:
-					// [EXAMPLES] button
-					return v, func() tea.Msg {
-						return messages.NavigateToExamplesMsg{}
-					}
-				case 3:
-					// [DASH] button
+			case 4:
+				// Button 4: DASH (only when runs selected)
+				if selectedRunCount > 0 {
 					return v, func() tea.Msg {
 						return messages.NavigateToDashboardMsg{}
 					}
@@ -783,25 +814,6 @@ func (v *BulkView) updateRunListViewport() {
 	// This method is kept for compatibility with existing calls
 }
 
-// getMaxButtonNum returns the maximum button number based on current state
-func (v *BulkView) getMaxButtonNum() int {
-	// Count selected runs to determine button layout
-	selectedRunCount := 0
-	for _, run := range v.runs {
-		if run.Selected {
-			selectedRunCount++
-		}
-	}
-
-	if selectedRunCount > 0 {
-		// Layout: [SUBMIT] [FILES] [EXAMPLES] [DASH] = 4 buttons
-		return 4
-	} else {
-		// Layout: [FILES] [EXAMPLES] [DASH] = 3 buttons
-		return 3
-	}
-}
-
 // ensureSelectedVisible ensures the selected item is visible in the viewport
 func (v *BulkView) ensureSelectedVisible() {
 	if v.focusMode == "buttons" {
@@ -831,42 +843,23 @@ func (v *BulkView) ensureSelectedVisible() {
 	}
 }
 
-// ensureButtonsVisible scrolls the viewport to show the buttons
+// ensureButtonsVisible scrolls the viewport to show the button area
 func (v *BulkView) ensureButtonsVisible() {
-	// Calculate where buttons are in the content
-	// Format: Title (1 line) + separator (1 line) + blank (1 line) +
-	// instructions (1 line) + blank (1 line) + header (1 line) + blank (1 line) +
-	// all runs + blank (2 lines) + buttons (dynamic number)
-	buttonStartLine := 7 + len(v.runs) + 2 // Header lines + runs + spacing
-	maxButtons := v.getMaxButtonNum()
-	debug.LogToFilef("🔘 BUTTONS: start line=%d, total buttons=%d\n", buttonStartLine, maxButtons)
-
-	// Get current viewport position
-	viewportTop := v.viewport.YOffset
-	viewportBottom := viewportTop + v.viewport.Height - 1
-
-	// Check if buttons are visible
-	// Calculate button end line (start + number of buttons)
-	buttonEndLine := buttonStartLine + maxButtons
-
-	if buttonStartLine > viewportBottom {
-		// Buttons are below viewport, scroll down to show them
-		// Position so buttons are visible in the viewport
-		newOffset := buttonStartLine - v.viewport.Height + maxButtons + 1 // Show buttons with minimal context
+	// Simple approach: scroll to the bottom to show buttons
+	// This works with any amount of content without complex calculations
+	totalLines := v.viewport.TotalLineCount()
+	if totalLines > v.viewport.Height {
+		// Scroll to show the bottom content (where buttons are)
+		newOffset := totalLines - v.viewport.Height + 1
 		if newOffset < 0 {
 			newOffset = 0
 		}
 		v.viewport.SetYOffset(newOffset)
-		debug.LogToFilef("🔘 SCROLL DOWN: buttons at %d-%d, viewport %d-%d, new offset=%d\n",
-			buttonStartLine, buttonEndLine, viewportTop, viewportBottom, newOffset)
-	} else if buttonEndLine < viewportTop {
-		// Buttons are above viewport (rare case when scrolled too far down)
-		v.viewport.SetYOffset(buttonStartLine - 2) // Show with some context above
-		debug.LogToFilef("🔘 SCROLL UP: buttons at %d-%d, viewport %d-%d\n",
-			buttonStartLine, buttonEndLine, viewportTop, viewportBottom)
+		debug.LogToFilef("🔘 BUTTONS: scrolled to show bottom, offset=%d, total=%d\n", newOffset, totalLines)
 	} else {
-		debug.LogToFilef("🔘 VISIBLE: buttons at %d-%d already in viewport %d-%d\n",
-			buttonStartLine, buttonEndLine, viewportTop, viewportBottom)
+		// Content fits in viewport, no scrolling needed
+		v.viewport.SetYOffset(0)
+		debug.LogToFilef("🔘 BUTTONS: content fits, no scrolling needed\n")
 	}
 }
 
@@ -1227,13 +1220,13 @@ func (v *BulkView) renderRunList() string {
 	// Set viewport content
 	v.viewport.SetContent(content.String())
 
-	// Create box for the viewport - adjust for border cutoff
+	// Create box for the viewport using proper dimensions
 	boxStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("63")).
 		Padding(0, 1).
-		Width(v.width - 2).
-		Height(v.height - 2) // Account for status line only
+		Width(v.width).
+		Height(v.height - 3) // Account for status line (1) + border (2)
 
 	// Check if content overflows and needs scrolling
 	var scrollIndicator string
