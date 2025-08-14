@@ -12,6 +12,14 @@ import (
 
 // updateDetailLines updates the detail lines for the selected run
 func (d *DashboardView) updateDetailLines() {
+	// Save current selection before updating if we're in the details column
+	if d.focusedColumn == 2 && d.selectedRunData != nil {
+		runID := d.selectedRunData.GetIDString()
+		if runID != "" {
+			d.detailLineMemory[runID] = d.selectedDetailLine
+		}
+	}
+
 	d.detailLines = []string{}
 	d.detailLinesOriginal = []string{}
 	d.selectedDetailLine = 0
@@ -126,6 +134,16 @@ func (d *DashboardView) updateDetailLines() {
 
 	// Update the details viewport with new content
 	d.updateDetailsViewportContent()
+
+	// Restore saved selection for this run if available
+	if runID := run.GetIDString(); runID != "" {
+		if savedLine, exists := d.detailLineMemory[runID]; exists {
+			// Ensure the saved selection is within bounds
+			if savedLine >= 0 && savedLine < len(d.detailLines) {
+				d.selectedDetailLine = savedLine
+			}
+		}
+	}
 }
 
 // updateAllRunsListData converts runs data for the shared scrollable list component

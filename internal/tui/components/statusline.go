@@ -166,31 +166,82 @@ func (s *StatusLine) Render() string {
 
 	// Check for active temporary message
 	if s.HasActiveMessage() {
-		// Create temporary message style - keep background consistent
-		tempStyle := lipgloss.NewStyle().
-			Background(lipgloss.Color("235")). // Keep same background as normal
-			Foreground(s.tempMessageColor).    // Only change text color
-			Padding(0, 1)
-
-		// For temporary messages, show the message in the help area
-		// Keep left content for context
-		statusContent := fmt.Sprintf("%s  %s",
-			s.leftContent,
-			s.tempMessage)
-
-		// Pad to full width
-		contentWidth := lipgloss.Width(statusContent)
-		if contentWidth < s.width {
-			statusContent += strings.Repeat(" ", s.width-contentWidth)
-		} else if contentWidth > s.width {
-			statusContent = truncateWithEllipsis(statusContent, s.width)
+		// Keep the same layout structure but replace help text with temporary message
+		leftContent := s.leftContent
+		tempMessage := s.tempMessage
+		
+		// Truncate parts if needed
+		maxPartWidth := s.width / 3
+		if lipgloss.Width(leftContent) > maxPartWidth {
+			leftContent = truncateWithEllipsis(leftContent, maxPartWidth)
 		}
-
-		return tempStyle.
-			Width(s.width).
-			MaxWidth(s.width).
-			MaxHeight(1).
-			Render(statusContent)
+		if lipgloss.Width(rightContent) > maxPartWidth {
+			rightContent = truncateWithEllipsis(rightContent, maxPartWidth)
+		}
+		
+		leftLen := lipgloss.Width(leftContent)
+		rightLen := lipgloss.Width(rightContent)
+		
+		// Calculate available space for the temporary message (in place of help text)
+		availableForMessage := s.width - leftLen - rightLen - 4 // Account for padding
+		if availableForMessage > 10 {
+			// Truncate message to fit
+			if lipgloss.Width(tempMessage) > availableForMessage {
+				tempMessage = truncateWithEllipsis(tempMessage, availableForMessage)
+			}
+			messageLen := lipgloss.Width(tempMessage)
+			middlePadding := strings.Repeat(" ", availableForMessage-messageLen)
+			
+			// Create colored message with the temporary message color
+			coloredMessage := lipgloss.NewStyle().
+				Foreground(s.tempMessageColor).
+				Render(tempMessage)
+			
+			// Build status content maintaining the same layout
+			statusContent := fmt.Sprintf("%s  %s%s  %s",
+				leftContent,
+				coloredMessage,
+				middlePadding,
+				rightContent)
+			
+			// Apply the base style (background)
+			return lipgloss.NewStyle().
+				Background(lipgloss.Color("235")).
+				Width(s.width).
+				MaxWidth(s.width).
+				MaxHeight(1).
+				Render(statusContent)
+		} else {
+			// Not enough space, just show left, message (truncated), and right
+			availableForMessage = s.width - leftLen - rightLen - 4
+			if availableForMessage < 0 {
+				availableForMessage = 0
+			}
+			if lipgloss.Width(tempMessage) > availableForMessage {
+				tempMessage = truncateWithEllipsis(tempMessage, availableForMessage)
+			}
+			
+			coloredMessage := lipgloss.NewStyle().
+				Foreground(s.tempMessageColor).
+				Render(tempMessage)
+			
+			padding := s.width - leftLen - lipgloss.Width(tempMessage) - rightLen
+			if padding < 0 {
+				padding = 0
+			}
+			statusContent := fmt.Sprintf("%s  %s%s%s",
+				leftContent,
+				coloredMessage,
+				strings.Repeat(" ", padding),
+				rightContent)
+			
+			return lipgloss.NewStyle().
+				Background(lipgloss.Color("235")).
+				Width(s.width).
+				MaxWidth(s.width).
+				MaxHeight(1).
+				Render(statusContent)
+		}
 	}
 
 	// Truncate individual parts if they're too long

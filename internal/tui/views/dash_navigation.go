@@ -149,15 +149,8 @@ func (d *DashboardView) handleMillerColumnsNavigation(msg tea.KeyMsg) tea.Cmd {
 			d.selectedRunData = d.filteredRuns[0]
 			d.updateDetailLines()
 		} else if d.focusedColumn == 2 {
-			// Moving to details column, select first non-empty line
-			d.selectedDetailLine = 0
-			// Skip empty lines at the beginning
-			if len(d.detailLines) > 0 && d.isEmptyLine(d.detailLines[0]) {
-				newIdx := d.findNextNonEmptyLine(-1, 1) // Start from -1 to check from index 0
-				if newIdx >= 0 && newIdx < len(d.detailLines) {
-					d.selectedDetailLine = newIdx
-				}
-			}
+			// Moving to details column, restore or init selection
+			d.restoreOrInitDetailSelection()
 		}
 
 	case key.Matches(msg, d.keys.Enter):
@@ -172,21 +165,21 @@ func (d *DashboardView) handleMillerColumnsNavigation(msg tea.KeyMsg) tea.Cmd {
 					d.updateDetailLines()
 				}
 			} else if d.focusedColumn == 2 {
-				// Moving to details column, select first non-empty line
-				d.selectedDetailLine = 0
-				// Skip empty lines at the beginning
-				if len(d.detailLines) > 0 && d.isEmptyLine(d.detailLines[0]) {
-					newIdx := d.findNextNonEmptyLine(-1, 1) // Start from -1 to check from index 0
-					if newIdx >= 0 && newIdx < len(d.detailLines) {
-						d.selectedDetailLine = newIdx
-					}
-				}
+				// Moving to details column, restore or init selection
+				d.restoreOrInitDetailSelection()
 			}
 		}
 
 	case msg.Type == tea.KeyBackspace:
 		// Backspace moves focus left
 		if d.focusedColumn > 0 {
+			// Save detail line selection if leaving details column
+			if d.focusedColumn == 2 && d.selectedRunData != nil {
+				runID := d.selectedRunData.GetIDString()
+				if runID != "" {
+					d.detailLineMemory[runID] = d.selectedDetailLine
+				}
+			}
 			d.focusedColumn--
 		}
 
@@ -307,20 +300,21 @@ func (d *DashboardView) handleMillerColumnsNavigation(msg tea.KeyMsg) tea.Cmd {
 				d.selectedRunData = d.filteredRuns[0]
 				d.updateDetailLines()
 			} else if d.focusedColumn == 2 {
-				// Select first non-empty line when moving to details
-				d.selectedDetailLine = 0
-				if len(d.detailLines) > 0 && d.isEmptyLine(d.detailLines[0]) {
-					newIdx := d.findNextNonEmptyLine(-1, 1)
-					if newIdx >= 0 && newIdx < len(d.detailLines) {
-						d.selectedDetailLine = newIdx
-					}
-				}
+				// Moving to details column, restore or init selection
+				d.restoreOrInitDetailSelection()
 			}
 		}
 
 	case key.Matches(msg, d.keys.Left) || (msg.Type == tea.KeyRunes && string(msg.Runes) == "h"):
 		// Move focus to the left
 		if d.focusedColumn > 0 {
+			// Save detail line selection if leaving details column
+			if d.focusedColumn == 2 && d.selectedRunData != nil {
+				runID := d.selectedRunData.GetIDString()
+				if runID != "" {
+					d.detailLineMemory[runID] = d.selectedDetailLine
+				}
+			}
 			d.focusedColumn--
 		}
 	}
@@ -390,16 +384,7 @@ func (d *DashboardView) moveToFirstItem() {
 			d.updateDetailLines()
 		}
 	case 2: // Details column
-		if len(d.detailLines) > 0 {
-			d.selectedDetailLine = 0
-			// Skip empty lines at the beginning
-			if d.isEmptyLine(d.detailLines[0]) {
-				newIdx := d.findNextNonEmptyLine(-1, 1)
-				if newIdx >= 0 && newIdx < len(d.detailLines) {
-					d.selectedDetailLine = newIdx
-				}
-			}
-		}
+		d.restoreOrInitDetailSelection()
 	}
 }
 
@@ -431,8 +416,42 @@ func (d *DashboardView) handleColumnNavigation(direction int) {
 		d.focusedColumn++
 		d.ensureValidSelection()
 	} else if direction < 0 && d.focusedColumn > 0 {
+		// Save detail line selection if leaving details column
+		if d.focusedColumn == 2 && d.selectedRunData != nil {
+			runID := d.selectedRunData.GetIDString()
+			if runID != "" {
+				d.detailLineMemory[runID] = d.selectedDetailLine
+			}
+		}
 		// Move left
 		d.focusedColumn--
+	}
+}
+
+// restoreOrInitDetailSelection restores saved detail line selection or initializes to first non-empty line
+func (d *DashboardView) restoreOrInitDetailSelection() {
+	// Try to restore saved selection for this run
+	restored := false
+	if d.selectedRunData != nil {
+		runID := d.selectedRunData.GetIDString()
+		if runID != "" {
+			if savedLine, exists := d.detailLineMemory[runID]; exists && savedLine >= 0 && savedLine < len(d.detailLines) {
+				d.selectedDetailLine = savedLine
+				restored = true
+			}
+		}
+	}
+	
+	// If not restored, initialize to first non-empty line
+	if !restored && len(d.detailLines) > 0 {
+		d.selectedDetailLine = 0
+		// Skip empty lines at the beginning
+		if d.isEmptyLine(d.detailLines[0]) {
+			newIdx := d.findNextNonEmptyLine(-1, 1)
+			if newIdx >= 0 && newIdx < len(d.detailLines) {
+				d.selectedDetailLine = newIdx
+			}
+		}
 	}
 }
 
@@ -446,15 +465,6 @@ func (d *DashboardView) ensureValidSelection() {
 			d.updateDetailLines()
 		}
 	case 2: // Details column
-		if len(d.detailLines) > 0 {
-			d.selectedDetailLine = 0
-			// Skip empty lines at the beginning
-			if d.isEmptyLine(d.detailLines[0]) {
-				newIdx := d.findNextNonEmptyLine(-1, 1)
-				if newIdx >= 0 && newIdx < len(d.detailLines) {
-					d.selectedDetailLine = newIdx
-				}
-			}
-		}
+		d.restoreOrInitDetailSelection()
 	}
 }

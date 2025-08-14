@@ -12,10 +12,18 @@ func (v *RunDetailsView) handleRowNavigation(msg tea.KeyMsg) tea.Cmd {
 		if v.selectedRow < len(v.fieldValues)-1 {
 			v.selectedRow++
 			v.scrollToSelectedField()
+		} else if len(v.fieldValues) > 0 {
+			// Wrap around to the first item
+			v.selectedRow = 0
+			v.scrollToSelectedField()
 		}
 	case "k", "up":
 		if v.selectedRow > 0 {
 			v.selectedRow--
+			v.scrollToSelectedField()
+		} else if len(v.fieldValues) > 0 {
+			// Wrap around to the last item
+			v.selectedRow = len(v.fieldValues) - 1
 			v.scrollToSelectedField()
 		}
 	case "g":

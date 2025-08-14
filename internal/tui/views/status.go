@@ -165,12 +165,20 @@ func (s *StatusView) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if s.selectedRow < len(s.statusFields)-1 {
 			s.selectedRow++
 			s.resetHorizontalScroll()
+		} else if len(s.statusFields) > 0 {
+			// Wrap around to the first item
+			s.selectedRow = 0
+			s.resetHorizontalScroll()
 		}
 		return s, nil
 
 	case "k", "up":
 		if s.selectedRow > 0 {
 			s.selectedRow--
+			s.resetHorizontalScroll()
+		} else if len(s.statusFields) > 0 {
+			// Wrap around to the last item
+			s.selectedRow = len(s.statusFields) - 1
 			s.resetHorizontalScroll()
 		}
 		return s, nil

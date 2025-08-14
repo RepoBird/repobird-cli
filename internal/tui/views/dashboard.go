@@ -33,9 +33,10 @@ type DashboardView struct {
 	selectedRepo       *models.Repository
 	selectedRepoIdx    int
 	selectedRunIdx     int
-	focusedColumn      int      // 0: repositories, 1: runs, 2: details
-	selectedDetailLine int      // Selected line in details column
-	detailLines        []string // Lines in details column for selection
+	focusedColumn      int               // 0: repositories, 1: runs, 2: details
+	selectedDetailLine int               // Selected line in details column
+	detailLines        []string          // Lines in details column for selection
+	detailLineMemory   map[string]int    // Remember selected detail line per run ID
 
 	// All-runs layout using shared component
 	allRunsList *components.ScrollableList
@@ -150,6 +151,7 @@ func NewDashboardView(client APIClient) *DashboardView {
 		initializing:     true,
 		refreshInterval:  30 * time.Second,
 		apiRepositories:  make(map[int]models.APIRepository),
+		detailLineMemory: make(map[string]int), // Initialize detail line memory
 		fzfColumn:        -1, // No FZF mode initially
 		spinner:          s,
 		statusLine:       components.NewStatusLine(),
@@ -400,7 +402,7 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					d.selectedRunData = d.filteredRuns[d.selectedRunIdx]
 					d.updateDetailLines()
 					d.focusedColumn = 2 // Move to details column
-					d.selectedDetailLine = 0
+					d.restoreOrInitDetailSelection()
 				}
 			case 2: // Details column
 				if msg.Result.Index >= 0 && msg.Result.Index < len(d.detailLines) {

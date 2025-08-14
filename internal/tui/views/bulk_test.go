@@ -498,8 +498,7 @@ func TestBulkViewRendering(t *testing.T) {
 
 		output := view.View()
 
-		assert.Contains(t, output, "Bulk Runs (2)")
-		assert.Contains(t, output, "Repository: test/repo")
+		assert.Contains(t, output, "Bulk Runs (2 total")
 		assert.Contains(t, output, "[✓] Test Run 1")
 		assert.Contains(t, output, "[ ] Test Run 2")
 		assert.Contains(t, output, "[BULK]")
@@ -569,7 +568,7 @@ func TestBulkViewStatusLineHelp(t *testing.T) {
 		expected string
 	}{
 		{ModeFileBrowser, "↑↓/j/k:nav space:select i:input mode b/esc:back enter:confirm"},
-		{ModeRunList, "↑↓:navigate space:toggle f:files ctrl+s:submit q:quit"},
+		{ModeRunList, "↑↓:navigate space:toggle enter:submit f:add-files pgup/pgdn:scroll"},
 		{ModeRunEdit, "q:quit ?:help"},
 		{ModeProgress, "q:quit ?:help"},
 		{ModeResults, "q:quit ?:help"},
