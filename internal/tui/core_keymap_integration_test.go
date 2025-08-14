@@ -203,8 +203,9 @@ func TestAppKeyRegistryIntegration(t *testing.T) {
 		app := NewApp(mockClient)
 
 		// Test that app's key registry has expected mappings (updated for new navigation)
-		assert.Equal(t, keymap.ActionNavigateBack, app.keyRegistry.GetAction("h"))        // h is now back
-		assert.Equal(t, keymap.ActionNavigateToDashboard, app.keyRegistry.GetAction("q")) // q goes to dashboard
+		assert.Equal(t, keymap.ActionNavigateToDashboard, app.keyRegistry.GetAction("h"))  // h goes to dashboard
+		assert.Equal(t, keymap.ActionNavigateToDashboard, app.keyRegistry.GetAction("H"))  // H goes to dashboard
+		assert.Equal(t, keymap.ActionNavigateToDashboard, app.keyRegistry.GetAction("q"))  // q goes to dashboard
 		assert.Equal(t, keymap.ActionViewSpecific, app.keyRegistry.GetAction("b"))        // b is view-specific
 		assert.Equal(t, keymap.ActionNavigateBulk, app.keyRegistry.GetAction("B"))
 		assert.Equal(t, keymap.ActionGlobalQuit, app.keyRegistry.GetAction("Q"))

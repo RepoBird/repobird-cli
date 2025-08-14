@@ -167,16 +167,23 @@ func (v *ExamplesView) handleWindowSizeMsg(msg tea.WindowSizeMsg) {
 		v.layout.Update(msg.Width, msg.Height)
 	}
 
-	// Calculate double-column layout
-	leftWidth := msg.Width / 3    // Example list takes 1/3
-	rightWidth := msg.Width - leftWidth - 6 // Preview takes remaining space minus borders
+	// Top row: List (left) + Preview (right) 
+	// Bottom row: Description (full width, compact)
+	
+	totalHeight := msg.Height - 2 // Account for status line
+	leftWidth := msg.Width / 3    // Left side takes 1/3 of width
+	rightWidth := msg.Width - leftWidth - 4 // Right side takes remaining space minus gap
+	
+	// Description gets very compact height, top row gets the rest
+	descHeight := 2 // Minimal space for 1-2 lines of content, no padding
+	topRowHeight := totalHeight - descHeight
+	
+	// Update preview viewport dimensions - shares top row height
+	v.previewViewport.Width = rightWidth - 4     // Account for border padding
+	v.previewViewport.Height = topRowHeight - 4  // Top row height minus borders
 
-	// Update preview viewport dimensions
-	v.previewViewport.Width = rightWidth
-	v.previewViewport.Height = msg.Height - 6 // Account for title and status line
-
-	debug.LogToFilef("📐 EXAMPLES LAYOUT: Left=%d, Right=%d, Preview=%dx%d 📐\n",
-		leftWidth, rightWidth, v.previewViewport.Width, v.previewViewport.Height)
+	debug.LogToFilef("📐 EXAMPLES LAYOUT: Left=%d, Right=%d, TopRow=%d, Desc=%d, Preview=%dx%d 📐\n",
+		leftWidth, rightWidth, topRowHeight, descHeight, v.previewViewport.Width, v.previewViewport.Height)
 
 	// Update preview content for new dimensions
 	v.updatePreviewContent()
@@ -290,38 +297,55 @@ func (v *ExamplesView) View() string {
 		return v.layout.GetMinimalView("Examples - Loading...")
 	}
 
-	// Calculate layout dimensions
-	leftWidth := v.width / 3
-	rightWidth := v.width - leftWidth - 6
+	// Layout: Top row (list left + preview right), Bottom row (description full width)
+	totalHeight := v.height - 2 // Account for status line
+	leftWidth := v.width / 3    // Left side takes 1/3
+	rightWidth := v.width - leftWidth - 4 // Right side takes remaining space
+	
+	// Heights
+	descHeight := 2 // Very compact description
+	topRowHeight := totalHeight - descHeight
 
-	// Left column: Example list
-	leftContent := v.renderExamplesList(leftWidth)
-
-	// Right column: Preview with scroll indicators
-	rightContent := v.renderPreview(rightWidth)
-
-	// Combine columns
-	leftColumn := lipgloss.NewStyle().
+	// Top row: List (left) + Preview (right)
+	listContent := v.renderExamplesList(leftWidth, topRowHeight)
+	listBox := lipgloss.NewStyle().
 		Width(leftWidth).
+		Height(topRowHeight).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("63")).
-		Render(leftContent)
+		Render(listContent)
 
-	rightColumn := lipgloss.NewStyle().
+	previewContent := v.renderPreview(rightWidth, topRowHeight)
+	previewBox := lipgloss.NewStyle().
 		Width(rightWidth).
+		Height(topRowHeight).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("205")).
-		Render(rightContent)
+		Render(previewContent)
 
-	doubleColumn := lipgloss.JoinHorizontal(lipgloss.Top, leftColumn, rightColumn)
+	topRow := lipgloss.JoinHorizontal(lipgloss.Top, listBox, previewBox)
 
-	// Status line with clipboard message or help
-	statusMsg := v.renderStatusLine()
+	// Bottom row: Description (full width, minimal spacing)
+	descContent := v.renderDescription(v.width, descHeight)
+	descBox := lipgloss.NewStyle().
+		Width(v.width).
+		Height(descHeight).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("141")).
+		MarginTop(0).      // Remove top margin to minimize gap
+		Padding(0).        // Remove padding for tighter fit
+		Render(descContent)
 
-	return lipgloss.JoinVertical(lipgloss.Left, doubleColumn, statusMsg)
+	// Combine top and bottom rows with minimal spacing
+	mainView := lipgloss.JoinVertical(lipgloss.Left, topRow, descBox)
+
+	// Use global status line like other views
+	statusLine := v.renderGlobalStatusLine()
+
+	return lipgloss.JoinVertical(lipgloss.Left, mainView, statusLine)
 }
 
-func (v *ExamplesView) renderExamplesList(width int) string {
+func (v *ExamplesView) renderExamplesList(width, height int) string {
 	var content strings.Builder
 
 	// Title
@@ -329,7 +353,7 @@ func (v *ExamplesView) renderExamplesList(width int) string {
 	content.WriteString(titleStyle.Render("📚 Configuration Examples"))
 	content.WriteString("\n\n")
 
-	// Example list
+	// Example list - no descriptions here, they go in the bottom section
 	normalStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
 	selectedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true)
 
@@ -341,9 +365,9 @@ func (v *ExamplesView) renderExamplesList(width int) string {
 			lineStyle = selectedStyle
 			prefix = "▸ "
 
-			// Add yank animation
+			// Add yank animation with clipboard emoji
 			if v.yankAnimating && time.Now().Before(v.yankAnimExpiry) {
-				prefix = "⚡ "
+				prefix = "📋 "
 			}
 		} else {
 			lineStyle = normalStyle
@@ -352,19 +376,19 @@ func (v *ExamplesView) renderExamplesList(width int) string {
 		line := fmt.Sprintf("%s%s", prefix, example.Name)
 		content.WriteString(lineStyle.Render(line))
 		content.WriteString("\n")
+	}
 
-		// Add description for selected item
-		if i == v.selectedExample {
-			descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Italic(true)
-			content.WriteString("  " + descStyle.Render(example.Description))
-			content.WriteString("\n")
-		}
+	// Add padding for consistent height
+	contentLines := strings.Count(content.String(), "\n")
+	maxLines := height - 4 // Account for borders and title
+	for i := contentLines; i < maxLines; i++ {
+		content.WriteString("\n")
 	}
 
 	return content.String()
 }
 
-func (v *ExamplesView) renderPreview(width int) string {
+func (v *ExamplesView) renderPreview(width, height int) string {
 	var content strings.Builder
 
 	// Title with selected example name
@@ -381,7 +405,7 @@ func (v *ExamplesView) renderPreview(width int) string {
 		content.WriteString("\n\n")
 	}
 
-	// Viewport content
+	// Viewport content - should fit exactly within the allocated space
 	content.WriteString(v.previewViewport.View())
 
 	return content.String()
@@ -411,22 +435,58 @@ func (v *ExamplesView) getScrollIndicators() string {
 	}
 }
 
-func (v *ExamplesView) renderStatusLine() string {
-	var statusMsg string
+func (v *ExamplesView) renderDescription(width, height int) string {
+	// No title, no padding - just compact content
+	if v.selectedExample >= 0 && v.selectedExample < len(v.examples) {
+		selectedConfig := v.examples[v.selectedExample]
+		
+		// Single line combining description + usage
+		descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("250"))
+		
+		var usageText string
+		switch {
+		case strings.Contains(selectedConfig.Name, "Simple"):
+			usageText = "• Quick setup"
+		case strings.Contains(selectedConfig.Name, "Full"):
+			usageText = "• Production ready"
+		case strings.Contains(selectedConfig.Name, "YAML"):
+			usageText = "• Multiline format"
+		case strings.Contains(selectedConfig.Name, "Markdown"):
+			usageText = "• Self-documenting"
+		case strings.Contains(selectedConfig.Name, "Plan"):
+			usageText = "• Safe planning"
+		case strings.Contains(selectedConfig.Name, "Force"):
+			usageText = "• Force execution"
+		case strings.Contains(selectedConfig.Name, "Large"):
+			usageText = "• High throughput"
+		case strings.Contains(selectedConfig.Name, "Mixed"):
+			usageText = "• Flexible config"
+		default:
+			usageText = "• Customizable"
+		}
+		
+		// Single compact line
+		return descStyle.Render(selectedConfig.Description + " " + usageText)
+	}
+	
+	return "Select an example to view description"
+}
 
-	// Show clipboard message if active
+func (v *ExamplesView) renderGlobalStatusLine() string {
+	// Create formatter for consistent global status line format
+	formatter := components.NewStatusFormatter("EXAMPLES", v.width)
+
+	// Status message content
+	var statusMsg string
 	if v.clipboardMsg != "" && time.Now().Before(v.clipboardExpiry) {
 		statusMsg = v.clipboardMsg
 	} else {
-		statusMsg = "Use ↑↓ to select • y to copy • Ctrl+D/U or J/K to scroll preview • h/ESC to go back"
+		statusMsg = "↑↓:nav y:copy Ctrl+D/U,J/K:scroll h/ESC:back"
 	}
 
-	statusStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("240")).
-		Background(lipgloss.Color("236")).
-		Padding(0, 1)
-
-	return statusStyle.Render(statusMsg)
+	// Create consistent status line
+	statusLine := formatter.StandardStatusLine("EXAMPLES", "", statusMsg)
+	return statusLine.Render()
 }
 
 // Message types for examples view

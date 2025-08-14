@@ -259,8 +259,8 @@ func (v *BulkView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// The viewport needs to fit inside the box's content area
 		// Box has border (2 chars) and horizontal padding (2 chars)
 		v.viewport.Width = viewportWidth - 2 // Account for horizontal padding
-		// Reduce height to prevent content overflow
-		v.viewport.Height = viewportHeight - 2 // Account for border expansion
+		// Increase viewport height to show more content
+		v.viewport.Height = viewportHeight + 2 // Give more space for content
 
 		debug.LogToFilef("🎯 BULK WindowSize: viewport set to %dx%d\n",
 			v.viewport.Width, v.viewport.Height)
@@ -746,25 +746,34 @@ func (v *BulkView) ensureButtonsVisible() {
 	// instructions (1 line) + blank (1 line) + header (1 line) + blank (1 line) +
 	// all runs + blank (2 lines) + buttons (6 lines for 6 buttons)
 	buttonStartLine := 7 + len(v.runs) + 2 // Header lines + runs + spacing
+	debug.LogToFilef("🔘 BUTTONS: start line=%d, total buttons=6\n", buttonStartLine)
 	
 	// Get current viewport position
 	viewportTop := v.viewport.YOffset
 	viewportBottom := viewportTop + v.viewport.Height - 1
 	
 	// Check if buttons are visible
+	// Calculate button end line (start + 6 buttons)
+	buttonEndLine := buttonStartLine + 6
+	
 	if buttonStartLine > viewportBottom {
 		// Buttons are below viewport, scroll down to show them
-		// Position so buttons are at the bottom of the viewport with some margin
-		newOffset := buttonStartLine - v.viewport.Height + 4 // Show buttons with some context
+		// Position so buttons are visible in the viewport
+		newOffset := buttonStartLine - v.viewport.Height + 8 // Show buttons with context
 		if newOffset < 0 {
 			newOffset = 0
 		}
 		v.viewport.SetYOffset(newOffset)
-		debug.LogToFilef("DEBUG: Scrolling to show buttons at line %d, new offset=%d\n", buttonStartLine, newOffset)
-	} else if buttonStartLine < viewportTop {
+		debug.LogToFilef("🔘 SCROLL DOWN: buttons at %d-%d, viewport %d-%d, new offset=%d\n", 
+			buttonStartLine, buttonEndLine, viewportTop, viewportBottom, newOffset)
+	} else if buttonEndLine < viewportTop {
 		// Buttons are above viewport (rare case when scrolled too far down)
 		v.viewport.SetYOffset(buttonStartLine - 2) // Show with some context above
-		debug.LogToFilef("DEBUG: Scrolling up to show buttons at line %d\n", buttonStartLine)
+		debug.LogToFilef("🔘 SCROLL UP: buttons at %d-%d, viewport %d-%d\n", 
+			buttonStartLine, buttonEndLine, viewportTop, viewportBottom)
+	} else {
+		debug.LogToFilef("🔘 VISIBLE: buttons at %d-%d already in viewport %d-%d\n", 
+			buttonStartLine, buttonEndLine, viewportTop, viewportBottom)
 	}
 }
 
@@ -1096,25 +1105,25 @@ func (v *BulkView) renderRunList() string {
 		content.WriteString(normalBtnStyle.Render("  🏠 [DASH]") + "\n")
 	}
 	
-	// Button 4: TEST2
+	// Button 4: TEST1
 	if v.focusMode == "buttons" && v.selectedButton == 4 {
+		content.WriteString(selectedBtnStyle.Render("▸ [TEST1]") + "\n")
+	} else {
+		content.WriteString(normalBtnStyle.Render("  [TEST1]") + "\n")
+	}
+	
+	// Button 5: TEST2
+	if v.focusMode == "buttons" && v.selectedButton == 5 {
 		content.WriteString(selectedBtnStyle.Render("▸ [TEST2]") + "\n")
 	} else {
 		content.WriteString(normalBtnStyle.Render("  [TEST2]") + "\n")
 	}
 	
-	// Button 5: TEST3
-	if v.focusMode == "buttons" && v.selectedButton == 5 {
+	// Button 6: TEST3
+	if v.focusMode == "buttons" && v.selectedButton == 6 {
 		content.WriteString(selectedBtnStyle.Render("▸ [TEST3]") + "\n")
 	} else {
 		content.WriteString(normalBtnStyle.Render("  [TEST3]") + "\n")
-	}
-	
-	// Button 6: TEST4
-	if v.focusMode == "buttons" && v.selectedButton == 6 {
-		content.WriteString(selectedBtnStyle.Render("▸ [TEST4]") + "\n")
-	} else {
-		content.WriteString(normalBtnStyle.Render("  [TEST4]") + "\n")
 	}
 
 	// Set viewport content
@@ -1126,19 +1135,28 @@ func (v *BulkView) renderRunList() string {
 		BorderForeground(lipgloss.Color("63")).
 		Padding(0, 1).
 		Width(v.width - 2).
-		Height(v.height - 3) // Account for status line and prevent border cutoff
+		Height(v.height - 2) // Account for status line only
 
 	// Check if content overflows and needs scrolling
 	var scrollIndicator string
-	if !v.viewport.AtTop() || !v.viewport.AtBottom() {
-		percentScrolled := v.viewport.ScrollPercent()
-		position := "TOP"
-		if v.viewport.AtBottom() {
-			position = "BOTTOM"
-		} else if percentScrolled > 0 {
-			position = fmt.Sprintf("%d%%", int(percentScrolled*100))
+	totalLines := strings.Count(content.String(), "\n")
+	viewportCanShow := v.viewport.Height
+	
+	debug.LogToFilef("📊 VIEWPORT: content=%d lines, viewport height=%d, can show all=%t\n", 
+		totalLines, viewportCanShow, totalLines <= viewportCanShow)
+	
+	if totalLines > viewportCanShow {
+		// Content overflows, show scroll indicator
+		if v.viewport.AtTop() {
+			scrollIndicator = "[TOP ↓]"
+		} else if v.viewport.AtBottom() {
+			scrollIndicator = "[↑ BOTTOM]"
+		} else {
+			percentScrolled := v.viewport.ScrollPercent()
+			scrollIndicator = fmt.Sprintf("[↑ %d%% ↓]", int(percentScrolled*100))
 		}
-		scrollIndicator = fmt.Sprintf("[%s]", position)
+		debug.LogToFilef("📊 SCROLL: position=%s, offset=%d, total=%d\n", 
+			scrollIndicator, v.viewport.YOffset, totalLines)
 	}
 
 	// Render viewport in box

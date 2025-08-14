@@ -310,6 +310,19 @@ func (a *App) handleNavigation(msg messages.NavigationMsg) (tea.Model, tea.Cmd) 
 		a.viewStack = append(a.viewStack, a.current)
 		a.current = views.NewHelpView(a.client, a.cache)
 
+		// Send current window dimensions to the new view if we have them
+		var cmds []tea.Cmd
+		cmds = append(cmds, a.current.Init())
+		if a.width > 0 && a.height > 0 {
+			debug.LogToFilef("📐 HELP NAV: Sending WindowSizeMsg to new HelpView: %dx%d 📐\n", a.width, a.height)
+			cmds = append(cmds, func() tea.Msg {
+				return tea.WindowSizeMsg{Width: a.width, Height: a.height}
+			})
+		} else {
+			debug.LogToFile("⚠️ HELP NAV: No stored dimensions to send to HelpView ⚠️\n")
+		}
+		return a, tea.Batch(cmds...)
+
 	case messages.NavigateToExamplesMsg:
 		debug.LogToFilef("📚 EXAMPLES NAV: Navigating to examples view 📚\n")
 		a.viewStack = append(a.viewStack, a.current)

@@ -53,8 +53,9 @@ func NewCoreKeyRegistry() *CoreKeyRegistry {
 	}
 
 	// Register default key mappings
-	// Primary navigation: h for back (vim/ranger style), q for dashboard/quit
-	registry.Register("h", ActionNavigateBack, "go back")
+	// Primary navigation: h/H for dashboard (vim/ranger style), q for dashboard/quit
+	registry.Register("h", ActionNavigateToDashboard, "dashboard")
+	registry.Register("H", ActionNavigateToDashboard, "dashboard") // Same as h
 	registry.Register("B", ActionNavigateBulk, "bulk operations")
 	registry.Register("n", ActionNavigateNew, "new run")
 	registry.Register("r", ActionNavigateRefresh, "refresh")

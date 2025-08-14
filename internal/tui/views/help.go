@@ -122,8 +122,8 @@ func (h *HelpView) handleWindowSizeMsg(msg tea.WindowSizeMsg) (tea.Model, tea.Cm
 func (h *HelpView) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Check for navigation keys first
 	switch msg.String() {
-	case "q", "esc", "b", "h":
-		// Navigate back (h should go back like other views, not to dashboard)
+	case "q", "esc":
+		// Navigate back to previous view
 		debug.LogToFilef("🔙 HELP: Navigating back from help view\n")
 		return h, func() tea.Msg {
 			return messages.NavigateBackMsg{}

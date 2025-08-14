@@ -479,7 +479,7 @@ func (h *HelpView) View() string {
 	}
 
 	// Status line
-	shortHelp := "[↑↓/jk]scroll [Ctrl+u/d/J/K]halfpage [g/G]top/bottom [y]copy [?/q/h/b]back"
+	shortHelp := "[↑↓/jk]scroll [Ctrl+u/d/J/K]halfpage [g/G]top/bottom [y]copy [h/H]dashboard [q/?]back"
 
 	// Show copy message if active
 	statusText := shortHelp

@@ -179,9 +179,9 @@ func (d *DashboardView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Mo
 		return true, d, func() tea.Msg {
 			return messages.NavigateToBulkMsg{}
 		}
-	case "h":
-		// Handle 'h' for column navigation (move left)
-		// Only allow back navigation if we're already in the leftmost column
+	case "h", "H":
+		// Handle 'h' and 'H' for column navigation (move left)
+		// Both keys behave identically on dashboard
 		if d.focusedColumn > 0 {
 			// Move to the left column
 			d.focusedColumn--

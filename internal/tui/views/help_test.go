@@ -162,8 +162,6 @@ func TestHelpView_NavigationKeys(t *testing.T) {
 	}{
 		{"Quit key", "q", messages.NavigateBackMsg{}},
 		{"Escape key", "esc", messages.NavigateBackMsg{}},
-		{"Back key", "b", messages.NavigateBackMsg{}},
-		{"Vim back", "h", messages.NavigateBackMsg{}},
 		{"Help toggle", "?", messages.NavigateBackMsg{}},
 	}
 
@@ -293,4 +291,29 @@ func TestHelpView_HandleKey(t *testing.T) {
 	assert.False(t, handled)
 	assert.Equal(t, helpView, model)
 	assert.Nil(t, cmd)
+}
+
+func TestHelpView_GlobalDashboardKeys(t *testing.T) {
+	// Setup
+	mockClient := new(MockHelpAPIClient)
+	testCache := cache.NewSimpleCache()
+	helpView := NewHelpView(mockClient, testCache)
+	
+	// Initialize with window size
+	helpView.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
+
+	// Test that 'h' and 'H' keys are NOT handled by the view
+	// (they should fall through to the global navigation system)
+	dashboardKeys := []string{"h", "H"}
+
+	for _, key := range dashboardKeys {
+		t.Run("Dashboard key: "+key, func(t *testing.T) {
+			model, cmd := helpView.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(key)})
+			
+			// These keys should NOT trigger any navigation from the view
+			// They will be handled by the global system
+			assert.Equal(t, helpView, model)
+			assert.Nil(t, cmd)
+		})
+	}
 }
