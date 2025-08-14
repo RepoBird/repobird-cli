@@ -120,15 +120,22 @@ func NewMockServer(t *testing.T) *MockServer {
 // handler routes requests to appropriate handlers
 func (ms *MockServer) handler(w http.ResponseWriter, r *http.Request) {
 	// Add response delay if configured
-	if ms.responseTime > 0 {
-		time.Sleep(ms.responseTime)
+	ms.mu.RLock()
+	responseTime := ms.responseTime
+	ms.mu.RUnlock()
+	if responseTime > 0 {
+		time.Sleep(responseTime)
 	}
 
 	// Check for forced failure
-	if ms.failNext {
-		ms.mu.Lock()
+	ms.mu.Lock()
+	shouldFail := ms.failNext
+	if shouldFail {
 		ms.failNext = false
-		ms.mu.Unlock()
+	}
+	ms.mu.Unlock()
+	
+	if shouldFail {
 		http.Error(w, "Forced failure", http.StatusInternalServerError)
 		return
 	}

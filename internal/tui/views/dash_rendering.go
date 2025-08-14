@@ -111,11 +111,6 @@ func (d *DashboardView) renderTripleColumnLayout() string {
 	var parts []string
 	parts = append(parts, columns)
 
-	// Add notification above status line if there's a message
-	if notificationLine := d.renderNotificationLine(); notificationLine != "" {
-		parts = append(parts, notificationLine)
-	}
-
 	parts = append(parts, statusline)
 
 	// Use PlaceVertical to position the statusline at the bottom
@@ -138,9 +133,6 @@ func (d *DashboardView) renderAllRunsLayout() string {
 	// Add notification above status line if there's a message
 	var parts []string
 	parts = append(parts, runListContent)
-	if notificationLine := d.renderNotificationLine(); notificationLine != "" {
-		parts = append(parts, notificationLine)
-	}
 	parts = append(parts, statusline)
 
 	return lipgloss.JoinVertical(lipgloss.Left, parts...)
@@ -157,9 +149,6 @@ func (d *DashboardView) renderRepositoriesLayout() string {
 	// Add notification above status line if there's a message
 	var parts []string
 	parts = append(parts, content)
-	if notificationLine := d.renderNotificationLine(); notificationLine != "" {
-		parts = append(parts, notificationLine)
-	}
 	parts = append(parts, statusline)
 
 	return lipgloss.JoinVertical(lipgloss.Left, parts...)
@@ -469,36 +458,6 @@ func (d *DashboardView) renderDetailsColumn(width, height int) string {
 	return lipgloss.JoinVertical(lipgloss.Left, title, contentStyle.Render(d.detailsViewport.View()))
 }
 
-// renderNotificationLine renders the notification/copy feedback line
-func (d *DashboardView) renderNotificationLine() string {
-	// If we're showing a status message in the status line, don't show notification
-	if d.statusLine.HasActiveMessage() {
-		return ""
-	}
-
-	if d.copiedMessage == "" || time.Since(d.copiedMessageTime) >= 250*time.Millisecond {
-		return ""
-	}
-
-	var notificationStyle lipgloss.Style
-	if d.clipboardManager.ShouldHighlight() {
-		// Bright and bold when visible
-		notificationStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("82")).
-			Background(lipgloss.Color("235")).
-			Bold(true).
-			Width(d.width)
-	} else {
-		// After blinking period, show normally
-		notificationStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("82")).
-			Background(lipgloss.Color("235")).
-			Bold(true).
-			Width(d.width)
-	}
-
-	return notificationStyle.Render(" " + d.copiedMessage)
-}
 
 // renderStatusLine renders the universal status line
 func (d *DashboardView) renderStatusLine(layoutName string) string {

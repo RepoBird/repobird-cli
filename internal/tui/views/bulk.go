@@ -442,6 +442,8 @@ func (v *BulkView) handleFileBrowserKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (v *BulkView) handleRunListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	var cmds []tea.Cmd
+	
 	switch {
 	case key.Matches(msg, v.keys.Quit):
 		// Navigate back to dashboard instead of quitting directly
@@ -451,21 +453,36 @@ func (v *BulkView) handleRunListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, v.keys.Up):
 		if v.selectedRun > 0 {
 			v.selectedRun--
+			v.updateRunListViewport()
+			// Ensure selected item is visible
+			v.ensureSelectedVisible()
 		}
 	case key.Matches(msg, v.keys.Down):
 		if v.selectedRun < len(v.runs)-1 {
 			v.selectedRun++
+			v.updateRunListViewport()
+			// Ensure selected item is visible
+			v.ensureSelectedVisible()
 		}
-	case key.Matches(msg, v.keys.Select):
+	case key.Matches(msg, v.keys.PageUp):
+		v.viewport.HalfViewUp()
+	case key.Matches(msg, v.keys.PageDown):
+		v.viewport.HalfViewDown()
+	case key.Matches(msg, v.keys.Select), msg.String() == " ":
 		if v.selectedRun < len(v.runs) {
 			v.runs[v.selectedRun].Selected = !v.runs[v.selectedRun].Selected
+			v.updateRunListViewport()
 		}
-	case key.Matches(msg, v.keys.FZF):
+	case msg.String() == "enter":
+		// Submit selected bulk runs
+		return v, v.submitBulkRuns()
+	case key.Matches(msg, v.keys.FZF), msg.String() == "f":
 		// Switch back to file browser mode
 		v.mode = ModeFileBrowser
 		if v.fileSelector == nil {
 			v.fileSelector = components.NewBulkFileSelector(v.width, v.height)
 		}
+		return v, v.fileSelector.Activate()
 	case key.Matches(msg, v.keys.FileMode):
 		// Switch to file browser mode (uppercase F key)
 		v.mode = ModeFileBrowser
@@ -475,8 +492,77 @@ func (v *BulkView) handleRunListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, v.keys.Submit):
 		// Submit selected bulk runs
 		return v, v.submitBulkRuns()
+	default:
+		// Pass other keys to viewport
+		var vpCmd tea.Cmd
+		v.viewport, vpCmd = v.viewport.Update(msg)
+		cmds = append(cmds, vpCmd)
 	}
-	return v, nil
+	
+	return v, tea.Batch(cmds...)
+}
+
+// updateRunListViewport updates the viewport content with the current run list
+func (v *BulkView) updateRunListViewport() {
+	var content strings.Builder
+	selectedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true)
+	normalStyle := lipgloss.NewStyle()
+	
+	for i, run := range v.runs {
+		statusIcon := "[ ]"
+		if run.Selected {
+			statusIcon = "[✓]"
+		}
+		
+		runTitle := run.Title
+		if runTitle == "" {
+			runTitle = fmt.Sprintf("Run %d", i+1)
+		}
+		
+		// Truncate title if too long
+		maxTitleLen := v.viewport.Width - 10 // Account for icon and padding
+		if len(runTitle) > maxTitleLen && maxTitleLen > 3 {
+			runTitle = runTitle[:maxTitleLen-3] + "..."
+		}
+		
+		line := fmt.Sprintf("%s %s", statusIcon, runTitle)
+		
+		if i == v.selectedRun {
+			content.WriteString(selectedStyle.Render("▸ " + line))
+		} else {
+			content.WriteString(normalStyle.Render("  " + line))
+		}
+		
+		if i < len(v.runs)-1 {
+			content.WriteString("\n")
+		}
+	}
+	
+	v.viewport.SetContent(content.String())
+}
+
+// ensureSelectedVisible ensures the selected item is visible in the viewport
+func (v *BulkView) ensureSelectedVisible() {
+	// Calculate the line position of the selected item
+	lineHeight := 1 // Each item takes 1 line
+	selectedLine := v.selectedRun * lineHeight
+	
+	// Get current viewport position
+	viewportTop := v.viewport.YOffset
+	viewportBottom := viewportTop + v.viewport.Height - 1
+	
+	// Adjust viewport if selected item is not visible
+	if selectedLine < viewportTop {
+		// Selected item is above viewport
+		v.viewport.SetYOffset(selectedLine)
+	} else if selectedLine > viewportBottom {
+		// Selected item is below viewport
+		newOffset := selectedLine - v.viewport.Height + 1
+		if newOffset < 0 {
+			newOffset = 0
+		}
+		v.viewport.SetYOffset(newOffset)
+	}
 }
 
 // View renders the bulk view
@@ -623,7 +709,7 @@ func (v *BulkView) renderFileBrowser() string {
 	)
 }
 
-// renderRunList renders the run list view
+// renderRunList renders the run list view with scrollable viewport
 func (v *BulkView) renderRunList() string {
 	// Initialize layout if not done yet
 	if v.layout == nil {
@@ -633,69 +719,78 @@ func (v *BulkView) renderRunList() string {
 	// Use WindowLayout system for consistent styling
 	boxStyle := v.layout.CreateStandardBox()
 	titleStyle := v.layout.CreateTitleStyle()
-	contentStyle := v.layout.CreateContentStyle()
-
-	// Title with count
-	title := titleStyle.Render(fmt.Sprintf("Bulk Runs (%d)", len(v.runs)))
-
-	// Repository info
-	repoInfo := fmt.Sprintf("Repository: %s | Source: %s | Type: %s",
-		v.repository, v.sourceBranch, v.runType)
-	repoStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-
-	// Runs list
-	var runsList strings.Builder
-	selectedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Bold(true)
-
-	for i, run := range v.runs {
-		prefix := "  "
-		if i == v.selectedRun {
-			prefix = "> "
-		}
-
-		runTitle := run.Title
-		if runTitle == "" {
-			runTitle = fmt.Sprintf("Run %d", i+1)
-		}
-
-		statusIcon := ""
+	
+	// Create header with repository info and instructions
+	selectedCount := 0
+	for _, run := range v.runs {
 		if run.Selected {
-			statusIcon = "[✓] "
-		} else {
-			statusIcon = "[ ] "
+			selectedCount++
 		}
-
-		line := fmt.Sprintf("%s%s%s", prefix, statusIcon, runTitle)
-		if i == v.selectedRun {
-			line = selectedStyle.Render(line)
-		}
-		runsList.WriteString(line + "\n")
 	}
-
-	// Combine content
-	content := lipgloss.JoinVertical(
+	
+	// Title with counts
+	title := titleStyle.Render(fmt.Sprintf("📋 Bulk Runs (%d total, %d selected)", len(v.runs), selectedCount))
+	
+	// Simple instructions - just 1-2 sentences
+	instructionStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Italic(true)
+	instructions := instructionStyle.Render("Select runs with space. Press f to add more files or Enter to submit.")
+	
+	// Action buttons style
+	buttonStyle := lipgloss.NewStyle().
+		Padding(0, 1).
+		MarginRight(1).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("63"))
+	
+	selectedButtonStyle := buttonStyle.Copy().
+		Background(lipgloss.Color("63")).
+		Foreground(lipgloss.Color("0")).
+		Bold(true)
+	
+	// Create action buttons row
+	addButton := buttonStyle.Render("[f] Add Files")
+	submitButton := buttonStyle.Render("[Enter] Submit")
+	if selectedCount > 0 {
+		submitButton = selectedButtonStyle.Render(fmt.Sprintf("[Enter] Submit %d", selectedCount))
+	}
+	
+	buttonsRow := lipgloss.JoinHorizontal(lipgloss.Left, addButton, submitButton)
+	
+	// Set viewport content styling
+	v.viewport.Style = lipgloss.NewStyle().PaddingLeft(1)
+	
+	// Create the header content
+	headerContent := lipgloss.JoinVertical(
 		lipgloss.Left,
-		repoStyle.Render(repoInfo),
+		title,
+		instructions,
 		"",
-		runsList.String(),
+		buttonsRow,
+		"",
 	)
-
-	// Style and size the content
-	styledContent := contentStyle.Render(content)
-
+	
+	// Render viewport with the run list
+	viewportContent := v.viewport.View()
+	
+	// Combine header and viewport
+	fullContent := lipgloss.JoinVertical(
+		lipgloss.Left,
+		headerContent,
+		viewportContent,
+	)
+	
 	// Get proper dimensions from layout
 	boxWidth, boxHeight := v.layout.GetBoxDimensions()
-
-	// Create the main container with proper dimensions
+	
+	// Create the main container
 	mainContainer := boxStyle.
 		Width(boxWidth).
 		Height(boxHeight).
-		Render(lipgloss.JoinVertical(lipgloss.Left, title, "", styledContent))
-
-	// Status line
+		Render(fullContent)
+	
+	// Status line with better help text
 	statusLine := v.renderStatusLine("BULK")
-
-	// Join with status line
+	
 	return lipgloss.JoinVertical(lipgloss.Left, mainContainer, statusLine)
 }
 
