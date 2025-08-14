@@ -170,17 +170,17 @@ func (v *ExamplesView) handleWindowSizeMsg(msg tea.WindowSizeMsg) {
 	// Top row: List (left) + Preview (right) 
 	// Bottom row: Description (full width, compact)
 	
-	totalHeight := msg.Height - 2 // Account for status line
+	totalHeight := msg.Height - 1 // Account for status line (1 line)
 	leftWidth := msg.Width / 3    // Left side takes 1/3 of width
-	rightWidth := msg.Width - leftWidth - 4 // Right side takes remaining space minus gap
+	rightWidth := msg.Width - leftWidth // Right side takes remaining space (no gap)
 	
 	// Description gets very compact height, top row gets the rest
-	descHeight := 2 // Minimal space for 1-2 lines of content, no padding
+	descHeight := 2 // Minimal height for description (back to 2)
 	topRowHeight := totalHeight - descHeight
 	
-	// Update preview viewport dimensions - shares top row height
-	v.previewViewport.Width = rightWidth - 4     // Account for border padding
-	v.previewViewport.Height = topRowHeight - 4  // Top row height minus borders
+	// Update preview viewport dimensions - account for borders properly
+	v.previewViewport.Width = rightWidth - 2     // Account for border (2 not 4)
+	v.previewViewport.Height = topRowHeight - 2  // Account for border (2 not 4)
 
 	debug.LogToFilef("📐 EXAMPLES LAYOUT: Left=%d, Right=%d, TopRow=%d, Desc=%d, Preview=%dx%d 📐\n",
 		leftWidth, rightWidth, topRowHeight, descHeight, v.previewViewport.Width, v.previewViewport.Height)
@@ -298,12 +298,12 @@ func (v *ExamplesView) View() string {
 	}
 
 	// Layout: Top row (list left + preview right), Bottom row (description full width)
-	totalHeight := v.height - 2 // Account for status line
+	totalHeight := v.height - 1 // Account for status line (1 line)
 	leftWidth := v.width / 3    // Left side takes 1/3
-	rightWidth := v.width - leftWidth - 4 // Right side takes remaining space
+	rightWidth := v.width - leftWidth // Right side takes remaining space (no gap)
 	
 	// Heights
-	descHeight := 2 // Very compact description
+	descHeight := 2 // Minimal description height
 	topRowHeight := totalHeight - descHeight
 
 	// Top row: List (left) + Preview (right)
@@ -332,8 +332,8 @@ func (v *ExamplesView) View() string {
 		Height(descHeight).
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("141")).
-		MarginTop(0).      // Remove top margin to minimize gap
-		Padding(0).        // Remove padding for tighter fit
+		Margin(0).         // Remove all margins
+		Padding(0).        // Remove all padding
 		Render(descContent)
 
 	// Combine top and bottom rows with minimal spacing
@@ -380,7 +380,7 @@ func (v *ExamplesView) renderExamplesList(width, height int) string {
 
 	// Add padding for consistent height
 	contentLines := strings.Count(content.String(), "\n")
-	maxLines := height - 4 // Account for borders and title
+	maxLines := height - 2 // Account for borders (reduced from 4 to 2)
 	for i := contentLines; i < maxLines; i++ {
 		content.WriteString("\n")
 	}
@@ -484,8 +484,8 @@ func (v *ExamplesView) renderGlobalStatusLine() string {
 		statusMsg = "↑↓:nav y:copy Ctrl+D/U,J/K:scroll h/ESC:back"
 	}
 
-	// Create consistent status line
-	statusLine := formatter.StandardStatusLine("EXAMPLES", "", statusMsg)
+	// Create consistent status line - let formatter handle the brackets
+	statusLine := formatter.StandardStatusLine("", "", statusMsg)
 	return statusLine.Render()
 }
 
