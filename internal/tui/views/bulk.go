@@ -144,7 +144,7 @@ func NewBulkView(client *api.Client) *BulkView {
 		runs:            []BulkRunItem{},
 		statusLine:      components.NewStatusLine(),
 		viewport:        vp,
-		selectedButton:  0,
+		selectedButton:  1, // Start with first button selected
 		navigationFocus: "runs",
 	}
 }
@@ -257,9 +257,9 @@ func (v *BulkView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		debug.LogToFilef("🎯 BULK WindowSize: terminal=%dx%d, content=%dx%d\n", 
 			msg.Width, msg.Height, viewportWidth, viewportHeight)
 		
-		// Subtract space for border and padding
+		// Subtract space for border, padding, and title
 		v.viewport.Width = viewportWidth - 2  // Account for padding
-		v.viewport.Height = viewportHeight - 2 // Account for title and padding
+		v.viewport.Height = viewportHeight - 3 // Account for title, padding, and margin
 		
 		debug.LogToFilef("🎯 BULK WindowSize: viewport set to %dx%d\n", 
 			v.viewport.Width, v.viewport.Height)
@@ -700,13 +700,10 @@ func (v *BulkView) renderInstructions() string {
 		v.layout = components.NewWindowLayout(v.width, v.height)
 	}
 
-	// Build title
-	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("63"))
-	title := titleStyle.Render("📋 Bulk Operations")
-	
-	// Build complete content
+	// Build complete content (title will be in box border)
 	var fullContent strings.Builder
-	fullContent.WriteString(title + "\n\n")
+	fullContent.WriteString("📋 Bulk Operations\n")
+	fullContent.WriteString(strings.Repeat("─", 50) + "\n\n")
 	
 	if v.error != nil {
 		// Show error message
@@ -786,6 +783,13 @@ func (v *BulkView) renderInstructions() string {
 	boxHeight := v.height - 2 // Account for status line
 	
 	debug.LogToFilef("🎯 BULK box dimensions: width=%d, height=%d\n", boxWidth, boxHeight)
+	debug.LogToFilef("🎯 BULK content lines: %d, viewport can show: %d lines\n", strings.Count(contentStr, "\n"), v.viewport.Height)
+	
+	// Check if content overflows viewport
+	contentLines := strings.Count(contentStr, "\n")
+	if contentLines > v.viewport.Height {
+		debug.LogToFilef("⚠️ BULK OVERFLOW: Content has %d lines but viewport only shows %d lines\n", contentLines, v.viewport.Height)
+	}
 	
 	boxStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
@@ -798,15 +802,31 @@ func (v *BulkView) renderInstructions() string {
 	viewportView := v.viewport.View()
 	debug.LogToFilef("🎯 BULK viewport view lines: %d\n", strings.Count(viewportView, "\n"))
 	
+	// Add scroll indicator if content overflows
+	scrollIndicator := ""
+	if !v.viewport.AtTop() || !v.viewport.AtBottom() {
+		scrollPercent := int(float64(v.viewport.YOffset) / float64(v.viewport.TotalLineCount()-v.viewport.Height) * 100)
+		if scrollPercent < 0 {
+			scrollPercent = 0
+		}
+		if scrollPercent > 100 {
+			scrollPercent = 100
+		}
+		scrollIndicator = fmt.Sprintf(" [%d%%]", scrollPercent)
+		debug.LogToFilef("🎯 BULK scroll: offset=%d, total=%d, height=%d, percent=%d%%\n", 
+			v.viewport.YOffset, v.viewport.TotalLineCount(), v.viewport.Height, scrollPercent)
+	}
+	
 	boxedContent := boxStyle.Render(viewportView)
 	debug.LogToFilef("🎯 BULK boxed content lines: %d\n", strings.Count(boxedContent, "\n"))
 	
-	// Status line
-	statusLine := v.renderStatusLine("BULK")
+	// Status line with scroll indicator
+	statusLine := v.renderStatusLine("BULK" + scrollIndicator)
 	
 	// Join with status line
 	final := lipgloss.JoinVertical(lipgloss.Left, boxedContent, statusLine)
 	debug.LogToFilef("🎯 BULK final output lines: %d\n", strings.Count(final, "\n"))
+	debug.LogToFilef("🎯 BULK final height should be: %d (terminal height)\n", v.height)
 	
 	return final
 }
