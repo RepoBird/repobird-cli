@@ -3,6 +3,7 @@ package views
 import (
 	"context"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/repobird/repobird-cli/internal/api/dto"
@@ -69,12 +70,14 @@ func TestBulkResultsView_QuitKeySetsDashboardRefreshFlag(t *testing.T) {
 	// Add some active runs that should be invalidated
 	activeRuns := []models.RunResponse{
 		{
-			ID:     "processing-run-1",
-			Status: models.StatusProcessing,
+			ID:        "processing-run-1",
+			Status:    models.StatusProcessing,
+			CreatedAt: time.Now().Add(-30 * time.Minute),
 		},
 		{
-			ID:     "queued-run-1",
-			Status: models.StatusQueued,
+			ID:        "queued-run-1",
+			Status:    models.StatusQueued,
+			CreatedAt: time.Now().Add(-10 * time.Minute),
 		},
 	}
 	testCache.SetRuns(activeRuns)
@@ -160,7 +163,11 @@ func TestBulkResultsView_DashButtonSetsRefreshFlag(t *testing.T) {
 
 	// Add some active runs
 	activeRuns := []models.RunResponse{
-		{ID: "active-run-1", Status: models.StatusProcessing},
+		{
+			ID:        "active-run-1",
+			Status:    models.StatusProcessing,
+			CreatedAt: time.Now().Add(-15 * time.Minute),
+		},
 	}
 	testCache.SetRuns(activeRuns)
 
