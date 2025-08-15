@@ -137,17 +137,17 @@ func TestHybridCache_InvalidateActiveRuns(t *testing.T) {
 func TestSessionCache_InvalidateActiveRuns(t *testing.T) {
 	session := NewSessionCache()
 
-	// Add both terminal and active runs
+	// Add only active runs (session cache should only store active runs)
 	runs := []models.RunResponse{
 		{
-			ID:        "done-run",
-			Status:    models.StatusDone,
-			CreatedAt: time.Now().Add(-1 * time.Hour),
-		},
-		{
-			ID:        "running-run",
+			ID:        "running-run-1",
 			Status:    models.StatusProcessing,
 			CreatedAt: time.Now().Add(-5 * time.Minute),
+		},
+		{
+			ID:        "running-run-2",
+			Status:    models.StatusQueued,
+			CreatedAt: time.Now().Add(-10 * time.Minute),
 		},
 	}
 
@@ -157,17 +157,16 @@ func TestSessionCache_InvalidateActiveRuns(t *testing.T) {
 	// Verify both are in session cache
 	cachedRuns, found := session.GetRuns()
 	assert.True(t, found)
-	assert.Len(t, cachedRuns, 2)
+	assert.Len(t, cachedRuns, 2, "Should have 2 active runs")
 
-	// Invalidate active runs
+	// Invalidate active runs (should clear all since session cache only has active runs)
 	err = session.InvalidateActiveRuns()
 	require.NoError(t, err)
 
-	// Check remaining runs
+	// Check remaining runs (should be empty)
 	cachedRuns, found = session.GetRuns()
-	assert.True(t, found)
-	assert.Len(t, cachedRuns, 1, "Should only have terminal run remaining")
-	assert.Equal(t, "done-run", cachedRuns[0].ID)
+	assert.False(t, found, "Should not find runs after invalidation")
+	assert.Empty(t, cachedRuns, "Should have no runs remaining after invalidation")
 }
 
 // TestInvalidateActiveRuns_EmptyCache tests invalidation on empty cache
