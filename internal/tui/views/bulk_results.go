@@ -229,12 +229,11 @@ func (v *BulkResultsView) handleRunKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case key.Matches(msg, v.keys.Dashboard), key.Matches(msg, v.keys.Quit):
-		// Invalidate dashboard cache to force refresh with new runs
-		debug.LogToFilef("📊 RESULTS: Invalidating dashboard cache before navigation\n")
+		// Invalidate active runs in cache and set refresh flag
+		debug.LogToFilef("📊 RESULTS: Invalidating active runs and setting refresh flag\n")
 		v.cache.InvalidateActiveRuns()
-		// Set flag so dashboard knows to refresh
 		v.cache.SetNavigationContext("dashboard_needs_refresh", true)
-		
+
 		// Go to dashboard
 		return v, func() tea.Msg {
 			return messages.NavigateToDashboardMsg{}
@@ -303,10 +302,11 @@ func (v *BulkResultsView) handleButtonKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	case key.Matches(msg, v.keys.Enter):
 		// Activate selected button
 		if v.selectedButton == 1 {
-			// DASH button - invalidate cache before navigation
-			debug.LogToFilef("📊 RESULTS: Invalidating dashboard cache before navigation (button)\n")
+			// DASH button - invalidate active runs and set refresh flag
+			debug.LogToFilef("📊 RESULTS: Invalidating active runs and setting refresh flag (button)\n")
 			v.cache.InvalidateActiveRuns()
-			
+			v.cache.SetNavigationContext("dashboard_needs_refresh", true)
+
 			return v, func() tea.Msg {
 				return messages.NavigateToDashboardMsg{}
 			}
@@ -320,12 +320,11 @@ func (v *BulkResultsView) handleButtonKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		return v, nil
 
 	case key.Matches(msg, v.keys.Dashboard), key.Matches(msg, v.keys.Quit):
-		// Invalidate dashboard cache to force refresh with new runs
-		debug.LogToFilef("📊 RESULTS: Invalidating dashboard cache before navigation\n")
+		// Invalidate active runs in cache and set refresh flag
+		debug.LogToFilef("📊 RESULTS: Invalidating active runs and setting refresh flag\n")
 		v.cache.InvalidateActiveRuns()
-		// Set flag so dashboard knows to refresh
 		v.cache.SetNavigationContext("dashboard_needs_refresh", true)
-		
+
 		// Go to dashboard
 		return v, func() tea.Msg {
 			return messages.NavigateToDashboardMsg{}

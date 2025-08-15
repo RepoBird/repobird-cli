@@ -58,61 +58,74 @@ func (d *DashboardView) loadDashboardData() tea.Cmd {
 		userInfo := d.cache.GetUserInfo()
 		isDebugMode := userInfo != nil && userInfo.ID < 0
 
-		// First try to load from run cache which should always have data
-		runs, cached, detailsCache := d.cache.GetCachedList()
-		debug.LogToFilef("  Cache check: cached=%v, runs=%d, details=%d, isDebugMode=%v\n", cached, len(runs), len(detailsCache), isDebugMode)
+		// Declare variables at top level
+		var runs []models.RunResponse
+		var cached bool
+		var detailsCache map[string]*models.RunResponse
 
-		// In debug mode, always fetch fresh data
-		if cached && len(runs) > 0 && !isDebugMode {
-			debug.LogToFilef("  ✅ CACHE: Found cached data: %d runs, %d details\n", len(runs), len(detailsCache))
+		// Check if this is a forced refresh (from 'r' key or after creating/submitting runs)
+		forceRefresh := d.cache.GetNavigationContext("force_api_refresh") != nil
+		if forceRefresh {
+			debug.LogToFilef("  🔄 FORCED REFRESH: Clearing force_api_refresh flag and fetching from API\n")
+			d.cache.SetNavigationContext("force_api_refresh", nil)
+			// Skip cache and go directly to API fetch
+		} else {
+			// First try to load from run cache which should always have data
+			runs, cached, detailsCache = d.cache.GetCachedList()
+			debug.LogToFilef("  Cache check: cached=%v, runs=%d, details=%d, isDebugMode=%v\n", cached, len(runs), len(detailsCache), isDebugMode)
 
-			// Filter out invalid runs instead of clearing entire cache
-			validRuns := make([]models.RunResponse, 0, len(runs))
-			invalidCount := 0
+			// In debug mode, always fetch fresh data
+			if cached && len(runs) > 0 && !isDebugMode {
+				debug.LogToFilef("  ✅ CACHE: Found cached data: %d runs, %d details\n", len(runs), len(detailsCache))
 
-			for _, run := range runs {
-				// Skip test data or runs with empty repository (use proper GetRepositoryName method)
-				repoName := run.GetRepositoryName()
-				if strings.HasPrefix(run.ID, "test-") || repoName == "" {
-					invalidCount++
-					debug.LogToFilef("  🚮 CACHE: Filtering out invalid run: ID=%s, Repository='%s', RepositoryName='%s'\n", run.ID, run.Repository, run.RepositoryName)
-					continue
-				}
-				validRuns = append(validRuns, run)
-			}
+				// Filter out invalid runs instead of clearing entire cache
+				validRuns := make([]models.RunResponse, 0, len(runs))
+				invalidCount := 0
 
-			debug.LogToFilef("  📊 CACHE: Valid runs: %d, Invalid runs: %d, Total: %d\n", len(validRuns), invalidCount, len(runs))
-
-			// Only clear cache if majority of runs are invalid (more than 50%)
-			if len(validRuns) > 0 && float64(len(validRuns))/float64(len(runs)) > 0.5 {
-				debug.LogToFilef("  ✅ CACHE: Using cached data with %d valid runs (filtered %d invalid)\n", len(validRuns), invalidCount)
-
-				// Convert to pointer slice
-				allRuns := make([]*models.RunResponse, len(validRuns))
-				for i, run := range validRuns {
-					allRuns[i] = &run
-				}
-
-				// Try to get cached repository overview
-				repositories, repoCached := d.cache.GetRepositoryOverview()
-				if !repoCached || len(repositories) == 0 {
-					// Build repositories from runs if not cached
-					repositories = d.cache.BuildRepositoryOverviewFromRuns(allRuns)
-					d.cache.SetRepositoryOverview(repositories)
+				for _, run := range runs {
+					// Skip test data or runs with empty repository (use proper GetRepositoryName method)
+					repoName := run.GetRepositoryName()
+					if strings.HasPrefix(run.ID, "test-") || repoName == "" {
+						invalidCount++
+						debug.LogToFilef("  🚮 CACHE: Filtering out invalid run: ID=%s, Repository='%s', RepositoryName='%s'\n", run.ID, run.Repository, run.RepositoryName)
+						continue
+					}
+					validRuns = append(validRuns, run)
 				}
 
-				debug.LogToFilef("  🏗️ CACHE: Built %d repositories from %d valid cached runs\n", len(repositories), len(validRuns))
+				debug.LogToFilef("  📊 CACHE: Valid runs: %d, Invalid runs: %d, Total: %d\n", len(validRuns), invalidCount, len(runs))
 
-				return dashboardDataLoadedMsg{
-					repositories: repositories,
-					allRuns:      allRuns,
-					detailsCache: detailsCache,
-					error:        nil,
+				// Only clear cache if majority of runs are invalid (more than 50%)
+				if len(validRuns) > 0 && float64(len(validRuns))/float64(len(runs)) > 0.5 {
+					debug.LogToFilef("  ✅ CACHE: Using cached data with %d valid runs (filtered %d invalid)\n", len(validRuns), invalidCount)
+
+					// Convert to pointer slice
+					allRuns := make([]*models.RunResponse, len(validRuns))
+					for i, run := range validRuns {
+						allRuns[i] = &run
+					}
+
+					// Try to get cached repository overview
+					repositories, repoCached := d.cache.GetRepositoryOverview()
+					if !repoCached || len(repositories) == 0 {
+						// Build repositories from runs if not cached
+						repositories = d.cache.BuildRepositoryOverviewFromRuns(allRuns)
+						d.cache.SetRepositoryOverview(repositories)
+					}
+
+					debug.LogToFilef("  🏗️ CACHE: Built %d repositories from %d valid cached runs\n", len(repositories), len(validRuns))
+
+					return dashboardDataLoadedMsg{
+						repositories: repositories,
+						allRuns:      allRuns,
+						detailsCache: detailsCache,
+						error:        nil,
+					}
+				} else {
+					// Only clear cache if majority of runs are invalid
+					debug.LogToFilef("  ❌ CACHE: Too many invalid runs (%d/%d valid), clearing cache and fetching from API\n", len(validRuns), len(runs))
+					d.cache.Clear()
 				}
-			} else {
-				// Only clear cache if majority of runs are invalid
-				debug.LogToFilef("  ❌ CACHE: Too many invalid runs (%d/%d valid), clearing cache and fetching from API\n", len(validRuns), len(runs))
-				d.cache.Clear()
 			}
 		}
 
@@ -240,63 +253,65 @@ func (d *DashboardView) loadDashboardData() tea.Cmd {
 }
 
 // loadFromRunsOnly loads dashboard data using only runs (fallback method)
-func (d *DashboardView) loadFromRunsOnly() tea.Msg {
-	runs, cached, detailsCache := d.cache.GetCachedList()
-	if !cached || len(runs) == 0 {
-		// Fetch from API using context-aware method
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
+func (d *DashboardView) loadFromRunsOnly() tea.Cmd {
+	return func() tea.Msg {
+		runs, cached, detailsCache := d.cache.GetCachedList()
+		if !cached || len(runs) == 0 {
+			// Fetch from API using context-aware method
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
 
-		listResp, err := d.client.ListRuns(ctx, 1, 1000) // page 1, limit 1000
-		if err != nil {
+			listResp, err := d.client.ListRuns(ctx, 1, 1000) // page 1, limit 1000
+			if err != nil {
+				return dashboardDataLoadedMsg{
+					detailsCache: make(map[string]*models.RunResponse),
+					error:        err,
+				}
+			}
+
+			var runsResp []*models.RunResponse
+			if listResp != nil && listResp.Data != nil {
+				runsResp = listResp.Data
+			} else {
+				runsResp = []*models.RunResponse{}
+			}
+
+			// Convert to pointer slice
+			allRuns := make([]*models.RunResponse, len(runsResp))
+			copy(allRuns, runsResp)
+
+			// Build repository overview from runs
+			repositories := d.cache.BuildRepositoryOverviewFromRuns(allRuns)
+
+			// Cache the data
+			d.cache.SetRepositoryOverview(repositories)
+
+			// Batch cache updates using worker pool to avoid lock contention
+			d.batchCacheRepositoryData(repositories, allRuns, detailsCache)
+
 			return dashboardDataLoadedMsg{
-				detailsCache: make(map[string]*models.RunResponse),
-				error:        err,
+				repositories: repositories,
+				allRuns:      allRuns,
+				error:        nil,
 			}
 		}
 
-		var runsResp []*models.RunResponse
-		if listResp != nil && listResp.Data != nil {
-			runsResp = listResp.Data
-		} else {
-			runsResp = []*models.RunResponse{}
+		// Use cached run data
+		allRuns := make([]*models.RunResponse, len(runs))
+		for i, run := range runs {
+			allRuns[i] = &run
 		}
 
-		// Convert to pointer slice
-		allRuns := make([]*models.RunResponse, len(runsResp))
-		copy(allRuns, runsResp)
-
-		// Build repository overview from runs
+		// Build repository overview from cached runs
 		repositories := d.cache.BuildRepositoryOverviewFromRuns(allRuns)
-
-		// Cache the data
 		d.cache.SetRepositoryOverview(repositories)
-
-		// Batch cache updates using worker pool to avoid lock contention
-		d.batchCacheRepositoryData(repositories, allRuns, detailsCache)
 
 		return dashboardDataLoadedMsg{
 			repositories: repositories,
 			allRuns:      allRuns,
+			detailsCache: detailsCache,
 			error:        nil,
 		}
-	}
-
-	// Use cached run data
-	allRuns := make([]*models.RunResponse, len(runs))
-	for i, run := range runs {
-		allRuns[i] = &run
-	}
-
-	// Build repository overview from cached runs
-	repositories := d.cache.BuildRepositoryOverviewFromRuns(allRuns)
-	d.cache.SetRepositoryOverview(repositories)
-
-	return dashboardDataLoadedMsg{
-		repositories: repositories,
-		allRuns:      allRuns,
-		detailsCache: detailsCache,
-		error:        nil,
 	}
 }
 

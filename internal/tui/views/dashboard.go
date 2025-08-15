@@ -269,12 +269,11 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Check if dashboard needs refresh after navigation
 		if needsRefresh := d.cache.GetNavigationContext("dashboard_needs_refresh"); needsRefresh != nil {
 			if refresh, ok := needsRefresh.(bool); ok && refresh {
-				debug.LogToFilef("🔄 DASHBOARD: Detected refresh flag - invalidating cache and reloading 🔄\n")
+				debug.LogToFilef("🔄 DASHBOARD: Detected refresh flag - triggering data reload 🔄\n")
 				// Clear the flag first
 				d.cache.SetNavigationContext("dashboard_needs_refresh", nil)
-				// Invalidate active runs cache
-				d.cache.InvalidateActiveRuns()
-				// Trigger data reload
+				// Active runs were already invalidated by the source view
+				// Now trigger data reload which will fetch from API
 				d.loading = true
 				cmds = append(cmds, d.loadDashboardData())
 				cmds = append(cmds, d.spinner.Tick)
@@ -584,9 +583,9 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			d.cache.Stop()
 			return d, tea.Quit
 		case key.Matches(msg, d.keys.Refresh):
-			// Invalidate active runs cache to force fresh data from API
-			debug.LogToFilef("  REFRESH: User pressed 'r' - invalidating active runs and refreshing from API\n")
-			d.cache.InvalidateActiveRuns()
+			// Clear entire cache to force fresh data from API
+			debug.LogToFilef("  REFRESH: User pressed 'r' - clearing cache and refreshing from API\n")
+			d.cache.Clear()
 			d.loading = true
 			cmds = append(cmds, d.loadDashboardData())
 			cmds = append(cmds, d.spinner.Tick) // Restart spinner animation

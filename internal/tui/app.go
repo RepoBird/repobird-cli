@@ -66,7 +66,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Clear cache on initial startup to ensure fresh data
 		debug.LogToFile("🔄 APP: Initial startup - clearing cache to fetch fresh data 🔄\n")
 		a.cache.Clear()
-		
+
 		// Initialize dashboard view now that we have user context
 		a.current = views.NewDashboardView(a.client, a.cache)
 
@@ -175,6 +175,12 @@ func (a *App) handleNavigation(msg messages.NavigationMsg) (tea.Model, tea.Cmd) 
 
 	case messages.NavigateToDetailsMsg:
 		a.viewStack = append(a.viewStack, a.current)
+
+		// Store FromCreate flag in navigation context if present
+		if msg.FromCreate {
+			debug.LogToFile("📝 APP: Setting from_create flag in navigation context\n")
+			a.cache.SetNavigationContext("from_create", true)
+		}
 
 		// Create Details view - use cached run data if available to avoid API call
 		if msg.RunData != nil {

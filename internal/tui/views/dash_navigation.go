@@ -140,6 +140,86 @@ func (d *DashboardView) handleMillerColumnsNavigation(msg tea.KeyMsg) tea.Cmd {
 			}
 		}
 
+	case msg.Type == tea.KeyRunes && string(msg.Runes) == "J":
+		// Capital J - scroll half page down
+		switch d.focusedColumn {
+		case 0: // Repository column
+			if len(d.repositories) > 0 {
+				// Calculate half page worth of items (assuming ~20 visible items per page)
+				halfPage := 10
+				newIdx := d.selectedRepoIdx + halfPage
+				if newIdx >= len(d.repositories) {
+					newIdx = len(d.repositories) - 1
+				}
+				d.selectedRepoIdx = newIdx
+				d.selectedRepo = &d.repositories[d.selectedRepoIdx]
+				debug.LogToFilef("\n[NAV HALF-PAGE-DOWN] Moving to repo[%d]: '%s'\n", d.selectedRepoIdx, d.selectedRepo.Name)
+				return d.selectRepository(d.selectedRepo)
+			}
+		case 1: // Runs column
+			if len(d.filteredRuns) > 0 {
+				// Calculate half page worth of items
+				halfPage := 10
+				newIdx := d.selectedRunIdx + halfPage
+				if newIdx >= len(d.filteredRuns) {
+					newIdx = len(d.filteredRuns) - 1
+				}
+				d.selectedRunIdx = newIdx
+				d.selectedRunData = d.filteredRuns[d.selectedRunIdx]
+				d.updateDetailLines()
+			}
+		case 2: // Details column
+			if len(d.detailLines) > 0 {
+				// Calculate half page worth of items
+				halfPage := 10
+				newIdx := d.selectedDetailLine + halfPage
+				if newIdx >= len(d.detailLines) {
+					newIdx = len(d.detailLines) - 1
+				}
+				d.selectedDetailLine = newIdx
+			}
+		}
+
+	case msg.Type == tea.KeyRunes && string(msg.Runes) == "K":
+		// Capital K - scroll half page up
+		switch d.focusedColumn {
+		case 0: // Repository column
+			if len(d.repositories) > 0 {
+				// Calculate half page worth of items (assuming ~20 visible items per page)
+				halfPage := 10
+				newIdx := d.selectedRepoIdx - halfPage
+				if newIdx < 0 {
+					newIdx = 0
+				}
+				d.selectedRepoIdx = newIdx
+				d.selectedRepo = &d.repositories[d.selectedRepoIdx]
+				debug.LogToFilef("\n[NAV HALF-PAGE-UP] Moving to repo[%d]: '%s'\n", d.selectedRepoIdx, d.selectedRepo.Name)
+				return d.selectRepository(d.selectedRepo)
+			}
+		case 1: // Runs column
+			if len(d.filteredRuns) > 0 {
+				// Calculate half page worth of items
+				halfPage := 10
+				newIdx := d.selectedRunIdx - halfPage
+				if newIdx < 0 {
+					newIdx = 0
+				}
+				d.selectedRunIdx = newIdx
+				d.selectedRunData = d.filteredRuns[d.selectedRunIdx]
+				d.updateDetailLines()
+			}
+		case 2: // Details column
+			if len(d.detailLines) > 0 {
+				// Calculate half page worth of items
+				halfPage := 10
+				newIdx := d.selectedDetailLine - halfPage
+				if newIdx < 0 {
+					newIdx = 0
+				}
+				d.selectedDetailLine = newIdx
+			}
+		}
+
 	case key.Matches(msg, d.keys.Tab):
 		// Tab cycles through columns
 		d.focusedColumn = (d.focusedColumn + 1) % 3

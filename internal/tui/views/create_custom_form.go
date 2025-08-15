@@ -63,7 +63,7 @@ func NewCustomCreateForm() *CustomCreateForm {
 			Label:       "Title",
 			Type:        "text",
 			Placeholder: "Brief description of the task",
-			Required:    false,  // Not required per user request
+			Required:    false, // Not required per user request
 			Icon:        "📝",
 		},
 		{
@@ -79,8 +79,8 @@ func NewCustomCreateForm() *CustomCreateForm {
 			Label:       "Source Branch",
 			Type:        "text",
 			Placeholder: "main",
-			Value:       "",  // Keep empty by default - no git detection
-			Required:    false,  // Not required per user request
+			Value:       "",    // Keep empty by default - no git detection
+			Required:    false, // Not required per user request
 			Icon:        "🌿",
 		},
 		{

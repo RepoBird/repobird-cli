@@ -223,12 +223,32 @@ func (v *RunDetailsView) handleKeyInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case msg.String() == "d":
 		// d key to go to dashboard
 		v.stopPolling()
+		// Check if we came from CREATE view and set refresh flag
+		if fromCreate := v.cache.GetNavigationContext("from_create"); fromCreate != nil {
+			if wasFromCreate, ok := fromCreate.(bool); ok && wasFromCreate {
+				debug.LogToFilef("🔄 DETAILS: Came from CREATE, setting dashboard refresh flag\n")
+				v.cache.SetNavigationContext("dashboard_needs_refresh", true)
+				v.cache.InvalidateActiveRuns()
+				// Clear the from_create flag
+				v.cache.SetNavigationContext("from_create", nil)
+			}
+		}
 		return v, func() tea.Msg {
 			return messages.NavigateToDashboardMsg{}
 		}
 	case key.Matches(msg, v.keys.Help):
 		// Navigate to dashboard with docs
 		v.stopPolling()
+		// Check if we came from CREATE view and set refresh flag
+		if fromCreate := v.cache.GetNavigationContext("from_create"); fromCreate != nil {
+			if wasFromCreate, ok := fromCreate.(bool); ok && wasFromCreate {
+				debug.LogToFilef("🔄 DETAILS: Came from CREATE, setting dashboard refresh flag\n")
+				v.cache.SetNavigationContext("dashboard_needs_refresh", true)
+				v.cache.InvalidateActiveRuns()
+				// Clear the from_create flag
+				v.cache.SetNavigationContext("from_create", nil)
+			}
+		}
 		return v, func() tea.Msg {
 			return messages.NavigateToDashboardMsg{}
 		}
