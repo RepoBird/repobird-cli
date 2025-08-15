@@ -264,7 +264,7 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			newView := d.spinner.View() // Capture after update
 			// Also update the status line spinner with the actual tick message
 			d.statusLine.UpdateSpinnerWithTick(msg)
-			debug.LogToFilef("🔄 SPINNER: Tick processed - loading=%t initializing=%t, before='%s', after='%s', changed=%t 🔄\n", 
+			debug.LogToFilef("🔄 SPINNER: Tick processed - loading=%t initializing=%t, before='%s', after='%s', changed=%t 🔄\n",
 				d.loading, d.initializing, oldView, newView, oldView != newView)
 			// Don't return early - continue processing other messages
 			cmds = append(cmds, cmd)

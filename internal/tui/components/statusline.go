@@ -115,8 +115,8 @@ func (s *StatusLine) UpdateSpinnerWithTick(msg spinner.TickMsg) *StatusLine {
 		// Advance custom spinner index
 		s.customSpinnerIndex = (s.customSpinnerIndex + 1) % len(s.customSpinnerFrames)
 		newFrame := s.getCurrentSpinnerFrame()
-		
-		debug.LogToFilef("🔄 STATUSLINE: Custom spinner tick - isLoading=%t, index=%d, before='%s', after='%s', changed=%t 🔄\n", 
+
+		debug.LogToFilef("🔄 STATUSLINE: Custom spinner tick - isLoading=%t, index=%d, before='%s', after='%s', changed=%t 🔄\n",
 			s.isLoading, s.customSpinnerIndex, oldFrame, newFrame, oldFrame != newFrame)
 	} else {
 		debug.LogToFilef("🔄 STATUSLINE: Ignoring spinner tick - isLoading=%t 🔄\n", s.isLoading)
