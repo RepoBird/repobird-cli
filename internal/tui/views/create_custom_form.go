@@ -79,7 +79,7 @@ func NewCustomCreateForm() *CustomCreateForm {
 			Label:       "Source Branch",
 			Type:        "text",
 			Placeholder: "main",
-			Value:       "main",
+			Value:       "",  // Keep empty by default - no git detection
 			Required:    false,  // Not required per user request
 			Icon:        "🌿",
 		},

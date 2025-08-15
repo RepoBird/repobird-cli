@@ -275,6 +275,22 @@ func (h *HybridCache) IsAuthCacheValid() bool {
 	return false
 }
 
+// GetLastUsedRepository retrieves the last repository used for trigger runs
+func (h *HybridCache) GetLastUsedRepository() (string, bool) {
+	if h.permanent != nil {
+		return h.permanent.GetLastUsedRepository()
+	}
+	return "", false
+}
+
+// SetLastUsedRepository stores the last repository used for trigger runs
+func (h *HybridCache) SetLastUsedRepository(repository string) error {
+	if h.permanent != nil {
+		return h.permanent.SetLastUsedRepository(repository)
+	}
+	return nil
+}
+
 // GetFileHash retrieves cached file hash from permanent storage
 func (h *HybridCache) GetFileHash(path string) (string, bool) {
 	if h.permanent != nil {

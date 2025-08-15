@@ -270,6 +270,54 @@ func (p *PermanentCache) GetRepositoryList() ([]string, bool) {
 	return repos, true
 }
 
+// GetLastUsedRepository retrieves the last repository used for trigger runs
+func (p *PermanentCache) GetLastUsedRepository() (string, bool) {
+	// No lock needed - file system handles concurrent reads
+	path := filepath.Join(p.baseDir, "last-repository.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", false
+	}
+
+	var lastRepo struct {
+		Repository string    `json:"repository"`
+		UpdatedAt  time.Time `json:"updated_at"`
+	}
+	if err := json.Unmarshal(data, &lastRepo); err != nil {
+		return "", false
+	}
+
+	return lastRepo.Repository, true
+}
+
+// SetLastUsedRepository stores the last repository used for trigger runs
+func (p *PermanentCache) SetLastUsedRepository(repository string) error {
+	// Prepare data without lock
+	tempPath := filepath.Join(p.baseDir, "last-repository.tmp")
+	finalPath := filepath.Join(p.baseDir, "last-repository.json")
+
+	lastRepo := struct {
+		Repository string    `json:"repository"`
+		UpdatedAt  time.Time `json:"updated_at"`
+	}{
+		Repository: repository,
+		UpdatedAt:  time.Now(),
+	}
+
+	data, err := json.MarshalIndent(lastRepo, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal last repository: %w", err)
+	}
+
+	// Write to temp file
+	if err := os.WriteFile(tempPath, data, 0600); err != nil {
+		return err
+	}
+
+	// Atomic rename
+	return os.Rename(tempPath, finalPath)
+}
+
 // SetRepositoryList caches repository list
 func (p *PermanentCache) SetRepositoryList(repos []string) error {
 	// Prepare data without lock

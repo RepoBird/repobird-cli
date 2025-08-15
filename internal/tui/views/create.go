@@ -12,7 +12,6 @@ import (
 	"github.com/repobird/repobird-cli/internal/tui/components"
 	"github.com/repobird/repobird-cli/internal/tui/debug"
 	"github.com/repobird/repobird-cli/internal/tui/messages"
-	"github.com/repobird/repobird-cli/pkg/utils"
 )
 
 // CreateRunView implements a form-based view for creating new runs
@@ -55,21 +54,25 @@ func (v *CreateRunView) Init() tea.Cmd {
 		}
 	}
 
-	// Try to detect current git repository
-	if currentRepo, err := utils.DetectRepository(); err == nil && currentRepo != "" {
-		// Only set if not already set from context
-		values := v.form.GetValues()
-		if values["repository"] == "" {
-			v.form.SetValue("repository", currentRepo)
-			debug.LogToFilef("🔍 CREATE VIEW: Auto-detected repository: %s", currentRepo)
+	// Try to use last used repository from cache instead of git detection
+	values := v.form.GetValues()
+	if values["repository"] == "" {
+		// First try to get last used repository from permanent cache
+		if lastRepo, found := v.cache.GetLastUsedRepository(); found && lastRepo != "" {
+			v.form.SetValue("repository", lastRepo)
+			debug.LogToFilef("💾 CREATE VIEW: Using last used repository from cache: %s", lastRepo)
+		} else {
+			// Fallback: try to get repository from most recent run in cache
+			runs := v.cache.GetRuns()
+			if len(runs) > 0 && runs[0].Repository != "" {
+				v.form.SetValue("repository", runs[0].Repository)
+				debug.LogToFilef("📝 CREATE VIEW: Using repository from most recent run: %s", runs[0].Repository)
+			}
 		}
 	}
 
-	// Try to detect current branch for source
-	if currentBranch, err := utils.GetCurrentBranch(); err == nil && currentBranch != "" {
-		v.form.SetValue("source", currentBranch)
-		debug.LogToFilef("🌿 CREATE VIEW: Auto-detected branch: %s", currentBranch)
-	}
+	// Don't auto-fill source branch - keep it as default "main"
+	// User requested to not do any git detection for branches
 
 	// Load saved form data if available (takes precedence over auto-detection)
 	if savedFormData := v.cache.GetFormData(); savedFormData != nil {
@@ -271,6 +274,15 @@ func (v *CreateRunView) handleRunCreated(msg runCreatedMsg) (tea.Model, tea.Cmd)
 	}
 
 	debug.LogToFilef("✅ CREATE VIEW: Run created successfully: %s", msg.run.GetIDString())
+
+	// Save the repository name to permanent cache for future use
+	if msg.run.Repository != "" {
+		if err := v.cache.SetLastUsedRepository(msg.run.Repository); err != nil {
+			debug.LogToFilef("⚠️ CREATE VIEW: Failed to save last used repository: %v", err)
+		} else {
+			debug.LogToFilef("💾 CREATE VIEW: Saved last used repository: %s", msg.run.Repository)
+		}
+	}
 
 	// Cache the new run
 	v.cache.SetRun(*msg.run)

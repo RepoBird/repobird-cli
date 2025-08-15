@@ -142,6 +142,16 @@ func (c *SimpleCache) InvalidateActiveRuns() {
 	_ = c.hybrid.InvalidateActiveRuns()
 }
 
+// GetLastUsedRepository retrieves the last repository used for trigger runs
+func (c *SimpleCache) GetLastUsedRepository() (string, bool) {
+	return c.hybrid.GetLastUsedRepository()
+}
+
+// SetLastUsedRepository stores the last repository used for trigger runs
+func (c *SimpleCache) SetLastUsedRepository(repository string) error {
+	return c.hybrid.SetLastUsedRepository(repository)
+}
+
 // Stop gracefully stops the cache's background goroutines
 func (c *SimpleCache) Stop() {
 	_ = c.hybrid.Close()
