@@ -52,7 +52,7 @@ var markdownCmd = &cobra.Command{
 	Long:  "Generate markdown documentation for RepoBird CLI commands.",
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		outputDir := "docs"
+		outputDir := "docs/generated"
 		if len(args) > 0 {
 			outputDir = args[0]
 		}

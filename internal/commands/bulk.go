@@ -29,15 +29,14 @@ var (
 	bulkDryRun      bool
 	bulkForce       bool
 	bulkInteractive bool
-	bulkParallel    int
 )
 
 // NewBulkCommand creates the bulk command
 func NewBulkCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "bulk [files...]",
-		Short: "Submit multiple runs in parallel from configuration files",
-		Long: `Submit multiple runs in parallel from configuration files.
+		Short: "Submit multiple runs from configuration files",
+		Long: `Submit multiple runs from configuration files.
 		
 Supports multiple formats:
 - Bulk JSON/YAML files with multiple runs
@@ -67,7 +66,6 @@ Examples:
 	cmd.Flags().BoolVar(&bulkDryRun, "dry-run", false, "Validate without submitting")
 	cmd.Flags().BoolVar(&bulkForce, "force", false, "Deprecated - has no effect (kept for backwards compatibility)")
 	cmd.Flags().BoolVarP(&bulkInteractive, "interactive", "i", false, "Interactive bulk mode")
-	cmd.Flags().IntVarP(&bulkParallel, "parallel", "p", 5, "Max concurrent runs")
 
 	// Mark force flag as deprecated
 	cmd.Flags().MarkDeprecated("force", "file hashes are now for tracking only and won't block runs")
@@ -165,11 +163,9 @@ func runBulk(cmd *cobra.Command, args []string) error {
 		SourceBranch:   bulkConfig.Source,
 		BatchTitle:     bulkConfig.BatchTitle,
 		// Force is deprecated but kept for backwards compatibility
-		Force: false,
-		Runs:  make([]dto.RunItem, len(bulkConfig.Runs)),
-		Options: dto.BulkOptions{
-			Parallel: bulkParallel,
-		},
+		Force:   false,
+		Runs:    make([]dto.RunItem, len(bulkConfig.Runs)),
+		Options: dto.BulkOptions{},
 	}
 
 	for i, run := range bulkConfig.Runs {

@@ -230,7 +230,7 @@ interface ListResponse<T> {
 4. **Batch Operations**:
    - JSONL batch file support (multiple runs)
    - Each line creates separate run
-   - Sequential processing (parallel in future)
+   - Sequential processing
 
 5. **Usage Metrics**:
    - Remaining pro runs (remainingProRuns from userSchema)

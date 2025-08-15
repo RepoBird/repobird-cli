@@ -91,8 +91,24 @@ or in an encrypted file as a fallback.`,
 		// For Free tier, always show both lines
 		if strings.Contains(strings.ToLower(userInfo.Tier), "free") {
 			// Free tier - show both, Runs then Plan Runs
-			fmt.Printf("  Runs: %d/%d\n", userInfo.RemainingProRuns, userInfo.ProTotalRuns)
-			fmt.Printf("  Plan Runs: %d/%d\n", userInfo.RemainingPlanRuns, userInfo.PlanTotalRuns)
+			// Use hardcoded defaults if totals are 0 (API didn't return them)
+			proTotal := userInfo.ProTotalRuns
+			planTotal := userInfo.PlanTotalRuns
+			if proTotal == 0 {
+				proTotal = 3 // Free tier default
+			}
+			if planTotal == 0 {
+				planTotal = 5 // Free tier default
+			}
+			// Handle admin credits that exceed defaults
+			if userInfo.RemainingProRuns > proTotal {
+				proTotal = userInfo.RemainingProRuns
+			}
+			if userInfo.RemainingPlanRuns > planTotal {
+				planTotal = userInfo.RemainingPlanRuns
+			}
+			fmt.Printf("  Runs: %d/%d\n", userInfo.RemainingProRuns, proTotal)
+			fmt.Printf("  Plan Runs: %d/%d\n", userInfo.RemainingPlanRuns, planTotal)
 		} else {
 			// Other tiers - show Runs, and Plan Runs if available
 			fmt.Printf("  Runs: %d/%d\n", userInfo.RemainingProRuns, userInfo.ProTotalRuns)
@@ -185,8 +201,24 @@ var verifyCmd = &cobra.Command{
 		// For Free tier, always show both lines
 		if strings.Contains(strings.ToLower(userInfo.Tier), "free") {
 			// Free tier - show both, Runs then Plan Runs
-			fmt.Printf("  Runs: %d/%d\n", userInfo.RemainingProRuns, userInfo.ProTotalRuns)
-			fmt.Printf("  Plan Runs: %d/%d\n", userInfo.RemainingPlanRuns, userInfo.PlanTotalRuns)
+			// Use hardcoded defaults if totals are 0 (API didn't return them)
+			proTotal := userInfo.ProTotalRuns
+			planTotal := userInfo.PlanTotalRuns
+			if proTotal == 0 {
+				proTotal = 3 // Free tier default
+			}
+			if planTotal == 0 {
+				planTotal = 5 // Free tier default
+			}
+			// Handle admin credits that exceed defaults
+			if userInfo.RemainingProRuns > proTotal {
+				proTotal = userInfo.RemainingProRuns
+			}
+			if userInfo.RemainingPlanRuns > planTotal {
+				planTotal = userInfo.RemainingPlanRuns
+			}
+			fmt.Printf("  Runs: %d/%d\n", userInfo.RemainingProRuns, proTotal)
+			fmt.Printf("  Plan Runs: %d/%d\n", userInfo.RemainingPlanRuns, planTotal)
 		} else {
 			// Other tiers - show Runs, and Plan Runs if available
 			fmt.Printf("  Runs: %d/%d\n", userInfo.RemainingProRuns, userInfo.ProTotalRuns)
@@ -267,11 +299,33 @@ var infoCmd = &cobra.Command{
 				// Always show both for Free tier, or if either has values
 				if strings.Contains(strings.ToLower(userInfo.Tier), "free") || 
 				   userInfo.ProTotalRuns > 0 || userInfo.RemainingProRuns > 0 {
-					fmt.Printf("  Runs: %d/%d\n", userInfo.RemainingProRuns, userInfo.ProTotalRuns)
+					// Use hardcoded defaults if totals are 0 (API didn't return them)
+					proTotal := userInfo.ProTotalRuns
+					if proTotal == 0 && strings.Contains(strings.ToLower(userInfo.Tier), "free") {
+						proTotal = 3 // Free tier default
+					} else if proTotal == 0 {
+						proTotal = 30 // Pro tier default
+					}
+					// Handle admin credits that exceed defaults
+					if userInfo.RemainingProRuns > proTotal {
+						proTotal = userInfo.RemainingProRuns
+					}
+					fmt.Printf("  Runs: %d/%d\n", userInfo.RemainingProRuns, proTotal)
 				}
 				if strings.Contains(strings.ToLower(userInfo.Tier), "free") || 
 				   userInfo.PlanTotalRuns > 0 || userInfo.RemainingPlanRuns > 0 {
-					fmt.Printf("  Plan Runs: %d/%d\n", userInfo.RemainingPlanRuns, userInfo.PlanTotalRuns)
+					// Use hardcoded defaults if totals are 0 (API didn't return them)
+					planTotal := userInfo.PlanTotalRuns
+					if planTotal == 0 && strings.Contains(strings.ToLower(userInfo.Tier), "free") {
+						planTotal = 5 // Free tier default
+					} else if planTotal == 0 {
+						planTotal = 35 // Pro tier default
+					}
+					// Handle admin credits that exceed defaults
+					if userInfo.RemainingPlanRuns > planTotal {
+						planTotal = userInfo.RemainingPlanRuns
+					}
+					fmt.Printf("  Plan Runs: %d/%d\n", userInfo.RemainingPlanRuns, planTotal)
 				}
 
 				// Calculate reset date

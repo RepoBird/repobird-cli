@@ -58,8 +58,6 @@ Press `B` in dashboard to open bulk view:
   "repository": "org/repo",
   "source": "main",
   "runType": "approval",
-  "parallel": true,
-  "maxConcurrent": 5,
   "defaults": {
     "context": "Follow existing code patterns",
     "files": ["src/"],
@@ -91,8 +89,6 @@ Press `B` in dashboard to open bulk view:
 | `repository` | string | Target repository (org/repo) | Required |
 | `source` | string | Source branch | Required |
 | `runType` | string | "run" or "approval" | "run" |
-| `parallel` | bool | Execute runs in parallel | true |
-| `maxConcurrent` | int | Max parallel runs | 5 |
 | `defaults` | object | Default values for all runs | {} |
 
 ### Run Settings
@@ -223,7 +219,6 @@ ajv validate -s bulk-schema.json -d config.json
 {
   "repository": "myorg/backend",
   "source": "main",
-  "parallel": false,
   "runs": [
     {
       "title": "Extract service layer",
@@ -279,7 +274,6 @@ repobird auth verify
 **Rate Limiting:**
 ```json
 {
-  "maxConcurrent": 2,
   "delayBetweenRuns": 5000
 }
 ```
@@ -293,10 +287,8 @@ tail -f /tmp/repobird_debug.log
 ## Performance Tips
 
 1. **Batch Similar Tasks** - Group related changes
-2. **Use Parallel Execution** - For independent tasks
-3. **Set Reasonable Limits** - maxConcurrent based on API limits
-4. **Monitor Progress** - Use --follow or TUI
-5. **Validate First** - Always use --dry-run
+2. **Monitor Progress** - Use --follow or TUI
+3. **Validate First** - Always use --dry-run
 
 ## API Integration
 

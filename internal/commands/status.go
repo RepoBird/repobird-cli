@@ -78,9 +78,34 @@ func getRunStatus(client *api.Client, runID string) error {
 }
 
 func listRuns(client *api.Client) error {
-	// Show version info in dev/debug mode
+	// Always show version info in dev/debug mode or when there's an error
 	env := os.Getenv("REPOBIRD_ENV")
-	if strings.ToLower(env) == "dev" || strings.ToLower(env) == "development" || cfg.Debug {
+	showDebugInfo := strings.ToLower(env) == "dev" || strings.ToLower(env) == "development" || cfg.Debug
+	
+	// Try to verify auth first to check for API/auth errors
+	userInfo, authErr := client.VerifyAuth()
+	
+	// If API/auth error, show version info and error, then exit
+	if authErr != nil && (errors.IsAuthError(authErr) || errors.IsNetworkError(authErr)) {
+		// Always show version/debug info when there's an API error
+		fmt.Printf("Build: %s", version.GetVersion())
+		if version.GetVersion() == "dev" {
+			fmt.Printf(" (development)")
+		}
+		fmt.Printf(" | Commit: %s", version.GitCommit)
+		if cfg.Debug {
+			fmt.Printf(" | Debug: ON")
+		}
+		fmt.Println()
+		fmt.Println()
+		
+		// Show the error below version info
+		fmt.Fprintf(os.Stderr, "Error: %s\n", errors.FormatUserError(authErr))
+		return nil // Return nil to prevent cobra from showing usage and error again
+	}
+	
+	// Show version info in dev/debug mode for successful requests
+	if showDebugInfo {
 		fmt.Printf("Build: %s", version.GetVersion())
 		if version.GetVersion() == "dev" {
 			fmt.Printf(" (development)")
@@ -93,21 +118,55 @@ func listRuns(client *api.Client) error {
 		fmt.Println()
 	}
 	
-	userInfo, err := client.VerifyAuth()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: Could not fetch user info: %s\n", errors.FormatUserError(err))
-	} else {
-		// Set the current user for cache initialization
+	// If auth succeeded but had a warning-level error, show warning
+	if authErr != nil {
+		fmt.Fprintf(os.Stderr, "Warning: Could not fetch user info: %s\n", errors.FormatUserError(authErr))
+	} else if userInfo != nil {
+		// Set the current user for cache initialization and show user info
 		services.SetCurrentUser(userInfo)
-		fmt.Printf("Runs: %d/%d (%s tier)\n", userInfo.RemainingProRuns, userInfo.ProTotalRuns, userInfo.Tier)
-		if userInfo.PlanTotalRuns > 0 {
-			fmt.Printf("Plan Runs: %d/%d\n", userInfo.RemainingPlanRuns, userInfo.PlanTotalRuns)
+		
+		// Use hardcoded fallback totals when API returns 0 (like auth info does)
+		if userInfo.Tier == "Free Plan v1" {
+			// Hardcoded limits for Free Plan v1
+			proTotal := 4
+			planTotal := 5
+			// Use higher value if remaining exceeds the hardcoded
+			if userInfo.RemainingProRuns > proTotal {
+				proTotal = userInfo.RemainingProRuns
+			}
+			if userInfo.RemainingPlanRuns > planTotal {
+				planTotal = userInfo.RemainingPlanRuns
+			}
+			fmt.Printf("Runs: %d/%d (%s tier)\n", userInfo.RemainingProRuns, proTotal, userInfo.Tier)
+			fmt.Printf("Plan Runs: %d/%d\n", userInfo.RemainingPlanRuns, planTotal)
+		} else {
+			// Other tiers - show actual values from API
+			fmt.Printf("Runs: %d/%d (%s tier)\n", userInfo.RemainingProRuns, userInfo.ProTotalRuns, userInfo.Tier)
+			if userInfo.PlanTotalRuns > 0 || userInfo.RemainingPlanRuns > 0 {
+				fmt.Printf("Plan Runs: %d/%d\n", userInfo.RemainingPlanRuns, userInfo.PlanTotalRuns)
+			}
 		}
 		fmt.Println()
 	}
 
 	runs, err := client.ListRunsLegacy(statusLimit, 0)
 	if err != nil {
+		// If this is also an API/auth error and we haven't shown version info yet, show it
+		if !showDebugInfo && (errors.IsAuthError(err) || errors.IsNetworkError(err)) {
+			fmt.Printf("Build: %s", version.GetVersion())
+			if version.GetVersion() == "dev" {
+				fmt.Printf(" (development)")
+			}
+			fmt.Printf(" | Commit: %s", version.GitCommit)
+			if cfg.Debug {
+				fmt.Printf(" | Debug: ON")
+			}
+			fmt.Println()
+			fmt.Println()
+			
+			fmt.Fprintf(os.Stderr, "Error: failed to list runs: %s\n", errors.FormatUserError(err))
+			return nil // Return nil to prevent cobra from showing usage and error again
+		}
 		return fmt.Errorf("failed to list runs: %s", errors.FormatUserError(err))
 	}
 
