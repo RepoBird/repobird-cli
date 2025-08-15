@@ -56,7 +56,7 @@ export REPOBIRD_API_KEY=your_key
 
 **Example:**
 ```yaml
-api_url: https://api.repobird.ai
+api_url: https://repobird.ai
 timeout: 45m
 debug: false
 output_format: table
@@ -73,7 +73,7 @@ tui:
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `REPOBIRD_API_KEY` | API authentication key | - |
-| `REPOBIRD_API_URL` | API endpoint | `https://api.repobird.ai` |
+| `REPOBIRD_API_URL` | API endpoint | `https://repobird.ai` |
 | `REPOBIRD_ENV` | Environment (prod/dev) | `prod` |
 | `REPOBIRD_DEBUG_LOG` | Debug logging (0/1) | `0` |
 | `REPOBIRD_TIMEOUT` | Request timeout | `45m` |
@@ -161,7 +161,7 @@ repobird config set api-key test_key
 profiles:
   default:
     api_key: ${REPOBIRD_API_KEY}
-    api_url: https://api.repobird.ai
+    api_url: https://repobird.ai
   
   staging:
     api_key: ${STAGING_API_KEY}

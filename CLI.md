@@ -219,7 +219,7 @@ type Client struct {
 
 func NewClient(apiKey string) *Client {
     return &Client{
-        baseURL:    "https://api.repobird.ai/v1",
+        baseURL:    "https://repobird.ai/api/v1",
         apiKey:     apiKey,
         httpClient: &http.Client{
             Timeout: 30 * time.Second,

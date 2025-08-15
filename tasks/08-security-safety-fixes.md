@@ -129,7 +129,7 @@ This analysis covers security vulnerabilities, error handling safety issues, and
 
 ## HTTP Security Assessment (MOSTLY SAFE)
 **Finding**: HTTPS properly enforced in production
-- Default API URL uses HTTPS: `https://api.repobird.ai`
+- Default API URL uses HTTPS: `https://repobird.ai`
 - HTTP only used in test environments (acceptable)
 - No hardcoded HTTP URLs in production code paths
 

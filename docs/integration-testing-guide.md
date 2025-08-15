@@ -475,7 +475,7 @@ env := map[string]string{
 
 // ❌ WRONG - Never use production
 env := map[string]string{
-    "REPOBIRD_API_URL": "https://api.repobird.ai",  // DANGEROUS!
+    "REPOBIRD_API_URL": "https://repobird.ai",  // DANGEROUS!
 }
 ```
 

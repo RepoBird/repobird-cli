@@ -12,7 +12,7 @@ REST API client implementation for RepoBird AI platform with resilience patterns
 
 ## Configuration
 
-**Base URL:** `https://api.repobird.ai/v1`  
+**Base URL:** `https://repobird.ai/api/v1`  
 **Authentication:** Bearer token via `Authorization: Bearer <API_KEY>`  
 **Timeout:** 45 minutes default  
 **User Agent:** `repobird-cli/{version}`

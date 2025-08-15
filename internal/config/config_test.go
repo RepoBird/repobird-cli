@@ -19,7 +19,7 @@ func TestLoadConfig_Default(t *testing.T) {
 	require.NotNil(t, config)
 
 	// Should have default values
-	assert.Equal(t, "https://api.repobird.ai", config.APIURL)
+	assert.Equal(t, "https://repobird.ai", config.APIURL)
 	assert.Empty(t, config.APIKey)
 	assert.False(t, config.Debug)
 }
@@ -196,7 +196,7 @@ func TestSaveConfig_CreatesDirectory(t *testing.T) {
 	require.True(t, os.IsNotExist(err))
 
 	config := &Config{
-		APIURL: "https://api.repobird.ai",
+		APIURL: "https://repobird.ai",
 		APIKey: "test-key",
 		Debug:  false,
 	}
@@ -240,7 +240,7 @@ func TestConfig_Validation(t *testing.T) {
 		{
 			name: "Valid with debug",
 			config: Config{
-				APIURL: "https://api.repobird.ai",
+				APIURL: "https://repobird.ai",
 				APIKey: "another-valid-key",
 				Debug:  true,
 			},
@@ -249,7 +249,7 @@ func TestConfig_Validation(t *testing.T) {
 		{
 			name: "Empty API key (still valid - might be set via environment)",
 			config: Config{
-				APIURL: "https://api.repobird.ai",
+				APIURL: "https://repobird.ai",
 				APIKey: "",
 				Debug:  false,
 			},
@@ -296,7 +296,7 @@ func TestConfig_EdgeCases(t *testing.T) {
 		}
 
 		config := &Config{
-			APIURL: "https://api.repobird.ai",
+			APIURL: "https://repobird.ai",
 			APIKey: string(longKey),
 			Debug:  false,
 		}
@@ -313,7 +313,7 @@ func TestConfig_EdgeCases(t *testing.T) {
 		_ = setupTempHome(t)
 
 		config := &Config{
-			APIURL: "https://api.repobird.ai",
+			APIURL: "https://repobird.ai",
 			APIKey: "key-with-special!@#$%^&*()_+{}|:<>?[]\\;'\"./~`",
 			Debug:  false,
 		}

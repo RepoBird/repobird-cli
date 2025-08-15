@@ -22,7 +22,7 @@ info:
     url: https://repobird.ai
 
 servers:
-  - url: https://api.repobird.ai
+  - url: https://repobird.ai
     description: Production API
   - url: http://localhost:3000
     description: Development server
@@ -639,7 +639,7 @@ paths:
       summary: Create new run
       description: |
         Creates a new AI agent run for the specified repository.
-        Supports file hash tracking for audit purposes (duplicates allowed).
+        Supports duplicate detection via file hash.
       tags:
         - Runs
       requestBody:

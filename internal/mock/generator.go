@@ -348,7 +348,7 @@ func (m *MockClient) ListRunsLegacy(limit, offset int) ([]*models.RunResponse, e
 
 // GetAPIEndpoint returns the mock API endpoint
 func (m *MockClient) GetAPIEndpoint() string {
-	return "https://api.repobird.ai"
+	return "https://repobird.ai"
 }
 
 // VerifyAuth returns mock user info

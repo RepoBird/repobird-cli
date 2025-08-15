@@ -29,7 +29,7 @@ type apiRunRepository struct {
 // NewAPIRunRepository creates a new API-based run repository
 func NewAPIRunRepository(httpClient HTTPClient, baseURL, apiKey string, debug bool) domain.RunRepository {
 	if baseURL == "" {
-		baseURL = "https://api.repobird.ai"
+		baseURL = "https://repobird.ai"
 	}
 	return &apiRunRepository{
 		httpClient: httpClient,

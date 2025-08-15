@@ -55,7 +55,7 @@ func TestNetworkError_Error(t *testing.T) {
 			err: &NetworkError{
 				Err:       baseErr,
 				Operation: "POST /api/v1/runs",
-				URL:       "https://api.repobird.ai/api/v1/runs",
+				URL:       "https://repobird.ai/api/v1/runs",
 			},
 			expected: "network error during POST /api/v1/runs: connection refused",
 		},
@@ -63,7 +63,7 @@ func TestNetworkError_Error(t *testing.T) {
 			name: "without operation",
 			err: &NetworkError{
 				Err: baseErr,
-				URL: "https://api.repobird.ai",
+				URL: "https://repobird.ai",
 			},
 			expected: "network error: connection refused",
 		},

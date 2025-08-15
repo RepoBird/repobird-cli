@@ -110,7 +110,7 @@ repobird config set api-key KEY     # Set API key
 
 ```bash
 export REPOBIRD_API_KEY=your_key
-export REPOBIRD_API_URL=https://api.repobird.ai  # Optional
+export REPOBIRD_API_URL=https://repobird.ai  # Optional
 export REPOBIRD_DEBUG=true                       # Debug mode
 ```
 
@@ -119,7 +119,7 @@ export REPOBIRD_DEBUG=true                       # Debug mode
 ```yaml
 # ~/.repobird/config.yaml
 api_key: your_key_here
-api_url: https://api.repobird.ai
+api_url: https://repobird.ai
 tui:
   refresh_interval: 30s
 ```

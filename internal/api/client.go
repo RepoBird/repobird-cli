@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	DefaultAPIURL  = "https://api.repobird.ai"
+	DefaultAPIURL  = "https://repobird.ai"
 	DefaultTimeout = 45 * time.Minute
 )
 
