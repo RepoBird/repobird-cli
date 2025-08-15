@@ -78,9 +78,8 @@ func TestDashboardManualRefresh(t *testing.T) {
 	cachedRuns := testCache.GetRuns()
 	assert.Empty(t, cachedRuns, "Cache should be completely cleared after manual refresh")
 
-	// Verify force_api_refresh flag was set
-	forceFlag := testCache.GetNavigationContext("force_api_refresh")
-	assert.NotNil(t, forceFlag, "force_api_refresh flag should be set")
+	// Note: The 'r' key calls cache.Clear() directly, not setting force_api_refresh flag
+	// This is different from the navigation-triggered refresh which uses the flag
 }
 
 // TestDashboardAutoRefreshOnNavigation tests automatic refresh when returning from other views
@@ -271,16 +270,20 @@ func TestDashboardNoRefreshWithoutFlag(t *testing.T) {
 	// Create dashboard
 	dashboard := NewDashboardView(mockClient, testCache)
 
+	// Simulate dashboard finishing its initial load by setting loading to false
+	// (Dashboard starts with loading=true by default)
+	dashboard.loading = false
+
 	// Don't expect any API calls since no refresh flag is set
 	// mockClient.On("GetRunsWithLimit", mock.Anything) - NOT called
 
-	// Send WindowSizeMsg
+	// Send WindowSizeMsg (this should NOT trigger a refresh without flags)
 	model, _ := dashboard.Update(tea.WindowSizeMsg{
 		Width:  120,
 		Height: 40,
 	})
 
-	// Verify dashboard is NOT loading (no unnecessary refresh)
+	// Verify dashboard is still NOT loading (no unnecessary refresh)
 	updatedDash := model.(*DashboardView)
 	assert.False(t, updatedDash.loading, "Dashboard should not refresh without flag")
 

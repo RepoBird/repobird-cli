@@ -100,12 +100,14 @@ func TestDetailsViewDashboardNavigation(t *testing.T) {
 	// Add some active runs that should be invalidated
 	activeRuns := []models.RunResponse{
 		{
-			ID:     "active-run-1",
-			Status: models.StatusProcessing,
+			ID:        "active-run-1",
+			Status:    models.StatusProcessing,
+			CreatedAt: time.Now().Add(-15 * time.Minute),
 		},
 		{
-			ID:     "active-run-2",
-			Status: models.StatusQueued,
+			ID:        "active-run-2",
+			Status:    models.StatusQueued,
+			CreatedAt: time.Now().Add(-20 * time.Minute),
 		},
 	}
 	testCache.SetRuns(activeRuns)
@@ -165,8 +167,16 @@ func TestDetailsViewWithoutFromCreateFlag(t *testing.T) {
 
 	// Add some runs
 	runs := []models.RunResponse{
-		{ID: "run-1", Status: models.StatusProcessing},
-		{ID: "run-2", Status: models.StatusDone},
+		{
+			ID:        "run-1",
+			Status:    models.StatusProcessing,
+			CreatedAt: time.Now().Add(-15 * time.Minute),
+		},
+		{
+			ID:        "run-2",
+			Status:    models.StatusDone,
+			CreatedAt: time.Now().Add(-1 * time.Hour),
+		},
 	}
 	testCache.SetRuns(runs)
 
@@ -264,8 +274,16 @@ func TestCompleteCreateToDashboardFlow(t *testing.T) {
 	testCache := cache.NewSimpleCache()
 
 	initialRuns := []models.RunResponse{
-		{ID: "old-run-1", Status: models.StatusProcessing},
-		{ID: "old-run-2", Status: models.StatusDone},
+		{
+			ID:        "old-run-1",
+			Status:    models.StatusProcessing,
+			CreatedAt: time.Now().Add(-30 * time.Minute),
+		},
+		{
+			ID:        "old-run-2",
+			Status:    models.StatusDone,
+			CreatedAt: time.Now().Add(-2 * time.Hour),
+		},
 	}
 	testCache.SetRuns(initialRuns)
 
