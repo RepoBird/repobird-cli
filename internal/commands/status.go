@@ -82,7 +82,11 @@ func listRuns(client *api.Client) error {
 	} else {
 		// Set the current user for cache initialization
 		services.SetCurrentUser(userInfo)
-		fmt.Printf("Remaining runs: %d/%d (%s tier)\n\n", userInfo.RemainingRuns, userInfo.TotalRuns, userInfo.Tier)
+		fmt.Printf("Runs: %d/%d (%s tier)\n", userInfo.RemainingProRuns, userInfo.ProTotalRuns, userInfo.Tier)
+		if userInfo.PlanTotalRuns > 0 {
+			fmt.Printf("Plan Runs: %d/%d\n", userInfo.RemainingPlanRuns, userInfo.PlanTotalRuns)
+		}
+		fmt.Println()
 	}
 
 	runs, err := client.ListRunsLegacy(statusLimit, 0)

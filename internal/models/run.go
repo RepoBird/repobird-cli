@@ -151,15 +151,19 @@ func (r *RunResponse) UnmarshalJSON(data []byte) error {
 }
 
 type UserInfo struct {
-	ID             int    `json:"id,omitempty"`
-	StringID       string `json:"stringId,omitempty"` // Original string ID from API
-	Email          string `json:"email"`
-	Name           string `json:"name,omitempty"`
-	GithubUsername string `json:"githubUsername,omitempty"`
-	RemainingRuns  int    `json:"remainingRuns"`
-	TotalRuns      int    `json:"totalRuns"`
-	Tier           string `json:"tier"`
-	TierDetails    *Tier  `json:"tierDetails,omitempty"`
+	ID                int    `json:"id,omitempty"`
+	StringID          string `json:"stringId,omitempty"` // Original string ID from API
+	Email             string `json:"email"`
+	Name              string `json:"name,omitempty"`
+	GithubUsername    string `json:"githubUsername,omitempty"`
+	RemainingRuns     int    `json:"remainingRuns"`     // Deprecated: use RemainingProRuns
+	TotalRuns         int    `json:"totalRuns"`         // Deprecated: use ProTotalRuns
+	RemainingProRuns  int    `json:"remainingProRuns"`  // Pro runs remaining (displayed as "Runs Left")
+	RemainingPlanRuns int    `json:"remainingPlanRuns"` // Plan runs remaining (displayed as "Plan Runs Left")
+	ProTotalRuns      int    `json:"proTotalRuns"`      // Total pro runs in tier (displayed as "Run Total")
+	PlanTotalRuns     int    `json:"planTotalRuns"`     // Total plan runs in tier (displayed as "Plan Run Total")
+	Tier              string `json:"tier"`
+	TierDetails       *Tier  `json:"tierDetails,omitempty"`
 }
 
 type ListRunsResponse struct {

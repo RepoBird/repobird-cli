@@ -499,57 +499,52 @@ func (s *StatusView) initializeStatusFields() {
 		s.fieldLines = append(s.fieldLines, lineNum)
 		lineNum++
 
-		// Usage information
-		switch s.userInfo.Tier {
-		case "FREE", "BASIC":
-			var runsRemaining string
-			if s.userInfo.TotalRuns > 0 {
-				remaining := s.userInfo.RemainingRuns
-				if remaining < 0 {
-					remaining = 0
-				}
-				runsRemaining = fmt.Sprintf("%d / %d", remaining, s.userInfo.TotalRuns)
-			} else {
-				runsRemaining = "Unknown"
-			}
-			s.statusKeys = append(s.statusKeys, "Runs Remaining:")
-			s.statusFields = append(s.statusFields, runsRemaining)
+		// Usage information - show pro runs as "Runs" and plan runs as "Plan Runs"
+		// Pro runs (displayed as "Runs")
+		if s.userInfo.ProTotalRuns > 0 {
+			s.statusKeys = append(s.statusKeys, "Runs:")
+			s.statusFields = append(s.statusFields, fmt.Sprintf("%d/%d", s.userInfo.RemainingProRuns, s.userInfo.ProTotalRuns))
 			s.fieldLines = append(s.fieldLines, lineNum)
 			lineNum++
+		}
 
-			// Usage percentage
-			if s.userInfo.TotalRuns > 0 {
-				usedRuns := s.userInfo.TotalRuns - s.userInfo.RemainingRuns
-				percentage := float64(usedRuns) / float64(s.userInfo.TotalRuns) * 100
+		// Plan runs (displayed as "Plan Runs")
+		if s.userInfo.PlanTotalRuns > 0 {
+			s.statusKeys = append(s.statusKeys, "Plan Runs:")
+			s.statusFields = append(s.statusFields, fmt.Sprintf("%d/%d", s.userInfo.RemainingPlanRuns, s.userInfo.PlanTotalRuns))
+			s.fieldLines = append(s.fieldLines, lineNum)
+			lineNum++
+		}
 
-				var usageValue string
-				if percentage >= 90 {
-					usageValue = fmt.Sprintf("%.1f%% ⚠️", percentage)
-				} else if percentage >= 75 {
-					usageValue = fmt.Sprintf("%.1f%% ⚡", percentage)
-				} else {
-					usageValue = fmt.Sprintf("%.1f%% ✅", percentage)
-				}
+		// Calculate usage percentage (combined)
+		totalRuns := s.userInfo.ProTotalRuns + s.userInfo.PlanTotalRuns
+		remainingRuns := s.userInfo.RemainingProRuns + s.userInfo.RemainingPlanRuns
+		if totalRuns > 0 {
+			usedRuns := totalRuns - remainingRuns
+			percentage := float64(usedRuns) / float64(totalRuns) * 100
 
-				s.statusKeys = append(s.statusKeys, "Usage:")
-				s.statusFields = append(s.statusFields, usageValue)
-				s.fieldLines = append(s.fieldLines, lineNum)
-				lineNum++
-			}
-		case "PRO":
-			if s.userInfo.TotalRuns > 0 {
-				usedRuns := s.userInfo.TotalRuns - s.userInfo.RemainingRuns
-				percentage := float64(usedRuns) / float64(s.userInfo.TotalRuns) * 100
-				s.statusKeys = append(s.statusKeys, "Usage:")
-				s.statusFields = append(s.statusFields, fmt.Sprintf("%.1f%%", percentage))
-				s.fieldLines = append(s.fieldLines, lineNum)
-				lineNum++
+			var usageValue string
+			if percentage >= 90 {
+				usageValue = fmt.Sprintf("%.1f%% ⚠️", percentage)
+			} else if percentage >= 75 {
+				usageValue = fmt.Sprintf("%.1f%% ⚡", percentage)
 			} else {
-				s.statusKeys = append(s.statusKeys, "Usage:")
-				s.statusFields = append(s.statusFields, "Unlimited")
-				s.fieldLines = append(s.fieldLines, lineNum)
-				lineNum++
+				usageValue = fmt.Sprintf("%.1f%% ✅", percentage)
 			}
+
+			s.statusKeys = append(s.statusKeys, "Usage:")
+			s.statusFields = append(s.statusFields, usageValue)
+			s.fieldLines = append(s.fieldLines, lineNum)
+			lineNum++
+		}
+
+		// Show unlimited for enterprise tier
+		tierUpper := strings.ToUpper(s.userInfo.Tier)
+		if tierUpper == "ENTERPRISE" {
+			s.statusKeys = append(s.statusKeys, "Runs Available:")
+			s.statusFields = append(s.statusFields, "Unlimited ♾️")
+			s.fieldLines = append(s.fieldLines, lineNum)
+			lineNum++
 		}
 	}
 

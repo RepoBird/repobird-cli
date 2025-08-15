@@ -86,7 +86,20 @@ or in an encrypted file as a fallback.`,
 		fmt.Println("✓ API key validated and stored successfully!")
 		fmt.Printf("  Email: %s\n", userInfo.Email)
 		fmt.Printf("  Tier: %s\n", userInfo.Tier)
-		fmt.Printf("  Runs remaining: %d/%d\n", userInfo.RemainingRuns, userInfo.TotalRuns)
+		
+		// Show runs - always show Runs first, then Plan Runs
+		// For Free tier, always show both lines
+		if strings.Contains(strings.ToLower(userInfo.Tier), "free") {
+			// Free tier - show both, Runs then Plan Runs
+			fmt.Printf("  Runs: %d/%d\n", userInfo.RemainingProRuns, userInfo.ProTotalRuns)
+			fmt.Printf("  Plan Runs: %d/%d\n", userInfo.RemainingPlanRuns, userInfo.PlanTotalRuns)
+		} else {
+			// Other tiers - show Runs, and Plan Runs if available
+			fmt.Printf("  Runs: %d/%d\n", userInfo.RemainingProRuns, userInfo.ProTotalRuns)
+			if userInfo.PlanTotalRuns > 0 || userInfo.RemainingPlanRuns > 0 {
+				fmt.Printf("  Plan Runs: %d/%d\n", userInfo.RemainingPlanRuns, userInfo.PlanTotalRuns)
+			}
+		}
 
 		// Display storage method
 		fmt.Println()
@@ -167,7 +180,20 @@ var verifyCmd = &cobra.Command{
 		fmt.Println("✓ API key is valid")
 		fmt.Printf("  Email: %s\n", userInfo.Email)
 		fmt.Printf("  Tier: %s\n", userInfo.Tier)
-		fmt.Printf("  Runs remaining: %d/%d\n", userInfo.RemainingRuns, userInfo.TotalRuns)
+		
+		// Show runs - always show Runs first, then Plan Runs
+		// For Free tier, always show both lines
+		if strings.Contains(strings.ToLower(userInfo.Tier), "free") {
+			// Free tier - show both, Runs then Plan Runs
+			fmt.Printf("  Runs: %d/%d\n", userInfo.RemainingProRuns, userInfo.ProTotalRuns)
+			fmt.Printf("  Plan Runs: %d/%d\n", userInfo.RemainingPlanRuns, userInfo.PlanTotalRuns)
+		} else {
+			// Other tiers - show Runs, and Plan Runs if available
+			fmt.Printf("  Runs: %d/%d\n", userInfo.RemainingProRuns, userInfo.ProTotalRuns)
+			if userInfo.PlanTotalRuns > 0 || userInfo.RemainingPlanRuns > 0 {
+				fmt.Printf("  Plan Runs: %d/%d\n", userInfo.RemainingPlanRuns, userInfo.PlanTotalRuns)
+			}
+		}
 
 		// Calculate reset date (assuming monthly reset)
 		now := time.Now()
@@ -237,8 +263,16 @@ var infoCmd = &cobra.Command{
 				fmt.Println("Account Information:")
 				fmt.Printf("  Email: %s\n", userInfo.Email)
 				fmt.Printf("  Tier: %s\n", userInfo.Tier)
-				fmt.Printf("  Monthly limit: %d runs\n", userInfo.TotalRuns)
-				fmt.Printf("  Remaining: %d runs\n", userInfo.RemainingRuns)
+				
+				// Always show both for Free tier, or if either has values
+				if strings.Contains(strings.ToLower(userInfo.Tier), "free") || 
+				   userInfo.ProTotalRuns > 0 || userInfo.RemainingProRuns > 0 {
+					fmt.Printf("  Runs: %d/%d\n", userInfo.RemainingProRuns, userInfo.ProTotalRuns)
+				}
+				if strings.Contains(strings.ToLower(userInfo.Tier), "free") || 
+				   userInfo.PlanTotalRuns > 0 || userInfo.RemainingPlanRuns > 0 {
+					fmt.Printf("  Plan Runs: %d/%d\n", userInfo.RemainingPlanRuns, userInfo.PlanTotalRuns)
+				}
 
 				// Calculate reset date
 				now := time.Now()

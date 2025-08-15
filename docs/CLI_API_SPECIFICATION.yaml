@@ -68,7 +68,23 @@ components:
           type: string
           example: johndoe
         tier:
-          $ref: '#/components/schemas/Tier'
+          type: string
+          enum: [free, pro, enterprise]
+          example: pro
+        remainingProRuns:
+          type: integer
+          example: 45
+        remainingPlanRuns:
+          type: integer
+          example: 10
+        proTotalRuns:
+          type: integer
+          example: 100
+          description: Total pro runs available per period for this tier
+        planTotalRuns:
+          type: integer
+          example: 20
+          description: Total plan runs available per period for this tier
 
     Tier:
       type: object
@@ -83,6 +99,14 @@ components:
         remainingPlanRuns:
           type: integer
           example: 10
+        proTotalRuns:
+          type: integer
+          example: 100
+          description: Total pro runs available per period for this tier
+        planTotalRuns:
+          type: integer
+          example: 20
+          description: Total plan runs available per period for this tier
         lastPeriodResetDate:
           type: string
           format: date-time
@@ -529,10 +553,40 @@ paths:
                   data:
                     type: object
                     properties:
-                      user:
-                        $ref: '#/components/schemas/User'
+                      id:
+                        type: string
+                        example: user_2abc123def456
+                      email:
+                        type: string
+                        example: developer@example.com
+                      name:
+                        type: string
+                        example: John Doe
+                      githubUsername:
+                        type: string
+                        example: johndoe
                       tier:
-                        $ref: '#/components/schemas/Tier'
+                        type: string
+                        enum: [free, pro, enterprise]
+                        example: pro
+                      remainingProRuns:
+                        type: integer
+                        example: 45
+                      remainingPlanRuns:
+                        type: integer
+                        example: 10
+                      proTotalRuns:
+                        type: integer
+                        example: 100
+                        description: Total pro runs available per period for this tier
+                      planTotalRuns:
+                        type: integer
+                        example: 20
+                        description: Total plan runs available per period for this tier
+                      lastPeriodResetDate:
+                        type: string
+                        format: date-time
+                        example: 2024-01-01T00:00:00Z
         '401':
           description: Invalid API key
           content:
@@ -608,11 +662,22 @@ paths:
                     properties:
                       remainingProRuns:
                         type: integer
+                        example: 45
                       remainingPlanRuns:
                         type: integer
+                        example: 10
+                      proTotalRuns:
+                        type: integer
+                        example: 100
+                        description: Total pro runs available per period for this tier
+                      planTotalRuns:
+                        type: integer
+                        example: 20
+                        description: Total plan runs available per period for this tier
                       lastPeriodResetDate:
                         type: string
                         format: date-time
+                        example: 2024-01-01T00:00:00Z
         '401':
           description: Authentication failed
           content:

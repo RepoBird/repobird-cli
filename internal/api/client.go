@@ -298,13 +298,23 @@ func (c *Client) VerifyAuth() (*models.UserInfo, error) {
 
 	// First try the new nested structure
 	var authResponse models.AuthVerifyResponse
-	if err := json.Unmarshal(body, &authResponse); err == nil && authResponse.Data.User.Email != "" {
-		// Successfully parsed as new format
-		if c.debug {
-			logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-			logger.Debug("Parsed as AuthVerifyResponse", "email", authResponse.Data.User.Email)
+	if err := json.Unmarshal(body, &authResponse); err == nil {
+		// Check if we have valid data (either nested or flattened)
+		hasValidData := (authResponse.Data.User != nil && authResponse.Data.User.Email != "") ||
+			authResponse.Data.Email != ""
+
+		if hasValidData {
+			// Successfully parsed as new format
+			if c.debug {
+				email := authResponse.Data.Email
+				if authResponse.Data.User != nil {
+					email = authResponse.Data.User.Email
+				}
+				logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
+				logger.Debug("Parsed as AuthVerifyResponse", "email", email)
+			}
+			return authResponse.ToUserInfo(), nil
 		}
-		return authResponse.ToUserInfo(), nil
 	}
 
 	// Fall back to legacy flat structure
@@ -426,9 +436,15 @@ func (c *Client) GetUserInfoWithContext(ctx context.Context) (*models.UserInfo, 
 
 	// First try the new nested structure
 	var authResponse models.AuthVerifyResponse
-	if err := json.Unmarshal(body, &authResponse); err == nil && authResponse.Data.User.Email != "" {
-		// Successfully parsed as new format
-		return authResponse.ToUserInfo(), nil
+	if err := json.Unmarshal(body, &authResponse); err == nil {
+		// Check if we have valid data (either nested or flattened)
+		hasValidData := (authResponse.Data.User != nil && authResponse.Data.User.Email != "") ||
+			authResponse.Data.Email != ""
+
+		if hasValidData {
+			// Successfully parsed as new format
+			return authResponse.ToUserInfo(), nil
+		}
 	}
 
 	// Fall back to legacy flat structure

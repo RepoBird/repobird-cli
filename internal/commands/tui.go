@@ -39,13 +39,17 @@ func runTUI(cmd *cobra.Command, args []string) error {
 
 		// Set the debug user immediately for cache initialization
 		debugUserInfo := &models.UserInfo{
-			Email:          "debug-user@repobird.ai",
-			Name:           "Debug User",
-			ID:             -1, // Negative ID for debug mode
-			GithubUsername: "debug-user",
-			RemainingRuns:  100,
-			TotalRuns:      500,
-			Tier:           "premium",
+			Email:             "debug-user@repobird.ai",
+			Name:              "Debug User",
+			ID:                -1, // Negative ID for debug mode
+			GithubUsername:    "debug-user",
+			RemainingRuns:     100, // Deprecated
+			TotalRuns:         500, // Deprecated
+			RemainingProRuns:  80,
+			RemainingPlanRuns: 20,
+			ProTotalRuns:      400,
+			PlanTotalRuns:     100,
+			Tier:              "premium",
 		}
 		services.SetCurrentUser(debugUserInfo)
 

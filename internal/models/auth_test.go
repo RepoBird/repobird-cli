@@ -34,13 +34,17 @@ func TestAuthVerifyResponseParsing(t *testing.T) {
 				}
 			}`,
 			expected: &UserInfo{
-				ID:             HashStringToInt("user-123"),
-				Email:          "test@example.com",
-				Name:           "Test User",
-				GithubUsername: "testuser",
-				RemainingRuns:  15, // 10 + 5
-				TotalRuns:      15,
-				Tier:           "pro",
+				ID:                HashStringToInt("user-123"),
+				Email:             "test@example.com",
+				Name:              "Test User",
+				GithubUsername:    "testuser",
+				RemainingRuns:     15, // 10 + 5
+				TotalRuns:         0,  // No total runs in test data
+				RemainingProRuns:  10,
+				RemainingPlanRuns: 5,
+				ProTotalRuns:      0, // Not provided in test
+				PlanTotalRuns:     0, // Not provided in test
+				Tier:              "pro",
 			},
 		},
 		{
@@ -61,13 +65,17 @@ func TestAuthVerifyResponseParsing(t *testing.T) {
 				}
 			}`,
 			expected: &UserInfo{
-				ID:             HashStringToInt("456"),
-				Email:          "free@example.com",
-				Name:           "Free User",
-				GithubUsername: "",
-				RemainingRuns:  3,
-				TotalRuns:      3,
-				Tier:           "free",
+				ID:                HashStringToInt("456"),
+				Email:             "free@example.com",
+				Name:              "Free User",
+				GithubUsername:    "",
+				RemainingRuns:     3, // 0 + 3
+				TotalRuns:         0, // No total runs in test data
+				RemainingProRuns:  0,
+				RemainingPlanRuns: 3,
+				ProTotalRuns:      0, // Not provided in test
+				PlanTotalRuns:     0, // Not provided in test
+				Tier:              "free",
 			},
 		},
 	}
@@ -83,8 +91,13 @@ func TestAuthVerifyResponseParsing(t *testing.T) {
 			assert.Equal(t, tt.expected.Email, userInfo.Email)
 			assert.Equal(t, tt.expected.Name, userInfo.Name)
 			assert.Equal(t, tt.expected.GithubUsername, userInfo.GithubUsername)
+			// Check the new fields
+			assert.Equal(t, tt.expected.RemainingProRuns, userInfo.RemainingProRuns)
+			assert.Equal(t, tt.expected.RemainingPlanRuns, userInfo.RemainingPlanRuns)
+			assert.Equal(t, tt.expected.ProTotalRuns, userInfo.ProTotalRuns)
+			assert.Equal(t, tt.expected.PlanTotalRuns, userInfo.PlanTotalRuns)
+			// Deprecated fields should still work for backward compatibility
 			assert.Equal(t, tt.expected.RemainingRuns, userInfo.RemainingRuns)
-			assert.Equal(t, tt.expected.TotalRuns, userInfo.TotalRuns)
 			assert.Equal(t, tt.expected.Tier, userInfo.Tier)
 			assert.NotNil(t, userInfo.TierDetails)
 		})
