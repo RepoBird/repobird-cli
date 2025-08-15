@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/repobird/repobird-cli/internal/tui/components"
+	"github.com/repobird/repobird-cli/internal/tui/debug"
 	"github.com/repobird/repobird-cli/internal/utils"
 )
 
@@ -466,6 +467,17 @@ func (d *DashboardView) renderStatusLine(layoutName string) string {
 	// Data freshness indicator - removed to clean up status line
 	dataInfo := ""
 	isLoadingData := d.loading || d.initializing
+
+	// Debug logging for refresh state
+	if d.loading && !d.initializing {
+		debug.LogToFilef("🔄 STATUS: Rendering statusline during REFRESH - loading=%t initializing=%t 🔄\n", d.loading, d.initializing)
+	}
+
+	// Show refresh indicator during refresh (when loading but not initializing)
+	if d.loading && !d.initializing {
+		dataInfo = "" // Empty but loading spinner will still show
+		debug.LogToFilef("🔄 STATUS: Refresh state - dataInfo empty but spinner should animate 🔄\n")
+	}
 
 	// Format left content consistently
 	leftContent := formatter.FormatViewName()

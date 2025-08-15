@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/repobird/repobird-cli/internal/tui/debug"
 	"github.com/repobird/repobird-cli/internal/utils"
 )
 
@@ -35,13 +36,25 @@ type StatusLine struct {
 	tempMessageColor    lipgloss.Color
 	isLoading           bool
 	loadingSpinner      spinner.Model
+	// Custom spinner state
+	customSpinnerFrames []string
+	customSpinnerIndex  int
 }
 
 // NewStatusLine creates a new status line component
 func NewStatusLine() *StatusLine {
 	s := spinner.New()
-	s.Spinner = spinner.Dot
+	// Create a custom spinner with very obvious animation frames
+	s.Spinner = spinner.Spinner{
+		Frames: []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"},
+		FPS:    100 * time.Millisecond, // 10 FPS for smooth animation
+	}
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("226")) // Bright yellow for better visibility
+
+	debug.LogToFilef("🔄 STATUSLINE: Created new statusline with spinner frames: %+v 🔄\n", s.Spinner.Frames)
+
+	// Initialize custom spinner frames
+	customFrames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 
 	return &StatusLine{
 		style: lipgloss.NewStyle().
@@ -50,7 +63,9 @@ func NewStatusLine() *StatusLine {
 			Padding(0, 1),
 		helpStyle: lipgloss.NewStyle().
 			Foreground(lipgloss.Color("240")),
-		loadingSpinner: s,
+		loadingSpinner:      s,
+		customSpinnerFrames: customFrames,
+		customSpinnerIndex:  0,
 	}
 }
 
@@ -74,7 +89,12 @@ func (s *StatusLine) SetRight(content string) *StatusLine {
 
 // SetLoading sets the loading state of the status line
 func (s *StatusLine) SetLoading(loading bool) *StatusLine {
+	debug.LogToFilef("🔄 STATUSLINE: SetLoading called - loading=%t (was %t) 🔄\n", loading, s.isLoading)
 	s.isLoading = loading
+	// If we're starting to load, show the initial spinner state
+	if loading {
+		debug.LogToFilef("🔄 STATUSLINE: Starting loading - spinner view: '%s' 🔄\n", s.loadingSpinner.View())
+	}
 	return s
 }
 
@@ -91,11 +111,25 @@ func (s *StatusLine) UpdateSpinner() *StatusLine {
 // UpdateSpinnerWithTick updates the loading spinner with the actual tick message
 func (s *StatusLine) UpdateSpinnerWithTick(msg spinner.TickMsg) *StatusLine {
 	if s.isLoading {
-		var cmd tea.Cmd
-		s.loadingSpinner, cmd = s.loadingSpinner.Update(msg)
-		_ = cmd // Ignore the command since we're just updating the view
+		oldFrame := s.getCurrentSpinnerFrame()
+		// Advance custom spinner index
+		s.customSpinnerIndex = (s.customSpinnerIndex + 1) % len(s.customSpinnerFrames)
+		newFrame := s.getCurrentSpinnerFrame()
+		
+		debug.LogToFilef("🔄 STATUSLINE: Custom spinner tick - isLoading=%t, index=%d, before='%s', after='%s', changed=%t 🔄\n", 
+			s.isLoading, s.customSpinnerIndex, oldFrame, newFrame, oldFrame != newFrame)
+	} else {
+		debug.LogToFilef("🔄 STATUSLINE: Ignoring spinner tick - isLoading=%t 🔄\n", s.isLoading)
 	}
 	return s
+}
+
+// getCurrentSpinnerFrame returns the current spinner frame
+func (s *StatusLine) getCurrentSpinnerFrame() string {
+	if len(s.customSpinnerFrames) == 0 {
+		return "⠋" // fallback
+	}
+	return s.customSpinnerFrames[s.customSpinnerIndex]
 }
 
 // SetHelp sets the help content of the status line
@@ -167,11 +201,17 @@ func (s *StatusLine) Render() string {
 	// Add loading spinner to right content if loading
 	rightContent := s.rightContent
 	if s.isLoading {
+		// Use custom spinner instead of Bubble Tea spinner
+		spinnerContent := s.getCurrentSpinnerFrame()
+		// Apply yellow color style
+		styledSpinner := lipgloss.NewStyle().Foreground(lipgloss.Color("226")).Render(spinnerContent)
+		debug.LogToFilef("🔄 RENDER: isLoading=%t, spinnerContent='%s', rightContent='%s' 🔄\n", s.isLoading, spinnerContent, rightContent)
 		if rightContent != "" {
-			rightContent = s.loadingSpinner.View() + " " + rightContent
+			rightContent = styledSpinner + " " + rightContent
 		} else {
-			rightContent = s.loadingSpinner.View()
+			rightContent = styledSpinner
 		}
+		debug.LogToFilef("🔄 RENDER: Final rightContent='%s' 🔄\n", rightContent)
 	}
 
 	// Check for active temporary message

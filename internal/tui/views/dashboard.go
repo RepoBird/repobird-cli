@@ -123,7 +123,11 @@ func NewDashboardViewWithState(client APIClient, cache *cache.SimpleCache, selec
 func NewDashboardView(client APIClient, cache *cache.SimpleCache) *DashboardView {
 	// Initialize spinner
 	s := spinner.New()
-	s.Spinner = spinner.Dot
+	// Create a custom spinner with very obvious animation frames
+	s.Spinner = spinner.Spinner{
+		Frames: []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"},
+		FPS:    100 * time.Millisecond, // 10 FPS for smooth animation
+	}
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("63"))
 
 	dashboard := &DashboardView{
@@ -254,12 +258,18 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case spinner.TickMsg:
 		if d.loading || d.initializing {
+			oldView := d.spinner.View() // Capture before update
 			var cmd tea.Cmd
 			d.spinner, cmd = d.spinner.Update(msg)
+			newView := d.spinner.View() // Capture after update
 			// Also update the status line spinner with the actual tick message
 			d.statusLine.UpdateSpinnerWithTick(msg)
+			debug.LogToFilef("🔄 SPINNER: Tick processed - loading=%t initializing=%t, before='%s', after='%s', changed=%t 🔄\n", 
+				d.loading, d.initializing, oldView, newView, oldView != newView)
 			// Don't return early - continue processing other messages
 			cmds = append(cmds, cmd)
+		} else {
+			debug.LogToFilef("🔄 SPINNER: Ignoring tick - loading=%t initializing=%t 🔄\n", d.loading, d.initializing)
 		}
 
 	case tea.WindowSizeMsg:
@@ -295,8 +305,11 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case dashboardDataLoadedMsg:
 		debug.LogToFilef("\n[DASHBOARD DATA LOADED MSG RECEIVED]\n")
+		debug.LogToFilef("🔄 REFRESH: Data loaded - setting loading state to false 🔄\n")
 		d.loading = false
 		d.initializing = false
+		// Update statusline loading state
+		d.statusLine.SetLoading(false)
 		if msg.error != nil {
 			debug.LogToFilef("  ERROR: %v\n", msg.error)
 			d.error = msg.error
@@ -584,9 +597,13 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return d, tea.Quit
 		case key.Matches(msg, d.keys.Refresh):
 			// Clear entire cache to force fresh data from API
-			debug.LogToFilef("  REFRESH: User pressed 'r' - clearing cache and refreshing from API\n")
+			debug.LogToFilef("🔄 REFRESH: User pressed 'r' - clearing cache and refreshing from API 🔄\n")
+			debug.LogToFilef("🔄 REFRESH: Setting loading state to true 🔄\n")
 			d.cache.Clear()
 			d.loading = true
+			// Update statusline loading state immediately
+			d.statusLine.SetLoading(true)
+			debug.LogToFilef("🔄 REFRESH: Starting refresh data load and spinner animation 🔄\n")
 			cmds = append(cmds, d.loadDashboardData())
 			cmds = append(cmds, d.spinner.Tick) // Restart spinner animation
 			return d, tea.Batch(cmds...)

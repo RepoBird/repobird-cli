@@ -41,7 +41,7 @@ func (m *MockAPIClient) GetAPIEndpoint() string {
 
 // Implement remaining interface methods
 func (m *MockAPIClient) ListRuns(ctx context.Context, page, limit int) (*models.ListRunsResponse, error) {
-	return &models.ListRunsResponse{Runs: []models.RunResponse{}}, nil
+	return &models.ListRunsResponse{Data: []*models.RunResponse{}}, nil
 }
 
 func (m *MockAPIClient) ListRunsLegacy(limit, offset int) ([]*models.RunResponse, error) {

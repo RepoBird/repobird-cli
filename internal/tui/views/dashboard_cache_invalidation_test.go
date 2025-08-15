@@ -6,7 +6,6 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/repobird/repobird-cli/internal/api/dto"
 	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/repobird/repobird-cli/internal/tui/cache"
 	"github.com/stretchr/testify/assert"
@@ -31,7 +30,7 @@ func (m *mockAPIClient) GetUserInfo() (*models.UserInfo, error) {
 	return args.Get(0).(*models.UserInfo), args.Error(1)
 }
 
-func (m *mockAPIClient) CreateRunAPI(request models.RunRequest) (*models.RunResponse, error) {
+func (m *mockAPIClient) CreateRunAPI(request *models.APIRunRequest) (*models.RunResponse, error) {
 	args := m.Called(request)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -61,6 +60,43 @@ func (m *mockAPIClient) ListRepositories(ctx context.Context) ([]models.APIRepos
 		return nil, args.Error(1)
 	}
 	return args.Get(0).([]models.APIRepository), args.Error(1)
+}
+
+func (m *mockAPIClient) GetAPIEndpoint() string {
+	args := m.Called()
+	return args.String(0)
+}
+
+func (m *mockAPIClient) VerifyAuth() (*models.UserInfo, error) {
+	args := m.Called()
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.UserInfo), args.Error(1)
+}
+
+func (m *mockAPIClient) GetUserInfoWithContext(ctx context.Context) (*models.UserInfo, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.UserInfo), args.Error(1)
+}
+
+func (m *mockAPIClient) ListRunsLegacy(limit, offset int) ([]*models.RunResponse, error) {
+	args := m.Called(limit, offset)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*models.RunResponse), args.Error(1)
+}
+
+func (m *mockAPIClient) GetFileHashes(ctx context.Context) ([]models.FileHashEntry, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]models.FileHashEntry), args.Error(1)
 }
 
 // TestDashboardRefreshOnWindowSize tests that dashboard refreshes when refresh flag is set
@@ -170,8 +206,7 @@ func TestCacheInvalidateActiveRuns(t *testing.T) {
 	for _, run := range remainingRuns {
 		assert.True(t,
 			run.Status == models.StatusDone ||
-				run.Status == models.StatusFailed ||
-				run.Status == dto.StatusCancelled,
+				run.Status == models.StatusFailed,
 			"Only terminal runs should remain after InvalidateActiveRuns")
 	}
 }
