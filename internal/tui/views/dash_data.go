@@ -12,6 +12,15 @@ import (
 	"github.com/repobird/repobird-cli/internal/tui/debug"
 )
 
+// isRetryExhausted checks if an error indicates all retry attempts have been exhausted
+func isRetryExhausted(err error) bool {
+	if err == nil {
+		return false
+	}
+	// Check for the retry exhaustion error message from retry.Client
+	return strings.Contains(err.Error(), "giving up after") && strings.Contains(err.Error(), "attempts")
+}
+
 // syncFileHashes syncs file hashes from the API on startup
 func (d *DashboardView) syncFileHashes() tea.Cmd {
 	return func() tea.Msg {
@@ -142,6 +151,20 @@ func (d *DashboardView) loadDashboardData() tea.Cmd {
 		apiRepositories, err := d.client.ListRepositories(ctx)
 		if err != nil {
 			debug.LogToFilef("  ListRepositories failed: %v\n", err)
+			
+			// Check if this is a retry exhaustion error (after 3 attempts)
+			// The retry client wraps the error with "giving up after X attempts"
+			if isRetryExhausted(err) {
+				debug.LogToFilef("  ❌ All retries exhausted for ListRepositories, returning error for navigation\n")
+				return dashboardDataLoadedMsg{
+					repositories: []models.Repository{},
+					allRuns:      []*models.RunResponse{},
+					detailsCache: make(map[string]*models.RunResponse),
+					error:        err,
+					retryExhausted: true,
+				}
+			}
+			
 			// Fall back to building repos from runs if repository API fails
 			return d.loadFromRunsOnly()
 		}
@@ -263,9 +286,15 @@ func (d *DashboardView) loadFromRunsOnly() tea.Cmd {
 
 			listResp, err := d.client.ListRuns(ctx, 1, 1000) // page 1, limit 1000
 			if err != nil {
+				// Check if this is also a retry exhaustion
+				retryExhausted := isRetryExhausted(err)
+				if retryExhausted {
+					debug.LogToFilef("  ❌ All retries exhausted for ListRuns fallback, returning error for navigation\n")
+				}
 				return dashboardDataLoadedMsg{
-					detailsCache: make(map[string]*models.RunResponse),
-					error:        err,
+					detailsCache:   make(map[string]*models.RunResponse),
+					error:          err,
+					retryExhausted: retryExhausted,
 				}
 			}
 

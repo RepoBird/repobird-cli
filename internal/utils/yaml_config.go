@@ -355,10 +355,21 @@ func ParseJSONFromStdin() (*models.RunConfig, error) {
 
 // ParseJSONFromStdinWithPrompts parses JSON from stdin with validation prompts
 func ParseJSONFromStdinWithPrompts() (*models.RunConfig, *prompts.ValidationPromptHandler, error) {
+	// Check if stdin is a terminal (no piped input)
+	stat, _ := os.Stdin.Stat()
+	if (stat.Mode() & os.ModeCharDevice) != 0 {
+		return nil, nil, fmt.Errorf("no input provided: either specify a file path or pipe JSON data to stdin")
+	}
+
 	// First, read all stdin data
 	data, err := io.ReadAll(os.Stdin)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to read from stdin: %w", err)
+	}
+
+	// Check if stdin data is empty
+	if len(data) == 0 {
+		return nil, nil, fmt.Errorf("no input provided: stdin is empty")
 	}
 
 	// Parse into a generic map to detect unknown fields

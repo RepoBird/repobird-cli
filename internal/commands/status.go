@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"text/tabwriter"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/repobird/repobird-cli/internal/services"
 	"github.com/repobird/repobird-cli/internal/utils"
+	"github.com/repobird/repobird-cli/pkg/version"
 )
 
 var (
@@ -76,6 +78,21 @@ func getRunStatus(client *api.Client, runID string) error {
 }
 
 func listRuns(client *api.Client) error {
+	// Show version info in dev/debug mode
+	env := os.Getenv("REPOBIRD_ENV")
+	if strings.ToLower(env) == "dev" || strings.ToLower(env) == "development" || cfg.Debug {
+		fmt.Printf("Build: %s", version.GetVersion())
+		if version.GetVersion() == "dev" {
+			fmt.Printf(" (development)")
+		}
+		fmt.Printf(" | Commit: %s", version.GitCommit)
+		if cfg.Debug {
+			fmt.Printf(" | Debug: ON")
+		}
+		fmt.Println()
+		fmt.Println()
+	}
+	
 	userInfo, err := client.VerifyAuth()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: Could not fetch user info: %s\n", errors.FormatUserError(err))

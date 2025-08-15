@@ -311,7 +311,21 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Update statusline loading state
 		d.statusLine.SetLoading(false)
 		if msg.error != nil {
-			debug.LogToFilef("  ERROR: %v\n", msg.error)
+			debug.LogToFilef("  ERROR: %v, retryExhausted: %v\n", msg.error, msg.retryExhausted)
+			
+			// If all retries have been exhausted, navigate to error view
+			if msg.retryExhausted {
+				debug.LogToFilef("  ❌ All retries exhausted, navigating to error view\n")
+				return d, func() tea.Msg {
+					return messages.NavigateToErrorMsg{
+						Error:       msg.error,
+						Message:     "Failed to load dashboard after 3 attempts",
+						Recoverable: true,
+					}
+				}
+			}
+			
+			// Otherwise, just set the error for inline display
 			d.error = msg.error
 		} else {
 			debug.LogToFilef("  Repositories loaded: %d\n", len(msg.repositories))

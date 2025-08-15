@@ -391,7 +391,16 @@ func (a *App) handleNavigation(msg messages.NavigationMsg) (tea.Model, tea.Cmd) 
 		}
 
 		a.current = views.NewErrorView(msg.Error, msg.Message, msg.Recoverable)
-		return a, a.current.Init()
+		
+		// Send current window dimensions to the error view
+		var cmds []tea.Cmd
+		cmds = append(cmds, a.current.Init())
+		if a.width > 0 && a.height > 0 {
+			cmds = append(cmds, func() tea.Msg {
+				return tea.WindowSizeMsg{Width: a.width, Height: a.height}
+			})
+		}
+		return a, tea.Batch(cmds...)
 	}
 
 	return a, nil

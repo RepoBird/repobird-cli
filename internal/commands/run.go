@@ -26,12 +26,78 @@ var runCmd = &cobra.Command{
 	Short: "Create a new run from a JSON, YAML, or Markdown file",
 	Long: `Create a new run from a configuration file containing the task details.
 
-Supported formats:
-  - JSON (.json)
-  - YAML (.yaml, .yml)
-  - Markdown with YAML frontmatter (.md, .markdown)
+SUPPORTED FORMATS:
+  • JSON (.json)                 - Standard JSON configuration
+  • YAML (.yaml, .yml)           - YAML configuration
+  • Markdown (.md, .markdown)    - Markdown with YAML frontmatter
+  • Stdin                        - Pipe JSON directly (no file needed)
 
-If no file is specified, reads JSON from stdin.`,
+CONFIGURATION FIELDS:
+
+Required:
+  • prompt      (string)  - The task description/instructions for the AI
+  • repository  (string)  - Repository name in format "owner/repo"
+  • target      (string)  - Target branch for the changes
+  • title       (string)  - Title for the run
+
+Optional:
+  • source      (string)  - Source branch (defaults to "main")
+  • runType     (string)  - Type: "run", "plan", or "approval" (defaults to "run")
+  • context     (string)  - Additional context or instructions
+  • files       (array)   - List of specific files to include
+
+EXAMPLES:
+
+JSON file (task.json):
+  {
+    "prompt": "Fix the login bug in auth.js",
+    "repository": "myorg/webapp",
+    "source": "main",
+    "target": "fix/login-bug",
+    "title": "Fix authentication issue",
+    "runType": "run",
+    "context": "Users report login fails after 5 attempts",
+    "files": ["src/auth.js", "src/utils/validation.js"]
+  }
+
+YAML file (task.yaml):
+  prompt: Fix the login bug in auth.js
+  repository: myorg/webapp
+  source: main
+  target: fix/login-bug
+  title: Fix authentication issue
+  runType: run
+  context: Users report login fails after 5 attempts
+  files:
+    - src/auth.js
+    - src/utils/validation.js
+
+Markdown with frontmatter (task.md):
+  ---
+  prompt: Fix the login bug
+  repository: myorg/webapp
+  target: fix/login-bug
+  title: Fix authentication issue
+  ---
+  # Additional Context
+  
+  Users are experiencing login failures after 5 attempts.
+  The issue seems to be in the rate limiting logic.
+
+Stdin (pipe JSON):
+  echo '{"prompt":"Fix bug","repository":"org/repo","target":"fix","title":"Bug fix"}' | repobird run
+
+AUTO-DETECTION:
+  If running from a git repository:
+  • Repository name auto-detected from git remote
+  • Source branch auto-detected from current branch
+
+USAGE:
+  repobird run task.json                    # Run from file
+  repobird run task.yaml --follow           # Run and follow status
+  repobird run task.md --dry-run            # Validate without running
+  cat task.json | repobird run              # Pipe from stdin
+  repobird run                              # Error: requires file or stdin`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: runCommand,
 }

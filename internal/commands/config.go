@@ -24,13 +24,32 @@ Available keys:
 var configCmd = &cobra.Command{
 	Use:   "config",
 	Short: "Manage RepoBird configuration",
-	Long:  `Manage RepoBird CLI configuration including API keys and endpoints.`,
+	Long: `Manage RepoBird CLI configuration including API keys and endpoints.
+
+Available configuration keys:
+  api-key    API authentication key (stored securely)
+  api-url    API endpoint URL (default: https://repobird.ai)
+  debug      Enable debug output (true/false)
+
+Storage locations:
+  Config file: ~/.repobird/config.yaml
+  API key:     Secure storage (system keyring or encrypted file)
+  Cache:       ~/.config/repobird/cache/
+
+Examples:
+  repobird config get                      # Show all configuration
+  repobird config set api-key YOUR_KEY     # Set API key
+  repobird config set api-url https://...  # Set custom API endpoint
+  repobird config delete api-key           # Remove API key`,
 }
 
 var configSetCmd = &cobra.Command{
 	Use:   "set [key] [value]",
 	Short: "Set a configuration value",
 	Long:  `Set a configuration value.` + availableKeysHelp,
+	Example: `  repobird config set api-key YOUR_KEY
+  repobird config set api-url https://repobird.ai
+  repobird config set debug true`,
 	Args: func(cmd *cobra.Command, args []string) error {
 		if len(args) != 2 {
 			return fmt.Errorf("accepts 2 arg(s), received %d%s", len(args), availableKeysHelp)
@@ -106,6 +125,11 @@ Available keys:
   storage-info  API key storage information
 
 If no key is specified, shows all configuration values.`,
+	Example: `  repobird config get           # Show all configuration
+  repobird config get api-key    # Show masked API key
+  repobird config get api-url    # Show API endpoint URL
+  repobird config get debug      # Show debug setting
+  repobird config get storage-info  # Show API key storage details`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		secureCfg, err := config.LoadSecureConfig()
@@ -178,6 +202,13 @@ If no key is specified, shows all configuration values.`,
 var configDeleteCmd = &cobra.Command{
 	Use:   "delete [key]",
 	Short: "Delete a configuration value",
+	Long: `Delete a configuration value.
+
+Available keys:
+  api-key    API authentication key (removes from all storage locations)
+
+Note: Only the API key can be deleted. Other settings can be changed with 'config set'.`,
+	Example: `  repobird config delete api-key`,
 	Args: func(cmd *cobra.Command, args []string) error {
 		if len(args) != 1 {
 			return fmt.Errorf("accepts 1 arg, received %d\n\nOnly 'api-key' can be deleted", len(args))

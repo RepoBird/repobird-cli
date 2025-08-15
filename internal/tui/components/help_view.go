@@ -2,6 +2,7 @@ package components
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -43,6 +44,36 @@ func NewHelpView() *HelpView {
 		lineToSection: make(map[int]int),
 		sections:      getDefaultHelpSections(),
 	}
+}
+
+// getTroubleshootingContent returns troubleshooting content, with dev-specific info in dev mode
+func getTroubleshootingContent() []string {
+	content := []string{
+		"Connection Issues:",
+		"• Check API key: repobird config get api-key",
+		"• Verify network: repobird status",
+	}
+	
+	// Show API URL check only in dev mode
+	env := os.Getenv("REPOBIRD_ENV")
+	if strings.ToLower(env) == "dev" || strings.ToLower(env) == "development" {
+		content = append(content, "• Check API URL: REPOBIRD_API_URL env var")
+	}
+	
+	content = append(content,
+		"",
+		"Display Issues:",
+		"• Resize terminal if content is cut off",
+		"• Use fullscreen mode for best experience",
+		"• Check terminal emulator settings",
+		"",
+		"Performance:",
+		"• Use 'r' to manually refresh data",
+		"• FZF mode ('f') for large lists",
+		"• Clear cache if data seems stale",
+	)
+	
+	return content
 }
 
 // getDefaultHelpSections returns the organized help content
@@ -206,22 +237,7 @@ func getDefaultHelpSections() []HelpSection {
 		},
 		{
 			Title: "🔧 Troubleshooting",
-			Content: []string{
-				"Connection Issues:",
-				"• Check API key: repobird config get api-key",
-				"• Verify network: repobird status",
-				"• Check API URL: REPOBIRD_API_URL env var",
-				"",
-				"Display Issues:",
-				"• Resize terminal if content is cut off",
-				"• Use fullscreen mode for best experience",
-				"• Check terminal emulator settings",
-				"",
-				"Performance:",
-				"• Use 'r' to manually refresh data",
-				"• FZF mode ('f') for large lists",
-				"• Clear cache if data seems stale",
-			},
+			Content: getTroubleshootingContent(),
 		},
 	}
 }

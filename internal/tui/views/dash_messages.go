@@ -8,10 +8,11 @@ import (
 
 // dashboardDataLoadedMsg is sent when dashboard data has been loaded
 type dashboardDataLoadedMsg struct {
-	repositories []models.Repository
-	allRuns      []*models.RunResponse
-	detailsCache map[string]*models.RunResponse
-	error        error
+	repositories   []models.Repository
+	allRuns        []*models.RunResponse
+	detailsCache   map[string]*models.RunResponse
+	error          error
+	retryExhausted bool // Indicates if all retry attempts have been exhausted
 }
 
 // dashboardRepositorySelectedMsg is sent when a repository is selected
