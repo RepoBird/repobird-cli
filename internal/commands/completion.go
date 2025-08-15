@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -11,40 +12,52 @@ var completionCmd = &cobra.Command{
 	Short: "Generate shell completion scripts",
 	Long: `Generate shell completion scripts for RepoBird CLI.
 
-To load completions:
+To enable tab completions for both 'repobird' and 'rb' commands:
+
+Zsh:
+  # IMPORTANT: The completion setup must come AFTER 'autoload -U compinit; compinit' in your ~/.zshrc
+  
+  # Method 1: Add to ~/.zshrc (simplest, works everywhere, includes 'rb' alias)
+  $ echo 'eval "$(repobird completion zsh)"' >> ~/.zshrc
+  $ source ~/.zshrc
+  
+  # Method 2: Static file in personal directory (faster startup)
+  $ mkdir -p ~/.config/zsh/completions
+  $ repobird completion zsh > ~/.config/zsh/completions/_repobird
+  $ echo 'fpath=(~/.config/zsh/completions $fpath)' >> ~/.zshrc
+  $ source ~/.zshrc
 
 Bash:
-  $ source <(repobird completion bash)
+  # Add to ~/.bashrc:
+  $ echo 'source <(repobird completion bash)' >> ~/.bashrc
+  $ echo 'complete -o default -F __start_repobird rb' >> ~/.bashrc
+  $ source ~/.bashrc
 
-  # To load completions for each session, execute once:
+  # Alternative: Install to system directory
   # Linux:
-  $ repobird completion bash > /etc/bash_completion.d/repobird
+  $ repobird completion bash | sudo tee /etc/bash_completion.d/repobird
   # macOS:
   $ repobird completion bash > $(brew --prefix)/etc/bash_completion.d/repobird
 
-Zsh:
-  # If shell completion is not already enabled in your environment,
-  # you will need to enable it.  You can execute the following once:
-
-  $ echo "autoload -U compinit; compinit" >> ~/.zshrc
-
-  # To load completions for each session, execute once:
-  $ repobird completion zsh > "${fpath[1]}/_repobird"
-
-  # You will need to start a new shell for this setup to take effect.
-
 Fish:
+  # Install for current and future sessions:
+  $ repobird completion fish > ~/.config/fish/completions/repobird.fish
+  $ repobird completion fish | sed 's/repobird/rb/g' > ~/.config/fish/completions/rb.fish
+  
+  # Or for current session only:
   $ repobird completion fish | source
 
-  # To load completions for each session, execute once:
-  $ repobird completion fish > ~/.config/fish/completions/repobird.fish
-
 PowerShell:
+  # Add to your PowerShell profile:
+  PS> repobird completion powershell >> $PROFILE
+  
+  # Or for current session:
   PS> repobird completion powershell | Out-String | Invoke-Expression
 
-  # To load completions for every new session, run:
-  PS> repobird completion powershell > repobird.ps1
-  # and source this file from your PowerShell profile.
+Troubleshooting:
+  - For zsh: Ensure completion setup comes AFTER 'compinit' in ~/.zshrc
+  - Restart your terminal or run 'source ~/.zshrc' (or ~/.bashrc) after setup
+  - Test with: repobird [TAB][TAB] or rb [TAB][TAB]
 `,
 	DisableFlagsInUseLine: true,
 	ValidArgs:             []string{"bash", "zsh", "fish", "powershell"},
@@ -55,6 +68,9 @@ PowerShell:
 			cmd.Root().GenBashCompletion(os.Stdout)
 		case "zsh":
 			cmd.Root().GenZshCompletion(os.Stdout)
+			// Add rb alias completion at the end
+			fmt.Println("\n# Enable completion for 'rb' alias")
+			fmt.Println("compdef _repobird rb")
 		case "fish":
 			cmd.Root().GenFishCompletion(os.Stdout, true)
 		case "powershell":

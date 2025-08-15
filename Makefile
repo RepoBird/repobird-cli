@@ -67,6 +67,12 @@ build:
 	$(DEV_ENV) CGO_ENABLED=0 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) $(MAIN_PATH)
 	@echo "Development build complete: $(BUILD_DIR)/$(BINARY_NAME)"
 
+## build-cp: Build and copy to ~/.local/bin (overwriting)
+build-cp: build
+	@mkdir -p ~/.local/bin
+	@cp -f $(BUILD_DIR)/$(BINARY_NAME) ~/.local/bin/$(BINARY_NAME)
+	@echo "✓ Built and copied to ~/.local/bin/$(BINARY_NAME)"
+
 ## build-cgo: Build the binary with CGO enabled (development, better clipboard support)
 build-cgo:
 	@mkdir -p $(BUILD_DIR)
