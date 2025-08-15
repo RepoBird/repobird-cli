@@ -196,6 +196,44 @@ install_binary() {
     fi
 }
 
+# Setup shell completions
+setup_completions() {
+    local shell_type=""
+    
+    # Detect current shell
+    if [ -n "$BASH_VERSION" ]; then
+        shell_type="bash"
+    elif [ -n "$ZSH_VERSION" ]; then
+        shell_type="zsh"
+    elif [ -n "$FISH_VERSION" ]; then
+        shell_type="fish"
+    fi
+    
+    echo ""
+    echo -e "${BLUE}Shell Completions:${NC}"
+    echo "To enable tab completions for $BINARY_NAME and $ALIAS_NAME:"
+    echo ""
+    
+    # Provide shell-specific instructions
+    echo "For Bash:"
+    echo "  echo 'source <($BINARY_NAME completion bash)' >> ~/.bashrc"
+    echo "  echo 'complete -o default -F __start_${BINARY_NAME} $ALIAS_NAME' >> ~/.bashrc"
+    echo ""
+    echo "For Zsh:"
+    echo "  echo 'source <($BINARY_NAME completion zsh)' >> ~/.zshrc"
+    echo "  echo 'compdef _${BINARY_NAME} $ALIAS_NAME' >> ~/.zshrc"
+    echo ""
+    echo "For Fish:"
+    echo "  $BINARY_NAME completion fish > ~/.config/fish/completions/${BINARY_NAME}.fish"
+    echo "  $BINARY_NAME completion fish | sed 's/${BINARY_NAME}/$ALIAS_NAME/g' > ~/.config/fish/completions/${ALIAS_NAME}.fish"
+    echo ""
+    
+    if [ -n "$shell_type" ]; then
+        echo -e "${GREEN}Detected shell: $shell_type${NC}"
+        echo "Run the commands above for your shell, then restart your terminal or source your config."
+    fi
+}
+
 # Check if install directory is in PATH
 check_path() {
     if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
@@ -280,6 +318,7 @@ EOF
     install_binary "$platform" "$version"
     check_path
     verify_installation
+    setup_completions
 }
 
 # Handle script being piped from curl
