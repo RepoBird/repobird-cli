@@ -6,6 +6,10 @@ import (
 )
 
 func TestParseAPIError(t *testing.T) {
+	// Ensure clean environment for consistent test results
+	t.Setenv("REPOBIRD_ENV", "")
+	t.Setenv("REPOBIRD_API_URL", "")
+	
 	tests := []struct {
 		name       string
 		statusCode int
