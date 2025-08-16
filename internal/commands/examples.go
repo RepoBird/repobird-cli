@@ -156,6 +156,11 @@ func showBulkSchema() {
 }
 
 func generateExample(cmd *cobra.Command, args []string) error {
+	// If no arguments provided and no output file, show help
+	if len(args) == 0 && outputFile == "" {
+		return cmd.Help()
+	}
+	
 	exampleType := "run"
 	if len(args) > 0 {
 		exampleType = args[0]
@@ -190,14 +195,20 @@ func generateExample(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("failed to write file: %w", err)
 		}
 		fmt.Printf("✓ Example configuration written to: %s\n", outputFile)
-		fmt.Printf("\nRun with: repobird run %s\n", outputFile)
+		fmt.Printf("Run with: repobird run %s\n", outputFile)
 	} else {
+		// When no output file specified, just show what would be generated
+		fmt.Printf("Example %s configuration (%s format):\n\n", exampleType, formatType)
 		fmt.Println(content)
-		fmt.Println()
-		fmt.Println("Tip: Save to file with -o flag: repobird examples generate -o task.json")
 	}
 
 	return nil
+}
+
+// jsonQuote properly escapes and quotes a string for JSON
+func jsonQuote(s string) string {
+	b, _ := json.Marshal(s)
+	return string(b)
 }
 
 func generateRunExample(format string, minimal bool) (string, error) {
@@ -228,11 +239,35 @@ func generateRunExample(format string, minimal bool) (string, error) {
 
 	switch strings.ToLower(format) {
 	case "json":
-		b, err := json.MarshalIndent(example, "", "  ")
-		if err != nil {
-			return "", err
+		// Manually build JSON to maintain field order (repository first, prompt second)
+		var jsonStr string
+		if minimal {
+			jsonStr = fmt.Sprintf(`{
+  "repository": %s,
+  "prompt": %s
+}`, jsonQuote(example["repository"].(string)), jsonQuote(example["prompt"].(string)))
+		} else {
+			// Full example with all fields in desired order
+			filesJSON, _ := json.Marshal(example["files"])
+			jsonStr = fmt.Sprintf(`{
+  "repository": %s,
+  "prompt": %s,
+  "source": %s,
+  "target": %s,
+  "title": %s,
+  "runType": %s,
+  "context": %s,
+  "files": %s
+}`, jsonQuote(example["repository"].(string)),
+				jsonQuote(example["prompt"].(string)),
+				jsonQuote(example["source"].(string)),
+				jsonQuote(example["target"].(string)),
+				jsonQuote(example["title"].(string)),
+				jsonQuote(example["runType"].(string)),
+				jsonQuote(example["context"].(string)),
+				filesJSON)
 		}
-		return string(b), nil
+		return jsonStr, nil
 
 	case "yaml", "yml":
 		b, err := yaml.Marshal(example)
@@ -294,41 +329,37 @@ func generateRunExample(format string, minimal bool) (string, error) {
 }
 
 func generateBulkExample() (string, error) {
-	bulk := map[string]interface{}{
-		"runs": []map[string]interface{}{
-			{
-				"repository": "myorg/webapp",
-				"prompt":     "Add comprehensive error handling to the authentication module",
-				"context":    "Add try-catch blocks and user-friendly error messages",
-				"files": []string{
-					"src/auth/login.js",
-					"src/auth/register.js",
-				},
-			},
-			{
-				"repository": "myorg/webapp",
-				"prompt":     "Create unit tests for the user profile component with at least 80% code coverage",
-				"files": []string{
-					"src/components/UserProfile.js",
-				},
-			},
-			{
-				"repository": "myorg/backend",
-				"prompt":     "Plan refactoring of the database layer to use connection pooling",
-				"runType":    "plan",
-				"context":    "Current implementation creates new connections for each request",
-			},
-		},
-	}
-
-	b, err := json.MarshalIndent(bulk, "", "  ")
-	if err != nil {
-		return "", err
-	}
+	// Manually build JSON to maintain field order
+	bulkJSON := `{
+  "runs": [
+    {
+      "repository": "myorg/webapp",
+      "prompt": "Add comprehensive error handling to the authentication module",
+      "context": "Add try-catch blocks and user-friendly error messages",
+      "files": [
+        "src/auth/login.js",
+        "src/auth/register.js"
+      ]
+    },
+    {
+      "repository": "myorg/webapp",
+      "prompt": "Create unit tests for the user profile component with at least 80% code coverage",
+      "files": [
+        "src/components/UserProfile.js"
+      ]
+    },
+    {
+      "repository": "myorg/backend",
+      "prompt": "Plan refactoring of the database layer to use connection pooling",
+      "runType": "plan",
+      "context": "Current implementation creates new connections for each request"
+    }
+  ]
+}`
 	
 	header := "// Bulk run configuration example\n"
 	header += "// This will create 3 separate runs sequentially\n"
 	header += "// Save this file and run: repobird bulk bulk-tasks.json\n\n"
 	
-	return header + string(b), nil
+	return header + bulkJSON, nil
 }
