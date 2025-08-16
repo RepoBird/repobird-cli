@@ -4,11 +4,19 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	netstderrors "errors"
+	"net/http"
 	"os"
+	"strings"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 
+	"github.com/repobird/repobird-cli/internal/api"
+	"github.com/repobird/repobird-cli/internal/api/dto"
+	"github.com/repobird/repobird-cli/internal/bulk"
+	"github.com/repobird/repobird-cli/internal/cache"
 	"github.com/repobird/repobird-cli/internal/domain"
 	"github.com/repobird/repobird-cli/internal/errors"
 	"github.com/repobird/repobird-cli/internal/models"
@@ -24,114 +32,20 @@ var (
 var runCmd = &cobra.Command{
 	Use:   "run [file]",
 	Short: "Create runs from a JSON, YAML, Markdown, or bulk configuration file",
-	Long: `Create one or more runs from a configuration file containing the task details.
+	Long: `Create one or more runs from a configuration file.
 
-SUPPORTED FORMATS:
-  • JSON (.json)                 - Standard JSON configuration (single or bulk)
-  • YAML (.yaml, .yml)           - YAML configuration (single or bulk)
-  • Markdown (.md, .markdown)    - Markdown with YAML frontmatter (single or bulk)
-  • JSONL (.jsonl)               - JSON Lines for bulk runs
-  • Stdin                        - Pipe JSON directly (no file needed)
+Supports single run or bulk run configurations in JSON, YAML, or Markdown format.
 
-SINGLE RUN CONFIGURATION:
-
-Required fields:
-  • prompt      (string)  - The task description/instructions for the AI
-  • repository  (string)  - Repository name in format "owner/repo"
-  • target      (string)  - Target branch for the changes
-  • title       (string)  - Title for the run
-
-Optional fields:
-  • source      (string)  - Source branch (defaults to "main")
-  • runType     (string)  - Type: "run" or "plan" (defaults to "run")
-  • context     (string)  - Additional context or instructions
-  • files       (array)   - List of specific files to include
-
-BULK RUN CONFIGURATION:
-
-Top-level fields:
-  • repository  (string)  - Repository for all runs
-  • source      (string)  - Source branch for all runs
-  • runType     (string)  - Type for all runs
-  • runs        (array)   - Array of run configurations
-
-Each run in 'runs' array:
-  • prompt      (string)  - Task description (required)
-  • title       (string)  - Run title
-  • target      (string)  - Target branch
-  • context     (string)  - Additional context
-
-EXAMPLES:
-
-Single run (task.json):
-  {
-    "prompt": "Fix the login bug in auth.js",
-    "repository": "myorg/webapp",
-    "source": "main",
-    "target": "fix/login-bug",
-    "title": "Fix authentication issue",
-    "runType": "run",
-    "context": "Users report login fails after 5 attempts",
-    "files": ["src/auth.js", "src/utils/validation.js"]
-  }
-
-Bulk runs (tasks.json):
-  {
-    "repository": "myorg/webapp",
-    "source": "main",
-    "runType": "run",
-    "runs": [
-      {
-        "prompt": "Fix login bug",
-        "title": "Fix authentication",
-        "target": "fix/auth"
-      },
-      {
-        "prompt": "Add logging to API",
-        "title": "Add API logging",
-        "target": "feature/logging"
-      }
-    ]
-  }
-
-YAML format (task.yaml):
-  prompt: Fix the login bug in auth.js
-  repository: myorg/webapp
-  source: main
-  target: fix/login-bug
-  title: Fix authentication issue
-  runType: run
-  context: Users report login fails after 5 attempts
-  files:
-    - src/auth.js
-    - src/utils/validation.js
-
-Markdown with frontmatter (task.md):
-  ---
-  prompt: Fix the login bug
-  repository: myorg/webapp
-  target: fix/login-bug
-  title: Fix authentication issue
-  ---
-  # Additional Context
-  
-  Users are experiencing login failures after 5 attempts.
-  The issue seems to be in the rate limiting logic.
-
-Stdin (pipe JSON):
-  echo '{"prompt":"Fix bug","repository":"org/repo","target":"fix","title":"Bug fix"}' | repobird run
-
-AUTO-DETECTION:
-  If running from a git repository:
-  • Repository name auto-detected from git remote
-  • Source branch auto-detected from current branch
-
-USAGE:
+Examples:
   repobird run task.json                    # Run from file (single or bulk)
   repobird run tasks.yaml --follow           # Run and follow status
   repobird run task.md --dry-run            # Validate without running
-  cat task.json | repobird run              # Pipe from stdin
-  repobird run                              # Error: requires file or stdin`,
+  cat task.json | repobird run              # Pipe JSON from stdin
+
+For configuration examples and field descriptions:
+  repobird examples                         # View all examples
+  repobird examples generate run -o task.json
+  repobird examples generate bulk -o tasks.json`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: runCommand,
 }
@@ -146,37 +60,87 @@ func runCommand(cmd *cobra.Command, args []string) error {
 		return errors.NoAPIKeyError()
 	}
 
+	// Check if it's stdin input
+	if len(args) == 0 {
+		// Check if stdin has data
+		stat, _ := os.Stdin.Stat()
+		if (stat.Mode() & os.ModeCharDevice) != 0 {
+			// No stdin data and no file argument - show help
+			cmd.Help()
+			return nil
+		}
+		
+		// Read JSON from stdin with unknown field handling
+		runConfig, promptHandler, err := utils.ParseJSONFromStdinWithPrompts()
+		if err != nil {
+			// The error already contains helpful hints, don't add more
+			return err
+		}
+		
+		// Show informational messages about unknown fields (not prompts)
+		if promptHandler != nil && promptHandler.HasUnknownFields() {
+			unknownFields := promptHandler.GetUnknownFields()
+			if len(unknownFields) > 0 {
+				fmt.Fprintf(os.Stderr, "Note: Ignoring unknown fields in configuration: %s\n", strings.Join(unknownFields, ", "))
+				
+				// Show suggestions if available
+				suggestions := promptHandler.GetFieldSuggestions()
+				for field, suggestion := range suggestions {
+					if suggestion != "" {
+						fmt.Fprintf(os.Stderr, "      Did you mean '%s' instead of '%s'?\n", suggestion, field)
+					}
+				}
+			}
+		}
+		
+		return processSingleRun(runConfig, "")
+	}
+
+	// Load configuration from file
+	filename := args[0]
+	
+	// Check if it's a bulk configuration FIRST, before trying to parse it
+	isBulk, err := bulk.IsBulkConfig(filename)
+	if err != nil {
+		// If we can't read the file at all, return the error
+		return fmt.Errorf("failed to read configuration file: %w", err)
+	}
+
+	if isBulk {
+		// Process as bulk configuration - no need for validation prompts
+		return processBulkRuns(filename)
+	}
+
+	// Process as single run configuration
 	var runConfig *models.RunConfig
 	var additionalContext string
-	var err error
+	var promptHandler *prompts.ValidationPromptHandler
+	
+	runConfig, additionalContext, promptHandler, err = utils.LoadConfigFromFileWithPrompts(filename)
+	if err != nil {
+		return fmt.Errorf("failed to load configuration file: %w", err)
+	}
 
-	if len(args) > 0 {
-		// Load configuration from file (supports JSON, YAML, and Markdown)
-		filename := args[0]
-		var promptHandler *prompts.ValidationPromptHandler
-		runConfig, additionalContext, promptHandler, err = utils.LoadConfigFromFileWithPrompts(filename)
-		if err != nil {
-			return fmt.Errorf("failed to load configuration file: %w", err)
-		}
-
-		// Process any validation prompts before proceeding
-		if promptHandler != nil && promptHandler.HasPrompts() {
-			shouldContinue, err := promptHandler.ProcessPrompts()
-			if err != nil {
-				return fmt.Errorf("failed to process validation prompts: %w", err)
+	// Show informational messages about unknown fields (not prompts)
+	if promptHandler != nil && promptHandler.HasUnknownFields() {
+		unknownFields := promptHandler.GetUnknownFields()
+		if len(unknownFields) > 0 {
+			fmt.Fprintf(os.Stderr, "Note: Ignoring unknown fields in configuration: %s\n", strings.Join(unknownFields, ", "))
+			
+			// Show suggestions if available
+			suggestions := promptHandler.GetFieldSuggestions()
+			for field, suggestion := range suggestions {
+				if suggestion != "" {
+					fmt.Fprintf(os.Stderr, "      Did you mean '%s' instead of '%s'?\n", suggestion, field)
+				}
 			}
-			if !shouldContinue {
-				return fmt.Errorf("operation cancelled by user")
-			}
-		}
-	} else {
-		// Read JSON from stdin with unknown field handling
-		runConfig, err = utils.ParseJSONFromStdin()
-		if err != nil {
-			return fmt.Errorf("failed to parse input: %w\nHint: Run 'repobird examples' to see configuration formats and schemas", err)
 		}
 	}
 
+	return processSingleRun(runConfig, additionalContext)
+}
+
+func processSingleRun(runConfig *models.RunConfig, additionalContext string) error {
 	// Validate the configuration
 	if err := utils.ValidateRunConfig(runConfig); err != nil {
 		return fmt.Errorf("validation failed: %w", err)
@@ -203,29 +167,30 @@ func runCommand(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Auto-detect git info if needed
-	container := getContainer()
-	gitService := container.GitService()
-
-	if createReq.RepositoryName == "" && gitService.IsGitRepository() {
-		repo, err := gitService.GetRepositoryName()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: Could not auto-detect repository: %v\n", err)
-		} else {
-			createReq.RepositoryName = repo
-			fmt.Printf("Auto-detected repository: %s\n", repo)
-		}
-	}
-
-	if createReq.SourceBranch == "" && gitService.IsGitRepository() {
-		branch, err := gitService.GetCurrentBranch()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: Could not auto-detect branch: %v\n", err)
-		} else {
-			createReq.SourceBranch = branch
-			fmt.Printf("Auto-detected source branch: %s\n", branch)
-		}
-	}
+	// Auto-detection disabled for now
+	// TODO: Enable when feature is ready
+	// container := getContainer()
+	// gitService := container.GitService()
+	//
+	// if createReq.RepositoryName == "" && gitService.IsGitRepository() {
+	// 	repo, err := gitService.GetRepositoryName()
+	// 	if err != nil {
+	// 		fmt.Fprintf(os.Stderr, "Warning: Could not auto-detect repository: %v\n", err)
+	// 	} else {
+	// 		createReq.RepositoryName = repo
+	// 		fmt.Printf("Auto-detected repository: %s\n", repo)
+	// 	}
+	// }
+	//
+	// if createReq.SourceBranch == "" && gitService.IsGitRepository() {
+	// 	branch, err := gitService.GetCurrentBranch()
+	// 	if err != nil {
+	// 		fmt.Fprintf(os.Stderr, "Warning: Could not auto-detect branch: %v\n", err)
+	// 	} else {
+	// 		createReq.SourceBranch = branch
+	// 		fmt.Printf("Auto-detected source branch: %s\n", branch)
+	// 	}
+	// }
 
 	if dryRun {
 		fmt.Println("Validation successful. Run would be created with:")
@@ -235,6 +200,7 @@ func runCommand(cmd *cobra.Command, args []string) error {
 	}
 
 	// Use service layer to create run
+	container := getContainer()
 	runService := container.RunService()
 	ctx := context.Background()
 
@@ -256,6 +222,58 @@ func runCommand(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+func processBulkRuns(filename string) error {
+	// Load bulk configuration
+	bulkConfig, err := bulk.ParseBulkConfig(filename)
+	if err != nil {
+		return fmt.Errorf("failed to load bulk configuration: %w", err)
+	}
+
+	// Auto-detection disabled for now
+	// TODO: Enable when feature is ready
+	// container := getContainer()
+	// gitService := container.GitService()
+	//
+	// if bulkConfig.Repository == "" && gitService.IsGitRepository() {
+	// 	repo, err := gitService.GetRepositoryName()
+	// 	if err != nil {
+	// 		fmt.Fprintf(os.Stderr, "Warning: Could not auto-detect repository: %v\n", err)
+	// 	} else {
+	// 		bulkConfig.Repository = repo
+	// 		fmt.Printf("Auto-detected repository: %s\n", repo)
+	// 	}
+	// }
+	//
+	// if bulkConfig.Source == "" && gitService.IsGitRepository() {
+	// 	branch, err := gitService.GetCurrentBranch()
+	// 	if err != nil {
+	// 		fmt.Fprintf(os.Stderr, "Warning: Could not auto-detect branch: %v\n", err)
+	// 	} else {
+	// 		bulkConfig.Source = branch
+	// 		fmt.Printf("Auto-detected source branch: %s\n", branch)
+	// 	}
+	// }
+
+	if dryRun {
+		fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Render("✓ Configuration valid"))
+		fmt.Printf("Repository: %s\n", bulkConfig.Repository)
+		fmt.Printf("Source: %s\n", bulkConfig.Source)
+		fmt.Printf("RunType: %s\n", bulkConfig.RunType)
+		fmt.Printf("Total runs: %d\n", len(bulkConfig.Runs))
+		for i, run := range bulkConfig.Runs {
+			title := run.Title
+			if title == "" {
+				title = fmt.Sprintf("Run %d", i+1)
+			}
+			fmt.Printf("  - %s\n", title)
+		}
+		return nil
+	}
+
+	// Process bulk runs using the bulk command's logic
+	return executeBulkRuns(bulkConfig)
 }
 
 func followRunStatus(runService domain.RunService, runID string) error {
@@ -308,3 +326,166 @@ func formatDuration(d time.Duration) string {
 	}
 	return fmt.Sprintf("%ds", s)
 }
+
+func executeBulkRuns(bulkConfig *bulk.BulkConfig) error {
+	// Create API client
+	apiURL := os.Getenv("REPOBIRD_API_URL")
+	if apiURL == "" {
+		apiURL = api.DefaultAPIURL
+	}
+	client := api.NewClient(cfg.APIKey, apiURL, debug)
+
+	// Generate file hashes for tracking purposes
+	var runHashes []string
+	fileHashCache := cache.NewFileHashCache()
+	for i, run := range bulkConfig.Runs {
+		// Create a hash based on the run content for tracking
+		hashContent := fmt.Sprintf("%s-%s-%s-%s",
+			bulkConfig.Repository,
+			run.Prompt,
+			run.Target,
+			run.Context,
+		)
+		hash := cache.CalculateStringHash(hashContent)
+		runHashes = append(runHashes, hash)
+		fileHashCache.Set(fmt.Sprintf("bulk-run-%d", i), hash)
+	}
+
+	// Convert to API request format
+	bulkRequest := &dto.BulkRunRequest{
+		RepositoryName: bulkConfig.Repository,
+		RepoID:         bulkConfig.RepoID,
+		RunType:        bulkConfig.RunType,
+		SourceBranch:   bulkConfig.Source,
+		BatchTitle:     bulkConfig.BatchTitle,
+		Force:          false,
+		Runs:           make([]dto.RunItem, len(bulkConfig.Runs)),
+		Options:        dto.BulkOptions{},
+	}
+
+	for i, run := range bulkConfig.Runs {
+		item := dto.RunItem{
+			Prompt:  run.Prompt,
+			Title:   run.Title,
+			Target:  run.Target,
+			Context: run.Context,
+		}
+		// Always include file hash for tracking purposes
+		if i < len(runHashes) {
+			item.FileHash = runHashes[i]
+		}
+		bulkRequest.Runs[i] = item
+	}
+
+	// Submit bulk runs
+	ctx := context.Background()
+
+	// Display submission info
+	fmt.Println(lipgloss.NewStyle().Bold(true).Render("Submitting bulk runs..."))
+	fmt.Printf("Repository: %s\n", bulkConfig.Repository)
+	fmt.Printf("Total runs: %d\n", len(bulkConfig.Runs))
+	fmt.Println("\nThis may take up to 5 minutes. Please wait...")
+
+	// Show a progress indicator with elapsed time
+	startTime := time.Now()
+	spinner := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+	spinnerIdx := 0
+	done := make(chan bool, 1) // Buffered to prevent goroutine leak
+
+	// Start spinner in background
+	go func() {
+		ticker := time.NewTicker(100 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-done:
+				fmt.Print("\r\033[K") // Clear the spinner line
+				return
+			case <-ticker.C:
+				elapsed := time.Since(startTime)
+				fmt.Printf("\r%s Processing... (%.0fs)", spinner[spinnerIdx], elapsed.Seconds())
+				os.Stdout.Sync() // Force flush to ensure animation
+				spinnerIdx = (spinnerIdx + 1) % len(spinner)
+			}
+		}
+	}()
+
+	bulkResp, err := client.CreateBulkRuns(ctx, bulkRequest)
+	done <- true // Stop spinner
+	close(done)  // Clean up channel
+
+	if err != nil {
+		// Check for timeout error
+		if ctx.Err() == context.DeadlineExceeded || netstderrors.Is(err, context.DeadlineExceeded) {
+			return fmt.Errorf("bulk submission timed out after 5 minutes. The server may still be processing your runs.\nTry checking the status later with 'repobird status'")
+		}
+
+		// Check if this is a 403 error which might indicate duplicate runs
+		var authErr *errors.AuthError
+		if netstderrors.As(err, &authErr) && !bulkConfig.Force {
+			// Suggest using --force flag for duplicate issues
+			errMsg := errors.FormatUserError(err)
+			return fmt.Errorf("%s\n\nIf you're seeing duplicate run errors, try using the --force flag to bypass duplicate detection", errMsg)
+		}
+		return fmt.Errorf("%s", errors.FormatUserError(err))
+	}
+
+	// Handle different status codes
+	if bulkResp.StatusCode == http.StatusMultiStatus {
+		// 207 Multi-Status: Some runs still processing
+		fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render("\n⚠ Bulk submission in progress:"))
+		fmt.Printf("The server is still processing your runs. This is normal for large batches.\n")
+		fmt.Printf("Created: %d/%d runs so far\n", bulkResp.Data.Metadata.TotalSuccessful, bulkResp.Data.Metadata.TotalRequested)
+
+		if len(bulkResp.Data.Failed) > 0 {
+			fmt.Println("\nFailed runs:")
+			for _, runErr := range bulkResp.Data.Failed {
+				fmt.Printf("  ✗ Run %d: %s\n", runErr.RequestIndex+1, runErr.Message)
+			}
+		}
+
+		fmt.Println("\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("14")).Render("ℹ  The remaining runs are being processed in the background."))
+		fmt.Println("Use --follow or check status to monitor progress.")
+	} else if len(bulkResp.Data.Failed) > 0 {
+		// Some runs failed
+		fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render("\n⚠ Partial success:"))
+		fmt.Printf("Created: %d/%d runs\n", bulkResp.Data.Metadata.TotalSuccessful, bulkResp.Data.Metadata.TotalRequested)
+
+		// Check if failures are due to duplicates
+		hasDuplicates := false
+		for _, runErr := range bulkResp.Data.Failed {
+			fmt.Printf("  ✗ Run %d: %s\n", runErr.RequestIndex+1, runErr.Message)
+			if strings.Contains(strings.ToUpper(runErr.Error), "DUPLICATE") {
+				hasDuplicates = true
+			}
+		}
+
+		// Suggest using --force if duplicates detected and not already forcing
+		if hasDuplicates && !bulkConfig.Force {
+			fmt.Println("\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("14")).Render("💡 Tip: Use --force to bypass duplicate detection and re-run these tasks"))
+		}
+	} else {
+		// All runs created successfully
+		fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Render("\n✓ All runs created successfully"))
+	}
+
+	// Display created runs
+	if len(bulkResp.Data.Successful) > 0 {
+		fmt.Println("\nCreated runs:")
+		for _, run := range bulkResp.Data.Successful {
+			fmt.Printf("  • %s (ID: %d)\n", run.Title, run.ID)
+		}
+	}
+
+	// Follow progress if requested
+	if follow && len(bulkResp.Data.Successful) > 0 {
+		fmt.Println("\nFollowing batch progress...")
+		return followBulkProgress(ctx, client, bulkResp.Data.BatchID)
+	}
+
+	fmt.Printf("\nBatch ID: %s\n", bulkResp.Data.BatchID)
+	fmt.Println("Use 'repobird bulk status " + bulkResp.Data.BatchID + "' to check progress")
+
+	return nil
+}
+

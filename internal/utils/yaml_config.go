@@ -360,11 +360,6 @@ func ParseJSONFromStdin() (*models.RunConfig, error) {
 
 // ParseJSONFromStdinWithPrompts parses JSON from stdin with validation prompts
 func ParseJSONFromStdinWithPrompts() (*models.RunConfig, *prompts.ValidationPromptHandler, error) {
-	// Check if stdin is a terminal (no piped input)
-	stat, _ := os.Stdin.Stat()
-	if (stat.Mode() & os.ModeCharDevice) != 0 {
-		return nil, nil, fmt.Errorf("no input provided: specify a file path (JSON/YAML/Markdown) or pipe JSON data to stdin\nHint: Run 'repobird examples' to see configuration formats and schemas")
-	}
 
 	// First, read all stdin data
 	data, err := io.ReadAll(os.Stdin)
@@ -374,7 +369,7 @@ func ParseJSONFromStdinWithPrompts() (*models.RunConfig, *prompts.ValidationProm
 
 	// Check if stdin data is empty
 	if len(data) == 0 {
-		return nil, nil, fmt.Errorf("no input provided: stdin is empty. Use a file (JSON/YAML/Markdown) or pipe valid JSON\nHint: Run 'repobird examples' to see configuration formats and schemas")
+		return nil, nil, fmt.Errorf("stdin is empty - no JSON data received")
 	}
 
 	// Parse into a generic map to detect unknown fields

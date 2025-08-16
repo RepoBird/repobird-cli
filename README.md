@@ -63,7 +63,7 @@ repobird examples generate bulk -o bulk.json
 
 #### Submit a Task
 ```bash
-# Run a task from a JSON file
+# Run a single task from a JSON file
 repobird run task.json
 
 # Run and follow progress
@@ -72,6 +72,9 @@ repobird run task.json --follow
 # Run from YAML or Markdown file
 repobird run task.yaml
 repobird run task.md
+
+# Run multiple tasks (bulk) from a file with runs array
+repobird run tasks.json  # Automatically detects bulk format
 ```
 
 #### Check Status
@@ -104,14 +107,14 @@ repobird tui
 
 ### Task Configuration Formats
 
-RepoBird supports JSON, YAML, and Markdown formats for task configuration.
+RepoBird supports JSON, YAML, and Markdown formats for task configuration. The `run` command automatically detects whether a file contains a single run or multiple bulk runs.
 
 #### Required Fields
-- `repository` - Repository name in format "owner/repo" (auto-detected in git repos)
+- `repository` - Repository name in format "owner/repo"
 - `prompt` - Task description/instructions for the AI
 
 #### Optional Fields
-- `source` - Source branch (default: "main", auto-detected in git repos)
+- `source` - Source branch (default: "main")
 - `target` - Target branch name (auto-generated if not specified)
 - `title` - Human-readable title (auto-generated if not specified)
 - `runType` - Type: "run" or "plan" (default: "run")
@@ -137,6 +140,27 @@ RepoBird supports JSON, YAML, and Markdown formats for task configuration.
   "runType": "run",
   "context": "Use JWT tokens and bcrypt for password hashing",
   "files": ["src/auth.js", "src/models/user.js"]
+}
+```
+
+#### Example: Bulk Configuration
+```json
+{
+  "repository": "myorg/webapp",
+  "source": "main",
+  "runType": "run",
+  "runs": [
+    {
+      "prompt": "Fix authentication bug",
+      "title": "Fix auth issue",
+      "target": "fix/auth"
+    },
+    {
+      "prompt": "Add logging to API",
+      "title": "Add API logging",
+      "target": "feature/logging"
+    }
+  ]
 }
 ```
 
@@ -233,7 +257,6 @@ repobird info       # Show authentication status
 
 #### Create Run View
 - **Repository Selection**: Fuzzy search through repository history
-- **Smart Defaults**: Auto-detects current git repository
 - **Form Validation**: Real-time validation with helpful error messages
 - **Keyboard Shortcuts**:
   - `Ctrl+F`: Activate fuzzy search for repository field

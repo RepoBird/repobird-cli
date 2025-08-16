@@ -221,3 +221,60 @@ func (h *ValidationPromptHandler) ProcessResponses(responses []string) bool {
 
 	return true
 }
+
+// HasUnknownFields returns true if there are unknown fields in the configuration
+func (h *ValidationPromptHandler) HasUnknownFields() bool {
+	for _, prompt := range h.prompts {
+		if prompt.Type == "unknown_field" || prompt.Type == "field_suggestion" {
+			return true
+		}
+	}
+	return false
+}
+
+// GetUnknownFields returns a list of unknown field names
+func (h *ValidationPromptHandler) GetUnknownFields() []string {
+	var fields []string
+	seen := make(map[string]bool)
+	
+	for _, prompt := range h.prompts {
+		if prompt.Type == "field_suggestion" && prompt.Field != "" {
+			if !seen[prompt.Field] {
+				fields = append(fields, prompt.Field)
+				seen[prompt.Field] = true
+			}
+		} else if prompt.Type == "unknown_field" {
+			// Extract fields from the message
+			// Message format: "Configuration contains unsupported fields: field1, field2. Continue anyway?"
+			if strings.Contains(prompt.Message, "unsupported fields:") {
+				parts := strings.Split(prompt.Message, "unsupported fields:")
+				if len(parts) > 1 {
+					fieldsPart := strings.Split(parts[1], ".")[0]
+					fieldsList := strings.Split(fieldsPart, ",")
+					for _, field := range fieldsList {
+						field = strings.TrimSpace(field)
+						if field != "" && !seen[field] {
+							fields = append(fields, field)
+							seen[field] = true
+						}
+					}
+				}
+			}
+		}
+	}
+	
+	return fields
+}
+
+// GetFieldSuggestions returns a map of unknown fields to their suggestions
+func (h *ValidationPromptHandler) GetFieldSuggestions() map[string]string {
+	suggestions := make(map[string]string)
+	
+	for _, prompt := range h.prompts {
+		if prompt.Type == "field_suggestion" && prompt.Field != "" && prompt.Suggestion != "" {
+			suggestions[prompt.Field] = prompt.Suggestion
+		}
+	}
+	
+	return suggestions
+}
