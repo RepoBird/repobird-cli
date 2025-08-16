@@ -12,20 +12,23 @@ Comprehensive testing strategies and patterns for RepoBird CLI.
 ## Quick Start
 
 ```bash
-# Run all tests
+# Run all tests (REPOBIRD_API_KEY is set to empty by Makefile)
 make test
 
 # With coverage
 make coverage
 
-# Specific package
-go test ./internal/api
+# Specific package (set API key to empty to avoid errors)
+REPOBIRD_API_KEY="" go test ./internal/api
 
 # With race detection
-go test -race ./...
+REPOBIRD_API_KEY="" go test -race ./...
 
 # Verbose output
-go test -v ./...
+REPOBIRD_API_KEY="" go test -v ./...
+
+# Note: Always set REPOBIRD_API_KEY="" when running tests directly
+# to avoid environment pollution and API key validation errors
 ```
 
 ## Test Structure

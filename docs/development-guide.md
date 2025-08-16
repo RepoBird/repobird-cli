@@ -68,6 +68,11 @@ export REPOBIRD_API_KEY=test_key
 
 # Enable debug logging
 export REPOBIRD_DEBUG_LOG=1
+
+# Important: For testing, set REPOBIRD_API_KEY to empty
+# to avoid environment pollution and API key errors
+# The Makefile already does this for 'make test'
+# REPOBIRD_API_KEY="" go test ./...
 ```
 
 ### 2. Common Tasks

@@ -134,11 +134,15 @@ func parseYAMLWithUnknownFieldsAndPrompts(data []byte) (*models.RunConfig, *prom
 		promptHandler.AddUnknownFieldWarning(fieldsWithoutSuggestions)
 	}
 
-	// Validate required fields and check if we have validation errors
+	// Check for validation errors but don't add them as prompts
+	// Validation errors can't be fixed interactively
 	validationErr := validateYAMLConfigForPrompts(&config)
-	// Don't add validation errors as prompts - they can't be fixed interactively
-	// We'll still return the config but without prompting, letting the caller handle validation
-
+	if validationErr != nil {
+		// Log for debugging but don't add as prompt
+		debug.LogToFilef("YAML has validation errors that will be caught later: %v\n", validationErr)
+		// Don't add validation errors as prompts - they'll be caught by ValidateRunConfig later
+	}
+	
 	// Convert to RunConfig (only supported fields are included)
 	runConfig := &models.RunConfig{
 		Prompt:     config.Prompt,
@@ -151,6 +155,8 @@ func parseYAMLWithUnknownFieldsAndPrompts(data []byte) (*models.RunConfig, *prom
 		Files:      config.Files,
 	}
 
+	// Return the config and prompts (but no validation error prompts)
+	// Actual validation will happen later via ValidateRunConfig
 	return runConfig, promptHandler, nil
 }
 

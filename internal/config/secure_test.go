@@ -3,8 +3,21 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
+
+// redactKey redacts an API key for safe display in test output
+func redactKey(key string) string {
+	if key == "" {
+		return "<empty>"
+	}
+	if len(key) <= 8 {
+		return "***"
+	}
+	// Show first 4 chars and redact the rest
+	return key[:4] + strings.Repeat("*", len(key)-4)
+}
 
 func TestSecureStorage_SaveAndGetAPIKey(t *testing.T) {
 	// Create temporary directory for testing
@@ -35,7 +48,10 @@ func TestSecureStorage_SaveAndGetAPIKey(t *testing.T) {
 	}
 
 	if retrievedKey != testKey {
-		t.Errorf("Retrieved key mismatch: got %q, want %q", retrievedKey, testKey)
+		// Redact API keys in error message
+		redactedGot := redactKey(retrievedKey)
+		redactedWant := redactKey(testKey)
+		t.Errorf("Retrieved key mismatch: got %q, want %q", redactedGot, redactedWant)
 	}
 
 	// Verify encrypted file was created
@@ -81,7 +97,9 @@ func TestSecureStorage_DeleteAPIKey(t *testing.T) {
 	// Verify key is deleted
 	retrievedKey, err := storage.GetAPIKey()
 	if err == nil && retrievedKey != "" {
-		t.Errorf("Key was not deleted: still got %q", retrievedKey)
+		// Redact API key in error message
+		redacted := redactKey(retrievedKey)
+		t.Errorf("Key was not deleted: still got %q", redacted)
 	}
 
 	// Verify encrypted file is removed
@@ -134,7 +152,10 @@ func TestSecureStorage_EnvironmentVariable(t *testing.T) {
 	}
 
 	if retrievedKey != envKey {
-		t.Errorf("Should get env var key: got %q, want %q", retrievedKey, envKey)
+		// Redact API keys in error message
+		redactedGot := redactKey(retrievedKey)
+		redactedWant := redactKey(envKey)
+		t.Errorf("Should get env var key: got %q, want %q", redactedGot, redactedWant)
 	}
 }
 
@@ -200,7 +221,10 @@ func TestSecureStorage_PlainTextMigration(t *testing.T) {
 	}
 
 	if retrievedKey != plainTextKey {
-		t.Errorf("Key mismatch: got %q, want %q", retrievedKey, plainTextKey)
+		// Redact API keys in error message
+		redactedGot := redactKey(retrievedKey)
+		redactedWant := redactKey(plainTextKey)
+		t.Errorf("Key mismatch: got %q, want %q", redactedGot, redactedWant)
 	}
 
 	// Verify encrypted file was created (migration happened)

@@ -189,7 +189,7 @@ clean:
 
 ## test: Run unit tests with summary (excludes integration tests)
 test:
-	@./scripts/test-summary.sh go test -v -race -timeout 30s ./...
+	@REPOBIRD_API_KEY="" ./scripts/test-summary.sh go test -v -race -timeout 30s ./...
 
 ## test-all: Run all tests including integration tests
 test-all: test test-integration
