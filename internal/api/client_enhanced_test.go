@@ -159,13 +159,13 @@ func TestClient_CreateRun_ValidationAndEdgeCases(t *testing.T) {
 				Repository: "user/repo",
 				Source:     "feature",
 				Target:     "main",
-				RunType:    models.RunTypeApproval,
+				RunType:    models.RunTypePlan,
 			},
 			serverResponse: func(w http.ResponseWriter, r *http.Request) {
 				var req models.RunRequest
 				json.NewDecoder(r.Body).Decode(&req)
 
-				assert.Equal(t, models.RunTypeApproval, req.RunType)
+				assert.Equal(t, models.RunTypePlan, req.RunType)
 
 				resp := models.RunResponse{
 					ID:     "approval-123",

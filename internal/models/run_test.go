@@ -11,7 +11,7 @@ func TestRunType(t *testing.T) {
 		expected string
 	}{
 		{"Run type", RunTypeRun, "run"},
-		{"Approval type", RunTypeApproval, "approval"},
+		{"Plan type", RunTypePlan, "plan"},
 	}
 
 	for _, tt := range tests {

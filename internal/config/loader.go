@@ -228,12 +228,12 @@ func (c *ConfigLoader) ValidateConfig(config *models.RunRequest) error {
 
 	// Validate runType
 	switch config.RunType {
-	case models.RunTypeRun, models.RunTypePlan, models.RunTypeApproval:
+	case models.RunTypeRun, models.RunTypePlan:
 		// Valid
 	case "":
 		config.RunType = models.RunTypeRun // Set default
 	default:
-		errors = append(errors, fmt.Sprintf("invalid runType '%s'", config.RunType))
+		errors = append(errors, fmt.Sprintf("invalid runType '%s', must be 'run' or 'plan'", config.RunType))
 	}
 
 	if len(errors) > 0 {

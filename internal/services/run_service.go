@@ -150,7 +150,7 @@ func (s *runService) validateCreateRequest(req domain.CreateRunRequest) error {
 		return fmt.Errorf("prompt is required")
 	}
 
-	if req.RunType != "" && req.RunType != domain.RunTypeRun && req.RunType != domain.RunTypeApproval {
+	if req.RunType != "" && req.RunType != domain.RunTypeRun && req.RunType != domain.RunTypePlan {
 		return fmt.Errorf("invalid run type: %s", req.RunType)
 	}
 

@@ -42,16 +42,17 @@ Examples:
 }
 
 var generateCmd = &cobra.Command{
-	Use:   "generate [run|bulk]",
+	Use:   "generate [run|bulk|minimal]",
 	Short: "Generate example configuration files",
 	Long: `Generate example configuration files for single or bulk runs.
 
 Examples:
-  repobird examples generate                     # Generate single run example (JSON)
+  repobird examples generate                     # Generate full single run example (JSON)
+  repobird examples generate minimal             # Generate minimal config (only required fields)
   repobird examples generate run --format yaml   # Generate YAML example
   repobird examples generate run --format md     # Generate Markdown example
   repobird examples generate bulk                # Generate bulk run example
-  repobird examples generate run -o task.json    # Save to file`,
+  repobird examples generate minimal -o task.json # Save minimal config to file`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: generateExample,
 }
@@ -109,24 +110,18 @@ func showRunSchema() {
 	fmt.Println("REQUIRED FIELDS:")
 	fmt.Println("  • prompt      (string)  - Task description/instructions for the AI")
 	fmt.Println("  • repository  (string)  - Repository in format 'owner/repo' (auto-detected in git repos)")
-	fmt.Println("  • target      (string)  - Target branch name for changes")
-	fmt.Println("  • title       (string)  - Human-readable title for the run")
 	fmt.Println()
 	fmt.Println("OPTIONAL FIELDS:")
+	fmt.Println("  • target      (string)  - Target branch name for changes (default: auto-generated)")
+	fmt.Println("  • title       (string)  - Human-readable title for the run (default: auto-generated)")
 	fmt.Println("  • source      (string)  - Source branch (default: 'main', auto-detected in git repos)")
-	fmt.Println("  • runType     (string)  - Type: 'run', 'plan', or 'approval' (default: 'run')")
+	fmt.Println("  • runType     (string)  - Type: 'run' or 'plan' (default: 'run')")
 	fmt.Println("  • context     (string)  - Additional context or instructions")
 	fmt.Println("  • files       (array)   - List of specific files to include")
 	fmt.Println()
 	fmt.Println("RUN TYPES:")
 	fmt.Println("  • run      - AI makes changes and creates PR automatically")
 	fmt.Println("  • plan     - AI creates detailed plan without code changes")
-	fmt.Println("  • approval - AI makes changes but waits for approval")
-	fmt.Println()
-	fmt.Println("AUTO-DETECTION:")
-	fmt.Println("  When running from a git repository:")
-	fmt.Println("  • repository - Detected from git remote origin")
-	fmt.Println("  • source     - Detected from current branch")
 	fmt.Println()
 	fmt.Println("EXAMPLES:")
 	fmt.Println("  repobird examples generate          # Generate JSON example")
@@ -171,11 +166,13 @@ func generateExample(cmd *cobra.Command, args []string) error {
 
 	switch exampleType {
 	case "run":
-		content, err = generateRunExample(formatType)
+		content, err = generateRunExample(formatType, false)
+	case "minimal":
+		content, err = generateRunExample(formatType, true)
 	case "bulk":
 		content, err = generateBulkExample()
 	default:
-		return fmt.Errorf("unknown example type: %s (use 'run' or 'bulk')", exampleType)
+		return fmt.Errorf("unknown example type: %s (use 'run', 'minimal', or 'bulk')", exampleType)
 	}
 
 	if err != nil {
@@ -203,19 +200,30 @@ func generateExample(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func generateRunExample(format string) (string, error) {
-	example := map[string]interface{}{
-		"prompt":     "Fix the authentication bug where users cannot log in after 5 failed attempts",
-		"repository": "myorg/webapp",
-		"source":     "main",
-		"target":     "fix/auth-rate-limit",
-		"title":      "Fix authentication rate limiting",
-		"runType":    "run",
-		"context":    "Users report being locked out permanently. The rate limit should reset after 15 minutes.",
-		"files": []string{
-			"src/auth/login.js",
-			"src/auth/rateLimit.js",
-		},
+func generateRunExample(format string, minimal bool) (string, error) {
+	var example map[string]interface{}
+	
+	if minimal {
+		// Minimal example with only required fields
+		example = map[string]interface{}{
+			"repository": "myorg/webapp",
+			"prompt":     "Fix the authentication bug where users cannot log in after 5 failed attempts",
+		}
+	} else {
+		// Full example with all commonly used fields (repository first, prompt second)
+		example = map[string]interface{}{
+			"repository": "myorg/webapp",
+			"prompt":     "Fix the authentication bug where users cannot log in after 5 failed attempts",
+			"source":     "main",
+			"target":     "fix/auth-bug",
+			"title":      "Fix authentication rate limiting",
+			"runType":    "run",
+			"context":    "Users report being locked out permanently. The rate limit should reset after 15 minutes.",
+			"files": []string{
+				"src/auth/login.js",
+				"src/auth/rateLimit.js",
+			},
+		}
 	}
 
 	switch strings.ToLower(format) {
@@ -234,15 +242,23 @@ func generateRunExample(format string) (string, error) {
 		return string(b), nil
 
 	case "md", "markdown":
-		// Create frontmatter without context (will be in markdown body)
-		frontmatter := map[string]interface{}{
-			"prompt":     example["prompt"],
-			"repository": example["repository"],
-			"source":     example["source"],
-			"target":     example["target"],
-			"title":      example["title"],
-			"runType":    example["runType"],
-			"files":      example["files"],
+		// Create frontmatter based on minimal or full
+		var frontmatter map[string]interface{}
+		if minimal {
+			frontmatter = map[string]interface{}{
+				"repository": example["repository"],
+				"prompt":     example["prompt"],
+			}
+		} else {
+			frontmatter = map[string]interface{}{
+				"repository": example["repository"],
+				"prompt":     example["prompt"],
+				"source":     example["source"],
+				"target":     example["target"],
+				"title":      example["title"],
+				"runType":    example["runType"],
+				"files":      example["files"],
+			}
 		}
 		
 		b, err := yaml.Marshal(frontmatter)
@@ -251,20 +267,24 @@ func generateRunExample(format string) (string, error) {
 		}
 
 		markdown := "---\n" + string(b) + "---\n\n"
-		markdown += "# Task: Fix Authentication Rate Limiting\n\n"
-		markdown += "## Problem Description\n\n"
-		markdown += "Users are experiencing a critical issue with our authentication system. "
-		markdown += "After 5 failed login attempts, they are permanently locked out instead of being temporarily rate-limited.\n\n"
-		markdown += "## Expected Behavior\n\n"
-		markdown += "- After 5 failed attempts, users should be temporarily locked for 15 minutes\n"
-		markdown += "- The lockout should automatically reset after the timeout period\n"
-		markdown += "- Users should see a clear message indicating when they can try again\n\n"
-		markdown += "## Technical Details\n\n"
-		markdown += "The issue appears to be in the `rateLimit.js` module where the reset logic is not properly implemented.\n\n"
-		markdown += "## Testing Requirements\n\n"
-		markdown += "- Test with multiple failed attempts\n"
-		markdown += "- Verify the 15-minute reset works\n"
-		markdown += "- Ensure proper error messages are shown\n"
+		
+		if !minimal {
+			// Add detailed documentation for full example
+			markdown += "# Task: Fix Authentication Rate Limiting\n\n"
+			markdown += "## Problem Description\n\n"
+			markdown += "Users are experiencing a critical issue with our authentication system. "
+			markdown += "After 5 failed login attempts, they are permanently locked out instead of being temporarily rate-limited.\n\n"
+			markdown += "## Expected Behavior\n\n"
+			markdown += "- After 5 failed attempts, users should be temporarily locked for 15 minutes\n"
+			markdown += "- The lockout should automatically reset after the timeout period\n"
+			markdown += "- Users should see a clear message indicating when they can try again\n\n"
+			markdown += "## Technical Details\n\n"
+			markdown += "The issue appears to be in the `rateLimit.js` module where the reset logic is not properly implemented.\n\n"
+			markdown += "## Testing Requirements\n\n"
+			markdown += "- Test with multiple failed attempts\n"
+			markdown += "- Verify the 15-minute reset works\n"
+			markdown += "- Ensure proper error messages are shown\n"
+		}
 
 		return markdown, nil
 
@@ -277,12 +297,8 @@ func generateBulkExample() (string, error) {
 	bulk := map[string]interface{}{
 		"runs": []map[string]interface{}{
 			{
-				"prompt":     "Add comprehensive error handling to the authentication module",
 				"repository": "myorg/webapp",
-				"source":     "main",
-				"target":     "feature/auth-error-handling",
-				"title":      "Improve auth error handling",
-				"runType":    "run",
+				"prompt":     "Add comprehensive error handling to the authentication module",
 				"context":    "Add try-catch blocks and user-friendly error messages",
 				"files": []string{
 					"src/auth/login.js",
@@ -290,23 +306,15 @@ func generateBulkExample() (string, error) {
 				},
 			},
 			{
-				"prompt":     "Create unit tests for the user profile component",
 				"repository": "myorg/webapp",
-				"source":     "main", 
-				"target":     "test/user-profile",
-				"title":      "Add user profile tests",
-				"runType":    "run",
-				"context":    "Achieve at least 80% code coverage",
+				"prompt":     "Create unit tests for the user profile component with at least 80% code coverage",
 				"files": []string{
 					"src/components/UserProfile.js",
 				},
 			},
 			{
-				"prompt":     "Plan refactoring of the database layer to use connection pooling",
 				"repository": "myorg/backend",
-				"source":     "develop",
-				"target":     "plan/db-pooling",
-				"title":      "Database connection pooling plan",
+				"prompt":     "Plan refactoring of the database layer to use connection pooling",
 				"runType":    "plan",
 				"context":    "Current implementation creates new connections for each request",
 			},

@@ -17,15 +17,15 @@ The `repobird run` command supports multiple configuration file formats to defin
 |-------|------|-------------|
 | `prompt` | string | The main task description/instructions for the AI agent |
 | `repository` | string | Repository name in format `owner/repo` (auto-detected if in git repo) |
-| `target` | string | Target branch name for the changes |
-| `title` | string | Human-readable title for the run |
 
 ### Optional Fields
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
+| `target` | string | auto-generated | Target branch name for the changes |
+| `title` | string | auto-generated | Human-readable title for the run |
 | `source` | string | `main` | Source branch to work from (auto-detected if in git repo) |
-| `runType` | string | `run` | Type of run: `run`, `plan`, or `approval` |
+| `runType` | string | `run` | Type of run: `run` or `plan` |
 | `context` | string | - | Additional context or instructions for the AI |
 | `files` | array | - | List of specific files to include in the context |
 
@@ -157,9 +157,7 @@ jq -n '{
 ```json
 {
   "prompt": "Add dark mode support to the settings page",
-  "repository": "myorg/webapp",
-  "target": "feature/dark-mode",
-  "title": "Add dark mode feature"
+  "repository": "myorg/webapp"
 }
 ```
 
@@ -167,8 +165,6 @@ jq -n '{
 ```yaml
 prompt: Add dark mode support to the settings page
 repository: myorg/webapp
-target: feature/dark-mode
-title: Add dark mode feature
 ```
 
 ### Minimal Markdown
@@ -176,8 +172,6 @@ title: Add dark mode feature
 ---
 prompt: Add dark mode support to the settings page
 repository: myorg/webapp
-target: feature/dark-mode
-title: Add dark mode feature
 ---
 ```
 
@@ -192,10 +186,10 @@ Example with auto-detection:
 ```yaml
 # When run from inside the 'myorg/webapp' git repository on 'develop' branch
 prompt: Fix the login bug
-target: fix/login-bug
-title: Fix authentication issue
 # repository: automatically detected as 'myorg/webapp'
 # source: automatically detected as 'develop'
+# target: automatically generated based on prompt
+# title: automatically generated based on prompt
 ```
 
 ## Run Types Explained
@@ -210,10 +204,6 @@ title: Fix authentication issue
 - No code changes are made
 - Useful for complex tasks requiring review
 
-### `approval`
-- AI agent makes changes but waits for approval
-- Changes are staged but not committed
-- Good for sensitive modifications
 
 ## Validation and Error Handling
 

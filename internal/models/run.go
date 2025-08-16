@@ -14,9 +14,8 @@ import (
 type RunType string
 
 const (
-	RunTypeRun      RunType = "run"
-	RunTypePlan     RunType = "plan"
-	RunTypeApproval RunType = "approval"
+	RunTypeRun  RunType = "run"
+	RunTypePlan RunType = "plan"
 )
 
 type RunStatus string

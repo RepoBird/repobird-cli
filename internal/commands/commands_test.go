@@ -355,17 +355,17 @@ func TestParseTaskFile(t *testing.T) {
 			},
 		},
 		{
-			name: "Approval type task",
+			name: "Plan type task",
 			content: `{
-				"prompt": "Review PR changes",
+				"prompt": "Plan refactoring changes",
 				"repository": "test/repo",
 				"source": "feature",
 				"target": "main",
-				"runType": "approval"
+				"runType": "plan"
 			}`,
 			expectError: false,
 			validate: func(t *testing.T, req *models.RunRequest) {
-				assert.Equal(t, models.RunTypeApproval, req.RunType)
+				assert.Equal(t, models.RunTypePlan, req.RunType)
 			},
 		},
 		{

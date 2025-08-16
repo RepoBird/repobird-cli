@@ -206,6 +206,12 @@ When working on this codebase:
 4. Update relevant docs/ files for significant changes
 5. Use `debug.LogToFilef()` for debugging TUI issues
 
+### Testing Requirements for Todo Lists
+When making changes to Go application code:
+- **Always add `make test` as the final todo item** when modifying any `.go` files
+- **Additionally add `make test-integration`** if CLI commands in `internal/commands/` are changed
+- This ensures all code changes are validated before completion
+
 ### Critical Implementation Files
 - **API Client**: `internal/api/client.go`, `internal/api/models.go`
 - **TUI Router**: `internal/tui/app.go` (all navigation goes through here)

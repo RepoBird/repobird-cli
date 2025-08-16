@@ -63,8 +63,8 @@ const (
 
 // RunType constants
 const (
-	RunTypeRun      = "run"
-	RunTypeApproval = "approval"
+	RunTypeRun  = "run"
+	RunTypePlan = "plan"
 )
 
 // IsTerminal returns true if the run status is terminal

@@ -35,7 +35,7 @@ func TestRunRequest_Validation(t *testing.T) {
 				Repository: "user/repo",
 				Source:     "feature",
 				Target:     "main",
-				RunType:    RunTypeApproval,
+				RunType:    RunTypePlan,
 			},
 			expectValid: true,
 		},
@@ -230,7 +230,7 @@ func TestRunType_String(t *testing.T) {
 		expected string
 	}{
 		{RunTypeRun, "run"},
-		{RunTypeApproval, "approval"},
+		{RunTypePlan, "plan"},
 	}
 
 	for _, tt := range tests {

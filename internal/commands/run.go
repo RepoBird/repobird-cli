@@ -42,7 +42,7 @@ Required:
 
 Optional:
   • source      (string)  - Source branch (defaults to "main")
-  • runType     (string)  - Type: "run", "plan", or "approval" (defaults to "run")
+  • runType     (string)  - Type: "run" or "plan" (defaults to "run")
   • context     (string)  - Additional context or instructions
   • files       (array)   - List of specific files to include
 
