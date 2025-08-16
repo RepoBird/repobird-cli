@@ -106,6 +106,36 @@ repobird config test
 repobird verify
 ```
 
+## Run Configuration
+
+### Generate Examples
+```bash
+# View configuration schema
+repobird examples schema
+
+# Generate example files
+repobird examples generate minimal -o task.json
+repobird examples generate run -f yaml -o task.yaml
+repobird examples generate bulk -o bulk.json
+```
+
+### Supported Formats
+- **JSON** - Standard JSON format
+- **YAML** - Human-friendly YAML
+- **Markdown** - Documentation with YAML frontmatter
+
+### Required Fields
+- `repository` - Repository name (owner/repo)
+- `prompt` - Task description
+
+### Optional Fields
+- `source` - Source branch (default: main)
+- `target` - Target branch (auto-generated)
+- `title` - Run title (auto-generated)
+- `runType` - "run" or "plan" (default: run)
+- `context` - Additional instructions
+- `files` - Specific files to include
+
 ## Cache Configuration
 
 **Location:**

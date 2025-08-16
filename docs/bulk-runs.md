@@ -11,6 +11,12 @@ Execute multiple AI-powered tasks simultaneously for efficient batch processing.
 
 ## Quick Start
 
+### Generate Example Configuration
+```bash
+# Generate bulk configuration example
+repobird examples generate bulk -o bulk-tasks.json
+```
+
 ### CLI Usage
 ```bash
 # Submit bulk runs

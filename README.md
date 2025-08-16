@@ -50,6 +50,17 @@ export REPOBIRD_API_KEY=YOUR_API_KEY
 
 ### Basic Usage
 
+#### Generate Example Configurations
+```bash
+# View configuration schema and examples
+repobird examples schema
+
+# Generate example files
+repobird examples generate minimal -o task.json
+repobird examples generate run -f yaml -o task.yaml
+repobird examples generate bulk -o bulk.json
+```
+
 #### Submit a Task
 ```bash
 # Run a task from a JSON file
@@ -57,6 +68,10 @@ repobird run task.json
 
 # Run and follow progress
 repobird run task.json --follow
+
+# Run from YAML or Markdown file
+repobird run task.yaml
+repobird run task.md
 ```
 
 #### Check Status
@@ -87,20 +102,71 @@ repobird tui
 # - q: Quit
 ```
 
-### Task File Format
+### Task Configuration Formats
 
-Create a `task.json` file:
+RepoBird supports JSON, YAML, and Markdown formats for task configuration.
+
+#### Required Fields
+- `repository` - Repository name in format "owner/repo" (auto-detected in git repos)
+- `prompt` - Task description/instructions for the AI
+
+#### Optional Fields
+- `source` - Source branch (default: "main", auto-detected in git repos)
+- `target` - Target branch name (auto-generated if not specified)
+- `title` - Human-readable title (auto-generated if not specified)
+- `runType` - Type: "run" or "plan" (default: "run")
+- `context` - Additional context or instructions
+- `files` - List of specific files to include
+
+#### Example: Minimal Configuration
 ```json
 {
+  "repository": "myorg/webapp",
+  "prompt": "Fix the authentication bug where users cannot log in after 5 failed attempts"
+}
+```
+
+#### Example: Full Configuration
+```json
+{
+  "repository": "myorg/webapp",
   "prompt": "Add user authentication to the application",
-  "repository": "org/repo",
   "source": "main",
   "target": "feature/auth",
+  "title": "Add authentication system",
   "runType": "run",
-  "title": "Add authentication",
-  "context": "Use JWT tokens for authentication",
-  "files": ["src/auth.js", "src/routes.js"]
+  "context": "Use JWT tokens and bcrypt for password hashing",
+  "files": ["src/auth.js", "src/models/user.js"]
 }
+```
+
+#### Example: YAML Format
+```yaml
+repository: myorg/webapp
+prompt: Add user authentication to the application
+source: main
+target: feature/auth
+title: Add authentication system
+runType: run
+context: Use JWT tokens and bcrypt for password hashing
+files:
+  - src/auth.js
+  - src/models/user.js
+```
+
+#### Example: Markdown Format
+```markdown
+---
+repository: myorg/webapp
+prompt: Add user authentication to the application
+---
+
+# Additional Context
+
+Implement a secure authentication system using:
+- JWT tokens for session management
+- bcrypt for password hashing
+- Rate limiting for login attempts
 ```
 
 ### Duplicate Run Prevention

@@ -23,32 +23,47 @@ var (
 
 var runCmd = &cobra.Command{
 	Use:   "run [file]",
-	Short: "Create a new run from a JSON, YAML, or Markdown file",
-	Long: `Create a new run from a configuration file containing the task details.
+	Short: "Create runs from a JSON, YAML, Markdown, or bulk configuration file",
+	Long: `Create one or more runs from a configuration file containing the task details.
 
 SUPPORTED FORMATS:
-  • JSON (.json)                 - Standard JSON configuration
-  • YAML (.yaml, .yml)           - YAML configuration
-  • Markdown (.md, .markdown)    - Markdown with YAML frontmatter
+  • JSON (.json)                 - Standard JSON configuration (single or bulk)
+  • YAML (.yaml, .yml)           - YAML configuration (single or bulk)
+  • Markdown (.md, .markdown)    - Markdown with YAML frontmatter (single or bulk)
+  • JSONL (.jsonl)               - JSON Lines for bulk runs
   • Stdin                        - Pipe JSON directly (no file needed)
 
-CONFIGURATION FIELDS:
+SINGLE RUN CONFIGURATION:
 
-Required:
+Required fields:
   • prompt      (string)  - The task description/instructions for the AI
   • repository  (string)  - Repository name in format "owner/repo"
   • target      (string)  - Target branch for the changes
   • title       (string)  - Title for the run
 
-Optional:
+Optional fields:
   • source      (string)  - Source branch (defaults to "main")
   • runType     (string)  - Type: "run" or "plan" (defaults to "run")
   • context     (string)  - Additional context or instructions
   • files       (array)   - List of specific files to include
 
+BULK RUN CONFIGURATION:
+
+Top-level fields:
+  • repository  (string)  - Repository for all runs
+  • source      (string)  - Source branch for all runs
+  • runType     (string)  - Type for all runs
+  • runs        (array)   - Array of run configurations
+
+Each run in 'runs' array:
+  • prompt      (string)  - Task description (required)
+  • title       (string)  - Run title
+  • target      (string)  - Target branch
+  • context     (string)  - Additional context
+
 EXAMPLES:
 
-JSON file (task.json):
+Single run (task.json):
   {
     "prompt": "Fix the login bug in auth.js",
     "repository": "myorg/webapp",
@@ -60,7 +75,26 @@ JSON file (task.json):
     "files": ["src/auth.js", "src/utils/validation.js"]
   }
 
-YAML file (task.yaml):
+Bulk runs (tasks.json):
+  {
+    "repository": "myorg/webapp",
+    "source": "main",
+    "runType": "run",
+    "runs": [
+      {
+        "prompt": "Fix login bug",
+        "title": "Fix authentication",
+        "target": "fix/auth"
+      },
+      {
+        "prompt": "Add logging to API",
+        "title": "Add API logging",
+        "target": "feature/logging"
+      }
+    ]
+  }
+
+YAML format (task.yaml):
   prompt: Fix the login bug in auth.js
   repository: myorg/webapp
   source: main
@@ -93,8 +127,8 @@ AUTO-DETECTION:
   • Source branch auto-detected from current branch
 
 USAGE:
-  repobird run task.json                    # Run from file
-  repobird run task.yaml --follow           # Run and follow status
+  repobird run task.json                    # Run from file (single or bulk)
+  repobird run tasks.yaml --follow           # Run and follow status
   repobird run task.md --dry-run            # Validate without running
   cat task.json | repobird run              # Pipe from stdin
   repobird run                              # Error: requires file or stdin`,

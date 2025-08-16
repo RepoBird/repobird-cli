@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v2"
 )
 
 var (
@@ -230,10 +229,6 @@ func generateRunExample(format string, minimal bool) (string, error) {
 			"title":      "Fix authentication rate limiting",
 			"runType":    "run",
 			"context":    "Users report being locked out permanently. The rate limit should reset after 15 minutes.",
-			"files": []string{
-				"src/auth/login.js",
-				"src/auth/rateLimit.js",
-			},
 		}
 	}
 
@@ -248,7 +243,6 @@ func generateRunExample(format string, minimal bool) (string, error) {
 }`, jsonQuote(example["repository"].(string)), jsonQuote(example["prompt"].(string)))
 		} else {
 			// Full example with all fields in desired order
-			filesJSON, _ := json.Marshal(example["files"])
 			jsonStr = fmt.Sprintf(`{
   "repository": %s,
   "prompt": %s,
@@ -256,52 +250,75 @@ func generateRunExample(format string, minimal bool) (string, error) {
   "target": %s,
   "title": %s,
   "runType": %s,
-  "context": %s,
-  "files": %s
+  "context": %s
 }`, jsonQuote(example["repository"].(string)),
 				jsonQuote(example["prompt"].(string)),
 				jsonQuote(example["source"].(string)),
 				jsonQuote(example["target"].(string)),
 				jsonQuote(example["title"].(string)),
 				jsonQuote(example["runType"].(string)),
-				jsonQuote(example["context"].(string)),
-				filesJSON)
+				jsonQuote(example["context"].(string)))
 		}
 		return jsonStr, nil
 
 	case "yaml", "yml":
-		b, err := yaml.Marshal(example)
-		if err != nil {
-			return "", err
+		// Manually build YAML to maintain field order (repository first, prompt second)
+		var yamlStr string
+		if minimal {
+			// For minimal, use multiline YAML format for prompt
+			yamlStr = fmt.Sprintf(`repository: %s
+prompt: |
+  Fix the authentication rate limiting bug.
+  Users are permanently locked out after 5 failed login attempts.
+  Should reset after 15 minutes but doesn't.`, 
+				example["repository"])
+		} else {
+			// For full example, use concise multiline YAML for prompt and context
+			yamlStr = fmt.Sprintf(`repository: %s
+prompt: |
+  Fix authentication rate limiting that permanently locks users after 5 failed attempts.
+  
+  Expected: Temporary 15-minute lockout with automatic reset
+  Current: Permanent lockout requiring manual intervention
+  Impact: Multiple daily support tickets from affected users
+source: %s
+target: %s
+title: %s
+runType: %s
+context: |
+  Bug introduced in v2.3.0 security update. Check auth middleware rate limiting logic.
+  Consider timestamp tracking and timezone handling.
+  Add tests for lockout/reset behavior.`, 
+				example["repository"],
+				example["source"],
+				example["target"],
+				example["title"],
+				example["runType"])
 		}
-		return string(b), nil
+		return yamlStr, nil
 
 	case "md", "markdown":
-		// Create frontmatter based on minimal or full
-		var frontmatter map[string]interface{}
+		// Create frontmatter with proper field ordering
+		var frontmatterYAML string
 		if minimal {
-			frontmatter = map[string]interface{}{
-				"repository": example["repository"],
-				"prompt":     example["prompt"],
-			}
+			frontmatterYAML = fmt.Sprintf(`repository: %s
+prompt: %s`, example["repository"], example["prompt"])
 		} else {
-			frontmatter = map[string]interface{}{
-				"repository": example["repository"],
-				"prompt":     example["prompt"],
-				"source":     example["source"],
-				"target":     example["target"],
-				"title":      example["title"],
-				"runType":    example["runType"],
-				"files":      example["files"],
-			}
-		}
-		
-		b, err := yaml.Marshal(frontmatter)
-		if err != nil {
-			return "", err
+			frontmatterYAML = fmt.Sprintf(`repository: %s
+prompt: %s
+source: %s
+target: %s
+title: %s
+runType: %s`, 
+				example["repository"],
+				example["prompt"],
+				example["source"],
+				example["target"],
+				example["title"],
+				example["runType"])
 		}
 
-		markdown := "---\n" + string(b) + "---\n\n"
+		markdown := "---\n" + frontmatterYAML + "\n---\n\n"
 		
 		if !minimal {
 			// Add detailed documentation for full example
@@ -335,18 +352,11 @@ func generateBulkExample() (string, error) {
     {
       "repository": "myorg/webapp",
       "prompt": "Add comprehensive error handling to the authentication module",
-      "context": "Add try-catch blocks and user-friendly error messages",
-      "files": [
-        "src/auth/login.js",
-        "src/auth/register.js"
-      ]
+      "context": "Add try-catch blocks and user-friendly error messages"
     },
     {
       "repository": "myorg/webapp",
-      "prompt": "Create unit tests for the user profile component with at least 80% code coverage",
-      "files": [
-        "src/components/UserProfile.js"
-      ]
+      "prompt": "Create unit tests for the user profile component with at least 80% code coverage"
     },
     {
       "repository": "myorg/backend",
