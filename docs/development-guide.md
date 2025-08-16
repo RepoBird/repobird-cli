@@ -78,10 +78,17 @@ export REPOBIRD_DEBUG_LOG=1
 # REPOBIRD_API_KEY="" go test ./...
 ```
 
-**URL Resolution Priority:**
-1. `REPOBIRD_API_URL` - Always takes precedence when set
-2. `REPOBIRD_ENV=dev` - Uses `http://localhost:3000` for API
-3. Default - Uses production `https://repobird.ai`
+**API URL Resolution Priority:**
+The CLI determines which API URL to use in the following order:
+1. `REPOBIRD_API_URL` environment variable (highest priority - always overrides)
+2. `REPOBIRD_ENV=dev` or `REPOBIRD_ENV=development` → `http://localhost:3000`
+3. Config file URL (from `~/.repobird/config.yaml`)
+4. Default production → `https://repobird.ai`
+
+This allows flexible development workflows:
+- Set `REPOBIRD_ENV=dev` for automatic localhost development
+- Override with `REPOBIRD_API_URL` for custom servers (e.g., ngrok tunnels)
+- Config file provides persistent custom URLs without env vars
 
 ### 2. Common Tasks
 ```bash

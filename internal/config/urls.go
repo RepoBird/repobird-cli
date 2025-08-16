@@ -51,7 +51,6 @@ func getBaseURL() string {
 		return apiURL
 	}
 	
-	// Handle ngrok URLs (e.g., localhost:3000)
 	if strings.Contains(apiURL, "ngrok") {
 		// Ngrok URLs typically don't have a separate frontend
 		return apiURL

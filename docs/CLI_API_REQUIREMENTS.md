@@ -199,7 +199,7 @@ interface ListResponse<T> {
 #### System Configuration
 - **API Base URL**: 
   - Production (default): https://repobird.ai
-  - Development: Set via .env file (e.g., REPOBIRD_API_URL=https://localhost:3000)
+  - Development: Set via .env file (e.g., REPOBIRD_API_URL=http://localhost:3000)
   - CLI should check .env for development override, otherwise use production URL
 - **API Version**: Version in path (/v1/)
 - **Max Request Size**: 10MB for prompts/context

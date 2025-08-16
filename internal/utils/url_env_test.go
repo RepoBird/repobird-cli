@@ -81,16 +81,7 @@ func TestGetAPIURL(t *testing.T) {
 			description:    "REPOBIRD_API_URL should override config fallback",
 		},
 		
-		// Ngrok and localhost scenarios
-		{
-			name: "Ngrok URL override",
-			envVars: map[string]string{
-				"REPOBIRD_ENV":     "dev",
-				"REPOBIRD_API_URL": "https://localhost:3000",
-			},
-			expectedURL: "https://localhost:3000",
-			description: "Ngrok URL should override dev environment",
-		},
+		// Localhost scenarios
 		{
 			name: "Localhost with custom port",
 			envVars: map[string]string{

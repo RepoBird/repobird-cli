@@ -145,8 +145,12 @@ Large views split for maintainability:
 #### URL Management
 - `internal/config/urls.go` - Centralized RepoBird URLs
 - `internal/utils/url.go::GetAPIURL()` - API URL resolution
-- Priority: `REPOBIRD_API_URL` > `REPOBIRD_ENV=dev` > production
-- Adapts URLs based on environment settings
+- **API URL Priority Order:**
+  1. `REPOBIRD_API_URL` environment variable (highest priority)
+  2. `REPOBIRD_ENV=dev` → `http://localhost:3000`
+  3. Config file URL (from `~/.repobird/config.yaml`)
+  4. Default production → `https://repobird.ai`
+- Dev mode automatically uses `localhost:3000` unless overridden
 - Pricing URL shown for quota errors
 
 #### Testing Patterns

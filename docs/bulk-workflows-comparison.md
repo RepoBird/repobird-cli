@@ -36,7 +36,7 @@ Both the TUI bulk view and the `repobird run` command support bulk operations fr
 4. **API Server Selection**
    - When run with `make tui`: Uses `REPOBIRD_API_URL` from `.env` file
    - Typically points to development server
-   - Example: `https://localhost:3000`
+   - Example: `http://localhost:3000`
 
 ### CLI Run Command Workflow
 
@@ -100,7 +100,7 @@ The only significant difference is the default API server:
 **Solutions**:
 1. Use dev server with CLI:
    ```bash
-   REPOBIRD_API_URL=https://your-dev-server.ngrok-free.app repobird run config.yaml
+   REPOBIRD_API_URL=http://localhost:3000 repobird run config.yaml
    ```
 
 2. Use a production repository in YAML:
@@ -120,7 +120,7 @@ For consistent behavior between TUI and CLI:
 
 ```bash
 # Set API URL for CLI to match TUI
-export REPOBIRD_API_URL=https://your-dev-server.ngrok-free.app
+export REPOBIRD_API_URL=http://localhost:3000
 
 # Now both will use the same server
 make tui                    # Uses dev server

@@ -166,9 +166,23 @@ rm -rf ~/.config/repobird/cache/
 ## Development Configuration
 
 ### Local API Server
+
+The CLI uses the following priority order to determine the API URL:
+1. `REPOBIRD_API_URL` environment variable (highest priority)
+2. `REPOBIRD_ENV=dev` → automatically uses `http://localhost:3000`
+3. Config file URL setting
+4. Default production → `https://repobird.ai`
+
 ```bash
-export REPOBIRD_API_URL=http://localhost:8080
+# Option 1: Use dev environment (auto-connects to localhost:3000)
 export REPOBIRD_ENV=dev
+
+# Option 2: Specify custom URL (overrides everything)
+export REPOBIRD_API_URL=http://localhost:8080
+
+# Option 3: Use ngrok tunnel in dev
+export REPOBIRD_ENV=dev
+export REPOBIRD_API_URL=https://your-tunnel.ngrok.app
 ```
 
 ### Debug Mode
