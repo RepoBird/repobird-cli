@@ -11,7 +11,7 @@ import (
 var docsCmd = &cobra.Command{
 	Use:   "docs",
 	Short: "Generate documentation",
-	Long:  "Generate documentation for the RepoBird CLI and TUI - trigger AI coding agents, submit batch runs, and interactively manage your automated pull request generation.",
+	Long:  "Generate documentation for the RepoBird CLI and TUI - trigger AI coding agents, submit batch runs, and monitor your AI agent runs through an interactive dashboard.",
 }
 
 var manCmd = &cobra.Command{

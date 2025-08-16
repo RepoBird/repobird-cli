@@ -1,6 +1,6 @@
 # RepoBird CLI
 
-CLI and TUI (Terminal User Interface) for [RepoBird.ai](https://repobird.ai) - trigger AI coding agents, submit batch runs, and interactively manage your automated pull request generation.
+CLI and TUI (Terminal User Interface) for [RepoBird.ai](https://repobird.ai) - trigger AI coding agents, submit batch runs, and monitor your AI agent runs through an interactive dashboard.
 
 ## Quick Start
 

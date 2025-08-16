@@ -22,7 +22,7 @@ var rootCmd = &cobra.Command{
 	Use:   "repobird",
 	Short: "CLI and TUI for RepoBird.ai - trigger AI coding agents and manage runs",
 	Long: `CLI and TUI (Terminal User Interface) for RepoBird.ai - trigger AI coding agents,
-submit batch runs, and interactively manage your automated pull request generation.
+submit batch runs, and monitor your AI agent runs through an interactive dashboard.
 
 Base URL: https://repobird.ai`,
 	PersistentPreRunE: func(_ *cobra.Command, _ []string) error {
