@@ -215,7 +215,7 @@ test-unit:
 
 ## test-integration: Run integration tests only (development)
 test-integration:
-	@./scripts/test-summary.sh go test -v -race -timeout 2m -tags=integration ./test/integration/...
+	@REPOBIRD_API_KEY= ./scripts/test-summary.sh go test -v -race -timeout 2m -tags=integration ./test/integration/...
 
 ## test-commands: Run command tests only (development)
 test-commands:
