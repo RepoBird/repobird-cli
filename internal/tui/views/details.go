@@ -335,14 +335,12 @@ func (v *RunDetailsView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (v *RunDetailsView) View() string {
 	if v.height == 0 || v.width == 0 {
 		// Terminal dimensions not yet known
-		debug.LogToFilef("DEBUG: Details view dimensions not set - width=%d, height=%d\n", v.width, v.height)
 		return ""
 	}
 
 	// Initialize layout if not done yet (this should have been done in handleWindowSizeMsg)
 	if v.layout == nil {
 		v.layout = components.NewWindowLayout(v.width, v.height)
-		debug.LogToFilef("📐 DETAILS VIEW: Late layout init with %dx%d 📐\n", v.width, v.height)
 	}
 
 	// Debug: Log rendering dimensions

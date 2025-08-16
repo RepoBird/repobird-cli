@@ -48,7 +48,8 @@ func statusCommand(_ *cobra.Command, args []string) error {
 		return errors.NoAPIKeyError()
 	}
 
-	client := api.NewClient(cfg.APIKey, cfg.APIURL, cfg.Debug)
+	apiURL := utils.GetAPIURL(cfg.APIURL)
+	client := api.NewClient(cfg.APIKey, apiURL, cfg.Debug)
 
 	if len(args) > 0 {
 		return getRunStatus(client, args[0])

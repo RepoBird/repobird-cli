@@ -2,12 +2,10 @@ package views
 
 import (
 	"fmt"
-	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/repobird/repobird-cli/internal/tui/components"
-	"github.com/repobird/repobird-cli/internal/tui/debug"
 	"github.com/repobird/repobird-cli/internal/tui/messages"
 )
 
@@ -77,7 +75,6 @@ func (e *ErrorView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // View implements tea.Model
 func (e *ErrorView) View() string {
-	debug.LogToFilef("🔴 ERROR VIEW: Starting render, terminal=%dx%d 🔴\n", e.width, e.height)
 
 	// Check if layout is initialized and dimensions are valid
 	if e.layout == nil || e.width == 0 || e.height == 0 {
@@ -91,10 +88,6 @@ func (e *ErrorView) View() string {
 	// Use WindowLayout for consistent sizing
 	boxStyle := e.layout.CreateStandardBox()
 	contentStyle := e.layout.CreateContentStyle()
-
-	// Get dimensions from layout
-	boxWidth, boxHeight := e.layout.GetBoxDimensions()
-	debug.LogToFilef("🔴 ERROR VIEW: Box dimensions from layout: %dx%d 🔴\n", boxWidth, boxHeight)
 
 	// Error-specific styles
 	errorStyle := lipgloss.NewStyle().
@@ -148,18 +141,12 @@ func (e *ErrorView) View() string {
 
 	// Create box
 	boxedContent := boxStyle.Render(centeredContent)
-	boxLines := strings.Count(boxedContent, "\n") + 1
-	debug.LogToFilef("🔴 ERROR VIEW: Box rendered with %d lines 🔴\n", boxLines)
 
 	// Create status line
 	statusLine := e.renderStatusLine()
-	statusLines := strings.Count(statusLine, "\n") + 1
-	debug.LogToFilef("🔴 ERROR VIEW: Status line rendered with %d lines 🔴\n", statusLines)
 
 	// Join box and status line directly without gap
 	result := lipgloss.JoinVertical(lipgloss.Left, boxedContent, statusLine)
-	totalLines := strings.Count(result, "\n") + 1
-	debug.LogToFilef("🔴 ERROR VIEW: Final result has %d lines (should be %d) 🔴\n", totalLines, e.height)
 
 	return result
 }

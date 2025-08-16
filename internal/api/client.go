@@ -75,6 +75,11 @@ func (c *Client) doRequest(method, path string, body interface{}) (*http.Respons
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", fmt.Sprintf("repobird-cli/%s", version.GetVersion()))
 
+	// Always log URL when REPOBIRD_DEBUG_API_URL is set
+	if os.Getenv("REPOBIRD_DEBUG_API_URL") == "1" {
+		fmt.Fprintf(os.Stderr, "[DEBUG API] Request: %s %s\n", method, req.URL.String())
+	}
+
 	if c.debug {
 		logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 		logger.Debug("API request",

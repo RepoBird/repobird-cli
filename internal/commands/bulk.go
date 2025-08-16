@@ -19,6 +19,7 @@ import (
 	"github.com/repobird/repobird-cli/internal/errors"
 	tuicache "github.com/repobird/repobird-cli/internal/tui/cache"
 	tuiviews "github.com/repobird/repobird-cli/internal/tui/views"
+	"github.com/repobird/repobird-cli/internal/utils"
 	"github.com/spf13/cobra"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -130,10 +131,7 @@ func runBulk(cmd *cobra.Command, args []string) error {
 	// File hashes are now for tracking purposes only
 
 	// Create API client
-	apiURL := os.Getenv("REPOBIRD_API_URL")
-	if apiURL == "" {
-		apiURL = api.DefaultAPIURL
-	}
+	apiURL := utils.GetAPIURL(cfg.APIURL)
 	client := api.NewClient(cfg.APIKey, apiURL, debug)
 
 	// Generate file hashes for tracking purposes (always generated now)
@@ -313,10 +311,7 @@ func runBulkInteractive() error {
 	}
 
 	// Create API client
-	apiURL := os.Getenv("REPOBIRD_API_URL")
-	if apiURL == "" {
-		apiURL = api.DefaultAPIURL
-	}
+	apiURL := utils.GetAPIURL(cfg.APIURL)
 	client := api.NewClient(cfg.APIKey, apiURL, debug)
 
 	// Launch bulk TUI view with a cache instance

@@ -144,7 +144,9 @@ Large views split for maintainability:
 
 #### URL Management
 - `internal/config/urls.go` - Centralized RepoBird URLs
-- Adapts URLs based on `REPOBIRD_API_URL` environment
+- `internal/utils/url.go::GetAPIURL()` - API URL resolution
+- Priority: `REPOBIRD_API_URL` > `REPOBIRD_ENV=dev` > production
+- Adapts URLs based on environment settings
 - Pricing URL shown for quota errors
 
 #### Testing Patterns
@@ -171,6 +173,21 @@ repobird run task.json --follow
 repobird tui
 repobird bulk config.json
 ```
+
+### Run Configuration Formats
+The `repobird run` command supports multiple formats for task definitions:
+- **JSON/YAML** - Single or bulk runs with `prompt` (required) and `repository` (required)
+- **Markdown** - YAML frontmatter with documentation in body
+- **JSONL** - JSON Lines for bulk operations
+- **Stdin** - Pipe JSON directly
+
+**Minimal single run**: `{"prompt": "task description", "repository": "owner/repo"}`
+
+**Optional fields**: `target` (branch), `title`, `source` (base branch), `runType` (run|plan), `context`, `files`
+
+**Bulk runs**: Top-level `repository` + `runs` array, each with its own `prompt`
+
+See [Run Config Formats](docs/run-config-formats.md) for complete examples.
 
 ## Testing Requirements
 - Minimum 70% coverage for new code

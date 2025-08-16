@@ -335,10 +335,7 @@ func formatDuration(d time.Duration) string {
 
 func executeBulkRuns(bulkConfig *bulk.BulkConfig) error {
 	// Create API client
-	apiURL := os.Getenv("REPOBIRD_API_URL")
-	if apiURL == "" {
-		apiURL = api.DefaultAPIURL
-	}
+	apiURL := utils.GetAPIURL(cfg.APIURL)
 	client := api.NewClient(cfg.APIKey, apiURL, debug)
 
 	// Generate file hashes for tracking purposes

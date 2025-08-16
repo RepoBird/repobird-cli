@@ -279,9 +279,7 @@ func NewRunDetailsViewWithCacheAndDimensions(
 		v.updateContent()
 	}
 
-	// Parent run data is deprecated - just log
-	debug.LogToFilef("DEBUG: Parent run data ignored in new pattern (%d runs, cached=%t)\n",
-		len(parentRuns), parentCached)
+	// Parent run data is deprecated - ignored
 
 	return v
 }
@@ -324,9 +322,7 @@ func NewRunDetailsViewWithCache(
 		v.updateContent()
 	}
 
-	// Parent run data is deprecated - just log
-	debug.LogToFilef("DEBUG: Parent run data ignored in new pattern (%d runs, cached=%t)\n",
-		len(parentRuns), parentCached)
+	// Parent run data is deprecated - ignored
 
 	return v
 }

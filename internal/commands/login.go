@@ -13,6 +13,7 @@ import (
 	"github.com/repobird/repobird-cli/internal/api"
 	"github.com/repobird/repobird-cli/internal/config"
 	"github.com/repobird/repobird-cli/internal/services"
+	"github.com/repobird/repobird-cli/internal/utils"
 )
 
 // readMaskedInput reads input character by character, showing first 3 chars then asterisks
@@ -131,7 +132,8 @@ or in an encrypted file as a fallback.`,
 		}
 
 		// Verify the API key first
-		client := api.NewClient(apiKey, cfg.APIURL, cfg.Debug)
+		apiURL := utils.GetAPIURL(cfg.APIURL)
+		client := api.NewClient(apiKey, apiURL, cfg.Debug)
 		userInfo, err := client.VerifyAuth()
 		if err != nil {
 			return fmt.Errorf("invalid API key: %w", err)

@@ -43,7 +43,7 @@ components:
       properties:
         error:
           type: string
-          description: Error code (e.g., REPO_NOT_FOUND, QUOTA_EXCEEDED, REPOSITORY_DISABLED, ALL_RUNS_FAILED, RUN_CREATION_FAILED)
+          description: Error code (e.g., REPO_NOT_FOUND, QUOTA_EXCEEDED, REPOSITORY_DISABLED, ALL_RUNS_FAILED, RUN_CREATION_FAILED, BRANCH_NOT_FOUND)
           example: REPO_NOT_FOUND
         message:
           type: string
@@ -297,11 +297,15 @@ components:
           example: Add authentication system
         sourceBranch:
           type: string
-          description: Source branch (defaults to repo default)
+          description: |
+            Source branch (defaults to repo default).
+            The branch must exist in the repository or the request will be rejected with a BRANCH_NOT_FOUND error.
           example: feature/auth
         targetBranch:
           type: string
-          description: Target branch (defaults to repo default)
+          description: |
+            Target branch (defaults to repo default).
+            If specified, the branch must exist in the repository or the request will be rejected with a BRANCH_NOT_FOUND error.
           example: main
         fileHash:
           type: string
@@ -344,11 +348,15 @@ components:
           description: Type of run for all runs in batch
         sourceBranch:
           type: string
-          description: Source branch for all runs (defaults to repo default)
+          description: |
+            Source branch for all runs (defaults to repo default).
+            The branch must exist in the repository or all runs will be rejected with a BRANCH_NOT_FOUND error.
           example: main
         targetBranch:
           type: string
-          description: Base target branch (individual runs can override)
+          description: |
+            Base target branch (individual runs can override).
+            If specified, the branch must exist in the repository or all runs will be rejected with a BRANCH_NOT_FOUND error.
           example: feature/bulk
         force:
           type: boolean
@@ -376,7 +384,9 @@ components:
                 example: Users can't login with Google OAuth
               target:
                 type: string
-                description: Target branch for this specific run
+                description: |
+                  Target branch for this specific run (overrides bulk targetBranch).
+                  If specified, the branch must exist in the repository or this run will fail with a BRANCH_NOT_FOUND error.
                 example: fix/auth-bug-1
               fileHash:
                 type: string
@@ -755,11 +765,27 @@ paths:
                       status: QUEUED
                       message: Run created successfully
         '400':
-          description: Invalid input
+          description: Invalid input (including branch not found)
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+              examples:
+                branchNotFound:
+                  summary: Source branch not found
+                  value:
+                    error: BRANCH_NOT_FOUND
+                    message: "Source branch 'feature/nonexistent' does not exist in acme/webapp"
+                targetBranchNotFound:
+                  summary: Target branch not found
+                  value:
+                    error: BRANCH_NOT_FOUND
+                    message: "Target branch 'invalid-branch' does not exist in acme/webapp"
+                invalidInput:
+                  summary: Missing repository identifier
+                  value:
+                    error: INVALID_INPUT
+                    message: Either repoId or repositoryName is required
         '403':
           description: Forbidden (no runs remaining or repo disabled)
           content:

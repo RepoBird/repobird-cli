@@ -133,9 +133,7 @@ func ValidateRunConfig(config *models.RunConfig) error {
 		config.Source = "main" // Default to main if not specified
 	}
 
-	if config.Target == "" {
-		errors = append(errors, "target branch is required")
-	}
+	// Target branch is optional - server will handle defaults
 
 	if config.RunType == "" {
 		config.RunType = "run" // Default to "run" if not specified
@@ -143,9 +141,7 @@ func ValidateRunConfig(config *models.RunConfig) error {
 		errors = append(errors, fmt.Sprintf("invalid runType '%s', must be 'run' or 'plan'", config.RunType))
 	}
 
-	if config.Title == "" {
-		errors = append(errors, "title is required")
-	}
+	// Title is optional - server will generate if not provided
 
 	// Validate repository format (basic check)
 	if config.Repository != "" && !strings.Contains(config.Repository, "/") {

@@ -8,7 +8,6 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/repobird/repobird-cli/internal/tui/debug"
 	"github.com/repobird/repobird-cli/internal/utils"
 )
 
@@ -51,7 +50,6 @@ func NewStatusLine() *StatusLine {
 	}
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("226")) // Bright yellow for better visibility
 
-	debug.LogToFilef("🔄 STATUSLINE: Created new statusline with spinner frames: %+v 🔄\n", s.Spinner.Frames)
 
 	// Initialize custom spinner frames
 	customFrames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
@@ -89,12 +87,7 @@ func (s *StatusLine) SetRight(content string) *StatusLine {
 
 // SetLoading sets the loading state of the status line
 func (s *StatusLine) SetLoading(loading bool) *StatusLine {
-	debug.LogToFilef("🔄 STATUSLINE: SetLoading called - loading=%t (was %t) 🔄\n", loading, s.isLoading)
 	s.isLoading = loading
-	// If we're starting to load, show the initial spinner state
-	if loading {
-		debug.LogToFilef("🔄 STATUSLINE: Starting loading - spinner view: '%s' 🔄\n", s.loadingSpinner.View())
-	}
 	return s
 }
 
@@ -111,15 +104,8 @@ func (s *StatusLine) UpdateSpinner() *StatusLine {
 // UpdateSpinnerWithTick updates the loading spinner with the actual tick message
 func (s *StatusLine) UpdateSpinnerWithTick(msg spinner.TickMsg) *StatusLine {
 	if s.isLoading {
-		oldFrame := s.getCurrentSpinnerFrame()
 		// Advance custom spinner index
 		s.customSpinnerIndex = (s.customSpinnerIndex + 1) % len(s.customSpinnerFrames)
-		newFrame := s.getCurrentSpinnerFrame()
-
-		debug.LogToFilef("🔄 STATUSLINE: Custom spinner tick - isLoading=%t, index=%d, before='%s', after='%s', changed=%t 🔄\n",
-			s.isLoading, s.customSpinnerIndex, oldFrame, newFrame, oldFrame != newFrame)
-	} else {
-		debug.LogToFilef("🔄 STATUSLINE: Ignoring spinner tick - isLoading=%t 🔄\n", s.isLoading)
 	}
 	return s
 }
@@ -205,13 +191,11 @@ func (s *StatusLine) Render() string {
 		spinnerContent := s.getCurrentSpinnerFrame()
 		// Apply yellow color style
 		styledSpinner := lipgloss.NewStyle().Foreground(lipgloss.Color("226")).Render(spinnerContent)
-		debug.LogToFilef("🔄 RENDER: isLoading=%t, spinnerContent='%s', rightContent='%s' 🔄\n", s.isLoading, spinnerContent, rightContent)
 		if rightContent != "" {
 			rightContent = styledSpinner + " " + rightContent
 		} else {
 			rightContent = styledSpinner
 		}
-		debug.LogToFilef("🔄 RENDER: Final rightContent='%s' 🔄\n", rightContent)
 	}
 
 	// Check for active temporary message

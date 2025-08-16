@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"fmt"
 	"net/url"
 	"os"
 	"os/exec"
@@ -110,6 +111,47 @@ func GenerateRepoBirdURL(runID string) string {
 	}
 	baseURL := getRepoBirdBaseURL()
 	return baseURL + "/repos/issue-runs/" + runID
+}
+
+// GetAPIURL returns the appropriate API URL based on environment
+// Priority: REPOBIRD_API_URL > REPOBIRD_ENV=dev > configFallback > default
+func GetAPIURL(configFallback ...string) string {
+	// Debug output if needed
+	if os.Getenv("REPOBIRD_DEBUG_API_URL") == "1" {
+		fmt.Fprintf(os.Stderr, "[DEBUG GetAPIURL] REPOBIRD_ENV=%q, REPOBIRD_API_URL=%q, fallback=%v\n", 
+			os.Getenv("REPOBIRD_ENV"), os.Getenv("REPOBIRD_API_URL"), configFallback)
+	}
+	
+	// Check REPOBIRD_API_URL first - this always takes precedence
+	if apiURL := os.Getenv("REPOBIRD_API_URL"); apiURL != "" {
+		if os.Getenv("REPOBIRD_DEBUG_API_URL") == "1" {
+			fmt.Fprintf(os.Stderr, "[DEBUG GetAPIURL] Using REPOBIRD_API_URL: %s\n", apiURL)
+		}
+		return apiURL
+	}
+	
+	// Check REPOBIRD_ENV for dev mode
+	env := os.Getenv("REPOBIRD_ENV")
+	if strings.ToLower(env) == "dev" || strings.ToLower(env) == "development" {
+		if os.Getenv("REPOBIRD_DEBUG_API_URL") == "1" {
+			fmt.Fprintf(os.Stderr, "[DEBUG GetAPIURL] Using dev mode: http://localhost:3000\n")
+		}
+		return "http://localhost:3000"
+	}
+	
+	// Use config fallback if provided
+	if len(configFallback) > 0 && configFallback[0] != "" {
+		if os.Getenv("REPOBIRD_DEBUG_API_URL") == "1" {
+			fmt.Fprintf(os.Stderr, "[DEBUG GetAPIURL] Using config fallback: %s\n", configFallback[0])
+		}
+		return configFallback[0]
+	}
+	
+	// Default to production
+	if os.Getenv("REPOBIRD_DEBUG_API_URL") == "1" {
+		fmt.Fprintf(os.Stderr, "[DEBUG GetAPIURL] Using default: https://repobird.ai\n")
+	}
+	return "https://repobird.ai"
 }
 
 // IsNonEmptyNumber checks if a string contains a non-empty number (digits only)

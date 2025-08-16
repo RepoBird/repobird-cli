@@ -107,7 +107,11 @@ repobird tui
 
 ### Task Configuration Formats
 
-RepoBird supports JSON, YAML, and Markdown formats for task configuration. The `run` command automatically detects whether a file contains a single run or multiple bulk runs.
+The `repobird run` command supports multiple formats and automatically detects single vs bulk runs:
+- **JSON/YAML** - Single or bulk runs with `prompt` (required) and `repository` (required)
+- **Markdown** - YAML frontmatter with documentation in body
+- **JSONL** - JSON Lines for bulk operations
+- **Stdin** - Pipe JSON directly
 
 #### Required Fields
 - `repository` - Repository name in format "owner/repo"
@@ -192,6 +196,8 @@ Implement a secure authentication system using:
 - bcrypt for password hashing
 - Rate limiting for login attempts
 ```
+
+For complete format documentation and more examples, see [Run Config Formats](docs/run-config-formats.md).
 
 ### Duplicate Run Prevention
 
@@ -291,165 +297,6 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 ## License
 
 [Add your license here]
-
-## Run Configuration File Formats
-
-RepoBird CLI supports three configuration file formats for defining run tasks. All formats support the same fields, with some being required and others optional.
-
-### Required Fields
-- `prompt` - The task description for the AI
-- `repository` - Repository in `owner/repo` format
-- `target` - Target branch for changes
-- `title` - Short title for the run
-
-### Optional Fields
-- `source` - Source branch (defaults to `main`)
-- `runType` - Type of run: `run`, `approval` (defaults to `run`)
-- `context` - Additional context for the AI
-- `files` - List of relevant files
-
-### JSON Format
-
-Traditional JSON format for defining run configurations:
-
-```json
-{
-  "prompt": "Implement user authentication with JWT tokens",
-  "repository": "acme/webapp",
-  "source": "main",
-  "target": "feature/jwt-auth",
-  "runType": "run",
-  "title": "Add JWT authentication system",
-  "context": "Need secure authentication with JWT tokens",
-  "files": ["src/auth.js", "src/middleware.js", "src/routes.js"]
-}
-```
-
-### YAML Format
-
-YAML provides a cleaner, more readable format with support for multiline strings:
-
-```yaml
-# task.yaml
-prompt: |
-  Implement a complete user authentication system with the following requirements:
-  - Use JWT tokens for stateless authentication
-  - Implement refresh token rotation
-  - Add rate limiting for login attempts
-  - Include password reset functionality
-  - Add email verification for new accounts
-  
-  Follow security best practices and add comprehensive error handling.
-  
-repository: acme/webapp
-source: main
-target: feature/jwt-auth
-runType: run
-title: Add JWT authentication system
-context: |
-  The application currently has no authentication.
-  We're using Express.js with TypeScript.
-  Database is PostgreSQL with Prisma ORM.
-  
-files:
-  - src/auth/jwt.ts
-  - src/middleware/auth.ts
-  - src/routes/auth.ts
-  - src/models/user.ts
-```
-
-Minimal YAML example with defaults:
-
-```yaml
-# fix-bug.yml
-prompt: Fix the login timeout issue affecting mobile users
-repository: myorg/mobile-app
-target: fix/login-timeout
-title: Fix mobile login timeout bug
-```
-
-### Markdown Format
-
-Markdown files with YAML frontmatter combine configuration with rich documentation:
-
-```markdown
----
-prompt: Implement comprehensive API documentation
-repository: acme/api-service
-source: main
-target: feature/api-docs
-runType: run
-title: Add OpenAPI documentation
-context: Generate OpenAPI 3.0 specification for all endpoints
-files:
-  - src/routes/
-  - src/controllers/
-  - src/models/
----
-
-# API Documentation Task
-
-## Overview
-The API service currently lacks comprehensive documentation, making it difficult for developers to integrate with our platform.
-
-## Requirements
-
-### OpenAPI Specification
-- Generate OpenAPI 3.0 compliant specification
-- Include all REST endpoints
-- Document request/response schemas
-- Add authentication requirements
-- Include example requests and responses
-
-### Interactive Documentation
-- Set up Swagger UI for interactive testing
-- Configure ReDoc for beautiful static docs
-- Add postman collection export
-
-### Code Integration
-- Add JSDoc comments to all route handlers
-- Implement schema validation matching the OpenAPI spec
-- Add automated tests to ensure docs stay in sync
-
-## Technical Considerations
-- The API uses Express.js with TypeScript
-- Authentication is handled via JWT tokens
-- Current version is v2, maintain backwards compatibility
-- Consider versioning strategy for future changes
-
-## Definition of Done
-- [ ] All endpoints documented in OpenAPI spec
-- [ ] Swagger UI accessible at /api-docs
-- [ ] ReDoc accessible at /docs
-- [ ] Schema validation implemented
-- [ ] CI/CD validates spec on each commit
-- [ ] Team review and approval
-```
-
-### Using Configuration Files
-
-```bash
-# Run with any format
-repobird run task.json
-repobird run task.yaml
-repobird run task.yml
-repobird run task.md
-
-# Follow run status after creation
-repobird run task.yaml --follow
-
-# Validate without creating (dry run)
-repobird run task.md --dry-run
-```
-
-### File Discovery in TUI
-
-The TUI's Create Run view can load configuration files:
-1. Navigate to "Load Config" field
-2. Press `Enter` or `f` to open file selector
-3. Automatically discovers `.json`, `.yaml`, `.yml`, `.md`, and `.markdown` files
-4. Files are shown with icons: 📄 JSON, 📋 YAML, 📝 Markdown
-5. Supports fuzzy search for quick filtering
 
 ## Support
 

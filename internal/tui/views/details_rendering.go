@@ -8,7 +8,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/repobird/repobird-cli/internal/tui/components"
-	"github.com/repobird/repobird-cli/internal/tui/debug"
 	"github.com/repobird/repobird-cli/internal/tui/styles"
 	"github.com/repobird/repobird-cli/internal/utils"
 )
@@ -118,10 +117,6 @@ func (v *RunDetailsView) renderContentWithCursor() []string {
 	if contentWidth <= 0 {
 		contentWidth = v.width - 6 // Account for border (2) + padding (4)
 	}
-
-	// Debug: Log viewport rendering details
-	debug.LogToFilef("DEBUG: renderContentWithCursor - viewportHeight=%d, contentWidth=%d, offset=%d\n",
-		viewportHeight, contentWidth, viewportOffset)
 
 	for i := viewportOffset; i < len(allLines) && i < viewportOffset+viewportHeight; i++ {
 		line := allLines[i]

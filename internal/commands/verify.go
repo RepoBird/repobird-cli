@@ -11,6 +11,7 @@ import (
 	"github.com/repobird/repobird-cli/internal/config"
 	"github.com/repobird/repobird-cli/internal/errors"
 	"github.com/repobird/repobird-cli/internal/services"
+	"github.com/repobird/repobird-cli/internal/utils"
 )
 
 var verifyCmd = &cobra.Command{
@@ -29,7 +30,8 @@ var verifyCmd = &cobra.Command{
 		}
 
 		// Verify with API
-		client := api.NewClient(secureConfig.APIKey, secureConfig.APIURL, secureConfig.Debug)
+		apiURL := utils.GetAPIURL(secureConfig.APIURL)
+		client := api.NewClient(secureConfig.APIKey, apiURL, secureConfig.Debug)
 		userInfo, err := client.VerifyAuth()
 		if err != nil {
 			return fmt.Errorf("API key verification failed: %w", err)

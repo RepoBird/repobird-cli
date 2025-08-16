@@ -11,6 +11,7 @@ import (
 	"github.com/repobird/repobird-cli/internal/config"
 	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/repobird/repobird-cli/internal/services"
+	"github.com/repobird/repobird-cli/internal/utils"
 )
 
 var infoCmd = &cobra.Command{
@@ -64,7 +65,8 @@ var infoCmd = &cobra.Command{
 		// Try to get user info if API key is available
 		if secureConfig.APIKey != "" {
 			fmt.Println()
-			client := api.NewClient(secureConfig.APIKey, secureConfig.APIURL, secureConfig.Debug)
+			apiURL := utils.GetAPIURL(secureConfig.APIURL)
+			client := api.NewClient(secureConfig.APIKey, apiURL, secureConfig.Debug)
 			if userInfo, err := client.VerifyAuth(); err == nil {
 				// Set the current user for cache initialization
 				services.SetCurrentUser(userInfo)

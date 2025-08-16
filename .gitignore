@@ -50,3 +50,9 @@ repobird
 logs/
 # Individual log files outside logs/ should not be committed
 *.log
+
+# Production run task files
+run-tasks/prod/
+
+# Development run task files
+run-tasks/dev/

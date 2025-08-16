@@ -11,6 +11,7 @@ import (
 	"github.com/repobird/repobird-cli/internal/services"
 	"github.com/repobird/repobird-cli/internal/tui"
 	tuiDebug "github.com/repobird/repobird-cli/internal/tui/debug"
+	"github.com/repobird/repobird-cli/internal/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -35,7 +36,7 @@ func runTUI(cmd *cobra.Command, args []string) error {
 	// Check if debug-user flag is set
 	if debugUser {
 		// Use mock client for testing
-		client := api.NewClient("mock-api-key", api.DefaultAPIURL, debug)
+		client := api.NewClient("mock-api-key", utils.GetAPIURL(), debug)
 		mockClient := mock.NewMockClient(client)
 
 		// Set the debug user immediately for cache initialization
@@ -70,7 +71,8 @@ func runTUI(cmd *cobra.Command, args []string) error {
 		return errors.NoAPIKeyError()
 	}
 
-	client := api.NewClient(cfg.APIKey, cfg.APIURL, cfg.Debug)
+	apiURL := utils.GetAPIURL(cfg.APIURL)
+	client := api.NewClient(cfg.APIKey, apiURL, cfg.Debug)
 	app := tui.NewApp(client)
 
 	return app.Run()

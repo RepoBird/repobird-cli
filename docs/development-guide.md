@@ -62,8 +62,11 @@ repobird --help
 
 ### 1. Environment Setup
 ```bash
-# Development API (optional)
-export REPOBIRD_API_URL=http://localhost:8080
+# Development mode (auto-uses localhost:3000 for API)
+export REPOBIRD_ENV=dev
+
+# Or manually specify API URL (overrides REPOBIRD_ENV)
+export REPOBIRD_API_URL=http://localhost:3000
 export REPOBIRD_API_KEY=test_key
 
 # Enable debug logging
@@ -74,6 +77,11 @@ export REPOBIRD_DEBUG_LOG=1
 # The Makefile already does this for 'make test'
 # REPOBIRD_API_KEY="" go test ./...
 ```
+
+**URL Resolution Priority:**
+1. `REPOBIRD_API_URL` - Always takes precedence when set
+2. `REPOBIRD_ENV=dev` - Uses `http://localhost:3000` for API
+3. Default - Uses production `https://repobird.ai`
 
 ### 2. Common Tasks
 ```bash

@@ -3,6 +3,7 @@ package commands
 import (
 	"github.com/repobird/repobird-cli/internal/config"
 	"github.com/repobird/repobird-cli/internal/container"
+	"github.com/repobird/repobird-cli/internal/utils"
 )
 
 var appContainer *container.Container
@@ -11,9 +12,10 @@ var appContainer *container.Container
 func getContainer() *container.Container {
 	if appContainer == nil {
 		// Convert SecureConfig to Config
+		apiURL := utils.GetAPIURL(cfg.APIURL)
 		config := &config.Config{
 			APIKey: cfg.APIKey,
-			APIURL: cfg.APIURL,
+			APIURL: apiURL,
 			Debug:  cfg.Debug,
 		}
 		appContainer = container.NewContainer(config)
