@@ -20,9 +20,11 @@ var (
 
 var rootCmd = &cobra.Command{
 	Use:   "repobird",
-	Short: "RepoBird CLI - AI-powered code generation and repository management",
-	Long: `RepoBird CLI allows you to run AI-powered tasks on your repositories,
-manage runs, and integrate with the RepoBird platform.`,
+	Short: "CLI and TUI for RepoBird.ai - trigger AI coding agents and manage runs",
+	Long: `CLI and TUI (Terminal User Interface) for RepoBird.ai - trigger AI coding agents,
+submit batch runs, and interactively manage your automated pull request generation.
+
+Base URL: https://repobird.ai`,
 	PersistentPreRunE: func(_ *cobra.Command, _ []string) error {
 		var err error
 		cfg, err = config.LoadSecureConfig()

@@ -3,7 +3,6 @@ package commands
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/cobra/doc"
@@ -12,7 +11,7 @@ import (
 var docsCmd = &cobra.Command{
 	Use:   "docs",
 	Short: "Generate documentation",
-	Long:  "Generate documentation for RepoBird CLI including man pages and markdown docs.",
+	Long:  "Generate documentation for the RepoBird CLI and TUI - trigger AI coding agents, submit batch runs, and interactively manage your automated pull request generation.",
 }
 
 var manCmd = &cobra.Command{
@@ -34,7 +33,7 @@ var manCmd = &cobra.Command{
 			Title:   "REPOBIRD",
 			Section: "1",
 			Manual:  "RepoBird CLI Manual",
-			Source:  "RepoBird CLI",
+			Source:  "CLI and TUI for RepoBird.ai - trigger AI coding agents and manage runs",
 		}
 
 		if err := doc.GenManTree(rootCmd, header, outputDir); err != nil {
@@ -71,26 +70,25 @@ var markdownCmd = &cobra.Command{
 }
 
 var yamlCmd = &cobra.Command{
-	Use:   "yaml [output-file]",
+	Use:   "yaml [output-dir]",
 	Short: "Generate YAML documentation",
 	Long:  "Generate YAML documentation for RepoBird CLI commands.",
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		outputFile := "repobird.yaml"
+		outputDir := "yaml"
 		if len(args) > 0 {
-			outputFile = args[0]
+			outputDir = args[0]
 		}
 
-		dir := filepath.Dir(outputFile)
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(outputDir, 0755); err != nil {
 			return fmt.Errorf("failed to create output directory: %w", err)
 		}
 
-		if err := doc.GenYamlTree(rootCmd, outputFile); err != nil {
+		if err := doc.GenYamlTree(rootCmd, outputDir); err != nil {
 			return fmt.Errorf("failed to generate YAML docs: %w", err)
 		}
 
-		fmt.Printf("✓ YAML documentation generated: %s\n", outputFile)
+		fmt.Printf("✓ YAML documentation generated in %s directory\n", outputDir)
 		return nil
 	},
 }

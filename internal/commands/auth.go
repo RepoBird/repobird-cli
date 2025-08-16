@@ -100,13 +100,7 @@ or in an encrypted file as a fallback.`,
 			if planTotal == 0 {
 				planTotal = 5 // Free tier default
 			}
-			// Handle admin credits that exceed defaults
-			if userInfo.RemainingProRuns > proTotal {
-				proTotal = userInfo.RemainingProRuns
-			}
-			if userInfo.RemainingPlanRuns > planTotal {
-				planTotal = userInfo.RemainingPlanRuns
-			}
+			// Always show tier total, not extra credits
 			fmt.Printf("  Runs: %d/%d\n", userInfo.RemainingProRuns, proTotal)
 			fmt.Printf("  Plan Runs: %d/%d\n", userInfo.RemainingPlanRuns, planTotal)
 		} else {
@@ -210,13 +204,7 @@ var verifyCmd = &cobra.Command{
 			if planTotal == 0 {
 				planTotal = 5 // Free tier default
 			}
-			// Handle admin credits that exceed defaults
-			if userInfo.RemainingProRuns > proTotal {
-				proTotal = userInfo.RemainingProRuns
-			}
-			if userInfo.RemainingPlanRuns > planTotal {
-				planTotal = userInfo.RemainingPlanRuns
-			}
+			// Always show tier total, not extra credits
 			fmt.Printf("  Runs: %d/%d\n", userInfo.RemainingProRuns, proTotal)
 			fmt.Printf("  Plan Runs: %d/%d\n", userInfo.RemainingPlanRuns, planTotal)
 		} else {

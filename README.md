@@ -1,6 +1,6 @@
 # RepoBird CLI
 
-A command-line interface for interacting with the [RepoBird.ai](https://repobird.ai) platform to automate code generation and modifications.
+CLI and TUI (Terminal User Interface) for [RepoBird.ai](https://repobird.ai) - trigger AI coding agents, submit batch runs, and interactively manage your automated pull request generation.
 
 ## Quick Start
 

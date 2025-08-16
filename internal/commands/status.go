@@ -127,16 +127,9 @@ func listRuns(client *api.Client) error {
 		
 		// Use hardcoded fallback totals when API returns 0 (like auth info does)
 		if userInfo.Tier == "Free Plan v1" {
-			// Hardcoded limits for Free Plan v1
-			proTotal := 4
+			// Hardcoded limits for Free Plan v1 - always show tier total, not extra credits
+			proTotal := 3
 			planTotal := 5
-			// Use higher value if remaining exceeds the hardcoded
-			if userInfo.RemainingProRuns > proTotal {
-				proTotal = userInfo.RemainingProRuns
-			}
-			if userInfo.RemainingPlanRuns > planTotal {
-				planTotal = userInfo.RemainingPlanRuns
-			}
 			fmt.Printf("Runs: %d/%d (%s tier)\n", userInfo.RemainingProRuns, proTotal, userInfo.Tier)
 			fmt.Printf("Plan Runs: %d/%d\n", userInfo.RemainingPlanRuns, planTotal)
 		} else {
