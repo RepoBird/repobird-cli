@@ -15,6 +15,64 @@ import (
 	"github.com/repobird/repobird-cli/internal/services"
 )
 
+// readMaskedInput reads input character by character, showing first 3 chars then asterisks
+func readMaskedInput() (string, error) {
+	// Set terminal to raw mode to read char by char
+	oldState, err := term.MakeRaw(int(syscall.Stdin))
+	if err != nil {
+		return "", err
+	}
+	defer term.Restore(int(syscall.Stdin), oldState)
+
+	var input []byte
+	reader := bufio.NewReader(os.Stdin)
+
+	for {
+		char, err := reader.ReadByte()
+		if err != nil {
+			return "", err
+		}
+
+		switch char {
+		case '\n', '\r': // Enter key
+			fmt.Println() // New line after input
+			return string(input), nil
+		case 127, '\b': // Backspace
+			if len(input) > 0 {
+				input = input[:len(input)-1]
+				// Clear current line and redraw
+				fmt.Print("\r\033[K")
+				fmt.Print("Enter your API key: ")
+				displayMasked(input)
+			}
+		case 3: // Ctrl+C
+			fmt.Println()
+			return "", fmt.Errorf("interrupted")
+		default:
+			if char >= 32 && char < 127 { // Printable characters
+				input = append(input, char)
+				// Clear current line and redraw
+				fmt.Print("\r\033[K")
+				fmt.Print("Enter your API key: ")
+				displayMasked(input)
+			}
+		}
+	}
+}
+
+// displayMasked shows first 3 chars then asterisks for the rest
+func displayMasked(input []byte) {
+	inputStr := string(input)
+	if len(inputStr) <= 3 {
+		fmt.Print(inputStr)
+	} else {
+		fmt.Print(inputStr[:3])
+		for i := 3; i < len(inputStr); i++ {
+			fmt.Print("*")
+		}
+	}
+}
+
 var loginCmd = &cobra.Command{
 	Use:   "login",
 	Short: "Configure your API key securely",
@@ -31,19 +89,23 @@ or in an encrypted file as a fallback.`,
 		if len(args) > 0 {
 			apiKey = args[0]
 		} else {
-			// Interactive prompt for API key
-			fmt.Print("Enter your API key: ")
-
-			// Read password without echoing
-			bytePassword, err := term.ReadPassword(int(syscall.Stdin))
+			// Interactive prompt for API key with masked input
+			maskedKey, err := readMaskedInput()
 			if err != nil {
-				// Fallback to regular input if terminal read fails
-				reader := bufio.NewReader(os.Stdin)
-				input, _ := reader.ReadString('\n')
-				apiKey = strings.TrimSpace(input)
+				// Fallback to regular password input if custom reader fails
+				fmt.Print("Enter your API key: ")
+				bytePassword, err := term.ReadPassword(int(syscall.Stdin))
+				if err != nil {
+					// Final fallback to regular input
+					reader := bufio.NewReader(os.Stdin)
+					input, _ := reader.ReadString('\n')
+					apiKey = strings.TrimSpace(input)
+				} else {
+					apiKey = string(bytePassword)
+					fmt.Println() // Add newline after hidden input
+				}
 			} else {
-				apiKey = string(bytePassword)
-				fmt.Println() // Add newline after hidden input
+				apiKey = strings.TrimSpace(maskedKey)
 			}
 		}
 
