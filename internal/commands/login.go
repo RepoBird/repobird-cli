@@ -17,12 +17,26 @@ import (
 
 // readMaskedInput reads input character by character, showing first 3 chars then asterisks
 func readMaskedInput() (string, error) {
+	// First print the prompt before entering raw mode
+	fmt.Print("Enter your API key: ")
+	
 	// Set terminal to raw mode to read char by char
 	oldState, err := term.MakeRaw(int(syscall.Stdin))
 	if err != nil {
 		return "", err
 	}
-	defer term.Restore(int(syscall.Stdin), oldState)
+	
+	var interrupted bool
+	defer func() {
+		// Clear the line before restoring to avoid duplicate prompt
+		if interrupted {
+			fmt.Print("\r\033[K")
+		}
+		term.Restore(int(syscall.Stdin), oldState)
+		if !interrupted {
+			fmt.Println() // Only add newline if not interrupted
+		}
+	}()
 
 	var input []byte
 	reader := bufio.NewReader(os.Stdin)
@@ -35,7 +49,6 @@ func readMaskedInput() (string, error) {
 
 		switch char {
 		case '\n', '\r': // Enter key
-			fmt.Println() // New line after input
 			return string(input), nil
 		case 127, '\b': // Backspace
 			if len(input) > 0 {
@@ -46,7 +59,7 @@ func readMaskedInput() (string, error) {
 				displayMasked(input)
 			}
 		case 3: // Ctrl+C
-			fmt.Println()
+			interrupted = true
 			return "", fmt.Errorf("interrupted")
 		default:
 			if char >= 32 && char < 127 { // Printable characters
@@ -92,6 +105,10 @@ or in an encrypted file as a fallback.`,
 			// Interactive prompt for API key with masked input
 			maskedKey, err := readMaskedInput()
 			if err != nil {
+				if err.Error() == "interrupted" {
+					fmt.Println("\nLogin cancelled.")
+					return nil
+				}
 				// Fallback to regular password input if custom reader fails
 				fmt.Print("Enter your API key: ")
 				bytePassword, err := term.ReadPassword(int(syscall.Stdin))
