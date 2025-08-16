@@ -391,7 +391,7 @@ func (a *App) handleNavigation(msg messages.NavigationMsg) (tea.Model, tea.Cmd) 
 		}
 
 		a.current = views.NewErrorView(msg.Error, msg.Message, msg.Recoverable)
-		
+
 		// Send current window dimensions to the error view
 		var cmds []tea.Cmd
 		cmds = append(cmds, a.current.Init())

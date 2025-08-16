@@ -44,8 +44,8 @@ repobird config path
 ### 3. Authentication Commands (Mock API)
 ```bash
 # Test with mock server
-repobird auth verify
-repobird auth info
+repobird verify
+repobird info
 ```
 
 ### 4. Run Commands (--dry-run ONLY)

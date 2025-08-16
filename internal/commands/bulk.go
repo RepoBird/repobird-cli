@@ -87,7 +87,7 @@ func runBulk(cmd *cobra.Command, args []string) error {
 
 	// Validate API key
 	if cfg.APIKey == "" {
-		return fmt.Errorf("API key not configured. Run 'repobird config set api-key YOUR_KEY' first")
+		return errors.NoAPIKeyError()
 	}
 
 	// Expand glob patterns and resolve paths
@@ -302,7 +302,7 @@ func runBulkInteractive() error {
 	}
 
 	if cfg.APIKey == "" {
-		return fmt.Errorf("API key not configured. Run 'repobird config set api-key YOUR_KEY' first")
+		return errors.NoAPIKeyError()
 	}
 
 	// Create API client

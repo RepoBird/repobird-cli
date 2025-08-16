@@ -268,7 +268,7 @@ jq . config.json || echo "Invalid JSON"
 **Authentication Errors:**
 ```bash
 # Verify API key
-repobird auth verify
+repobird verify
 ```
 
 **Rate Limiting:**

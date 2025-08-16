@@ -24,7 +24,8 @@ var rootCmd = &cobra.Command{
 	Long: `CLI and TUI (Terminal User Interface) for RepoBird.ai - trigger AI coding agents,
 submit batch runs, and monitor your AI agent runs through an interactive dashboard.
 
-Base URL: https://repobird.ai`,
+Base URL: https://repobird.ai
+Get API Key: https://repobird.ai/dashboard/user-profile/api-keys`,
 	PersistentPreRunE: func(_ *cobra.Command, _ []string) error {
 		var err error
 		cfg, err = config.LoadSecureConfig()
@@ -71,8 +72,12 @@ func init() {
 	rootCmd.AddCommand(runCmd)
 	rootCmd.AddCommand(statusCmd)
 	rootCmd.AddCommand(configCmd)
-	rootCmd.AddCommand(authCmd)
+	rootCmd.AddCommand(loginCmd)
+	rootCmd.AddCommand(logoutCmd)
+	rootCmd.AddCommand(verifyCmd)
+	rootCmd.AddCommand(infoCmd)
 	rootCmd.AddCommand(NewBulkCommand())
+	rootCmd.AddCommand(examplesCmd)
 }
 
 var versionCmd = &cobra.Command{

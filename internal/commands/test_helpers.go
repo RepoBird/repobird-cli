@@ -24,9 +24,24 @@ func NewConfigCommand() *cobra.Command {
 	return configCmd
 }
 
-// NewAuthCommand creates a new auth command for testing
-func NewAuthCommand() *cobra.Command {
-	return authCmd
+// NewLoginCommand creates a new login command for testing
+func NewLoginCommand() *cobra.Command {
+	return loginCmd
+}
+
+// NewLogoutCommand creates a new logout command for testing
+func NewLogoutCommand() *cobra.Command {
+	return logoutCmd
+}
+
+// NewVerifyCommand creates a new verify command for testing
+func NewVerifyCommand() *cobra.Command {
+	return verifyCmd
+}
+
+// NewInfoCommand creates a new info command for testing
+func NewInfoCommand() *cobra.Command {
+	return infoCmd
 }
 
 // NewTUICommand creates a new TUI command for testing

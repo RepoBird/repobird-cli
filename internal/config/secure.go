@@ -107,28 +107,58 @@ func (s *SecureStorage) GetAPIKey() (string, error) {
 
 // DeleteAPIKey removes the API key from all storage locations
 func (s *SecureStorage) DeleteAPIKey() error {
-	var lastErr error
+	var errors []string
+	var removedAny bool
 
 	// Remove from keyring
 	if s.useKeyring {
 		if err := keyring.Delete(keyringService, keyringAccount); err != nil {
-			lastErr = err
+			// Only log keyring errors if it's not a "not found" error
+			// The "name is not activatable" error means keyring service isn't available
+			if err != keyring.ErrNotFound && !isKeyringServiceError(err) {
+				errors = append(errors, fmt.Sprintf("keyring: %v", err))
+			}
+		} else {
+			removedAny = true
 		}
 	}
 
 	// Remove encrypted file
 	encryptedFile := filepath.Join(s.configDir, ".api_key.enc")
-	if err := os.Remove(encryptedFile); err != nil && !os.IsNotExist(err) {
-		lastErr = err
+	if err := os.Remove(encryptedFile); err != nil {
+		if !os.IsNotExist(err) {
+			errors = append(errors, fmt.Sprintf("encrypted file: %v", err))
+		}
+	} else {
+		removedAny = true
 	}
 
 	// Remove from plain text config
 	s.removeAPIKeyFromConfig()
 
-	if lastErr != nil {
-		return fmt.Errorf("some errors occurred while deleting API key: %w", lastErr)
+	// Check if we actually had an API key stored anywhere
+	configFile := filepath.Join(s.configDir, "config.yaml")
+	if _, err := os.Stat(configFile); err == nil {
+		removedAny = true
 	}
+
+	// Only return error if we had real failures and didn't remove anything
+	if len(errors) > 0 && !removedAny {
+		return fmt.Errorf("failed to remove API key: %s", errors[0])
+	}
+
 	return nil
+}
+
+// isKeyringServiceError checks if the error is due to keyring service not being available
+func isKeyringServiceError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errStr := err.Error()
+	return errStr == "The name is not activatable" ||
+		errStr == "Cannot autolaunch D-Bus without X11 $DISPLAY" ||
+		errStr == "The name org.freedesktop.secrets was not provided by any .service files"
 }
 
 // saveEncryptedAPIKey saves the API key in an encrypted file

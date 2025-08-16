@@ -161,10 +161,10 @@ repobird config
   config list
 
 # Authentication
-repobird auth
-  auth login             Interactive login
-  auth logout
-  auth status            Show current auth status
+repobird login             Interactive login
+repobird logout            Remove stored API key
+repobird verify            Verify current API key
+repobird info              Display authentication information
 ```
 
 ### Input File Examples

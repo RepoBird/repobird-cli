@@ -7,6 +7,17 @@ import (
 	"net/url"
 )
 
+// NoAPIKeyError returns a consistent error message for missing API key
+func NoAPIKeyError() error {
+	return fmt.Errorf(`API key not configured. You have 3 options:
+
+A) Run 'repobird login' for interactive setup (recommended)
+B) Run 'repobird config set api-key YOUR_KEY'  
+C) Set REPOBIRD_API_KEY environment variable in your shell config (e.g., ~/.bashrc, ~/.zshrc)
+
+Get your API key at: https://repobird.ai/dashboard/user-profile/api-keys`)
+}
+
 type ErrorType int
 
 const (

@@ -17,15 +17,15 @@ import (
 // TestUserInfoDisplay tests that user info is displayed correctly with new fields
 func TestUserInfoDisplay(t *testing.T) {
 	tests := []struct {
-		name               string
-		tier               string
-		remainingProRuns   int
-		remainingPlanRuns  int
-		proTotalRuns       int
-		planTotalRuns      int
-		expectedRunsLine   string
-		expectedPlanLine   string
-		expectPlanLine     bool
+		name              string
+		tier              string
+		remainingProRuns  int
+		remainingPlanRuns int
+		proTotalRuns      int
+		planTotalRuns     int
+		expectedRunsLine  string
+		expectedPlanLine  string
+		expectPlanLine    bool
 	}{
 		{
 			name:              "Free tier with plan runs",
@@ -112,7 +112,7 @@ func TestUserInfoDisplay(t *testing.T) {
 			output.WriteString("✓ API key is valid\n")
 			output.WriteString("  Email: " + userInfo.Email + "\n")
 			output.WriteString("  Tier: " + userInfo.Tier + "\n")
-			
+
 			// Check if Free tier (case-insensitive)
 			if strings.Contains(strings.ToLower(userInfo.Tier), "free") {
 				// Free tier - always show both
@@ -135,7 +135,7 @@ func TestUserInfoDisplay(t *testing.T) {
 			}
 
 			outputStr := output.String()
-			
+
 			// Verify expected output
 			assert.Contains(t, outputStr, tt.expectedRunsLine)
 			if tt.expectPlanLine {
@@ -197,7 +197,7 @@ func TestStatusCommandUserInfoDisplay(t *testing.T) {
 
 			// Simulate status command output
 			var output strings.Builder
-			
+
 			// Show runs - for Free tier, always show both
 			if strings.Contains(strings.ToLower(userInfo.Tier), "free") {
 				output.WriteString("Runs: ")
@@ -218,7 +218,7 @@ func TestStatusCommandUserInfoDisplay(t *testing.T) {
 			}
 
 			outputStr := output.String()
-			
+
 			// Verify expected output
 			for _, expected := range tt.expectedOutput {
 				assert.Contains(t, outputStr, expected)
@@ -247,11 +247,11 @@ func TestFieldOrderInOutput(t *testing.T) {
 	output.WriteString("  Plan Runs: 5/10\n")
 
 	outputStr := output.String()
-	
+
 	// Check order - Runs should come before Plan Runs
 	runsIndex := strings.Index(outputStr, "Runs: 0/0")
 	planRunsIndex := strings.Index(outputStr, "Plan Runs: 5/10")
-	
+
 	assert.True(t, runsIndex > 0, "Should contain Runs line")
 	assert.True(t, planRunsIndex > 0, "Should contain Plan Runs line")
 	assert.True(t, runsIndex < planRunsIndex, "Runs should appear before Plan Runs")

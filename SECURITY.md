@@ -37,13 +37,13 @@ Automatically used on headless servers, containers, or when keyring is unavailab
 
 2. **Use the secure login command**
    ```bash
-   repobird auth login
+   repobird login
    ```
    This ensures your key is stored using the most secure method available.
 
 3. **Check your storage method**
    ```bash
-   repobird auth info
+   repobird info
    ```
    This shows where and how your API key is stored.
 
@@ -53,7 +53,7 @@ Automatically used on headless servers, containers, or when keyring is unavailab
 
 5. **Use environment variables for CI/CD only**
    - Environment variables are suitable for automated systems
-   - For development, use `repobird auth login` instead
+   - For development, use `repobird login` instead
 
 #### For Developers
 
@@ -84,7 +84,7 @@ If you discover a security vulnerability in RepoBird CLI, please report it to:
 If you have an API key stored in plain text (legacy versions), it will be automatically migrated to secure storage on first use. You can manually trigger migration:
 
 ```bash
-repobird auth login
+repobird login
 ```
 
 ### Compliance
@@ -103,14 +103,14 @@ The CLI will warn you when:
 
 Example warnings:
 ```
-⚠️  Using API key from environment variable. For better security, use 'repobird auth login'
-⚠️  API key stored in plain text. Run 'repobird auth migrate' to secure it
+⚠️  Using API key from environment variable. For better security, use 'repobird login'
+⚠️  API key stored in plain text. Run 'repobird login' to secure it
 ```
 
 ### Frequently Asked Questions
 
 **Q: Is my API key encrypted?**
-A: Yes, when stored via `repobird auth login`, your key is either stored in the system keyring or encrypted with AES-256-GCM.
+A: Yes, when stored via `repobird login`, your key is either stored in the system keyring or encrypted with AES-256-GCM.
 
 **Q: Can I use the same API key on multiple machines?**
 A: Yes, but for better security, consider using different keys for different machines and revoking access when needed.
@@ -122,4 +122,4 @@ A: You can generate a new one from the RepoBird web interface. The old key shoul
 A: It's suitable for CI/CD where keys are injected securely. For development machines, use the keyring storage instead.
 
 **Q: How do I remove my API key completely?**
-A: Run `repobird auth logout` to remove it from all storage locations.
+A: Run `repobird logout` to remove it from all storage locations.

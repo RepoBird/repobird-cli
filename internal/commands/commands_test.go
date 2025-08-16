@@ -248,25 +248,30 @@ func TestConfigCommand_Execute(t *testing.T) {
 	}
 }
 
-func TestAuthCommand_Execute(t *testing.T) {
+func TestAuthCommands_Execute(t *testing.T) {
 	tests := []struct {
 		name        string
 		args        []string
 		expectError bool
 	}{
 		{
-			name:        "Auth verify",
-			args:        []string{"auth", "verify"},
+			name:        "Verify",
+			args:        []string{"verify"},
 			expectError: false, // Will fail without valid API key, but command should run
 		},
 		{
-			name:        "Auth login",
-			args:        []string{"auth", "login"},
+			name:        "Login",
+			args:        []string{"login"},
 			expectError: false,
 		},
 		{
-			name:        "Auth logout",
-			args:        []string{"auth", "logout"},
+			name:        "Logout",
+			args:        []string{"logout"},
+			expectError: false,
+		},
+		{
+			name:        "Info",
+			args:        []string{"info"},
 			expectError: false,
 		},
 	}
@@ -277,8 +282,10 @@ func TestAuthCommand_Execute(t *testing.T) {
 			defer cleanup()
 
 			rootCmd := NewRootCommand()
-			authCmd := NewAuthCommand()
-			rootCmd.AddCommand(authCmd)
+			rootCmd.AddCommand(loginCmd)
+			rootCmd.AddCommand(logoutCmd)
+			rootCmd.AddCommand(verifyCmd)
+			rootCmd.AddCommand(infoCmd)
 
 			var buf bytes.Buffer
 			rootCmd.SetOut(&buf)
@@ -457,7 +464,10 @@ func TestCommandHelp(t *testing.T) {
 		{"Run help", NewRunCommand()},
 		{"Status help", NewStatusCommand()},
 		{"Config help", NewConfigCommand()},
-		{"Auth help", NewAuthCommand()},
+		{"Login help", NewLoginCommand()},
+		{"Logout help", NewLogoutCommand()},
+		{"Verify help", NewVerifyCommand()},
+		{"Info help", NewInfoCommand()},
 		{"TUI help", NewTUICommand()},
 	}
 

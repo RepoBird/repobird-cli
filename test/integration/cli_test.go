@@ -137,22 +137,22 @@ func TestAuthCommands(t *testing.T) {
 	env, mockServer := SetupTestEnv(t)
 	defer mockServer.Close()
 
-	t.Run("auth verify with valid key", func(t *testing.T) {
-		result := RunCommandWithEnv(t, env, "auth", "verify")
+	t.Run("verify with valid key", func(t *testing.T) {
+		result := RunCommandWithEnv(t, env, "verify")
 		AssertSuccess(t, result)
 		AssertContains(t, result.Stdout, "valid")
 	})
 
-	t.Run("auth info", func(t *testing.T) {
-		result := RunCommandWithEnv(t, env, "auth", "info")
+	t.Run("info", func(t *testing.T) {
+		result := RunCommandWithEnv(t, env, "info")
 		AssertSuccess(t, result)
 		AssertContains(t, result.Stdout, "Email:")
 		AssertContains(t, result.Stdout, "Tier:")
 	})
 
-	t.Run("auth without API key", func(t *testing.T) {
+	t.Run("verify without API key", func(t *testing.T) {
 		delete(env, "REPOBIRD_API_KEY")
-		result := RunCommandWithEnv(t, env, "auth", "verify")
+		result := RunCommandWithEnv(t, env, "verify")
 		AssertFailure(t, result)
 		AssertContains(t, result.Stderr, "no API key configured")
 	})

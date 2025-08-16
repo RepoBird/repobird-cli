@@ -11,14 +11,22 @@ import (
 var docsCmd = &cobra.Command{
 	Use:   "docs",
 	Short: "Generate documentation",
-	Long:  "Generate documentation for the RepoBird CLI and TUI - trigger AI coding agents, submit batch runs, and monitor your AI agent runs through an interactive dashboard.",
+	Long: `Generate documentation for the RepoBird CLI and TUI - trigger AI coding agents, submit batch runs, and monitor your AI agent runs through an interactive dashboard.
+
+Base URL: https://repobird.ai
+Get API Key: https://repobird.ai/dashboard/user-profile/api-keys`,
 }
 
 var manCmd = &cobra.Command{
 	Use:   "man [output-dir]",
 	Short: "Generate man pages",
-	Long:  "Generate man pages for RepoBird CLI commands.",
-	Args:  cobra.MaximumNArgs(1),
+	Long: `Generate man pages for RepoBird CLI commands.
+
+Run configurations support JSON, YAML, and Markdown formats.
+See 'repobird run --help' for detailed format examples and field descriptions.
+
+Get API Key: https://repobird.ai/dashboard/user-profile/api-keys`,
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		outputDir := "man"
 		if len(args) > 0 {
@@ -33,7 +41,7 @@ var manCmd = &cobra.Command{
 			Title:   "REPOBIRD",
 			Section: "1",
 			Manual:  "RepoBird CLI Manual",
-			Source:  "CLI and TUI for RepoBird.ai - trigger AI coding agents and manage runs",
+			Source:  "RepoBird.ai - https://repobird.ai/dashboard/user-profile/api-keys",
 		}
 
 		if err := doc.GenManTree(rootCmd, header, outputDir); err != nil {
@@ -41,6 +49,7 @@ var manCmd = &cobra.Command{
 		}
 
 		fmt.Printf("✓ Man pages generated in %s directory\n", outputDir)
+		fmt.Println("Tip: Run configurations support JSON, YAML, and Markdown formats. See docs/run-config-formats.md for examples.")
 		return nil
 	},
 }
@@ -48,8 +57,13 @@ var manCmd = &cobra.Command{
 var markdownCmd = &cobra.Command{
 	Use:   "markdown [output-dir]",
 	Short: "Generate markdown documentation",
-	Long:  "Generate markdown documentation for RepoBird CLI commands.",
-	Args:  cobra.MaximumNArgs(1),
+	Long: `Generate markdown documentation for RepoBird CLI commands.
+
+Run configurations support JSON, YAML, and Markdown formats.
+See 'repobird run --help' for detailed format examples and field descriptions.
+
+Get API Key: https://repobird.ai/dashboard/user-profile/api-keys`,
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		outputDir := "docs/generated"
 		if len(args) > 0 {
@@ -65,6 +79,7 @@ var markdownCmd = &cobra.Command{
 		}
 
 		fmt.Printf("✓ Markdown documentation generated in %s directory\n", outputDir)
+		fmt.Println("Tip: Run configurations support JSON, YAML, and Markdown formats. See docs/run-config-formats.md for examples.")
 		return nil
 	},
 }
@@ -72,8 +87,13 @@ var markdownCmd = &cobra.Command{
 var yamlCmd = &cobra.Command{
 	Use:   "yaml [output-dir]",
 	Short: "Generate YAML documentation",
-	Long:  "Generate YAML documentation for RepoBird CLI commands.",
-	Args:  cobra.MaximumNArgs(1),
+	Long: `Generate YAML documentation for RepoBird CLI commands.
+
+Run configurations support JSON, YAML, and Markdown formats.
+See 'repobird run --help' for detailed format examples and field descriptions.
+
+Get API Key: https://repobird.ai/dashboard/user-profile/api-keys`,
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		outputDir := "yaml"
 		if len(args) > 0 {
@@ -89,6 +109,7 @@ var yamlCmd = &cobra.Command{
 		}
 
 		fmt.Printf("✓ YAML documentation generated in %s directory\n", outputDir)
+		fmt.Println("Tip: Run configurations support JSON, YAML, and Markdown formats. See docs/run-config-formats.md for examples.")
 		return nil
 	},
 }

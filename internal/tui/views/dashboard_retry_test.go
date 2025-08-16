@@ -15,7 +15,7 @@ import (
 // MockClientWithRetryExhaustion simulates a client that fails with retry exhaustion
 type MockClientWithRetryExhaustion struct {
 	failListRepositories bool
-	failListRuns        bool
+	failListRuns         bool
 }
 
 func (m *MockClientWithRetryExhaustion) ListRepositories(ctx context.Context) ([]models.APIRepository, error) {
@@ -72,20 +72,20 @@ func TestDashboardRetryExhaustion(t *testing.T) {
 		mockClient := &MockClientWithRetryExhaustion{
 			failListRepositories: true,
 		}
-		
+
 		// Create cache
 		mockCache := cache.NewSimpleCache()
-		
+
 		// Create dashboard view
 		dashboard := NewDashboardView(mockClient, mockCache)
-		
+
 		// Initialize the view
 		cmd := dashboard.Init()
 		assert.NotNil(t, cmd)
-		
+
 		// Execute the loadDashboardData command
 		msg := dashboard.loadDashboardData()()
-		
+
 		// Check that it's a dashboardDataLoadedMsg with error and retryExhausted flag
 		loadedMsg, ok := msg.(dashboardDataLoadedMsg)
 		assert.True(t, ok)
@@ -93,11 +93,11 @@ func TestDashboardRetryExhaustion(t *testing.T) {
 		assert.True(t, loadedMsg.retryExhausted)
 		assert.Contains(t, loadedMsg.error.Error(), "giving up after")
 		assert.Contains(t, loadedMsg.error.Error(), "attempts")
-		
+
 		// Update dashboard with the message
 		updatedView, cmd := dashboard.Update(loadedMsg)
 		assert.NotNil(t, cmd)
-		
+
 		// The command should return a NavigateToErrorMsg
 		navMsg := cmd()
 		errorNavMsg, ok := navMsg.(messages.NavigateToErrorMsg)
@@ -105,40 +105,40 @@ func TestDashboardRetryExhaustion(t *testing.T) {
 		assert.NotNil(t, errorNavMsg.Error)
 		assert.Equal(t, "Failed to load dashboard after 3 attempts", errorNavMsg.Message)
 		assert.True(t, errorNavMsg.Recoverable)
-		
+
 		// Dashboard should have loading set to false
 		dashboardView := updatedView.(*DashboardView)
 		assert.False(t, dashboardView.loading)
 		assert.False(t, dashboardView.initializing)
 	})
-	
+
 	t.Run("Navigate to error view after retry exhaustion for ListRuns fallback", func(t *testing.T) {
 		// Create mock client that simulates retry exhaustion for ListRuns
 		mockClient := &MockClientWithRetryExhaustion{
 			failListRepositories: true, // Fail repositories to trigger fallback
-			failListRuns:        true,  // Also fail runs
+			failListRuns:         true, // Also fail runs
 		}
-		
+
 		// Create cache
 		mockCache := cache.NewSimpleCache()
-		
+
 		// Create dashboard view
 		dashboard := NewDashboardView(mockClient, mockCache)
-		
+
 		// Execute the loadFromRunsOnly command (fallback)
 		msg := dashboard.loadFromRunsOnly()()
-		
+
 		// Check that it's a dashboardDataLoadedMsg with error and retryExhausted flag
 		loadedMsg, ok := msg.(dashboardDataLoadedMsg)
 		assert.True(t, ok)
 		assert.Error(t, loadedMsg.error)
 		assert.True(t, loadedMsg.retryExhausted)
 		assert.Contains(t, loadedMsg.error.Error(), "giving up after")
-		
+
 		// Update dashboard with the message
 		_, cmd := dashboard.Update(loadedMsg)
 		assert.NotNil(t, cmd)
-		
+
 		// The command should return a NavigateToErrorMsg
 		navMsg := cmd()
 		errorNavMsg, ok := navMsg.(messages.NavigateToErrorMsg)
@@ -147,32 +147,32 @@ func TestDashboardRetryExhaustion(t *testing.T) {
 		assert.Equal(t, "Failed to load dashboard after 3 attempts", errorNavMsg.Message)
 		assert.True(t, errorNavMsg.Recoverable)
 	})
-	
+
 	t.Run("Regular error without retry exhaustion shows inline error", func(t *testing.T) {
 		// Create mock client that doesn't fail with retry exhaustion
 		mockClient := &MockClientWithRetryExhaustion{
 			failListRepositories: false,
-			failListRuns:        false,
+			failListRuns:         false,
 		}
-		
+
 		// Create cache
 		mockCache := cache.NewSimpleCache()
-		
+
 		// Create dashboard view
 		dashboard := NewDashboardView(mockClient, mockCache)
-		
+
 		// Simulate a regular error (not retry exhaustion)
 		loadedMsg := dashboardDataLoadedMsg{
 			error:          errors.New("network error"),
 			retryExhausted: false,
 		}
-		
+
 		// Update dashboard with the message
 		updatedView, cmd := dashboard.Update(loadedMsg)
-		
+
 		// Should not navigate to error view
 		assert.Nil(t, cmd)
-		
+
 		// Dashboard should have the error set for inline display
 		dashboardView := updatedView.(*DashboardView)
 		assert.Error(t, dashboardView.error)
@@ -217,7 +217,7 @@ func TestIsRetryExhausted(t *testing.T) {
 			expected: false,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := isRetryExhausted(tt.err)

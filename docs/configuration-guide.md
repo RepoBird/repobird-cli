@@ -103,7 +103,7 @@ repobird config reset
 repobird config test
 
 # Verify API key
-repobird auth verify
+repobird verify
 ```
 
 ## Cache Configuration

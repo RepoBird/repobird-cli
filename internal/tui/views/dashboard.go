@@ -312,7 +312,7 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		d.statusLine.SetLoading(false)
 		if msg.error != nil {
 			debug.LogToFilef("  ERROR: %v, retryExhausted: %v\n", msg.error, msg.retryExhausted)
-			
+
 			// If all retries have been exhausted, navigate to error view
 			if msg.retryExhausted {
 				debug.LogToFilef("  ❌ All retries exhausted, navigating to error view\n")
@@ -324,7 +324,7 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 			}
-			
+
 			// Otherwise, just set the error for inline display
 			d.error = msg.error
 		} else {

@@ -53,13 +53,13 @@ func getTroubleshootingContent() []string {
 		"• Check API key: repobird config get api-key",
 		"• Verify network: repobird status",
 	}
-	
+
 	// Show API URL check only in dev mode
 	env := os.Getenv("REPOBIRD_ENV")
 	if strings.ToLower(env) == "dev" || strings.ToLower(env) == "development" {
 		content = append(content, "• Check API URL: REPOBIRD_API_URL env var")
 	}
-	
+
 	content = append(content,
 		"",
 		"Display Issues:",
@@ -72,7 +72,7 @@ func getTroubleshootingContent() []string {
 		"• FZF mode ('f') for large lists",
 		"• Clear cache if data seems stale",
 	)
-	
+
 	return content
 }
 
@@ -236,7 +236,7 @@ func getDefaultHelpSections() []HelpSection {
 			},
 		},
 		{
-			Title: "🔧 Troubleshooting",
+			Title:   "🔧 Troubleshooting",
 			Content: getTroubleshootingContent(),
 		},
 	}

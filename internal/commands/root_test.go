@@ -20,7 +20,10 @@ func TestRootCommand_NoDuplicateCommands(t *testing.T) {
 	testRootCmd.AddCommand(runCmd)
 	testRootCmd.AddCommand(statusCmd)
 	testRootCmd.AddCommand(configCmd)
-	testRootCmd.AddCommand(authCmd)
+	testRootCmd.AddCommand(loginCmd)
+	testRootCmd.AddCommand(logoutCmd)
+	testRootCmd.AddCommand(verifyCmd)
+	testRootCmd.AddCommand(infoCmd)
 	// Note: completion and docs commands are added by their own init() functions
 
 	// Track command names that have been seen
@@ -48,7 +51,10 @@ func TestRootCommand_HasExpectedCommands(t *testing.T) {
 		"run",
 		"status",
 		"config",
-		"auth",
+		"login",
+		"logout",
+		"verify",
+		"info",
 		"bulk",
 		"tui",
 		"completion",
@@ -74,8 +80,11 @@ func TestRootCommand_CommandDescriptions(t *testing.T) {
 		"run":        "Create a new run from a JSON, YAML, or Markdown file",
 		"status":     "Check the status of runs",
 		"config":     "Manage RepoBird configuration",
-		"auth":       "Manage authentication and API keys",
-		"bulk":       "Submit multiple runs in parallel from configuration files",
+		"login":      "Configure your API key securely",
+		"logout":     "Remove stored API key",
+		"verify":     "Verify current API key",
+		"info":       "Display authentication information",
+		"bulk":       "Submit multiple runs from configuration files",
 		"tui":        "Launch the interactive Terminal User Interface",
 		"completion": "Generate shell completion scripts",
 		"docs":       "Generate documentation",

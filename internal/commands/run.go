@@ -109,7 +109,7 @@ func init() {
 
 func runCommand(cmd *cobra.Command, args []string) error {
 	if cfg.APIKey == "" {
-		return fmt.Errorf("API key not configured. Set REPOBIRD_API_KEY or run 'repobird config set api-key'")
+		return errors.NoAPIKeyError()
 	}
 
 	var runConfig *models.RunConfig
@@ -139,7 +139,7 @@ func runCommand(cmd *cobra.Command, args []string) error {
 		// Read JSON from stdin with unknown field handling
 		runConfig, err = utils.ParseJSONFromStdin()
 		if err != nil {
-			return fmt.Errorf("failed to parse JSON from stdin: %w", err)
+			return fmt.Errorf("failed to parse input: %w\nHint: Run 'repobird examples' to see configuration formats and schemas", err)
 		}
 	}
 

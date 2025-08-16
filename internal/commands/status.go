@@ -44,7 +44,7 @@ func init() {
 
 func statusCommand(_ *cobra.Command, args []string) error {
 	if cfg.APIKey == "" {
-		return fmt.Errorf("API key not configured. Set REPOBIRD_API_KEY or run 'repobird config set api-key'")
+		return errors.NoAPIKeyError()
 	}
 
 	client := api.NewClient(cfg.APIKey, cfg.APIURL, cfg.Debug)
@@ -81,10 +81,10 @@ func listRuns(client *api.Client) error {
 	// Always show version info in dev/debug mode or when there's an error
 	env := os.Getenv("REPOBIRD_ENV")
 	showDebugInfo := strings.ToLower(env) == "dev" || strings.ToLower(env) == "development" || cfg.Debug
-	
+
 	// Try to verify auth first to check for API/auth errors
 	userInfo, authErr := client.VerifyAuth()
-	
+
 	// If API/auth error, show version info and error, then exit
 	if authErr != nil && (errors.IsAuthError(authErr) || errors.IsNetworkError(authErr)) {
 		// Always show version/debug info when there's an API error
@@ -98,12 +98,12 @@ func listRuns(client *api.Client) error {
 		}
 		fmt.Println()
 		fmt.Println()
-		
+
 		// Show the error below version info
 		fmt.Fprintf(os.Stderr, "Error: %s\n", errors.FormatUserError(authErr))
 		return nil // Return nil to prevent cobra from showing usage and error again
 	}
-	
+
 	// Show version info in dev/debug mode for successful requests
 	if showDebugInfo {
 		fmt.Printf("Build: %s", version.GetVersion())
@@ -117,14 +117,14 @@ func listRuns(client *api.Client) error {
 		fmt.Println()
 		fmt.Println()
 	}
-	
+
 	// If auth succeeded but had a warning-level error, show warning
 	if authErr != nil {
 		fmt.Fprintf(os.Stderr, "Warning: Could not fetch user info: %s\n", errors.FormatUserError(authErr))
 	} else if userInfo != nil {
 		// Set the current user for cache initialization and show user info
 		services.SetCurrentUser(userInfo)
-		
+
 		// Use hardcoded fallback totals when API returns 0 (like auth info does)
 		if userInfo.Tier == "Free Plan v1" {
 			// Hardcoded limits for Free Plan v1 - always show tier total, not extra credits
@@ -156,7 +156,7 @@ func listRuns(client *api.Client) error {
 			}
 			fmt.Println()
 			fmt.Println()
-			
+
 			fmt.Fprintf(os.Stderr, "Error: failed to list runs: %s\n", errors.FormatUserError(err))
 			return nil // Return nil to prevent cobra from showing usage and error again
 		}

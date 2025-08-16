@@ -5,6 +5,7 @@ import (
 
 	"github.com/repobird/repobird-cli/internal/api"
 	"github.com/repobird/repobird-cli/internal/config"
+	"github.com/repobird/repobird-cli/internal/errors"
 	"github.com/repobird/repobird-cli/internal/mock"
 	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/repobird/repobird-cli/internal/services"
@@ -66,7 +67,7 @@ func runTUI(cmd *cobra.Command, args []string) error {
 	}
 
 	if cfg.APIKey == "" {
-		return fmt.Errorf("API key not configured. Run 'rb config set api-key YOUR_KEY' first")
+		return errors.NoAPIKeyError()
 	}
 
 	client := api.NewClient(cfg.APIKey, cfg.APIURL, cfg.Debug)

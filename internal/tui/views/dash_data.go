@@ -151,20 +151,20 @@ func (d *DashboardView) loadDashboardData() tea.Cmd {
 		apiRepositories, err := d.client.ListRepositories(ctx)
 		if err != nil {
 			debug.LogToFilef("  ListRepositories failed: %v\n", err)
-			
+
 			// Check if this is a retry exhaustion error (after 3 attempts)
 			// The retry client wraps the error with "giving up after X attempts"
 			if isRetryExhausted(err) {
 				debug.LogToFilef("  ❌ All retries exhausted for ListRepositories, returning error for navigation\n")
 				return dashboardDataLoadedMsg{
-					repositories: []models.Repository{},
-					allRuns:      []*models.RunResponse{},
-					detailsCache: make(map[string]*models.RunResponse),
-					error:        err,
+					repositories:   []models.Repository{},
+					allRuns:        []*models.RunResponse{},
+					detailsCache:   make(map[string]*models.RunResponse),
+					error:          err,
 					retryExhausted: true,
 				}
 			}
-			
+
 			// Fall back to building repos from runs if repository API fails
 			return d.loadFromRunsOnly()
 		}

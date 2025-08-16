@@ -14,7 +14,7 @@ Common issues and solutions for RepoBird CLI.
 
 ```bash
 # Check setup
-repobird auth verify
+repobird verify
 
 # Test API connection
 repobird status

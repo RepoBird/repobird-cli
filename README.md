@@ -24,13 +24,27 @@ Download the latest release from the [releases page](https://github.com/youruser
 
 ### Configuration
 
-Set your API key:
+#### Authentication
 ```bash
-repobird config set api-key YOUR_API_KEY
+# Secure login (recommended)
+repobird login
+
+# Verify your API key
+repobird verify
+
+# Check authentication status
+repobird info
+
+# Logout (remove stored API key)
+repobird logout
 ```
 
-Or use environment variable:
+#### Alternative Methods
 ```bash
+# Set API key via config command
+repobird config set api-key YOUR_API_KEY
+
+# Or use environment variable
 export REPOBIRD_API_KEY=YOUR_API_KEY
 ```
 
@@ -123,8 +137,11 @@ repobird version
 # List configuration
 repobird config list
 
-# Remove API key
-repobird config unset api-key
+# Authentication commands
+repobird login      # Secure login with API key
+repobird logout     # Remove stored API key
+repobird verify     # Verify API key is valid
+repobird info       # Show authentication status
 ```
 
 ## Features
