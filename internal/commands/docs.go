@@ -22,8 +22,8 @@ var manCmd = &cobra.Command{
 	Short: "Generate man pages",
 	Long: `Generate man pages for RepoBird CLI commands.
 
-Run configurations support JSON, YAML, and Markdown formats.
-See 'repobird run --help' for detailed format examples and field descriptions.
+The 'run' command supports both single and bulk configurations in JSON, YAML, and Markdown formats.
+Use 'repobird examples' to see configuration formats and generate example files.
 
 Get API Key: https://repobird.ai/dashboard/user-profile/api-keys`,
 	Args: cobra.MaximumNArgs(1),
@@ -49,7 +49,7 @@ Get API Key: https://repobird.ai/dashboard/user-profile/api-keys`,
 		}
 
 		fmt.Printf("✓ Man pages generated in %s directory\n", outputDir)
-		fmt.Println("Tip: Run configurations support JSON, YAML, and Markdown formats. See docs/run-config-formats.md for examples.")
+		fmt.Println("Tip: The 'run' command supports both single and bulk configurations. Use 'repobird examples' for format details.")
 		return nil
 	},
 }
@@ -59,8 +59,8 @@ var markdownCmd = &cobra.Command{
 	Short: "Generate markdown documentation",
 	Long: `Generate markdown documentation for RepoBird CLI commands.
 
-Run configurations support JSON, YAML, and Markdown formats.
-See 'repobird run --help' for detailed format examples and field descriptions.
+The 'run' command supports both single and bulk configurations in JSON, YAML, and Markdown formats.
+Use 'repobird examples' to see configuration formats and generate example files.
 
 Get API Key: https://repobird.ai/dashboard/user-profile/api-keys`,
 	Args: cobra.MaximumNArgs(1),
@@ -79,7 +79,7 @@ Get API Key: https://repobird.ai/dashboard/user-profile/api-keys`,
 		}
 
 		fmt.Printf("✓ Markdown documentation generated in %s directory\n", outputDir)
-		fmt.Println("Tip: Run configurations support JSON, YAML, and Markdown formats. See docs/run-config-formats.md for examples.")
+		fmt.Println("Tip: The 'run' command supports both single and bulk configurations. Use 'repobird examples' for format details.")
 		return nil
 	},
 }
@@ -89,8 +89,8 @@ var yamlCmd = &cobra.Command{
 	Short: "Generate YAML documentation",
 	Long: `Generate YAML documentation for RepoBird CLI commands.
 
-Run configurations support JSON, YAML, and Markdown formats.
-See 'repobird run --help' for detailed format examples and field descriptions.
+The 'run' command supports both single and bulk configurations in JSON, YAML, and Markdown formats.
+Use 'repobird examples' to see configuration formats and generate example files.
 
 Get API Key: https://repobird.ai/dashboard/user-profile/api-keys`,
 	Args: cobra.MaximumNArgs(1),
@@ -109,7 +109,7 @@ Get API Key: https://repobird.ai/dashboard/user-profile/api-keys`,
 		}
 
 		fmt.Printf("✓ YAML documentation generated in %s directory\n", outputDir)
-		fmt.Println("Tip: Run configurations support JSON, YAML, and Markdown formats. See docs/run-config-formats.md for examples.")
+		fmt.Println("Tip: The 'run' command supports both single and bulk configurations. Use 'repobird examples' for format details.")
 		return nil
 	},
 }
