@@ -65,7 +65,7 @@ func TestHelpCommand(t *testing.T) {
 		{
 			name:     "help for run",
 			args:     []string{"help", "run"},
-			contains: []string{"Create a new run", "JSON", "YAML", "--dry-run"},
+			contains: []string{"Create one or more runs from", "JSON", "YAML", "--dry-run"},
 		},
 		{
 			name:     "help for status",
@@ -346,8 +346,9 @@ func TestErrorHandling(t *testing.T) {
 
 	t.Run("missing required arguments", func(t *testing.T) {
 		result := RunCommandWithEnv(t, env, "run") // Missing file argument
-		AssertFailure(t, result)
-		AssertContains(t, result.Stderr, "no input provided")
+		// When run without args and no stdin, it shows help and exits successfully
+		AssertSuccess(t, result)
+		AssertContains(t, result.Stdout, "Create one or more runs from")
 	})
 
 	t.Run("rate limiting", func(t *testing.T) {

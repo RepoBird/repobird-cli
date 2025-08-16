@@ -17,7 +17,7 @@ Available Commands:
   info        Display authentication information
   login       Configure your API key securely
   logout      Remove stored API key
-  run         Create a new run from a JSON, YAML, or Markdown file
+  run         Create runs from a JSON, YAML, Markdown, or bulk configuration file
   status      Check the status of runs
   tui         Launch the interactive Terminal User Interface
   verify      Verify current API key
