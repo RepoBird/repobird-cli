@@ -35,14 +35,7 @@ func (d *DashboardView) truncateString(s string, maxWidth int) string {
 
 // getRepositoryStatusIcon returns an icon based on repository status
 func (d *DashboardView) getRepositoryStatusIcon(repo *models.Repository) string {
-	if repo.RunCounts.Running > 0 {
-		return "🔄"
-	} else if repo.RunCounts.Failed > 0 {
-		return "❌"
-	} else if repo.RunCounts.Completed > 0 {
-		return "✅"
-	}
-	return "⚪"
+	return "📁"
 }
 
 // getRunStatusIcon returns an icon based on run status
