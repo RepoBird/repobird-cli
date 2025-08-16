@@ -8,10 +8,10 @@ export
 # Variables
 BINARY_NAME=repobird
 MAIN_PATH=./cmd/repobird
-VERSION=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+VERSION=$(shell cat VERSION 2>/dev/null || echo "0.1.0")
 COMMIT=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 DATE=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
-LDFLAGS=-ldflags "-s -w -X github.com/repobird/repobird-cli/pkg/version.Version=$(VERSION) -X github.com/repobird/repobird-cli/pkg/version.GitCommit=$(COMMIT) -X github.com/repobird/repobird-cli/pkg/version.BuildDate=$(DATE)"
+LDFLAGS=-ldflags "-s -w -X github.com/repobird/repobird-cli/pkg/version.Version=v$(VERSION) -X github.com/repobird/repobird-cli/pkg/version.GitCommit=$(COMMIT) -X github.com/repobird/repobird-cli/pkg/version.BuildDate=$(DATE)"
 
 # Environment variables for development vs production
 DEV_ENV=REPOBIRD_ENV=dev
@@ -345,6 +345,27 @@ version:
 	@echo "Version: $(VERSION)"
 	@echo "Commit:  $(COMMIT)"
 	@echo "Date:    $(DATE)"
+
+## bump-patch: Bump patch version (0.0.X)
+bump-patch:
+	@CURRENT=$$(cat VERSION); \
+	NEW=$$(echo $$CURRENT | awk -F. '{print $$1"."$$2"."$$3+1}'); \
+	echo $$NEW > VERSION; \
+	echo "Version bumped: $$CURRENT → $$NEW"
+
+## bump-minor: Bump minor version (0.X.0)
+bump-minor:
+	@CURRENT=$$(cat VERSION); \
+	NEW=$$(echo $$CURRENT | awk -F. '{print $$1"."$$2+1".0"}'); \
+	echo $$NEW > VERSION; \
+	echo "Version bumped: $$CURRENT → $$NEW"
+
+## bump-major: Bump major version (X.0.0)
+bump-major:
+	@CURRENT=$$(cat VERSION); \
+	NEW=$$(echo $$CURRENT | awk -F. '{print $$1+1".0.0"}'); \
+	echo $$NEW > VERSION; \
+	echo "Version bumped: $$CURRENT → $$NEW"
 
 # Shortcuts
 b: build

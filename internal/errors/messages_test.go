@@ -18,7 +18,7 @@ func TestParseAPIError(t *testing.T) {
 			statusCode: 400,
 			body:       []byte(`{"code":"NO_RUNS_REMAINING","message":"No runs remaining","details":{"tier":"Free","limit":10,"remaining":0}}`),
 			wantType:   "*errors.QuotaError",
-			wantMsg:    "no runs remaining (Tier: Free, Limit: 10/month). Upgrade at: https://repobird.ai/dashboard",
+			wantMsg:    "no runs remaining (Tier: Free, Limit: 10/month). Upgrade at: https://repobird.ai/pricing",
 		},
 		{
 			name:       "auth error with JSON response",

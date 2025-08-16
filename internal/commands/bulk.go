@@ -225,12 +225,19 @@ func runBulk(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("bulk submission timed out after 5 minutes. The server may still be processing your runs.\nTry checking the status later with 'repobird status'")
 		}
 
-		// Check if this is a 403 error which might indicate duplicate runs
+		// Check if this is a 403 error which might indicate duplicate runs or quota issues
 		var authErr *errors.AuthError
-		if stderrors.As(err, &authErr) && !bulkConfig.Force {
-			// Suggest using --force flag for duplicate issues
+		if stderrors.As(err, &authErr) {
 			errMsg := errors.FormatUserError(err)
-			return fmt.Errorf("%s\n\nIf you're seeing duplicate run errors, try using the --force flag to bypass duplicate detection", errMsg)
+			// Check for quota-related messages
+			if strings.Contains(strings.ToLower(errMsg), "insufficient run") || 
+			   strings.Contains(strings.ToLower(errMsg), "no runs remaining") {
+				return fmt.Errorf("%s\n\nUpgrade your plan at %s", errMsg, config.GetPricingURL())
+			}
+			// For other 403 errors, just return the error message
+			if !bulkConfig.Force {
+				return fmt.Errorf("%s", errMsg)
+			}
 		}
 		return fmt.Errorf("%s", errors.FormatUserError(err))
 	}
@@ -265,9 +272,9 @@ func runBulk(cmd *cobra.Command, args []string) error {
 			}
 		}
 
-		// Suggest using --force if duplicates detected and not already forcing
+		// Note: Duplicates detected (no longer suggesting --force as it's deprecated)
 		if hasDuplicates && !bulkConfig.Force {
-			fmt.Println("\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("14")).Render("💡 Tip: Use --force to bypass duplicate detection and re-run these tasks"))
+			// Duplicate detection is informational only
 		}
 	} else {
 		// All runs created successfully

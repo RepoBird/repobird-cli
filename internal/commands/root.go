@@ -3,6 +3,7 @@ package commands
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -19,13 +20,14 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "repobird",
-	Short: "CLI and TUI for RepoBird.ai - trigger AI coding agents and manage runs",
-	Long: `CLI and TUI (Terminal User Interface) for RepoBird.ai - trigger AI coding agents,
+	Use:     "repobird",
+	Short:   "CLI and TUI for RepoBird.ai - trigger AI coding agents and manage runs",
+	Version: version.GetBuildInfo(),
+	Long: fmt.Sprintf(`CLI and TUI (Terminal User Interface) for RepoBird.ai - trigger AI coding agents,
 submit batch runs, and monitor your AI agent runs through an interactive dashboard.
 
-Base URL: https://repobird.ai
-Get API Key: https://repobird.ai/dashboard/user-profile/api-keys`,
+Base URL: %s
+Get API Key: %s`, config.GetURLs().BaseURL, config.GetAPIKeysURL()),
 	PersistentPreRunE: func(_ *cobra.Command, _ []string) error {
 		var err error
 		cfg, err = config.LoadSecureConfig()
@@ -51,10 +53,10 @@ func Execute() {
 		fmt.Fprintf(os.Stderr, "Error: %s\n", errorMsg)
 
 		// Add helpful hints for common errors
-		if errors.IsAuthError(err) {
+		if errors.IsQuotaExceeded(err) || strings.Contains(strings.ToLower(errorMsg), "no runs remaining") {
+			fmt.Fprintf(os.Stderr, "\nHint: Upgrade your plan at %s\n", config.GetPricingURL())
+		} else if errors.IsAuthError(err) && !strings.Contains(strings.ToLower(errorMsg), "no runs remaining") {
 			fmt.Fprintf(os.Stderr, "\nHint: Run 'repobird config set api-key YOUR_API_KEY' to configure authentication\n")
-		} else if errors.IsQuotaExceeded(err) {
-			fmt.Fprintf(os.Stderr, "\nHint: Check your usage at https://repobird.ai/dashboard\n")
 		} else if errors.IsNetworkError(err) {
 			fmt.Fprintf(os.Stderr, "\nHint: Check your internet connection and try again\n")
 		}
@@ -64,9 +66,15 @@ func Execute() {
 }
 
 func init() {
+	// Set custom version template to show just the version info
+	rootCmd.SetVersionTemplate(version.GetBuildInfo() + "\n")
+	
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.repobird/config.yaml)")
 	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "enable debug output")
 	rootCmd.PersistentFlags().BoolVar(&debugUser, "debug-user", false, "enable debug user mode with mock data")
+	
+	// Add -v as shorthand for --version
+	rootCmd.Flags().BoolP("version", "v", false, "version for repobird")
 
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(runCmd)
@@ -81,8 +89,9 @@ func init() {
 }
 
 var versionCmd = &cobra.Command{
-	Use:   "version",
-	Short: "Print version information",
+	Use:     "version",
+	Aliases: []string{"v"},
+	Short:   "Print version information",
 	Run: func(_ *cobra.Command, _ []string) {
 		fmt.Println(version.GetBuildInfo())
 	},

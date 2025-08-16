@@ -5,26 +5,26 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	
+	"github.com/repobird/repobird-cli/internal/config"
 )
 
-const (
-	DashboardURL = "https://repobird.ai/dashboard"
-	ReposURL     = "https://repobird.ai/repos"
-	SettingsURL  = "https://repobird.ai/settings/api"
-)
-
-var StatusMessages = map[string]string{
-	"NO_RUNS_REMAINING":   "You've used all your available runs. Upgrade your plan at " + DashboardURL,
-	"REPO_NOT_FOUND":      "Repository not found or not connected. Please connect it at " + ReposURL,
-	"INVALID_API_KEY":     "Invalid API key. Get a new one at " + SettingsURL,
-	"RATE_LIMIT_EXCEEDED": "Rate limit exceeded. Please wait before retrying",
-	"SERVER_ERROR":        "RepoBird servers are experiencing issues. Please try again later",
-	"UNAUTHORIZED":        "You don't have permission to access this resource",
-	"FORBIDDEN":           "Access to this resource is forbidden",
-	"TIMEOUT":             "Request timed out. The operation may still be processing",
-	"NETWORK_ERROR":       "Network connectivity issue. Please check your connection",
-	"VALIDATION_ERROR":    "Invalid input provided. Please check your request",
-	"QUOTA_EXCEEDED":      "You have exceeded your quota limits",
+// GetStatusMessages returns status messages with dynamic URLs
+func GetStatusMessages() map[string]string {
+	urls := config.GetURLs()
+	return map[string]string{
+		"NO_RUNS_REMAINING":   "You've used all your available runs. Upgrade your plan at " + urls.PricingURL,
+		"REPO_NOT_FOUND":      "Repository not found or not connected. Please connect it at " + urls.ReposURL,
+		"INVALID_API_KEY":     "Invalid API key. Get a new one at " + urls.SettingsURL,
+		"RATE_LIMIT_EXCEEDED": "Rate limit exceeded. Please wait before retrying",
+		"SERVER_ERROR":        "RepoBird servers are experiencing issues. Please try again later",
+		"UNAUTHORIZED":        "You don't have permission to access this resource",
+		"FORBIDDEN":           "Access to this resource is forbidden",
+		"TIMEOUT":             "Request timed out. The operation may still be processing",
+		"NETWORK_ERROR":       "Network connectivity issue. Please check your connection",
+		"VALIDATION_ERROR":    "Invalid input provided. Please check your request",
+		"QUOTA_EXCEEDED":      "You have exceeded your quota limits. Upgrade at " + urls.PricingURL,
+	}
 }
 
 type APIErrorResponse struct {
@@ -75,20 +75,20 @@ func createErrorFromAPIResponse(statusCode int, apiErr APIErrorResponse) error {
 			Tier:          tier,
 			Limit:         limit,
 			RemainingRuns: remaining,
-			UpgradeURL:    DashboardURL,
+			UpgradeURL:    config.GetPricingURL(),
 		}
 
 	case "INVALID_API_KEY", "UNAUTHORIZED":
 		return &AuthError{
-			Message: StatusMessages["INVALID_API_KEY"],
+			Message: GetStatusMessages()["INVALID_API_KEY"],
 			Reason:  apiErr.Code,
 		}
 
 	case "REPO_NOT_FOUND":
-		message := StatusMessages["REPO_NOT_FOUND"]
+		message := GetStatusMessages()["REPO_NOT_FOUND"]
 		if apiErr.Details != nil {
 			if repo, ok := apiErr.Details["repository"].(string); ok {
-				message = fmt.Sprintf("Repository '%s' not found or not connected. Connect it at: %s", repo, ReposURL)
+				message = fmt.Sprintf("Repository '%s' not found or not connected. Connect it at: %s", repo, config.GetURLs().ReposURL)
 			}
 		}
 		return &APIError{
@@ -138,7 +138,7 @@ func createErrorFromStatusCode(statusCode int, message string) error {
 	case 401:
 		errorType = ErrorTypeAuth
 		if message == "" {
-			message = StatusMessages["INVALID_API_KEY"]
+			message = GetStatusMessages()["INVALID_API_KEY"]
 		}
 		return &AuthError{
 			Message: message,
@@ -148,7 +148,7 @@ func createErrorFromStatusCode(statusCode int, message string) error {
 	case 403:
 		errorType = ErrorTypeAuth
 		if message == "" {
-			message = StatusMessages["FORBIDDEN"]
+			message = GetStatusMessages()["FORBIDDEN"]
 		}
 		return &AuthError{
 			Message: message,
@@ -164,7 +164,7 @@ func createErrorFromStatusCode(statusCode int, message string) error {
 	case 429:
 		errorType = ErrorTypeRateLimit
 		if message == "" {
-			message = StatusMessages["RATE_LIMIT_EXCEEDED"]
+			message = GetStatusMessages()["RATE_LIMIT_EXCEEDED"]
 		}
 		// Return APIError with status code for consistency
 		return &APIError{
@@ -177,13 +177,13 @@ func createErrorFromStatusCode(statusCode int, message string) error {
 	case 408:
 		errorType = ErrorTypeTimeout
 		if message == "" {
-			message = StatusMessages["TIMEOUT"]
+			message = GetStatusMessages()["TIMEOUT"]
 		}
 
 	case 422:
 		errorType = ErrorTypeValidation
 		if message == "" {
-			message = StatusMessages["VALIDATION_ERROR"]
+			message = GetStatusMessages()["VALIDATION_ERROR"]
 		}
 		return &ValidationError{
 			Message: message,
@@ -192,7 +192,7 @@ func createErrorFromStatusCode(statusCode int, message string) error {
 	case 500, 502, 503, 504:
 		errorType = ErrorTypeAPI
 		if message == "" {
-			message = StatusMessages["SERVER_ERROR"]
+			message = GetStatusMessages()["SERVER_ERROR"]
 		}
 
 	default:

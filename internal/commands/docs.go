@@ -6,26 +6,28 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/cobra/doc"
+	
+	"github.com/repobird/repobird-cli/internal/config"
 )
 
 var docsCmd = &cobra.Command{
 	Use:   "docs",
 	Short: "Generate documentation",
-	Long: `Generate documentation for the RepoBird CLI and TUI - trigger AI coding agents, submit batch runs, and monitor your AI agent runs through an interactive dashboard.
+	Long: fmt.Sprintf(`Generate documentation for the RepoBird CLI and TUI - trigger AI coding agents, submit batch runs, and monitor your AI agent runs through an interactive dashboard.
 
-Base URL: https://repobird.ai
-Get API Key: https://repobird.ai/dashboard/user-profile/api-keys`,
+Base URL: %s
+Get API Key: %s`, config.GetURLs().BaseURL, config.GetAPIKeysURL()),
 }
 
 var manCmd = &cobra.Command{
 	Use:   "man [output-dir]",
 	Short: "Generate man pages",
-	Long: `Generate man pages for RepoBird CLI commands.
+	Long: fmt.Sprintf(`Generate man pages for RepoBird CLI commands.
 
 The 'run' command supports both single and bulk configurations in JSON, YAML, and Markdown formats.
 Use 'repobird examples' to see configuration formats and generate example files.
 
-Get API Key: https://repobird.ai/dashboard/user-profile/api-keys`,
+Get API Key: %s`, config.GetAPIKeysURL()),
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		outputDir := "man"
@@ -41,7 +43,7 @@ Get API Key: https://repobird.ai/dashboard/user-profile/api-keys`,
 			Title:   "REPOBIRD",
 			Section: "1",
 			Manual:  "RepoBird CLI Manual",
-			Source:  "RepoBird.ai - https://repobird.ai/dashboard/user-profile/api-keys",
+			Source:  "RepoBird.ai - " + config.GetAPIKeysURL(),
 		}
 
 		if err := doc.GenManTree(rootCmd, header, outputDir); err != nil {
@@ -57,12 +59,12 @@ Get API Key: https://repobird.ai/dashboard/user-profile/api-keys`,
 var markdownCmd = &cobra.Command{
 	Use:   "markdown [output-dir]",
 	Short: "Generate markdown documentation",
-	Long: `Generate markdown documentation for RepoBird CLI commands.
+	Long: fmt.Sprintf(`Generate markdown documentation for RepoBird CLI commands.
 
 The 'run' command supports both single and bulk configurations in JSON, YAML, and Markdown formats.
 Use 'repobird examples' to see configuration formats and generate example files.
 
-Get API Key: https://repobird.ai/dashboard/user-profile/api-keys`,
+Get API Key: %s`, config.GetAPIKeysURL()),
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		outputDir := "docs/generated"
@@ -87,12 +89,12 @@ Get API Key: https://repobird.ai/dashboard/user-profile/api-keys`,
 var yamlCmd = &cobra.Command{
 	Use:   "yaml [output-dir]",
 	Short: "Generate YAML documentation",
-	Long: `Generate YAML documentation for RepoBird CLI commands.
+	Long: fmt.Sprintf(`Generate YAML documentation for RepoBird CLI commands.
 
 The 'run' command supports both single and bulk configurations in JSON, YAML, and Markdown formats.
 Use 'repobird examples' to see configuration formats and generate example files.
 
-Get API Key: https://repobird.ai/dashboard/user-profile/api-keys`,
+Get API Key: %s`, config.GetAPIKeysURL()),
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		outputDir := "yaml"

@@ -17,6 +17,7 @@ import (
 	"github.com/repobird/repobird-cli/internal/api/dto"
 	"github.com/repobird/repobird-cli/internal/bulk"
 	"github.com/repobird/repobird-cli/internal/cache"
+	"github.com/repobird/repobird-cli/internal/config"
 	"github.com/repobird/repobird-cli/internal/domain"
 	"github.com/repobird/repobird-cli/internal/errors"
 	"github.com/repobird/repobird-cli/internal/models"
@@ -46,8 +47,10 @@ For configuration examples and field descriptions:
   repobird examples                         # View all examples
   repobird examples generate run -o task.json
   repobird examples generate bulk -o tasks.json`,
-	Args: cobra.MaximumNArgs(1),
-	RunE: runCommand,
+	Args:          cobra.MaximumNArgs(1),
+	RunE:          runCommand,
+	SilenceErrors: true,
+	SilenceUsage:  false,  // Let Cobra show usage for arg/flag errors
 }
 
 func init() {
@@ -56,6 +59,9 @@ func init() {
 }
 
 func runCommand(cmd *cobra.Command, args []string) error {
+	// For execution errors (not arg/flag errors), suppress usage
+	cmd.SilenceUsage = true
+	
 	if cfg.APIKey == "" {
 		return errors.NoAPIKeyError()
 	}
@@ -420,12 +426,19 @@ func executeBulkRuns(bulkConfig *bulk.BulkConfig) error {
 			return fmt.Errorf("bulk submission timed out after 5 minutes. The server may still be processing your runs.\nTry checking the status later with 'repobird status'")
 		}
 
-		// Check if this is a 403 error which might indicate duplicate runs
+		// Check if this is a 403 error which might indicate duplicate runs or quota issues
 		var authErr *errors.AuthError
-		if netstderrors.As(err, &authErr) && !bulkConfig.Force {
-			// Suggest using --force flag for duplicate issues
+		if netstderrors.As(err, &authErr) {
 			errMsg := errors.FormatUserError(err)
-			return fmt.Errorf("%s\n\nIf you're seeing duplicate run errors, try using the --force flag to bypass duplicate detection", errMsg)
+			// Check for quota-related messages
+			if strings.Contains(strings.ToLower(errMsg), "insufficient run") || 
+			   strings.Contains(strings.ToLower(errMsg), "no runs remaining") {
+				return fmt.Errorf("%s\n\nUpgrade your plan at %s", errMsg, config.GetPricingURL())
+			}
+			// For other 403 errors, just return the error message
+			if !bulkConfig.Force {
+				return fmt.Errorf("%s", errMsg)
+			}
 		}
 		return fmt.Errorf("%s", errors.FormatUserError(err))
 	}
@@ -460,9 +473,9 @@ func executeBulkRuns(bulkConfig *bulk.BulkConfig) error {
 			}
 		}
 
-		// Suggest using --force if duplicates detected and not already forcing
+		// Note: Duplicates detected (no longer suggesting --force as it's deprecated)
 		if hasDuplicates && !bulkConfig.Force {
-			fmt.Println("\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("14")).Render("💡 Tip: Use --force to bypass duplicate detection and re-run these tasks"))
+			// Duplicate detection is informational only
 		}
 	} else {
 		// All runs created successfully

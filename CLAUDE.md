@@ -142,6 +142,11 @@ Large views split for maintainability:
 - Always use `errors.FormatUserError()` for CLI output
 - `IsRetryable()`, `IsAuthError()` for error type checking
 
+#### URL Management
+- `internal/config/urls.go` - Centralized RepoBird URLs
+- Adapts URLs based on `REPOBIRD_API_URL` environment
+- Pricing URL shown for quota errors
+
 #### Testing Patterns
 - Mock API: `internal/api/mock_client.go`
 - Cache isolation: `t.Setenv("XDG_CONFIG_HOME", tmpDir)`
@@ -218,6 +223,7 @@ When making changes to Go application code:
 - **Cache**: `internal/tui/cache/simple_cache.go` (main interface)
 - **Components**: `internal/tui/components/` (reusable UI elements)
 - **Config**: `internal/config/manager.go` (settings management)
+- **URLs**: `internal/config/urls.go` (dynamic URL management)
 - **Retry Logic**: `internal/retry/retry.go` (exponential backoff)
 
 ### When Debugging

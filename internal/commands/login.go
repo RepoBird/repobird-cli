@@ -94,7 +94,7 @@ The key will be stored in your system keyring when available,
 or in an encrypted file as a fallback.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fmt.Println("Welcome to RepoBird CLI!")
-		fmt.Println("Get your API key at: https://repobird.ai/dashboard/user-profile/api-keys")
+		fmt.Printf("Get your API key at: %s\n", config.GetAPIKeysURL())
 		fmt.Println()
 
 		// Check if API key is provided as argument (for CI/CD)

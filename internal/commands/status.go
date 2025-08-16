@@ -27,8 +27,9 @@ var (
 )
 
 var statusCmd = &cobra.Command{
-	Use:   "status [run-id]",
-	Short: "Check the status of runs",
+	Use:     "status [run-id]",
+	Aliases: []string{"st"},
+	Short:   "Check the status of runs",
 	Long: `Check the status of a specific run or list all runs.
 If no run ID is provided, lists recent runs.`,
 	Args: cobra.MaximumNArgs(1),
