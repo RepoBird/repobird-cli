@@ -255,11 +255,11 @@ func (v *BulkResultsView) handleRunKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return v, nil
 
 	case key.Matches(msg, v.keys.PageUp):
-		v.viewport.HalfViewUp()
+		v.viewport.HalfPageUp()
 		return v, nil
 
 	case key.Matches(msg, v.keys.PageDown):
-		v.viewport.HalfViewDown()
+		v.viewport.HalfPageDown()
 		return v, nil
 
 	case key.Matches(msg, v.keys.Tab):

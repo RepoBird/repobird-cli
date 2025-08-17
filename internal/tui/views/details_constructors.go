@@ -211,11 +211,9 @@ func NewRunDetailsViewWithDashboardState(
 	_ = defaultCache.LoadFromDisk()
 
 	// Store parent cache data
-	if parentDetailsCache != nil {
-		for _, runData := range parentDetailsCache {
-			if runData != nil {
-				defaultCache.SetRun(*runData)
-			}
+	for _, runData := range parentDetailsCache {
+		if runData != nil {
+			defaultCache.SetRun(*runData)
 		}
 	}
 
@@ -258,11 +256,9 @@ func NewRunDetailsViewWithCacheAndDimensions(
 	_ = viewCache.LoadFromDisk()
 
 	// Store parent cache data
-	if parentDetailsCache != nil {
-		for _, runData := range parentDetailsCache {
-			if runData != nil {
-				viewCache.SetRun(*runData)
-			}
+	for _, runData := range parentDetailsCache {
+		if runData != nil {
+			viewCache.SetRun(*runData)
 		}
 	}
 
@@ -307,11 +303,9 @@ func NewRunDetailsViewWithCache(
 	}
 
 	// Store parent cache data
-	if parentDetailsCache != nil {
-		for _, runData := range parentDetailsCache {
-			if runData != nil {
-				viewCache.SetRun(*runData)
-			}
+	for _, runData := range parentDetailsCache {
+		if runData != nil {
+			viewCache.SetRun(*runData)
 		}
 	}
 

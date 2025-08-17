@@ -416,7 +416,6 @@ func ParseJSONFromStdinWithPrompts() (*models.RunConfig, *prompts.ValidationProm
 	return runConfig, promptHandler, nil
 }
 
-
 // findUnsupportedJSONFieldsForStdinWithSuggestions identifies fields and returns suggestions
 func findUnsupportedJSONFieldsForStdinWithSuggestions(data map[string]interface{}) ([]string, map[string]string) {
 	supportedFields := map[string]bool{

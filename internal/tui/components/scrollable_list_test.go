@@ -298,7 +298,7 @@ func TestScrollableListScrolling(t *testing.T) {
 	// Page up
 	msg = tea.KeyMsg{Type: tea.KeyPgUp}
 	model, _ = list.Update(msg)
-	list = model.(*ScrollableList)
+	_ = model.(*ScrollableList)
 }
 
 func TestScrollableListFocusManagement(t *testing.T) {

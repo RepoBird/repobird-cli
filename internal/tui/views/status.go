@@ -493,7 +493,12 @@ func (s *StatusView) initializeStatusFields() {
 		}
 
 		// Account tier
-		tierDisplay := strings.Title(strings.ToLower(s.userInfo.Tier))
+		// Simple title case - capitalize first letter
+		tierLower := strings.ToLower(s.userInfo.Tier)
+		tierDisplay := tierLower
+		if len(tierLower) > 0 {
+			tierDisplay = strings.ToUpper(tierLower[:1]) + tierLower[1:]
+		}
 		if tierDisplay == "" {
 			tierDisplay = "Basic"
 		}

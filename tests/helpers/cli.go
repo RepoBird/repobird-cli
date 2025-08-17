@@ -96,20 +96,20 @@ func SetupTestEnvironment(t *testing.T) (cleanup func()) {
 	origAPIKey := os.Getenv(config.EnvAPIKey)
 	origAPIURL := os.Getenv(config.EnvAPIURL)
 
-	os.Setenv("HOME", tempDir)
-	os.Unsetenv(config.EnvAPIKey)
-	os.Unsetenv(config.EnvAPIURL)
+	_ = os.Setenv("HOME", tempDir)
+	_ = os.Unsetenv(config.EnvAPIKey)
+	_ = os.Unsetenv(config.EnvAPIURL)
 
 	return func() {
-		os.RemoveAll(tempDir)
+		_ = os.RemoveAll(tempDir)
 		if origHome != "" {
-			os.Setenv("HOME", origHome)
+			_ = os.Setenv("HOME", origHome)
 		}
 		if origAPIKey != "" {
-			os.Setenv(config.EnvAPIKey, origAPIKey)
+			_ = os.Setenv(config.EnvAPIKey, origAPIKey)
 		}
 		if origAPIURL != "" {
-			os.Setenv(config.EnvAPIURL, origAPIURL)
+			_ = os.Setenv(config.EnvAPIURL, origAPIURL)
 		}
 	}
 }

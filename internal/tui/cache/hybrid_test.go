@@ -451,7 +451,7 @@ func TestHybridCache_OldStuckRunRouting(t *testing.T) {
 	defer func() { _ = cache2.Close() }()
 
 	// Old run should persist (from permanent cache)
-	cached, found = cache2.GetRun("old-stuck")
+	_, found = cache2.GetRun("old-stuck")
 	assert.True(t, found, "old stuck run should persist")
 
 	// Recent run should not persist (was only in session cache)

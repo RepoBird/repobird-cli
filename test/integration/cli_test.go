@@ -480,7 +480,7 @@ func TestExamplesGenerate(t *testing.T) {
 	t.Run("generate json example", func(t *testing.T) {
 		result := RunCommand(t, "examples", "generate", "run", "-f", "json")
 		AssertSuccess(t, result)
-		
+
 		// Extract JSON from output (skip the description line)
 		lines := strings.Split(result.Stdout, "\n")
 		var jsonStart int
@@ -490,19 +490,19 @@ func TestExamplesGenerate(t *testing.T) {
 				break
 			}
 		}
-		
+
 		if jsonStart == 0 {
 			t.Fatal("Could not find JSON in output")
 		}
-		
+
 		jsonContent := strings.Join(lines[jsonStart:], "\n")
-		
+
 		// Output should be valid JSON
 		var data map[string]interface{}
 		if err := json.Unmarshal([]byte(jsonContent), &data); err != nil {
 			t.Errorf("Generated JSON is not valid: %v\nContent: %s", err, jsonContent)
 		}
-		
+
 		// Check required fields
 		if _, ok := data["repository"]; !ok {
 			t.Error("Generated JSON missing required 'repository' field")
@@ -515,7 +515,7 @@ func TestExamplesGenerate(t *testing.T) {
 	t.Run("generate yaml example", func(t *testing.T) {
 		result := RunCommand(t, "examples", "generate", "run", "-f", "yaml")
 		AssertSuccess(t, result)
-		
+
 		// Check that output contains required YAML fields
 		if !strings.Contains(result.Stdout, "repository:") {
 			t.Error("Generated YAML missing 'repository' field")
@@ -528,7 +528,7 @@ func TestExamplesGenerate(t *testing.T) {
 	t.Run("generate markdown example", func(t *testing.T) {
 		result := RunCommand(t, "examples", "generate", "run", "-f", "md")
 		AssertSuccess(t, result)
-		
+
 		// Skip the description line and check for markdown frontmatter
 		lines := strings.Split(result.Stdout, "\n")
 		var mdStart int
@@ -538,12 +538,12 @@ func TestExamplesGenerate(t *testing.T) {
 				break
 			}
 		}
-		
+
 		if mdStart == 0 {
 			t.Error("Generated markdown missing frontmatter")
 			return
 		}
-		
+
 		mdContent := strings.Join(lines[mdStart:], "\n")
 		if !strings.HasPrefix(mdContent, "---\n") {
 			t.Error("Generated markdown missing frontmatter delimiter")
@@ -556,7 +556,7 @@ func TestExamplesGenerate(t *testing.T) {
 	t.Run("generate minimal example", func(t *testing.T) {
 		result := RunCommand(t, "examples", "generate", "minimal", "-f", "json")
 		AssertSuccess(t, result)
-		
+
 		// Extract JSON from output
 		lines := strings.Split(result.Stdout, "\n")
 		var jsonStart int
@@ -566,19 +566,19 @@ func TestExamplesGenerate(t *testing.T) {
 				break
 			}
 		}
-		
+
 		if jsonStart == 0 {
 			t.Fatal("Could not find JSON in output")
 		}
-		
+
 		jsonContent := strings.Join(lines[jsonStart:], "\n")
-		
+
 		// Output should be valid JSON with only required fields
 		var data map[string]interface{}
 		if err := json.Unmarshal([]byte(jsonContent), &data); err != nil {
 			t.Errorf("Generated minimal JSON is not valid: %v\nContent: %s", err, jsonContent)
 		}
-		
+
 		// Should have exactly 2 fields (repository and prompt)
 		if len(data) != 2 {
 			t.Errorf("Minimal example should have exactly 2 fields, got %d", len(data))
@@ -588,7 +588,7 @@ func TestExamplesGenerate(t *testing.T) {
 	t.Run("generate bulk example", func(t *testing.T) {
 		result := RunCommand(t, "examples", "generate", "bulk")
 		AssertSuccess(t, result)
-		
+
 		// Find where JSON starts (after comment lines)
 		lines := strings.Split(result.Stdout, "\n")
 		var jsonStart int
@@ -599,11 +599,11 @@ func TestExamplesGenerate(t *testing.T) {
 				break
 			}
 		}
-		
+
 		if jsonStart == 0 {
 			t.Fatal("Could not find JSON in bulk output")
 		}
-		
+
 		// Extract just the JSON part
 		var jsonLines []string
 		for i := jsonStart; i < len(lines); i++ {
@@ -614,13 +614,13 @@ func TestExamplesGenerate(t *testing.T) {
 			}
 		}
 		jsonContent := strings.Join(jsonLines, "\n")
-		
+
 		// Output should be valid JSON with runs array
 		var data map[string]interface{}
 		if err := json.Unmarshal([]byte(jsonContent), &data); err != nil {
 			t.Errorf("Generated bulk JSON is not valid: %v\nContent: %s", err, jsonContent)
 		}
-		
+
 		// Check for runs array
 		runs, ok := data["runs"].([]interface{})
 		if !ok {
@@ -636,21 +636,21 @@ func TestExamplesGenerate(t *testing.T) {
 		// Create temp directory for test
 		tempDir := t.TempDir()
 		outputPath := filepath.Join(tempDir, "test-config.json")
-		
+
 		result := RunCommand(t, "examples", "generate", "minimal", "-o", outputPath)
 		AssertSuccess(t, result)
-		
+
 		// Check file was created
 		if _, err := os.Stat(outputPath); os.IsNotExist(err) {
 			t.Errorf("Output file was not created: %s", outputPath)
 		}
-		
+
 		// Check file contents
 		content, err := os.ReadFile(outputPath)
 		if err != nil {
 			t.Errorf("Failed to read output file: %v", err)
 		}
-		
+
 		var data map[string]interface{}
 		if err := json.Unmarshal(content, &data); err != nil {
 			t.Errorf("Output file contains invalid JSON: %v", err)

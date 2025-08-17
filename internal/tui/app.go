@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/repobird/repobird-cli/internal/api"
@@ -130,8 +129,6 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// Otherwise delegate to current view
 	// Skip debug logging for spinner messages (too spammy)
-	if _, isSpinner := msg.(spinner.TickMsg); !isSpinner {
-	}
 	newModel, cmd := a.current.Update(msg)
 
 	// Check if the model changed (old pattern - view created child)
@@ -481,7 +478,6 @@ func (a *App) processKeyWithFiltering(keyMsg tea.KeyMsg) (handled bool, model te
 			// View provided custom handling - return the app as the model so commands work
 			return true, a, cmd
 		}
-	} else {
 	}
 
 	// Get the default action for this key from registry

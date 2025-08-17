@@ -345,7 +345,7 @@ func TestGitFunctions_ErrorConditions(t *testing.T) {
 				originalWd, _ := os.Getwd()
 				defer func() { _ = os.Chdir(originalWd) }()
 
-				os.Chdir(tempDir)
+				_ = os.Chdir(tempDir)
 				_, err = DetectRepository()
 				return err
 			},
@@ -362,7 +362,7 @@ func TestGitFunctions_ErrorConditions(t *testing.T) {
 				originalWd, _ := os.Getwd()
 				defer func() { _ = os.Chdir(originalWd) }()
 
-				os.Chdir(tempDir)
+				_ = os.Chdir(tempDir)
 				_, err = GetCurrentBranch()
 				return err
 			},
@@ -407,7 +407,7 @@ func createTempGitRepo(t *testing.T) string {
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
-		os.RemoveAll(tempDir)
+		_ = os.RemoveAll(tempDir)
 	})
 
 	// Initialize git repository
@@ -421,11 +421,11 @@ func createTempGitRepo(t *testing.T) string {
 	// Configure git user (required for commits)
 	cmd = exec.Command("git", "config", "user.name", "Test User")
 	cmd.Dir = tempDir
-	cmd.Run() // Ignore errors
+	_ = cmd.Run() // Ignore errors
 
 	cmd = exec.Command("git", "config", "user.email", "test@example.com")
 	cmd.Dir = tempDir
-	cmd.Run() // Ignore errors
+	_ = cmd.Run() // Ignore errors
 
 	// Create initial commit
 	readmePath := filepath.Join(tempDir, "README.md")
@@ -449,7 +449,7 @@ func createTempGitRepo(t *testing.T) string {
 	// Add fake remote origin
 	cmd = exec.Command("git", "remote", "add", "origin", "git@github.com:test/repo.git")
 	cmd.Dir = tempDir
-	cmd.Run() // Ignore errors - this is for testing URL parsing
+	_ = cmd.Run() // Ignore errors - this is for testing URL parsing
 
 	return tempDir
 }

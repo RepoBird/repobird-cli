@@ -7,8 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/repobird/repobird-cli/internal/tui/cache"
 	"time"
+
+	"github.com/repobird/repobird-cli/internal/tui/cache"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/repobird/repobird-cli/internal/models"

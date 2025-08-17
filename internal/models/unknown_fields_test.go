@@ -85,7 +85,7 @@ func TestFindUnsupportedJSONFields(t *testing.T) {
 			result := findUnsupportedJSONFields(test.input)
 
 			// Restore stderr and read captured output
-		_ = w.Close()
+			_ = w.Close()
 			os.Stderr = oldStderr
 			var buf bytes.Buffer
 			_, _ = buf.ReadFrom(r)

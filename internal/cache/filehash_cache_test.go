@@ -269,6 +269,7 @@ func TestFileHashCache_NewCache(t *testing.T) {
 
 	if cache == nil {
 		t.Error("NewFileHashCache should not return nil")
+		return
 	}
 
 	if cache.hashes == nil {
@@ -286,6 +287,7 @@ func TestFileHashCache_NewCacheForUser(t *testing.T) {
 
 	if cache == nil {
 		t.Error("NewFileHashCacheForUser should not return nil")
+		return
 	}
 
 	if cache.userID == nil || *cache.userID != userID {

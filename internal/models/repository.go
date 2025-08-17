@@ -33,8 +33,7 @@ const (
 
 // RepositoryAggregator provides methods for working with collections of repositories
 type RepositoryAggregator struct {
-	repositories []Repository
-	runs         []*RunResponse
+	runs []*RunResponse
 }
 
 // NewRepositoryAggregator creates a new repository aggregator

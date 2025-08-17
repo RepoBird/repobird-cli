@@ -246,10 +246,8 @@ func (h *HybridCache) SetUserInfo(info *models.UserInfo) error {
 func (h *HybridCache) InvalidateUserInfo() error {
 	// For permanent cache, we would need to implement this
 	// For now, just clear the file
-	if h.permanent != nil {
-		// This could be implemented in PermanentCache
-		// For now, we'll just overwrite with nil on next set
-	}
+	// This could be implemented in PermanentCache if needed
+	// For now, we'll just overwrite with nil on next set
 	return nil
 }
 

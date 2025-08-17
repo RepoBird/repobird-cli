@@ -108,10 +108,10 @@ func NewRunListViewWithCache(
 	// Enhanced debugging with more details
 	debugInfo := fmt.Sprintf("DEBUG: Creating RunListViewWithCache - cached=%v, runs=%d, detailsCache=%d\n",
 		cached, len(runs), len(detailsCache))
-	if runs != nil && len(runs) > 0 {
+	if len(runs) > 0 {
 		debugInfo += fmt.Sprintf("DEBUG: First run ID=%s, repo=%s\n", runs[0].GetIDString(), runs[0].Repository)
 	}
-	if detailsCache != nil && len(detailsCache) > 0 {
+	if len(detailsCache) > 0 {
 		var cacheKeys []string
 		for k := range detailsCache {
 			cacheKeys = append(cacheKeys, k)

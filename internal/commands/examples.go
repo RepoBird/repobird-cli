@@ -14,8 +14,8 @@ import (
 )
 
 var (
-	outputFile  string
-	formatType  string
+	outputFile string
+	formatType string
 )
 
 var examplesCmd = &cobra.Command{

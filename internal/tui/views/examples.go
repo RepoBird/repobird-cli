@@ -233,11 +233,11 @@ func (v *ExamplesView) handleKeyInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return v, nil
 
 	case key.Matches(msg, v.keys.PageUp):
-		v.previewViewport.LineUp(5)
+		v.previewViewport.ScrollUp(5)
 		return v, nil
 
 	case key.Matches(msg, v.keys.PageDown):
-		v.previewViewport.LineDown(5)
+		v.previewViewport.ScrollDown(5)
 		return v, nil
 
 	case key.Matches(msg, v.keys.Yank):

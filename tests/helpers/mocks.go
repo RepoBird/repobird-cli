@@ -224,9 +224,9 @@ func (m *MockAPIServer) sendResponse(w http.ResponseWriter, response MockRespons
 	// Send body
 	if response.Body != nil {
 		if bodyStr, ok := response.Body.(string); ok {
-			w.Write([]byte(bodyStr))
+			_, _ = w.Write([]byte(bodyStr))
 		} else {
-			json.NewEncoder(w).Encode(response.Body)
+			_ = json.NewEncoder(w).Encode(response.Body)
 		}
 	}
 }

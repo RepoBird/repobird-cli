@@ -57,7 +57,7 @@ func CreateTempFile(t *testing.T, pattern, content string) string {
 
 	// Register cleanup
 	t.Cleanup(func() {
-		os.Remove(tmpfile.Name())
+		_ = os.Remove(tmpfile.Name())
 	})
 
 	return tmpfile.Name()

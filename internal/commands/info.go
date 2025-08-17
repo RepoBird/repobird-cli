@@ -123,4 +123,3 @@ var infoCmd = &cobra.Command{
 		return nil
 	},
 }
-

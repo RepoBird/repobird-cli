@@ -63,7 +63,7 @@ sources: "main"
 			config, err := parseYAMLWithUnknownFields([]byte(test.yamlContent))
 
 			// Restore stderr and read captured output
-		_ = w.Close()
+			_ = w.Close()
 			os.Stderr = oldStderr
 			var buf bytes.Buffer
 			_, _ = buf.ReadFrom(r)

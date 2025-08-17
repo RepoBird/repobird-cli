@@ -252,7 +252,7 @@ func (c *SimpleCache) AddRepositoryToHistory(repo string) {
 // GetCachedList returns cached runs with details
 func (c *SimpleCache) GetCachedList() ([]models.RunResponse, bool, map[string]*models.RunResponse) {
 	runs := c.GetRuns()
-	if runs == nil || len(runs) == 0 {
+	if len(runs) == 0 {
 		return nil, false, nil
 	}
 
