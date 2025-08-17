@@ -173,16 +173,12 @@ func IsRetryable(err error) bool {
 	// Check for net.Error
 	var ne net.Error
 	if errors.As(err, &ne) {
-		return ne.Temporary() || ne.Timeout()
+		return ne.Timeout() // Temporary() is deprecated, but timeouts are still retryable
 	}
 
 	// Rate limit errors are retryable
 	var rateLimitErr *RateLimitError
-	if errors.As(err, &rateLimitErr) {
-		return true
-	}
-
-	return false
+	return errors.As(err, &rateLimitErr)
 }
 
 func IsTemporary(err error) bool {
@@ -193,7 +189,7 @@ func IsTemporary(err error) bool {
 	// Check for temporary network errors
 	var ne net.Error
 	if errors.As(err, &ne) {
-		return ne.Temporary()
+		return ne.Timeout() // Temporary() is deprecated, check for timeout instead
 	}
 
 	// Check for retryable API errors

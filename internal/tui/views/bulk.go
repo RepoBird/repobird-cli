@@ -490,10 +490,10 @@ func (v *BulkView) handleInstructionsKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return v, nil
 	case key.Matches(msg, v.keys.PageUp):
-		v.viewport.HalfViewUp()
+		v.viewport.HalfPageUp()
 		return v, nil
 	case key.Matches(msg, v.keys.PageDown):
-		v.viewport.HalfViewDown()
+		v.viewport.HalfPageDown()
 		return v, nil
 	case msg.String() == "enter" || msg.String() == " ":
 		// Handle button activation
@@ -686,10 +686,10 @@ func (v *BulkView) handleRunListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case key.Matches(msg, v.keys.PageUp):
-		v.viewport.HalfViewUp()
+		v.viewport.HalfPageUp()
 
 	case key.Matches(msg, v.keys.PageDown):
-		v.viewport.HalfViewDown()
+		v.viewport.HalfPageDown()
 
 	case key.Matches(msg, v.keys.Select), msg.String() == " ":
 		// Toggle selection for current run (only in runs mode)

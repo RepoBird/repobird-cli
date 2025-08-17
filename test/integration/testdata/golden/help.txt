@@ -28,5 +28,6 @@ Flags:
       --debug           enable debug output
       --debug-user      enable debug user mode with mock data
   -h, --help            help for repobird
+  -v, --version         version for repobird
 
 Use "repobird [command] --help" for more information about a command.

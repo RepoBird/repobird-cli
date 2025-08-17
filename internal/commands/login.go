@@ -36,7 +36,7 @@ func readMaskedInput() (string, error) {
 		if interrupted {
 			fmt.Print("\r\033[K")
 		}
-		term.Restore(int(syscall.Stdin), oldState)
+		_ = term.Restore(int(syscall.Stdin), oldState)
 		if !interrupted {
 			fmt.Println() // Only add newline if not interrupted
 		}

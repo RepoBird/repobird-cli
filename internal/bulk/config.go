@@ -212,7 +212,7 @@ func parseJSONL(path string) (*BulkConfig, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open JSONL file: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	var runs []BulkRunConfig
 	var repository string

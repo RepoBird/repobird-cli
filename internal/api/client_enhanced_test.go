@@ -75,7 +75,7 @@ func TestClient_doRequest_ErrorHandling(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", tt.contentType)
 				w.WriteHeader(tt.statusCode)
-				w.Write([]byte(tt.responseBody))
+				_, _ = w.Write([]byte(tt.responseBody))
 			}))
 			defer server.Close()
 
@@ -85,7 +85,7 @@ func TestClient_doRequest_ErrorHandling(t *testing.T) {
 			assert.NoError(t, err)
 			assert.NotNil(t, resp)
 			if resp != nil {
-				defer resp.Body.Close()
+				defer func() { _ = resp.Body.Close() }()
 			}
 			assert.Equal(t, tt.statusCode, resp.StatusCode)
 		})
@@ -95,7 +95,7 @@ func TestClient_doRequest_ErrorHandling(t *testing.T) {
 func TestClient_doRequest_DebugMode(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"success": true}`))
+		_, _ = w.Write([]byte(`{"success": true}`))
 	}))
 	defer server.Close()
 
@@ -104,7 +104,7 @@ func TestClient_doRequest_DebugMode(t *testing.T) {
 
 	resp, err := client.doRequest("GET", "/test", nil)
 	if resp != nil {
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 	}
 	assert.NoError(t, err)
 
@@ -133,7 +133,7 @@ func TestClient_CreateRun_ValidationAndEdgeCases(t *testing.T) {
 			},
 			serverResponse: func(w http.ResponseWriter, r *http.Request) {
 				var req models.RunRequest
-				json.NewDecoder(r.Body).Decode(&req)
+				_ = json.NewDecoder(r.Body).Decode(&req)
 
 				resp := models.RunResponse{
 					ID:         "run-123",
@@ -146,7 +146,7 @@ func TestClient_CreateRun_ValidationAndEdgeCases(t *testing.T) {
 					UpdatedAt:  time.Now(),
 				}
 				w.WriteHeader(http.StatusCreated)
-				json.NewEncoder(w).Encode(resp)
+				_ = json.NewEncoder(w).Encode(resp)
 			},
 			expectError: false,
 			validateResp: func(t *testing.T, resp *models.RunResponse) {
@@ -166,7 +166,7 @@ func TestClient_CreateRun_ValidationAndEdgeCases(t *testing.T) {
 			},
 			serverResponse: func(w http.ResponseWriter, r *http.Request) {
 				var req models.RunRequest
-				json.NewDecoder(r.Body).Decode(&req)
+				_ = json.NewDecoder(r.Body).Decode(&req)
 
 				assert.Equal(t, models.RunTypePlan, req.RunType)
 
@@ -175,7 +175,7 @@ func TestClient_CreateRun_ValidationAndEdgeCases(t *testing.T) {
 					Status: models.StatusQueued,
 				}
 				w.WriteHeader(http.StatusCreated)
-				json.NewEncoder(w).Encode(resp)
+				_ = json.NewEncoder(w).Encode(resp)
 			},
 			expectError: false,
 			validateResp: func(t *testing.T, resp *models.RunResponse) {
@@ -190,7 +190,7 @@ func TestClient_CreateRun_ValidationAndEdgeCases(t *testing.T) {
 			},
 			serverResponse: func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusBadRequest)
-				json.NewEncoder(w).Encode(map[string]interface{}{
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{
 					"error": map[string]interface{}{
 						"message": "Validation failed",
 						"details": map[string]string{
@@ -247,7 +247,7 @@ func TestClient_GetRun_EdgeCases(t *testing.T) {
 					UpdatedAt:   time.Now(),
 				}
 				w.WriteHeader(http.StatusOK)
-				json.NewEncoder(w).Encode(resp)
+				_ = json.NewEncoder(w).Encode(resp)
 			},
 			expectErr: false,
 			validate: func(t *testing.T, resp *models.RunResponse) {
@@ -269,7 +269,7 @@ func TestClient_GetRun_EdgeCases(t *testing.T) {
 					UpdatedAt: time.Now(),
 				}
 				w.WriteHeader(http.StatusOK)
-				json.NewEncoder(w).Encode(resp)
+				_ = json.NewEncoder(w).Encode(resp)
 			},
 			expectErr: false,
 			validate: func(t *testing.T, resp *models.RunResponse) {
@@ -282,7 +282,7 @@ func TestClient_GetRun_EdgeCases(t *testing.T) {
 			runID: "non-existent",
 			serverResp: func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusNotFound)
-				w.Write([]byte("Run not found"))
+				_, _ = w.Write([]byte("Run not found"))
 			},
 			expectErr: true,
 		},
@@ -371,7 +371,7 @@ func TestClient_ListRuns_Pagination(t *testing.T) {
 				}
 
 				w.WriteHeader(http.StatusOK)
-				json.NewEncoder(w).Encode(runs)
+				_ = json.NewEncoder(w).Encode(runs)
 			}))
 			defer server.Close()
 
@@ -407,7 +407,7 @@ func TestClient_VerifyAuth_UserInfoValidation(t *testing.T) {
 					Tier:          "pro",
 				}
 				w.WriteHeader(http.StatusOK)
-				json.NewEncoder(w).Encode(userInfo)
+				_ = json.NewEncoder(w).Encode(userInfo)
 			},
 			expectErr: false,
 			validate: func(t *testing.T, userInfo *models.UserInfo) {
@@ -427,7 +427,7 @@ func TestClient_VerifyAuth_UserInfoValidation(t *testing.T) {
 					Tier:          "free",
 				}
 				w.WriteHeader(http.StatusOK)
-				json.NewEncoder(w).Encode(userInfo)
+				_ = json.NewEncoder(w).Encode(userInfo)
 			},
 			expectErr: false,
 			validate: func(t *testing.T, userInfo *models.UserInfo) {
@@ -439,7 +439,7 @@ func TestClient_VerifyAuth_UserInfoValidation(t *testing.T) {
 			name: "Invalid API key",
 			serverResp: func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusUnauthorized)
-				json.NewEncoder(w).Encode(map[string]string{
+				_ = json.NewEncoder(w).Encode(map[string]string{
 					"error": "Invalid API key",
 				})
 			},
@@ -449,7 +449,7 @@ func TestClient_VerifyAuth_UserInfoValidation(t *testing.T) {
 			name: "Malformed response",
 			serverResp: func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
-				w.Write([]byte("invalid json"))
+				_, _ = w.Write([]byte("invalid json"))
 			},
 			expectErr: true,
 		},
@@ -483,7 +483,7 @@ func TestClient_Timeouts(t *testing.T) {
 		// Simulate slow response
 		time.Sleep(100 * time.Millisecond)
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 	}))
 	defer server.Close()
 
@@ -493,7 +493,7 @@ func TestClient_Timeouts(t *testing.T) {
 
 	resp, err := client.doRequest("GET", "/timeout", nil)
 	if resp != nil {
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 	}
 	// Should timeout
 	assert.Error(t, err)
@@ -511,7 +511,7 @@ func TestClient_RequestHeaders(t *testing.T) {
 		assert.Contains(t, r.Header.Get("User-Agent"), "repobird-cli")
 
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 	}))
 	defer server.Close()
 
@@ -520,7 +520,7 @@ func TestClient_RequestHeaders(t *testing.T) {
 	// Test with POST request (should have Content-Type)
 	resp, err := client.doRequest("POST", "/test", map[string]bool{"test": true})
 	if resp != nil && resp.Body != nil {
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 	}
 	assert.NoError(t, err)
 }

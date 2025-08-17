@@ -145,9 +145,9 @@ func TestGenerateRepoBirdURL(t *testing.T) {
 	originalEnv := os.Getenv("REPOBIRD_ENV")
 	defer func() {
 		if originalEnv != "" {
-			os.Setenv("REPOBIRD_ENV", originalEnv)
+			_ = os.Setenv("REPOBIRD_ENV", originalEnv)
 		} else {
-			os.Unsetenv("REPOBIRD_ENV")
+			_ = os.Unsetenv("REPOBIRD_ENV")
 		}
 	}()
 
@@ -180,9 +180,9 @@ func TestGenerateRepoBirdURL(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set environment for this test
 			if tt.env != "" {
-				os.Setenv("REPOBIRD_ENV", tt.env)
+				_ = os.Setenv("REPOBIRD_ENV", tt.env)
 			} else {
-				os.Unsetenv("REPOBIRD_ENV")
+				_ = os.Unsetenv("REPOBIRD_ENV")
 			}
 
 			result := GenerateRepoBirdURL(tt.runID)
@@ -198,9 +198,9 @@ func TestGetRepoBirdBaseURL(t *testing.T) {
 	originalEnv := os.Getenv("REPOBIRD_ENV")
 	defer func() {
 		if originalEnv != "" {
-			os.Setenv("REPOBIRD_ENV", originalEnv)
+			_ = os.Setenv("REPOBIRD_ENV", originalEnv)
 		} else {
-			os.Unsetenv("REPOBIRD_ENV")
+			_ = os.Unsetenv("REPOBIRD_ENV")
 		}
 	}()
 
@@ -223,9 +223,9 @@ func TestGetRepoBirdBaseURL(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set environment for this test
 			if tt.env != "" {
-				os.Setenv("REPOBIRD_ENV", tt.env)
+				_ = os.Setenv("REPOBIRD_ENV", tt.env)
 			} else {
-				os.Unsetenv("REPOBIRD_ENV")
+				_ = os.Unsetenv("REPOBIRD_ENV")
 			}
 
 			result := getRepoBirdBaseURL()

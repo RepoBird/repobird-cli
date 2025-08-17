@@ -1,4 +1,4 @@
-{"repository": "support-rb/test-ruby", "prompt": "Create a text file called 'log.txt' in the root directory. The file should contain: 'Log file created'", "title": "Create log file", "target": "feature/log-file"}
-{"repository": "support-rb/test-ruby", "prompt": "Create a text file called 'config.txt' in the root directory. The file should contain: 'Config: default'", "title": "Create config file", "target": "feature/config-file"}
-{"repository": "support-rb/test-ruby", "prompt": "Create a text file called 'readme.txt' in the root directory. The file should contain: 'Simple readme file'", "title": "Create readme file", "target": "feature/readme-file"}
-{"repository": "support-rb/test-ruby", "prompt": "Create a text file called 'test.txt' in the root directory. The file should contain: 'Test file for RepoBird'", "title": "Create test file", "target": "feature/test-file"}
+{"repository": "ownerName/repoName", "prompt": "Create a text file called 'log.txt' in the root directory. The file should contain: 'Log file created'", "title": "Create log file", "target": "feature/log-file"}
+{"repository": "ownerName/repoName", "prompt": "Create a text file called 'config.txt' in the root directory. The file should contain: 'Config: default'", "title": "Create config file", "target": "feature/config-file"}
+{"repository": "ownerName/repoName", "prompt": "Create a text file called 'readme.txt' in the root directory. The file should contain: 'Simple readme file'", "title": "Create readme file", "target": "feature/readme-file"}
+{"repository": "ownerName/repoName", "prompt": "Create a text file called 'test.txt' in the root directory. The file should contain: 'Test file for RepoBird'", "title": "Create test file", "target": "feature/test-file"}

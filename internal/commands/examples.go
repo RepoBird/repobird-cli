@@ -16,8 +16,6 @@ import (
 var (
 	outputFile  string
 	formatType  string
-	exampleType string
-	interactive bool
 )
 
 var examplesCmd = &cobra.Command{

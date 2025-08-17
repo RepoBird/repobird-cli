@@ -16,7 +16,6 @@ type HybridCache struct {
 	permanent *PermanentCache
 	session   *SessionCache
 	userID    string
-	mu        sync.RWMutex
 }
 
 // NewHybridCache creates a new hybrid cache for the specified user

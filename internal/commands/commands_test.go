@@ -79,11 +79,11 @@ func TestRunCommand_Execute(t *testing.T) {
 			// Set up temporary directory
 			tempDir, err := os.MkdirTemp("", "run-cmd-test-*")
 			require.NoError(t, err)
-			defer os.RemoveAll(tempDir)
+			defer func() { _ = os.RemoveAll(tempDir) }()
 
 			originalWd, err := os.Getwd()
 			require.NoError(t, err)
-			defer os.Chdir(originalWd)
+			defer func() { _ = os.Chdir(originalWd) }()
 
 			err = os.Chdir(tempDir)
 			require.NoError(t, err)
@@ -407,12 +407,12 @@ func TestParseTaskFile(t *testing.T) {
 			// Create temporary file
 			tempFile, err := os.CreateTemp("", "task-*.json")
 			require.NoError(t, err)
-			defer os.Remove(tempFile.Name())
+			defer func() { _ = os.Remove(tempFile.Name()) }()
 
 			// Write content
 			_, err = tempFile.WriteString(tt.content)
 			require.NoError(t, err)
-			tempFile.Close()
+			_ = tempFile.Close()
 
 			// Parse file
 			req, err := parseTaskFile(tempFile.Name())
@@ -505,20 +505,20 @@ func setupTestEnvironment(t *testing.T) func() {
 	originalAPIKey := os.Getenv(config.EnvAPIKey)
 	originalAPIURL := os.Getenv(config.EnvAPIURL)
 
-	os.Setenv("HOME", tempDir)
-	os.Unsetenv(config.EnvAPIKey)
-	os.Unsetenv(config.EnvAPIURL)
+	_ = os.Setenv("HOME", tempDir)
+	_ = os.Unsetenv(config.EnvAPIKey)
+	_ = os.Unsetenv(config.EnvAPIURL)
 
 	return func() {
-		os.RemoveAll(tempDir)
+		_ = os.RemoveAll(tempDir)
 		if originalHome != "" {
-			os.Setenv("HOME", originalHome)
+			_ = os.Setenv("HOME", originalHome)
 		}
 		if originalAPIKey != "" {
-			os.Setenv(config.EnvAPIKey, originalAPIKey)
+			_ = os.Setenv(config.EnvAPIKey, originalAPIKey)
 		}
 		if originalAPIURL != "" {
-			os.Setenv(config.EnvAPIURL, originalAPIURL)
+			_ = os.Setenv(config.EnvAPIURL, originalAPIURL)
 		}
 	}
 }

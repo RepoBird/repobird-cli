@@ -1,5 +1,5 @@
 ---
-repository: support-rb/test-ruby
+repository: ownerName/repoName
 source: main
 target: feature/timestamp-log
 runType: run

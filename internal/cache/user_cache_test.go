@@ -16,7 +16,7 @@ func TestUserSpecificCache(t *testing.T) {
 	// Use isolated cache directory for test
 	tmpDir := t.TempDir()
 	oldXDG := os.Getenv("XDG_CONFIG_HOME")
-	os.Setenv("XDG_CONFIG_HOME", tmpDir)
+	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Setenv("XDG_CONFIG_HOME", oldXDG)
 
 	// Clean start
@@ -100,7 +100,7 @@ func TestUserInfoCache(t *testing.T) {
 	// Use isolated cache directory for test
 	tmpDir := t.TempDir()
 	oldXDG := os.Getenv("XDG_CONFIG_HOME")
-	os.Setenv("XDG_CONFIG_HOME", tmpDir)
+	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Setenv("XDG_CONFIG_HOME", oldXDG)
 
 	// Clean start
@@ -149,7 +149,7 @@ func TestUserInfoCacheExpiry(t *testing.T) {
 	// Use isolated cache directory for test
 	tmpDir := t.TempDir()
 	oldXDG := os.Getenv("XDG_CONFIG_HOME")
-	os.Setenv("XDG_CONFIG_HOME", tmpDir)
+	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Setenv("XDG_CONFIG_HOME", oldXDG)
 
 	// Clean start

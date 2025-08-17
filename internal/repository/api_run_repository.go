@@ -58,7 +58,7 @@ func (r *apiRunRepository) Create(ctx context.Context, req domain.CreateRunReque
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		body, _ := io.ReadAll(resp.Body)
@@ -96,7 +96,7 @@ func (r *apiRunRepository) Get(ctx context.Context, id string) (*domain.Run, err
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -131,7 +131,7 @@ func (r *apiRunRepository) List(ctx context.Context, opts domain.ListOptions) ([
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)

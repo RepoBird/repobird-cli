@@ -17,7 +17,7 @@ import (
 func TestPermanentCache_OnlyStoresTerminalRuns(t *testing.T) {
 	// Setup test directory
 	tmpDir := t.TempDir()
-	os.Setenv("XDG_CONFIG_HOME", tmpDir)
+	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Unsetenv("XDG_CONFIG_HOME")
 
 	cache, err := NewPermanentCache("test-user-123")
@@ -66,7 +66,7 @@ func TestPermanentCache_OnlyStoresTerminalRuns(t *testing.T) {
 func TestPermanentCache_UserSeparation(t *testing.T) {
 	// Setup test directory
 	tmpDir := t.TempDir()
-	os.Setenv("XDG_CONFIG_HOME", tmpDir)
+	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Unsetenv("XDG_CONFIG_HOME")
 
 	// Create caches for different users
@@ -98,7 +98,7 @@ func TestPermanentCache_UserSeparation(t *testing.T) {
 func TestPermanentCache_FileHashStorage(t *testing.T) {
 	// Setup test directory
 	tmpDir := t.TempDir()
-	os.Setenv("XDG_CONFIG_HOME", tmpDir)
+	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Unsetenv("XDG_CONFIG_HOME")
 
 	cache, err := NewPermanentCache("test-user")
@@ -134,7 +134,7 @@ func TestPermanentCache_FileHashStorage(t *testing.T) {
 func TestPermanentCache_UserInfo(t *testing.T) {
 	// Setup test directory
 	tmpDir := t.TempDir()
-	os.Setenv("XDG_CONFIG_HOME", tmpDir)
+	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Unsetenv("XDG_CONFIG_HOME")
 
 	cache, err := NewPermanentCache("test-user")
@@ -168,7 +168,7 @@ func TestPermanentCache_UserInfo(t *testing.T) {
 func TestPermanentCache_RepositoryList(t *testing.T) {
 	// Setup test directory
 	tmpDir := t.TempDir()
-	os.Setenv("XDG_CONFIG_HOME", tmpDir)
+	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Unsetenv("XDG_CONFIG_HOME")
 
 	cache, err := NewPermanentCache("test-user")
@@ -196,7 +196,7 @@ func TestPermanentCache_RepositoryList(t *testing.T) {
 func TestPermanentCache_Clear(t *testing.T) {
 	// Setup test directory
 	tmpDir := t.TempDir()
-	os.Setenv("XDG_CONFIG_HOME", tmpDir)
+	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Unsetenv("XDG_CONFIG_HOME")
 
 	cache, err := NewPermanentCache("test-user")
@@ -234,7 +234,7 @@ func TestPermanentCache_Clear(t *testing.T) {
 func TestPermanentCache_DirectoryStructure(t *testing.T) {
 	// Setup test directory
 	tmpDir := t.TempDir()
-	os.Setenv("XDG_CONFIG_HOME", tmpDir)
+	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Unsetenv("XDG_CONFIG_HOME")
 
 	// Create cache for specific user
@@ -271,7 +271,7 @@ func TestPermanentCache_DirectoryStructure(t *testing.T) {
 func TestPermanentCache_AnonymousUser(t *testing.T) {
 	// Setup test directory
 	tmpDir := t.TempDir()
-	os.Setenv("XDG_CONFIG_HOME", tmpDir)
+	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Unsetenv("XDG_CONFIG_HOME")
 
 	// Create cache for anonymous user
@@ -299,7 +299,7 @@ func TestPermanentCache_AnonymousUser(t *testing.T) {
 func TestPermanentCache_OldStuckRuns(t *testing.T) {
 	// Setup test directory
 	tmpDir := t.TempDir()
-	os.Setenv("XDG_CONFIG_HOME", tmpDir)
+	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Unsetenv("XDG_CONFIG_HOME")
 
 	cache, err := NewPermanentCache("test-user")
@@ -338,7 +338,7 @@ func TestPermanentCache_OldStuckRuns(t *testing.T) {
 func TestPermanentCache_MixedAgeRuns(t *testing.T) {
 	// Setup test directory
 	tmpDir := t.TempDir()
-	os.Setenv("XDG_CONFIG_HOME", tmpDir)
+	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Unsetenv("XDG_CONFIG_HOME")
 
 	cache, err := NewPermanentCache("test-user")

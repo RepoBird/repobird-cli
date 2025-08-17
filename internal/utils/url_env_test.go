@@ -187,8 +187,8 @@ func TestGetAPIURL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Clear environment variables
-			os.Unsetenv("REPOBIRD_ENV")
-			os.Unsetenv("REPOBIRD_API_URL")
+			_ = os.Unsetenv("REPOBIRD_ENV")
+			_ = os.Unsetenv("REPOBIRD_API_URL")
 
 			// Set test environment variables
 			for key, value := range tt.envVars {
@@ -247,7 +247,7 @@ func TestGetRepoBirdBaseURLEnv(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Clear and set environment variable
-			os.Unsetenv("REPOBIRD_ENV")
+			_ = os.Unsetenv("REPOBIRD_ENV")
 			if tt.envVar != "" {
 				t.Setenv("REPOBIRD_ENV", tt.envVar)
 			}

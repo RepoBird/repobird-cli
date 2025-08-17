@@ -75,7 +75,7 @@ func runCommand(cmd *cobra.Command, args []string) error {
 		stat, _ := os.Stdin.Stat()
 		if (stat.Mode() & os.ModeCharDevice) != 0 {
 			// No stdin data and no file argument - show help
-			cmd.Help()
+			_ = cmd.Help()
 			return nil
 		}
 
@@ -410,7 +410,7 @@ func executeBulkRuns(bulkConfig *bulk.BulkConfig) error {
 			case <-ticker.C:
 				elapsed := time.Since(startTime)
 				fmt.Printf("\r%s Processing... (%.0fs)", spinner[spinnerIdx], elapsed.Seconds())
-				os.Stdout.Sync() // Force flush to ensure animation
+				_ = os.Stdout.Sync() // Force flush to ensure animation
 				spinnerIdx = (spinnerIdx + 1) % len(spinner)
 			}
 		}
@@ -465,17 +465,9 @@ func executeBulkRuns(bulkConfig *bulk.BulkConfig) error {
 		fmt.Printf("Created: %d/%d runs\n", bulkResp.Data.Metadata.TotalSuccessful, bulkResp.Data.Metadata.TotalRequested)
 
 		// Check if failures are due to duplicates
-		hasDuplicates := false
 		for _, runErr := range bulkResp.Data.Failed {
 			fmt.Printf("  ✗ Run %d: %s\n", runErr.RequestIndex+1, runErr.Message)
-			if strings.Contains(strings.ToUpper(runErr.Error), "DUPLICATE") {
-				hasDuplicates = true
-			}
-		}
-
-		// Note: Duplicates detected (no longer suggesting --force as it's deprecated)
-		if hasDuplicates && !bulkConfig.Force {
-			// Duplicate detection is informational only
+			// Note: Duplicates are no longer blocked as --force is deprecated
 		}
 	} else {
 		// All runs created successfully

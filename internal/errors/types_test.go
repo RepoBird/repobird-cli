@@ -411,7 +411,7 @@ func TestIsRetryableWithNetError(t *testing.T) {
 		{
 			name:     "temporary net error",
 			err:      mockNetError{msg: "temporary failure", temporary: true},
-			expected: true,
+			expected: false, // Temporary() is deprecated, only timeouts are retryable
 		},
 		{
 			name:     "timeout net error",

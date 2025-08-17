@@ -62,11 +62,6 @@ func NewPersistentCacheForUser(userID *int) (*PersistentCache, error) {
 	}, nil
 }
 
-// getCacheDir returns the appropriate cache directory for the platform (backward compatibility)
-func getCacheDir() (string, error) {
-	return getCacheDirForUser(nil)
-}
-
 // getCacheDirForUser returns the appropriate cache directory for a specific user
 func getCacheDirForUser(userID *int) (string, error) {
 	// Use XDG_CONFIG_HOME for consistency with TUI cache
@@ -152,7 +147,7 @@ func (pc *PersistentCache) LoadRun(runID string) (*models.RunResponse, error) {
 	// Check version for future compatibility
 	if cached.Version != cacheVersion {
 		// Handle version mismatch if needed in future
-		os.Remove(filePath)
+		_ = os.Remove(filePath)
 		return nil, nil
 	}
 
@@ -294,7 +289,7 @@ func readJSON(filePath string, dst interface{}) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	decoder := json.NewDecoder(file)
 	if err := decoder.Decode(dst); err != nil {

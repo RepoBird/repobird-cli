@@ -12,7 +12,6 @@ import (
 
 	"github.com/repobird/repobird-cli/internal/api"
 	"github.com/repobird/repobird-cli/internal/config"
-	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/repobird/repobird-cli/internal/services"
 	"github.com/repobird/repobird-cli/internal/utils"
 )
@@ -125,36 +124,3 @@ var infoCmd = &cobra.Command{
 	},
 }
 
-// Helper to cache user info
-type cachedUserInfo struct {
-	UserInfo *models.UserInfo
-	CachedAt time.Time
-}
-
-var userInfoCache *cachedUserInfo
-var cacheTimeout = 5 * time.Minute
-
-func getCachedUserInfo(apiKey, apiEndpoint string, debug bool) (*models.UserInfo, error) {
-	// Check if cache is valid
-	if userInfoCache != nil && time.Since(userInfoCache.CachedAt) < cacheTimeout {
-		return userInfoCache.UserInfo, nil
-	}
-
-	// Fetch fresh data
-	client := api.NewClient(apiKey, apiEndpoint, debug)
-	userInfo, err := client.VerifyAuth()
-	if err != nil {
-		return nil, err
-	}
-
-	// Set the current user for cache initialization
-	services.SetCurrentUser(userInfo)
-
-	// Update cache
-	userInfoCache = &cachedUserInfo{
-		UserInfo: userInfo,
-		CachedAt: time.Now(),
-	}
-
-	return userInfo, nil
-}

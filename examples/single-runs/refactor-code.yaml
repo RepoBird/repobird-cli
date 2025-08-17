@@ -1,4 +1,4 @@
-repository: support-rb/test-ruby
+repository: ownerName/repoName
 source: main
 target: feature/refactor-code
 runType: run

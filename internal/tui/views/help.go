@@ -31,8 +31,7 @@ type HelpView struct {
 	disabledKeys map[string]bool
 
 	// Copy feedback message
-	copiedMessage     string
-	copiedMessageTime time.Time
+	copiedMessage string
 }
 
 // NewHelpView creates a new standalone help view instance

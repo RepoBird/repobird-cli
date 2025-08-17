@@ -391,7 +391,7 @@ func TestFileHashCache_EnsureLoaded(t *testing.T) {
 	// Use temp directory to avoid cache pollution - IMPORTANT: isolate completely from real cache
 	tmpDir := t.TempDir()
 	oldCacheHome := os.Getenv("XDG_CACHE_HOME")
-	os.Setenv("XDG_CACHE_HOME", tmpDir)
+	_ = os.Setenv("XDG_CACHE_HOME", tmpDir)
 	defer os.Setenv("XDG_CACHE_HOME", oldCacheHome)
 
 	// Create cache with a test user ID to ensure isolation

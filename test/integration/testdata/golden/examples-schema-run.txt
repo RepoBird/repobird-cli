@@ -1,0 +1,23 @@
+SINGLE RUN CONFIGURATION SCHEMA
+================================
+
+REQUIRED FIELDS:
+  • prompt      (string)  - Task description/instructions for the AI
+  • repository  (string)  - Repository in format 'owner/repo' (auto-detected in git repos)
+
+OPTIONAL FIELDS:
+  • target      (string)  - Target branch name for changes (default: auto-generated)
+  • title       (string)  - Human-readable title for the run (default: auto-generated)
+  • source      (string)  - Source branch (default: 'main', auto-detected in git repos)
+  • runType     (string)  - Type: 'run' or 'plan' (default: 'run')
+  • context     (string)  - Additional context or instructions
+  • files       (array)   - List of specific files to include
+
+RUN TYPES:
+  • run      - AI makes changes and creates PR automatically
+  • plan     - AI creates detailed plan without code changes
+
+EXAMPLES:
+  repobird examples generate          # Generate JSON example
+  repobird examples generate -f yaml  # Generate YAML example
+  repobird examples generate -f md    # Generate Markdown example

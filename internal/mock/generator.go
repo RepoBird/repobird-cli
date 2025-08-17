@@ -132,29 +132,6 @@ var (
 		"Memory allocation failed",
 		"Network connection error",
 	}
-
-	commitMessages = []string{
-		"feat: add user authentication with JWT tokens",
-		"fix: resolve memory leak in event listeners",
-		"feat: integrate Stripe payment processing",
-		"perf: optimize database queries with indexing",
-		"refactor: modernize codebase with ES6+ features",
-		"chore: update dependencies to latest versions",
-		"test: add unit tests for user service",
-		"feat: implement dark mode theme toggle",
-		"fix: responsive design issues on mobile",
-		"ci: add GitHub Actions workflow",
-		"refactor: migrate to TypeScript",
-		"perf: implement Redis caching layer",
-		"fix: add error boundary components",
-		"fix: resolve accessibility violations",
-		"feat: add WebSocket notifications",
-		"feat: add i18n support",
-		"perf: reduce bundle size by 35%",
-		"security: fix critical vulnerabilities",
-		"feat: add API rate limiting",
-		"feat: implement Elasticsearch search",
-	}
 )
 
 // GenerateMockRuns creates a large set of mock runs for testing

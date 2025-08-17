@@ -19,7 +19,6 @@ type FileViewerView struct {
 	client     APIClient
 	width      int
 	height     int
-	statusLine string
 }
 
 // NewFileViewerView creates a new file viewer view

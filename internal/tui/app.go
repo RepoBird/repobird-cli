@@ -507,7 +507,7 @@ func (a *App) handleGlobalAction(action keymap.KeyAction, keyMsg tea.KeyMsg) (ha
 	switch action {
 	case keymap.ActionGlobalQuit:
 		// Force quit - always works
-		a.cache.SaveToDisk()
+		_ = a.cache.SaveToDisk()
 		return true, a, tea.Quit
 	case keymap.ActionGlobalHelp:
 		// Global help - could be implemented later
@@ -545,7 +545,7 @@ func (a *App) handleNavigationAction(action keymap.KeyAction, keyMsg tea.KeyMsg)
 	case keymap.ActionNavigateQuit:
 		debug.LogToFilef("🚪 NAV ACTION: Quitting application 🚪\n")
 		// Regular quit - save and quit
-		a.cache.SaveToDisk()
+		_ = a.cache.SaveToDisk()
 		return true, a, tea.Quit
 	case keymap.ActionNavigateHelp:
 		debug.LogToFilef("❓ NAV ACTION: Processing ActionNavigateHelp - creating NavigateToHelpMsg ❓\n")

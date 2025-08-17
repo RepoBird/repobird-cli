@@ -16,7 +16,7 @@ import (
 func TestHybridCache_StatusTransition(t *testing.T) {
 	// Setup test directory
 	tmpDir := t.TempDir()
-	os.Setenv("XDG_CONFIG_HOME", tmpDir)
+	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Unsetenv("XDG_CONFIG_HOME")
 
 	cache, err := NewHybridCache("test-user")
@@ -60,7 +60,7 @@ func TestHybridCache_StatusTransition(t *testing.T) {
 func TestHybridCache_MixedRunStates(t *testing.T) {
 	// Setup test directory
 	tmpDir := t.TempDir()
-	os.Setenv("XDG_CONFIG_HOME", tmpDir)
+	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Unsetenv("XDG_CONFIG_HOME")
 
 	cache, err := NewHybridCache("test-user")
@@ -106,7 +106,7 @@ func TestHybridCache_MixedRunStates(t *testing.T) {
 func TestHybridCache_UserInfo(t *testing.T) {
 	// Setup test directory
 	tmpDir := t.TempDir()
-	os.Setenv("XDG_CONFIG_HOME", tmpDir)
+	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Unsetenv("XDG_CONFIG_HOME")
 
 	cache, err := NewHybridCache("test-user")
@@ -145,7 +145,7 @@ func TestHybridCache_UserInfo(t *testing.T) {
 func TestHybridCache_FileHashes(t *testing.T) {
 	// Setup test directory
 	tmpDir := t.TempDir()
-	os.Setenv("XDG_CONFIG_HOME", tmpDir)
+	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Unsetenv("XDG_CONFIG_HOME")
 
 	cache, err := NewHybridCache("test-user")
@@ -182,7 +182,7 @@ func TestHybridCache_FileHashes(t *testing.T) {
 func TestHybridCache_RepositoryList(t *testing.T) {
 	// Setup test directory
 	tmpDir := t.TempDir()
-	os.Setenv("XDG_CONFIG_HOME", tmpDir)
+	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Unsetenv("XDG_CONFIG_HOME")
 
 	cache, err := NewHybridCache("test-user")
@@ -212,7 +212,7 @@ func TestHybridCache_RepositoryList(t *testing.T) {
 func TestHybridCache_DashboardData(t *testing.T) {
 	// Setup test directory
 	tmpDir := t.TempDir()
-	os.Setenv("XDG_CONFIG_HOME", tmpDir)
+	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Unsetenv("XDG_CONFIG_HOME")
 
 	cache, err := NewHybridCache("test-user")
@@ -253,7 +253,7 @@ func TestHybridCache_DashboardData(t *testing.T) {
 func TestHybridCache_InvalidateRun(t *testing.T) {
 	// Setup test directory
 	tmpDir := t.TempDir()
-	os.Setenv("XDG_CONFIG_HOME", tmpDir)
+	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Unsetenv("XDG_CONFIG_HOME")
 
 	cache, err := NewHybridCache("test-user")
@@ -303,7 +303,7 @@ func TestHybridCache_InvalidateRun(t *testing.T) {
 func TestHybridCache_Clear(t *testing.T) {
 	// Setup test directory
 	tmpDir := t.TempDir()
-	os.Setenv("XDG_CONFIG_HOME", tmpDir)
+	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Unsetenv("XDG_CONFIG_HOME")
 
 	cache, err := NewHybridCache("test-user")
@@ -346,7 +346,7 @@ func TestHybridCache_Clear(t *testing.T) {
 func TestHybridCache_GetStats(t *testing.T) {
 	// Setup test directory
 	tmpDir := t.TempDir()
-	os.Setenv("XDG_CONFIG_HOME", tmpDir)
+	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Unsetenv("XDG_CONFIG_HOME")
 
 	cache, err := NewHybridCache("test-user")
@@ -409,7 +409,7 @@ func TestHybridCache_FallbackToSessionOnly(t *testing.T) {
 func TestHybridCache_OldStuckRunRouting(t *testing.T) {
 	// Setup test directory
 	tmpDir := t.TempDir()
-	os.Setenv("XDG_CONFIG_HOME", tmpDir)
+	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Unsetenv("XDG_CONFIG_HOME")
 
 	cache, err := NewHybridCache("test-user")

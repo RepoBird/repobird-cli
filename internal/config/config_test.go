@@ -64,25 +64,25 @@ func TestLoadConfig_EnvironmentVariables(t *testing.T) {
 	defer func() {
 		// Restore original values
 		if originalAPIURL != "" {
-			os.Setenv(EnvAPIURL, originalAPIURL)
+			_ = os.Setenv(EnvAPIURL, originalAPIURL)
 		} else {
-			os.Unsetenv(EnvAPIURL)
+			_ = os.Unsetenv(EnvAPIURL)
 		}
 		if originalAPIKey != "" {
-			os.Setenv(EnvAPIKey, originalAPIKey)
+			_ = os.Setenv(EnvAPIKey, originalAPIKey)
 		} else {
-			os.Unsetenv(EnvAPIKey)
+			_ = os.Unsetenv(EnvAPIKey)
 		}
 		if originalDebug != "" {
-			os.Setenv(EnvDebug, originalDebug)
+			_ = os.Setenv(EnvDebug, originalDebug)
 		} else {
-			os.Unsetenv(EnvDebug)
+			_ = os.Unsetenv(EnvDebug)
 		}
 	}()
 
-	os.Setenv(EnvAPIURL, "https://env.api.com")
-	os.Setenv(EnvAPIKey, "env-key-456")
-	os.Setenv(EnvDebug, "true")
+	_ = os.Setenv(EnvAPIURL, "https://env.api.com")
+	_ = os.Setenv(EnvAPIKey, "env-key-456")
+	_ = os.Setenv(EnvDebug, "true")
 
 	config, err := LoadConfig()
 	require.NoError(t, err)
@@ -117,19 +117,19 @@ debug: false
 
 	defer func() {
 		if originalAPIURL != "" {
-			os.Setenv(EnvAPIURL, originalAPIURL)
+			_ = os.Setenv(EnvAPIURL, originalAPIURL)
 		} else {
-			os.Unsetenv(EnvAPIURL)
+			_ = os.Unsetenv(EnvAPIURL)
 		}
 		if originalDebug != "" {
-			os.Setenv(EnvDebug, originalDebug)
+			_ = os.Setenv(EnvDebug, originalDebug)
 		} else {
-			os.Unsetenv(EnvDebug)
+			_ = os.Unsetenv(EnvDebug)
 		}
 	}()
 
-	os.Setenv(EnvAPIURL, "https://env-override.api.com")
-	os.Setenv(EnvDebug, "true")
+	_ = os.Setenv(EnvAPIURL, "https://env-override.api.com")
+	_ = os.Setenv(EnvDebug, "true")
 
 	config, err := LoadConfig()
 	require.NoError(t, err)
@@ -357,10 +357,10 @@ func setupTempHome(t *testing.T) string {
 	originalAPIURL := os.Getenv("REPOBIRD_API_URL")
 	originalAPIKey := os.Getenv("REPOBIRD_API_KEY")
 
-	os.Setenv("HOME", tempDir)
-	os.Setenv("XDG_CONFIG_HOME", tempDir) // Also set XDG for complete isolation
-	os.Unsetenv("REPOBIRD_API_URL")       // Clear any env vars that might affect config
-	os.Unsetenv("REPOBIRD_API_KEY")
+	_ = os.Setenv("HOME", tempDir)
+	_ = os.Setenv("XDG_CONFIG_HOME", tempDir) // Also set XDG for complete isolation
+	_ = os.Unsetenv("REPOBIRD_API_URL")       // Clear any env vars that might affect config
+	_ = os.Unsetenv("REPOBIRD_API_KEY")
 
 	// Create a new viper instance to avoid global state pollution
 	viper.New()
@@ -369,15 +369,15 @@ func setupTempHome(t *testing.T) string {
 	viper.Reset()
 
 	t.Cleanup(func() {
-		os.Setenv("HOME", originalHome)
-		os.Setenv("XDG_CONFIG_HOME", originalXDGConfig)
+		_ = os.Setenv("HOME", originalHome)
+		_ = os.Setenv("XDG_CONFIG_HOME", originalXDGConfig)
 		if originalAPIURL != "" {
-			os.Setenv("REPOBIRD_API_URL", originalAPIURL)
+			_ = os.Setenv("REPOBIRD_API_URL", originalAPIURL)
 		}
 		if originalAPIKey != "" {
-			os.Setenv("REPOBIRD_API_KEY", originalAPIKey)
+			_ = os.Setenv("REPOBIRD_API_KEY", originalAPIKey)
 		}
-		os.RemoveAll(tempDir)
+		_ = os.RemoveAll(tempDir)
 		viper.Reset() // Reset viper after test
 	})
 

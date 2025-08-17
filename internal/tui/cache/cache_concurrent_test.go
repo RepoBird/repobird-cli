@@ -22,7 +22,7 @@ func TestNoCacheDeadlock(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
 
-	os.Setenv("XDG_CONFIG_HOME", tmpDir)
+	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Unsetenv("XDG_CONFIG_HOME")
 
 	cache := NewSimpleCache()
@@ -66,7 +66,7 @@ func TestConcurrentGetSetRuns(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
 
-	os.Setenv("XDG_CONFIG_HOME", tmpDir)
+	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Unsetenv("XDG_CONFIG_HOME")
 
 	cache := NewSimpleCache()
@@ -113,7 +113,7 @@ func TestParallelCacheOperations(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
 
-	os.Setenv("XDG_CONFIG_HOME", tmpDir)
+	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Unsetenv("XDG_CONFIG_HOME")
 
 	cache := NewSimpleCache()
@@ -198,7 +198,7 @@ func TestHybridCacheParallelFetch(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
 
-	os.Setenv("XDG_CONFIG_HOME", tmpDir)
+	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Unsetenv("XDG_CONFIG_HOME")
 
 	hybrid, err := NewHybridCache("test-user")
@@ -251,7 +251,7 @@ func TestAtomicFileWrites(t *testing.T) {
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
 
-	os.Setenv("XDG_CONFIG_HOME", tmpDir)
+	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
 	defer os.Unsetenv("XDG_CONFIG_HOME")
 
 	perm, err := NewPermanentCache("test-user")

@@ -16,7 +16,7 @@ import (
 // Test helper to create temporary test files
 func createTempFile(t *testing.T, dir, name, content string) string {
 	path := filepath.Join(dir, name)
-	err := os.WriteFile(path, []byte(content), 0644)
+	err := os.WriteFile(path, []byte(content), 0600)
 	require.NoError(t, err)
 	return path
 }
@@ -747,11 +747,13 @@ func BenchmarkParseBulkConfig_JSON(b *testing.B) {
 
 	tmpDir := b.TempDir()
 	filePath := filepath.Join(tmpDir, "bench.json")
-	os.WriteFile(filePath, []byte(content), 0644)
+	if err := os.WriteFile(filePath, []byte(content), 0600); err != nil {
+		b.Fatal(err)
+	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		ParseBulkConfig(filePath)
+		_, _ = ParseBulkConfig(filePath)
 	}
 }
 
@@ -770,11 +772,13 @@ runs:
 
 	tmpDir := b.TempDir()
 	filePath := filepath.Join(tmpDir, "bench.yaml")
-	os.WriteFile(filePath, []byte(content), 0644)
+	if err := os.WriteFile(filePath, []byte(content), 0600); err != nil {
+		b.Fatal(err)
+	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		ParseBulkConfig(filePath)
+		_, _ = ParseBulkConfig(filePath)
 	}
 }
 

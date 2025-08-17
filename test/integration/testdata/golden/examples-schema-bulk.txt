@@ -1,0 +1,23 @@
+BULK RUN CONFIGURATION SCHEMA
+==============================
+
+TOP-LEVEL STRUCTURE:
+  {
+    "runs": [              // Array of run configurations
+      { /* run config */ },
+      { /* run config */ }
+    ]
+  }
+
+EACH RUN CONFIGURATION:
+  Same as single run schema (see 'repobird examples schema run')
+
+BULK-SPECIFIC BEHAVIOR:
+  • Processes runs sequentially by default
+  • Continues on individual run failures
+  • Provides summary of all runs at completion
+  • Supports --dry-run for validation
+
+EXAMPLE:
+  repobird examples generate bulk     # Generate bulk example
+  repobird bulk config.json --dry-run # Validate bulk config

@@ -115,11 +115,11 @@ func TestGetCacheFilePath(t *testing.T) {
 
 	// Test with custom XDG_CONFIG_HOME
 	testDir := "/test/config"
-	os.Setenv("XDG_CONFIG_HOME", testDir)
+	_ = os.Setenv("XDG_CONFIG_HOME", testDir)
 
 	path := GetCacheFilePath()
 	assert.Equal(t, filepath.Join(testDir, "repobird", "cache.json"), path)
 
 	// Restore original
-	os.Setenv("XDG_CONFIG_HOME", oldConfigHome)
+	_ = os.Setenv("XDG_CONFIG_HOME", oldConfigHome)
 }

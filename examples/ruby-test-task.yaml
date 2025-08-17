@@ -9,7 +9,7 @@ prompt: |
   
   Focus on achieving at least 80% code coverage.
 
-repository: support-rb/test-ruby
+repository: ownerName/repoName
 source: main
 target: feature/improve-test-coverage
 runType: run

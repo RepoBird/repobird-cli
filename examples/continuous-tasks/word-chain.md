@@ -1,5 +1,5 @@
 ---
-repository: support-rb/test-ruby
+repository: ownerName/repoName
 source: main
 target: feature/word-chain
 runType: run

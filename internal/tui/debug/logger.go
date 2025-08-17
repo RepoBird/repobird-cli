@@ -56,7 +56,7 @@ func findProjectRoot() string {
 
 // LogToFile writes a debug message to the debug log file
 func LogToFile(message string) {
-	if f, err := os.OpenFile(getDebugLogPath(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+	if f, err := os.OpenFile(getDebugLogPath(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600); err == nil {
 		defer func() { _ = f.Close() }()
 		_, _ = f.WriteString(message)
 	}

@@ -28,7 +28,7 @@ func TestSecureStorage_SaveAndGetAPIKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Create secure storage instance with test directory
 	storage := &SecureStorage{
@@ -77,7 +77,7 @@ func TestSecureStorage_DeleteAPIKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	storage := &SecureStorage{
 		useKeyring: false,
@@ -117,7 +117,7 @@ func TestSecureStorage_EmptyAPIKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	storage := &SecureStorage{
 		useKeyring: false,
@@ -136,7 +136,7 @@ func TestSecureStorage_EnvironmentVariable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	storage := &SecureStorage{
 		useKeyring: false,
@@ -145,7 +145,7 @@ func TestSecureStorage_EnvironmentVariable(t *testing.T) {
 
 	// Set environment variable
 	envKey := "env-api-key-123"
-	os.Setenv(EnvAPIKey, envKey)
+	_ = os.Setenv(EnvAPIKey, envKey)
 	defer os.Unsetenv(EnvAPIKey)
 
 	// Get API key should return env var first
@@ -200,7 +200,7 @@ func TestSecureStorage_PlainTextMigration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Create a plain text config file with API key
 	configFile := filepath.Join(tmpDir, "config.yaml")
@@ -249,7 +249,7 @@ func TestGetStorageInfo(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	storage := &SecureStorage{
 		useKeyring: false,

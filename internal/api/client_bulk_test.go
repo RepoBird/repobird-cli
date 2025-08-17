@@ -210,7 +210,7 @@ func TestClient_CreateBulkRuns(t *testing.T) {
 
 				// Send mock response
 				w.WriteHeader(tt.mockStatusCode)
-				json.NewEncoder(w).Encode(tt.mockResponse)
+				_ = json.NewEncoder(w).Encode(tt.mockResponse)
 			}))
 			defer server.Close()
 
@@ -341,7 +341,7 @@ func TestClient_GetBulkStatus(t *testing.T) {
 				assert.Equal(t, fmt.Sprintf("/api/v1/runs/bulk/%s", tt.batchID), r.URL.Path)
 
 				w.WriteHeader(tt.mockStatusCode)
-				json.NewEncoder(w).Encode(tt.mockResponse)
+				_ = json.NewEncoder(w).Encode(tt.mockResponse)
 			}))
 			defer server.Close()
 
@@ -411,7 +411,7 @@ func TestClient_CancelBulkRuns(t *testing.T) {
 
 				w.WriteHeader(tt.mockStatusCode)
 				if tt.mockStatusCode != http.StatusOK {
-					json.NewEncoder(w).Encode(map[string]string{"error": "Error message"})
+					_ = json.NewEncoder(w).Encode(map[string]string{"error": "Error message"})
 				}
 			}))
 			defer server.Close()
@@ -476,7 +476,7 @@ func TestClient_PollBulkStatus(t *testing.T) {
 			}
 
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(response)
+			_ = json.NewEncoder(w).Encode(response)
 		}))
 		defer server.Close()
 
@@ -514,7 +514,7 @@ func TestClient_PollBulkStatus(t *testing.T) {
 				Status:  "processing",
 			}
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(response)
+			_ = json.NewEncoder(w).Encode(response)
 		}))
 		defer server.Close()
 
@@ -558,7 +558,7 @@ func TestClient_PollBulkStatus(t *testing.T) {
 				},
 			}
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(response)
+			_ = json.NewEncoder(w).Encode(response)
 		}))
 		defer server.Close()
 
@@ -594,7 +594,7 @@ func TestClient_PollBulkStatus(t *testing.T) {
 			if callCount == 1 {
 				// First call fails
 				w.WriteHeader(http.StatusInternalServerError)
-				json.NewEncoder(w).Encode(map[string]string{"error": "Server error"})
+				_ = json.NewEncoder(w).Encode(map[string]string{"error": "Server error"})
 			} else {
 				// Subsequent calls succeed
 				response := dto.BulkStatusResponse{
@@ -602,7 +602,7 @@ func TestClient_PollBulkStatus(t *testing.T) {
 					Status:  "completed",
 				}
 				w.WriteHeader(http.StatusOK)
-				json.NewEncoder(w).Encode(response)
+				_ = json.NewEncoder(w).Encode(response)
 			}
 		}))
 		defer server.Close()
@@ -638,7 +638,7 @@ func TestClient_BulkRetryBehavior(t *testing.T) {
 			}
 			// Succeed on third attempt
 			w.WriteHeader(http.StatusCreated)
-			json.NewEncoder(w).Encode(dto.BulkRunResponse{
+			_ = json.NewEncoder(w).Encode(dto.BulkRunResponse{
 				Data: dto.BulkRunData{
 					BatchID: "batch-retry",
 				},
@@ -670,7 +670,7 @@ func TestClient_BulkRetryBehavior(t *testing.T) {
 			}
 			// Succeed on second attempt
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(dto.BulkStatusResponse{
+			_ = json.NewEncoder(w).Encode(dto.BulkStatusResponse{
 				BatchID: "batch-123",
 				Status:  "processing",
 			})

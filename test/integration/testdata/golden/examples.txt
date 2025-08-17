@@ -1,0 +1,17 @@
+RepoBird Configuration Examples
+================================
+
+QUICK START:
+  repobird examples schema        # Show configuration fields
+  repobird examples generate      # Generate example file
+
+SINGLE RUN FORMATS:
+  • JSON (.json)         - Standard JSON configuration
+  • YAML (.yaml, .yml)   - Human-friendly YAML format
+  • Markdown (.md)       - Documentation with YAML frontmatter
+
+COMMANDS:
+  schema [type]     Show configuration schema
+  generate [type]   Generate example configuration files
+
+For detailed documentation, see: docs/run-config-formats.md
