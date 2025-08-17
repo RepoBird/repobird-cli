@@ -1,3 +1,7 @@
+// Copyright (C) 2025 Ariel Frischer
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+
 package errors
 
 import (
