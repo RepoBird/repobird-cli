@@ -1,7 +1,6 @@
 // Copyright (C) 2025 Ariel Frischer
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-
 // Package components provides reusable UI components for the TUI
 package components
 

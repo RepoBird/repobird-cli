@@ -1,7 +1,6 @@
 // Copyright (C) 2025 Ariel Frischer
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-
 package errors
 
 import (
@@ -11,10 +10,10 @@ import (
 
 func TestBranchNotFoundError(t *testing.T) {
 	tests := []struct {
-		name         string
-		statusCode   int
-		responseBody []byte
-		expectedMsg  string
+		name          string
+		statusCode    int
+		responseBody  []byte
+		expectedMsg   string
 		shouldContain string // For partial matches
 	}{
 		{
@@ -93,7 +92,7 @@ func TestBranchNotFoundError(t *testing.T) {
 
 			// Format the error for user display
 			formatted := FormatUserError(err)
-			
+
 			// Check the formatted message
 			if tt.shouldContain != "" {
 				if !strings.Contains(formatted, tt.shouldContain) {
@@ -135,11 +134,11 @@ func TestBranchNotFoundErrorIntegration(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Parse error as would happen in the API client
 			err := ParseAPIError(400, tc.apiResponse)
-			
+
 			// Format as would be shown to user in run command
 			// e.g., fmt.Errorf("failed to create run: %s", errors.FormatUserError(err))
 			userMessage := FormatUserError(err)
-			
+
 			if userMessage != tc.expectedUser {
 				t.Errorf("User would see:\n  %q\nExpected:\n  %q", userMessage, tc.expectedUser)
 			}

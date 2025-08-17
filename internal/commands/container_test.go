@@ -1,7 +1,6 @@
 // Copyright (C) 2025 Ariel Frischer
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-
 package commands
 
 import (
@@ -47,13 +46,13 @@ func TestGetContainer(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Reset container
 			resetContainer()
-			
+
 			// Clear and set environment variables
 			os.Clearenv()
 			for key, value := range tt.envVars {
 				t.Setenv(key, value)
 			}
-			
+
 			// Set up mock config
 			cfg = &config.SecureConfig{
 				Config: &config.Config{
@@ -62,23 +61,23 @@ func TestGetContainer(t *testing.T) {
 					Debug:  false,
 				},
 			}
-			
+
 			// Get container
 			container := getContainer()
 			if container == nil {
 				t.Fatal("Expected container to be created")
 			}
-			
+
 			// Verify container was created with correct config
 			containerConfig := container.Config()
 			if containerConfig == nil {
 				t.Fatal("Expected container to have config")
 			}
-			
+
 			// The actual URL verification happens through GetAPIURL
 			// which is tested separately in url_env_test.go
 			// This test ensures the container creation flow works
-			
+
 			// Reset for next test
 			resetContainer()
 		})
@@ -94,22 +93,22 @@ func TestResetContainer(t *testing.T) {
 			Debug:  false,
 		},
 	}
-	
+
 	// Create container
 	container1 := getContainer()
 	if container1 == nil {
 		t.Fatal("Expected container to be created")
 	}
-	
+
 	// Get container again - should be same instance
 	container2 := getContainer()
 	if container1 != container2 {
 		t.Error("Expected same container instance when called twice")
 	}
-	
+
 	// Reset container
 	resetContainer()
-	
+
 	// Get container again - should be new instance
 	container3 := getContainer()
 	if container1 == container3 {

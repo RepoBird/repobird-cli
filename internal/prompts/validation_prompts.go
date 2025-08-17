@@ -1,7 +1,6 @@
 // Copyright (C) 2025 Ariel Frischer
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-
 package prompts
 
 import (
@@ -240,7 +239,7 @@ func (h *ValidationPromptHandler) HasUnknownFields() bool {
 func (h *ValidationPromptHandler) GetUnknownFields() []string {
 	var fields []string
 	seen := make(map[string]bool)
-	
+
 	for _, prompt := range h.prompts {
 		if prompt.Type == "field_suggestion" && prompt.Field != "" {
 			if !seen[prompt.Field] {
@@ -266,19 +265,19 @@ func (h *ValidationPromptHandler) GetUnknownFields() []string {
 			}
 		}
 	}
-	
+
 	return fields
 }
 
 // GetFieldSuggestions returns a map of unknown fields to their suggestions
 func (h *ValidationPromptHandler) GetFieldSuggestions() map[string]string {
 	suggestions := make(map[string]string)
-	
+
 	for _, prompt := range h.prompts {
 		if prompt.Type == "field_suggestion" && prompt.Field != "" && prompt.Suggestion != "" {
 			suggestions[prompt.Field] = prompt.Suggestion
 		}
 	}
-	
+
 	return suggestions
 }

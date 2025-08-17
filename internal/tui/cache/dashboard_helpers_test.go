@@ -1,7 +1,6 @@
 // Copyright (C) 2025 Ariel Frischer
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-
 package cache
 
 import (
@@ -17,7 +16,7 @@ import (
 func TestBuildRepositoryOverviewFromRuns_SortingByCreatedAt(t *testing.T) {
 	// Create base time for consistent testing
 	baseTime := time.Now()
-	
+
 	tests := []struct {
 		name     string
 		runs     []*models.RunResponse
@@ -218,19 +217,19 @@ func TestBuildRepositoryOverviewFromRuns_SortingByCreatedAt(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create a cache instance
 			cache := NewSimpleCache()
-			
+
 			// Build repository overview
 			repos := cache.BuildRepositoryOverviewFromRuns(tt.runs)
-			
+
 			// Extract repository names in order
 			actualNames := []string{}
 			for _, repo := range repos {
 				actualNames = append(actualNames, repo.Name)
 			}
-			
+
 			// Assert the order matches expected
 			assert.Equal(t, tt.expected, actualNames, "Repository order should match expected")
-			
+
 			// Additional assertions for repository statistics
 			if len(repos) > 0 && tt.name != "repository with only repo ID mapping" {
 				// Verify run counts are accurate (skip for repo ID mapping test as it counts differently)
@@ -240,10 +239,10 @@ func TestBuildRepositoryOverviewFromRuns_SortingByCreatedAt(t *testing.T) {
 						repoRunCounts[name]++
 					}
 				}
-				
+
 				for _, repo := range repos {
 					expectedCount := repoRunCounts[repo.Name]
-					assert.Equal(t, expectedCount, repo.RunCounts.Total, 
+					assert.Equal(t, expectedCount, repo.RunCounts.Total,
 						"Repository %s should have correct total run count", repo.Name)
 				}
 			}
@@ -253,7 +252,7 @@ func TestBuildRepositoryOverviewFromRuns_SortingByCreatedAt(t *testing.T) {
 
 func TestBuildRepositoryOverviewFromRuns_Statistics(t *testing.T) {
 	baseTime := time.Now()
-	
+
 	runs := []*models.RunResponse{
 		{
 			ID:             "1",
@@ -288,19 +287,19 @@ func TestBuildRepositoryOverviewFromRuns_Statistics(t *testing.T) {
 			Status:         models.StatusQueued,
 		},
 	}
-	
+
 	cache := NewSimpleCache()
 	repos := cache.BuildRepositoryOverviewFromRuns(runs)
-	
+
 	require.Len(t, repos, 1, "Should have one repository")
 	repo := repos[0]
-	
+
 	assert.Equal(t, "org/test-repo", repo.Name)
 	assert.Equal(t, 4, repo.RunCounts.Total, "Should count all runs")
 	assert.Equal(t, 1, repo.RunCounts.Completed, "Should count completed runs")
 	assert.Equal(t, 1, repo.RunCounts.Failed, "Should count failed runs")
 	assert.Equal(t, 2, repo.RunCounts.Running, "Should count running and queued runs")
-	
+
 	// LastActivity should be the most recent UpdatedAt
 	expectedLastActivity := baseTime.Add(-30 * time.Minute)
 	assert.Equal(t, expectedLastActivity, repo.LastActivity, "Should track most recent activity")
@@ -308,7 +307,7 @@ func TestBuildRepositoryOverviewFromRuns_Statistics(t *testing.T) {
 
 func TestBuildRepositoryOverviewFromRuns_EdgeCases(t *testing.T) {
 	baseTime := time.Now()
-	
+
 	t.Run("handles nil runs in slice", func(t *testing.T) {
 		runs := []*models.RunResponse{
 			nil,
@@ -322,34 +321,34 @@ func TestBuildRepositoryOverviewFromRuns_EdgeCases(t *testing.T) {
 			},
 			nil,
 		}
-		
+
 		cache := NewSimpleCache()
 		repos := cache.BuildRepositoryOverviewFromRuns(runs)
-		
+
 		assert.Len(t, repos, 1)
 		assert.Equal(t, "org/repo", repos[0].Name)
 	})
-	
+
 	t.Run("repository name priority", func(t *testing.T) {
 		runs := []*models.RunResponse{
 			{
 				ID:             "1",
-				Repository:     "legacy/name",    // Legacy field
-				RepositoryName: "new/name",       // New field takes priority
+				Repository:     "legacy/name", // Legacy field
+				RepositoryName: "new/name",    // New field takes priority
 				CreatedAt:      baseTime,
 				UpdatedAt:      baseTime,
 				Status:         models.StatusDone,
 			},
 		}
-		
+
 		cache := NewSimpleCache()
 		repos := cache.BuildRepositoryOverviewFromRuns(runs)
-		
+
 		assert.Len(t, repos, 1)
 		// GetRepositoryName() should prefer RepositoryName over Repository
 		assert.Equal(t, "new/name", repos[0].Name)
 	})
-	
+
 	t.Run("very large time differences", func(t *testing.T) {
 		runs := []*models.RunResponse{
 			{
@@ -369,10 +368,10 @@ func TestBuildRepositoryOverviewFromRuns_EdgeCases(t *testing.T) {
 				Status:         models.StatusDone,
 			},
 		}
-		
+
 		cache := NewSimpleCache()
 		repos := cache.BuildRepositoryOverviewFromRuns(runs)
-		
+
 		assert.Len(t, repos, 2)
 		assert.Equal(t, "org/recent", repos[0].Name, "Recent should be first")
 		assert.Equal(t, "org/ancient", repos[1].Name, "Ancient should be second")
@@ -381,12 +380,12 @@ func TestBuildRepositoryOverviewFromRuns_EdgeCases(t *testing.T) {
 
 func TestBuildRepositoryOverviewFromRuns_PerformanceWithManyRuns(t *testing.T) {
 	baseTime := time.Now()
-	
+
 	// Create a large number of runs to test performance
 	var runs []*models.RunResponse
 	numRepos := 100
 	runsPerRepo := 50
-	
+
 	for i := 0; i < numRepos; i++ {
 		repoName := fmt.Sprintf("org/repo-%03d", i)
 		for j := 0; j < runsPerRepo; j++ {
@@ -400,22 +399,22 @@ func TestBuildRepositoryOverviewFromRuns_PerformanceWithManyRuns(t *testing.T) {
 			})
 		}
 	}
-	
+
 	cache := NewSimpleCache()
-	
+
 	start := time.Now()
 	repos := cache.BuildRepositoryOverviewFromRuns(runs)
 	duration := time.Since(start)
-	
+
 	assert.Len(t, repos, numRepos, "Should create correct number of repositories")
 	assert.Less(t, duration, 100*time.Millisecond, "Should complete within reasonable time")
-	
+
 	// Verify first repo has the most recent run
 	assert.Equal(t, "org/repo-000", repos[0].Name, "Most recent repo should be first")
-	
+
 	// Verify each repo has correct run count
 	for _, repo := range repos {
-		assert.Equal(t, runsPerRepo, repo.RunCounts.Total, 
+		assert.Equal(t, runsPerRepo, repo.RunCounts.Total,
 			"Each repository should have correct run count")
 	}
 }

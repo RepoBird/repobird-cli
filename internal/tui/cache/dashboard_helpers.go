@@ -1,7 +1,6 @@
 // Copyright (C) 2025 Ariel Frischer
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-
 package cache
 
 import (
@@ -42,7 +41,7 @@ func (c *SimpleCache) BuildRepositoryOverviewFromRuns(runs []*models.RunResponse
 			}
 			repoMap[repoName] = repo
 		}
-		
+
 		// Track the latest run creation time for this repository
 		if latestTime, exists := repoLatestRunCreation[repoName]; !exists || run.CreatedAt.After(latestTime) {
 			repoLatestRunCreation[repoName] = run.CreatedAt
@@ -90,7 +89,7 @@ func (c *SimpleCache) BuildRepositoryOverviewFromRuns(runs []*models.RunResponse
 		if run.UpdatedAt.After(repo.LastActivity) {
 			repo.LastActivity = run.UpdatedAt
 		}
-		
+
 		// Update latest run creation time if newer
 		if repoName != "" {
 			if latestTime, exists := repoLatestRunCreation[repoName]; !exists || run.CreatedAt.After(latestTime) {
@@ -113,12 +112,12 @@ func (c *SimpleCache) BuildRepositoryOverviewFromRuns(runs []*models.RunResponse
 	sort.Slice(repositories, func(i, j int) bool {
 		iTime, iHasRuns := repoLatestRunCreation[repositories[i].Name]
 		jTime, jHasRuns := repoLatestRunCreation[repositories[j].Name]
-		
+
 		// If both have runs, sort by most recent run creation
 		if iHasRuns && jHasRuns {
 			return iTime.After(jTime)
 		}
-		
+
 		// Repos with runs come before repos without runs
 		if iHasRuns && !jHasRuns {
 			return true
@@ -126,7 +125,7 @@ func (c *SimpleCache) BuildRepositoryOverviewFromRuns(runs []*models.RunResponse
 		if !iHasRuns && jHasRuns {
 			return false
 		}
-		
+
 		// If neither has runs, sort alphabetically by name
 		return repositories[i].Name < repositories[j].Name
 	})

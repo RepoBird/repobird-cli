@@ -1,7 +1,6 @@
 // Copyright (C) 2025 Ariel Frischer
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-
 // dashboard_no_help.go - Example modifications to remove help overlay
 // This file shows the key changes needed to remove help overlay functionality
 // from dashboard.go. The actual implementation would require modifying

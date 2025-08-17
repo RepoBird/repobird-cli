@@ -1,7 +1,6 @@
 // Copyright (C) 2025 Ariel Frischer
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-
 package views
 
 import (
@@ -354,7 +353,7 @@ func (d *DashboardView) updateRepositoryStats(repositories []models.Repository, 
 	debug.LogToFilef("    [updateRepositoryStats] Starting with %d repos and %d runs\n", len(repositories), len(allRuns))
 	// Create maps for quick lookup
 	repoMap := make(map[string]*models.Repository)
-	repoIDMap := make(map[int]*models.Repository) // Map by repo ID
+	repoIDMap := make(map[int]*models.Repository)       // Map by repo ID
 	repoLatestRunCreation := make(map[string]time.Time) // Track latest run creation time per repo
 
 	for i := range repositories {
@@ -431,12 +430,12 @@ func (d *DashboardView) updateRepositoryStats(repositories []models.Repository, 
 	sort.Slice(repositories, func(i, j int) bool {
 		iTime, iHasRuns := repoLatestRunCreation[repositories[i].Name]
 		jTime, jHasRuns := repoLatestRunCreation[repositories[j].Name]
-		
+
 		// If both have runs, sort by most recent run creation
 		if iHasRuns && jHasRuns {
 			return iTime.After(jTime)
 		}
-		
+
 		// Repos with runs come before repos without runs
 		if iHasRuns && !jHasRuns {
 			return true
@@ -444,7 +443,7 @@ func (d *DashboardView) updateRepositoryStats(repositories []models.Repository, 
 		if !iHasRuns && jHasRuns {
 			return false
 		}
-		
+
 		// If neither has runs, sort alphabetically by name
 		return repositories[i].Name < repositories[j].Name
 	})

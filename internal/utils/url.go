@@ -1,7 +1,6 @@
 // Copyright (C) 2025 Ariel Frischer
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-
 package utils
 
 import (
@@ -122,10 +121,10 @@ func GenerateRepoBirdURL(runID string) string {
 func GetAPIURL(configFallback ...string) string {
 	// Debug output if needed
 	if os.Getenv("REPOBIRD_DEBUG_API_URL") == "1" {
-		fmt.Fprintf(os.Stderr, "[DEBUG GetAPIURL] REPOBIRD_ENV=%q, REPOBIRD_API_URL=%q, fallback=%v\n", 
+		fmt.Fprintf(os.Stderr, "[DEBUG GetAPIURL] REPOBIRD_ENV=%q, REPOBIRD_API_URL=%q, fallback=%v\n",
 			os.Getenv("REPOBIRD_ENV"), os.Getenv("REPOBIRD_API_URL"), configFallback)
 	}
-	
+
 	// Check REPOBIRD_API_URL first - this always takes precedence
 	if apiURL := os.Getenv("REPOBIRD_API_URL"); apiURL != "" {
 		if os.Getenv("REPOBIRD_DEBUG_API_URL") == "1" {
@@ -133,7 +132,7 @@ func GetAPIURL(configFallback ...string) string {
 		}
 		return apiURL
 	}
-	
+
 	// Check REPOBIRD_ENV for dev mode
 	env := os.Getenv("REPOBIRD_ENV")
 	if strings.ToLower(env) == "dev" || strings.ToLower(env) == "development" {
@@ -142,7 +141,7 @@ func GetAPIURL(configFallback ...string) string {
 		}
 		return "http://localhost:3000"
 	}
-	
+
 	// Use config fallback if provided
 	if len(configFallback) > 0 && configFallback[0] != "" {
 		if os.Getenv("REPOBIRD_DEBUG_API_URL") == "1" {
@@ -150,7 +149,7 @@ func GetAPIURL(configFallback ...string) string {
 		}
 		return configFallback[0]
 	}
-	
+
 	// Default to production
 	if os.Getenv("REPOBIRD_DEBUG_API_URL") == "1" {
 		fmt.Fprintf(os.Stderr, "[DEBUG GetAPIURL] Using default: https://repobird.ai\n")

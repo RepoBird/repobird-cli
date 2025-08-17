@@ -1,7 +1,6 @@
 // Copyright (C) 2025 Ariel Frischer
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-
 package utils
 
 import (
@@ -56,7 +55,7 @@ func TestGetAPIURL(t *testing.T) {
 			expectedURL: "http://localhost:3000",
 			description: "Should handle mixed case Development",
 		},
-		
+
 		// Priority testing
 		{
 			name: "API URL override takes precedence over dev env",
@@ -84,7 +83,7 @@ func TestGetAPIURL(t *testing.T) {
 			expectedURL:    "https://api-override.com",
 			description:    "REPOBIRD_API_URL should override config fallback",
 		},
-		
+
 		// Localhost scenarios
 		{
 			name: "Localhost with custom port",
@@ -102,7 +101,7 @@ func TestGetAPIURL(t *testing.T) {
 			expectedURL: "http://127.0.0.1:3000",
 			description: "Should support 127.0.0.1 addresses",
 		},
-		
+
 		// Empty and edge cases
 		{
 			name: "Empty API URL with dev env",
@@ -129,7 +128,7 @@ func TestGetAPIURL(t *testing.T) {
 			expectedURL: "https://repobird.ai",
 			description: "Unknown environments should default to production",
 		},
-		
+
 		// Config fallback scenarios
 		{
 			name:           "Config fallback used when no env vars",
@@ -164,7 +163,7 @@ func TestGetAPIURL(t *testing.T) {
 			expectedURL:    "https://api-url-override.com",
 			description:    "Should follow priority: API_URL > ENV > config > default",
 		},
-		
+
 		// HTTPS and HTTP handling
 		{
 			name: "HTTP URL in dev",

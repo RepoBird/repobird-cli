@@ -1,7 +1,6 @@
 // Copyright (C) 2025 Ariel Frischer
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-
 package commands
 
 import (
@@ -24,13 +23,13 @@ import (
 func readMaskedInput() (string, error) {
 	// First print the prompt before entering raw mode
 	fmt.Print("Enter your API key: ")
-	
+
 	// Set terminal to raw mode to read char by char
 	oldState, err := term.MakeRaw(int(syscall.Stdin))
 	if err != nil {
 		return "", err
 	}
-	
+
 	var interrupted bool
 	defer func() {
 		// Clear the line before restoring to avoid duplicate prompt

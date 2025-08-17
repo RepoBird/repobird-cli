@@ -1,7 +1,6 @@
 // Copyright (C) 2025 Ariel Frischer
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-
 //go:build integration
 // +build integration
 
@@ -78,7 +77,7 @@ func RunCommandWithEnv(t *testing.T, env map[string]string, args ...string) *Com
 	// Set up environment - start with minimal environment for better test isolation
 	cmd.Env = []string{
 		"PATH=" + os.Getenv("PATH"), // Need PATH to find other commands
-		"TERM=xterm",                 // Some commands check TERM
+		"TERM=xterm",                // Some commands check TERM
 	}
 	// Add test-specific environment variables, overriding any defaults
 	for k, v := range env {

@@ -1,7 +1,6 @@
 // Copyright (C) 2025 Ariel Frischer
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-
 package components
 
 import (
@@ -53,7 +52,6 @@ func NewStatusLine() *StatusLine {
 		FPS:    100 * time.Millisecond, // 10 FPS for smooth animation
 	}
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("226")) // Bright yellow for better visibility
-
 
 	// Initialize custom spinner frames
 	customFrames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}

@@ -142,7 +142,7 @@ func parseYAMLWithUnknownFieldsAndPrompts(data []byte) (*models.RunConfig, *prom
 		debug.LogToFilef("YAML has validation errors that will be caught later: %v\n", validationErr)
 		// Don't add validation errors as prompts - they'll be caught by ValidateRunConfig later
 	}
-	
+
 	// Convert to RunConfig (only supported fields are included)
 	runConfig := &models.RunConfig{
 		Prompt:     config.Prompt,

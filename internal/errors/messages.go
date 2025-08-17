@@ -1,7 +1,6 @@
 // Copyright (C) 2025 Ariel Frischer
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-
 package errors
 
 import (
@@ -9,7 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	
+
 	"github.com/repobird/repobird-cli/internal/config"
 )
 
@@ -62,7 +61,7 @@ func createErrorFromAPIResponse(statusCode int, apiErr APIErrorResponse) error {
 	if errorCode == "" {
 		errorCode = strings.ToUpper(apiErr.Error)
 	}
-	
+
 	switch errorCode {
 	case "NO_RUNS_REMAINING":
 		tier := ""

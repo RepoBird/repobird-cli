@@ -1,7 +1,6 @@
 // Copyright (C) 2025 Ariel Frischer
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-
 package config
 
 import (
@@ -22,7 +21,7 @@ type URLs struct {
 // GetURLs returns the appropriate URLs based on the current API configuration
 func GetURLs() *URLs {
 	baseURL := getBaseURL()
-	
+
 	return &URLs{
 		BaseURL:      baseURL,
 		DashboardURL: baseURL + "/dashboard",
@@ -39,13 +38,13 @@ func getBaseURL() string {
 	if os.Getenv("REPOBIRD_ENV") == "dev" {
 		return "http://localhost:3000"
 	}
-	
+
 	// Check environment variable for API URL
 	apiURL := os.Getenv("REPOBIRD_API_URL")
 	if apiURL == "" {
 		apiURL = "https://repobird.ai"
 	}
-	
+
 	// Handle localhost and development environments
 	if strings.Contains(apiURL, "localhost") || strings.Contains(apiURL, "127.0.0.1") {
 		// For local development, use localhost:3000 for frontend
@@ -54,12 +53,12 @@ func getBaseURL() string {
 		}
 		return apiURL
 	}
-	
+
 	if strings.Contains(apiURL, "ngrok") {
 		// Ngrok URLs typically don't have a separate frontend
 		return apiURL
 	}
-	
+
 	// For production and staging, use the standard URL
 	return "https://repobird.ai"
 }

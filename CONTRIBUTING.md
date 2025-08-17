@@ -609,7 +609,10 @@ See the full roadmap and detailed task descriptions in [docs/roadmap.md](docs/ro
 
 ### Version Management
 
-1. Update version in `pkg/version/version.go`
+1. Bump version using Makefile commands:
+   - `make bump-patch` for patch releases (0.0.X)
+   - `make bump-minor` for minor releases (0.X.0)
+   - `make bump-major` for major releases (X.0.0)
 2. Update CHANGELOG.md
 3. Commit changes: `git commit -m "chore: bump version to vX.Y.Z"`
 4. Tag release: `git tag vX.Y.Z`

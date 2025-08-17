@@ -1,7 +1,6 @@
 // Copyright (C) 2025 Ariel Frischer
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-
 package commands
 
 import (
@@ -15,10 +14,10 @@ import (
 )
 
 var (
-	outputFile   string
-	formatType   string
-	exampleType  string
-	interactive  bool
+	outputFile  string
+	formatType  string
+	exampleType string
+	interactive bool
 )
 
 var examplesCmd = &cobra.Command{
@@ -63,7 +62,7 @@ Examples:
 func init() {
 	generateCmd.Flags().StringVarP(&outputFile, "output", "o", "", "output file path")
 	generateCmd.Flags().StringVarP(&formatType, "format", "f", "json", "output format: json, yaml, or md (markdown)")
-	
+
 	examplesCmd.AddCommand(schemaCmd)
 	examplesCmd.AddCommand(generateCmd)
 }
@@ -163,7 +162,7 @@ func generateExample(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 && outputFile == "" {
 		return cmd.Help()
 	}
-	
+
 	exampleType := "run"
 	if len(args) > 0 {
 		exampleType = args[0]
@@ -216,7 +215,7 @@ func jsonQuote(s string) string {
 
 func generateRunExample(format string, minimal bool) (string, error) {
 	var example map[string]interface{}
-	
+
 	if minimal {
 		// Minimal example with only required fields
 		example = map[string]interface{}{
@@ -274,7 +273,7 @@ func generateRunExample(format string, minimal bool) (string, error) {
 prompt: |
   Fix the authentication rate limiting bug.
   Users are permanently locked out after 5 failed login attempts.
-  Should reset after 15 minutes but doesn't.`, 
+  Should reset after 15 minutes but doesn't.`,
 				example["repository"])
 		} else {
 			// For full example, use concise multiline YAML for prompt and context
@@ -292,7 +291,7 @@ runType: %s
 context: |
   Bug introduced in v2.3.0 security update. Check auth middleware rate limiting logic.
   Consider timestamp tracking and timezone handling.
-  Add tests for lockout/reset behavior.`, 
+  Add tests for lockout/reset behavior.`,
 				example["repository"],
 				example["source"],
 				example["target"],
@@ -313,7 +312,7 @@ prompt: %s
 source: %s
 target: %s
 title: %s
-runType: %s`, 
+runType: %s`,
 				example["repository"],
 				example["prompt"],
 				example["source"],
@@ -323,7 +322,7 @@ runType: %s`,
 		}
 
 		markdown := "---\n" + frontmatterYAML + "\n---\n\n"
-		
+
 		if !minimal {
 			// Add detailed documentation for full example
 			markdown += "# Task: Fix Authentication Rate Limiting\n\n"
@@ -370,10 +369,10 @@ func generateBulkExample() (string, error) {
     }
   ]
 }`
-	
+
 	header := "// Bulk run configuration example\n"
 	header += "// This will create 3 separate runs sequentially\n"
 	header += "// Save this file and run: repobird bulk bulk-tasks.json\n\n"
-	
+
 	return header + bulkJSON, nil
 }

@@ -1,14 +1,13 @@
 // Copyright (C) 2025 Ariel Frischer
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-
 package commands
 
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	netstderrors "errors"
+	"fmt"
 	"net/http"
 	"os"
 	"strings"
@@ -54,7 +53,7 @@ For configuration examples and field descriptions:
 	Args:          cobra.MaximumNArgs(1),
 	RunE:          runCommand,
 	SilenceErrors: true,
-	SilenceUsage:  false,  // Let Cobra show usage for arg/flag errors
+	SilenceUsage:  false, // Let Cobra show usage for arg/flag errors
 }
 
 func init() {
@@ -65,7 +64,7 @@ func init() {
 func runCommand(cmd *cobra.Command, args []string) error {
 	// For execution errors (not arg/flag errors), suppress usage
 	cmd.SilenceUsage = true
-	
+
 	if cfg.APIKey == "" {
 		return errors.NoAPIKeyError()
 	}
@@ -79,20 +78,20 @@ func runCommand(cmd *cobra.Command, args []string) error {
 			cmd.Help()
 			return nil
 		}
-		
+
 		// Read JSON from stdin with unknown field handling
 		runConfig, promptHandler, err := utils.ParseJSONFromStdinWithPrompts()
 		if err != nil {
 			// The error already contains helpful hints, don't add more
 			return err
 		}
-		
+
 		// Show informational messages about unknown fields (not prompts)
 		if promptHandler != nil && promptHandler.HasUnknownFields() {
 			unknownFields := promptHandler.GetUnknownFields()
 			if len(unknownFields) > 0 {
 				fmt.Fprintf(os.Stderr, "Note: Ignoring unknown fields in configuration: %s\n", strings.Join(unknownFields, ", "))
-				
+
 				// Show suggestions if available
 				suggestions := promptHandler.GetFieldSuggestions()
 				for field, suggestion := range suggestions {
@@ -102,13 +101,13 @@ func runCommand(cmd *cobra.Command, args []string) error {
 				}
 			}
 		}
-		
+
 		return processSingleRun(runConfig, "")
 	}
 
 	// Load configuration from file
 	filename := args[0]
-	
+
 	// Check if it's a bulk configuration FIRST, before trying to parse it
 	isBulk, err := bulk.IsBulkConfig(filename)
 	if err != nil {
@@ -125,7 +124,7 @@ func runCommand(cmd *cobra.Command, args []string) error {
 	var runConfig *models.RunConfig
 	var additionalContext string
 	var promptHandler *prompts.ValidationPromptHandler
-	
+
 	runConfig, additionalContext, promptHandler, err = utils.LoadConfigFromFileWithPrompts(filename)
 	if err != nil {
 		return fmt.Errorf("failed to load configuration file: %w", err)
@@ -136,7 +135,7 @@ func runCommand(cmd *cobra.Command, args []string) error {
 		unknownFields := promptHandler.GetUnknownFields()
 		if len(unknownFields) > 0 {
 			fmt.Fprintf(os.Stderr, "Note: Ignoring unknown fields in configuration: %s\n", strings.Join(unknownFields, ", "))
-			
+
 			// Show suggestions if available
 			suggestions := promptHandler.GetFieldSuggestions()
 			for field, suggestion := range suggestions {
@@ -432,8 +431,8 @@ func executeBulkRuns(bulkConfig *bulk.BulkConfig) error {
 		if netstderrors.As(err, &authErr) {
 			errMsg := errors.FormatUserError(err)
 			// Check for quota-related messages
-			if strings.Contains(strings.ToLower(errMsg), "insufficient run") || 
-			   strings.Contains(strings.ToLower(errMsg), "no runs remaining") {
+			if strings.Contains(strings.ToLower(errMsg), "insufficient run") ||
+				strings.Contains(strings.ToLower(errMsg), "no runs remaining") {
 				return fmt.Errorf("%s\n\nUpgrade your plan at %s", errMsg, config.GetPricingURL())
 			}
 			// For other 403 errors, just return the error message
@@ -502,4 +501,3 @@ func executeBulkRuns(bulkConfig *bulk.BulkConfig) error {
 
 	return nil
 }
-

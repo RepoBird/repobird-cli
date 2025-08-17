@@ -1,7 +1,6 @@
 // Copyright (C) 2025 Ariel Frischer
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-
 package commands
 
 import (
@@ -12,7 +11,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/cobra/doc"
-	
+
 	"github.com/repobird/repobird-cli/internal/config"
 )
 
@@ -151,21 +150,21 @@ func addAliasesToMarkdown(outputDir string) error {
 		if err != nil {
 			return err
 		}
-		
+
 		// Only process .md files
 		if !strings.HasSuffix(path, ".md") {
 			return nil
 		}
-		
+
 		// Read the file
 		content, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}
-		
+
 		// Convert to string for processing
 		contentStr := string(content)
-		
+
 		// Add aliases for specific commands
 		if strings.Contains(path, "repobird_status.md") {
 			contentStr = strings.Replace(contentStr,
@@ -173,14 +172,14 @@ func addAliasesToMarkdown(outputDir string) error {
 				"```\nrepobird status [run-id] [flags]\n```\n\n### Aliases\n\n```\nrepobird st [run-id] [flags]\n```",
 				1)
 		}
-		
+
 		if strings.Contains(path, "repobird_version.md") {
 			contentStr = strings.Replace(contentStr,
 				"```\nrepobird version [flags]\n```",
 				"```\nrepobird version [flags]\n```\n\n### Aliases\n\n```\nrepobird v [flags]\n```",
 				1)
 		}
-		
+
 		// Write the updated content back
 		return os.WriteFile(path, []byte(contentStr), 0644)
 	})
@@ -193,21 +192,21 @@ func addAliasesToYAML(outputDir string) error {
 		if err != nil {
 			return err
 		}
-		
+
 		// Only process .yaml files
 		if !strings.HasSuffix(path, ".yaml") {
 			return nil
 		}
-		
+
 		// Read the file
 		content, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}
-		
+
 		// Convert to string for processing
 		contentStr := string(content)
-		
+
 		// Add aliases for specific commands
 		if strings.Contains(path, "repobird_status.yaml") {
 			contentStr = strings.Replace(contentStr,
@@ -215,14 +214,14 @@ func addAliasesToYAML(outputDir string) error {
 				"usage: repobird status [run-id] [flags]\naliases: [st]",
 				1)
 		}
-		
+
 		if strings.Contains(path, "repobird_version.yaml") {
 			contentStr = strings.Replace(contentStr,
 				"usage: repobird version [flags]",
 				"usage: repobird version [flags]\naliases: [v]",
 				1)
 		}
-		
+
 		// Write the updated content back
 		return os.WriteFile(path, []byte(contentStr), 0644)
 	})
@@ -235,21 +234,21 @@ func addAliasesToMan(outputDir string) error {
 		if err != nil {
 			return err
 		}
-		
+
 		// Only process .1 files (man pages)
 		if !strings.HasSuffix(path, ".1") {
 			return nil
 		}
-		
+
 		// Read the file
 		content, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}
-		
+
 		// Convert to string for processing
 		contentStr := string(content)
-		
+
 		// Add aliases for specific commands
 		if strings.Contains(path, "repobird-status.1") {
 			contentStr = strings.Replace(contentStr,
@@ -257,14 +256,14 @@ func addAliasesToMan(outputDir string) error {
 				".SH SYNOPSIS\n.PP\n\\fBrepobird st\\fP [run-id] [flags] (alias)\n",
 				1)
 		}
-		
+
 		if strings.Contains(path, "repobird-version.1") {
 			contentStr = strings.Replace(contentStr,
 				".SH SYNOPSIS",
 				".SH SYNOPSIS\n.PP\n\\fBrepobird v\\fP [flags] (alias)\n",
 				1)
 		}
-		
+
 		// Write the updated content back
 		return os.WriteFile(path, []byte(contentStr), 0644)
 	})

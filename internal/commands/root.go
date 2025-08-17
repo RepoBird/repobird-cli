@@ -1,7 +1,6 @@
 // Copyright (C) 2025 Ariel Frischer
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-
 package commands
 
 import (
@@ -72,11 +71,11 @@ func Execute() {
 func init() {
 	// Set custom version template to show just the version info
 	rootCmd.SetVersionTemplate(version.GetBuildInfo() + "\n")
-	
+
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.repobird/config.yaml)")
 	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "enable debug output")
 	rootCmd.PersistentFlags().BoolVar(&debugUser, "debug-user", false, "enable debug user mode with mock data")
-	
+
 	// Add -v as shorthand for --version
 	rootCmd.Flags().BoolP("version", "v", false, "version for repobird")
 

@@ -1,7 +1,6 @@
 // Copyright (C) 2025 Ariel Frischer
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-
 package commands
 
 import (
@@ -232,8 +231,8 @@ func runBulk(cmd *cobra.Command, args []string) error {
 		if stderrors.As(err, &authErr) {
 			errMsg := errors.FormatUserError(err)
 			// Check for quota-related messages
-			if strings.Contains(strings.ToLower(errMsg), "insufficient run") || 
-			   strings.Contains(strings.ToLower(errMsg), "no runs remaining") {
+			if strings.Contains(strings.ToLower(errMsg), "insufficient run") ||
+				strings.Contains(strings.ToLower(errMsg), "no runs remaining") {
 				return fmt.Errorf("%s\n\nUpgrade your plan at %s", errMsg, config.GetPricingURL())
 			}
 			// For other 403 errors, just return the error message

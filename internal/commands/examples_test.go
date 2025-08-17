@@ -1,7 +1,6 @@
 // Copyright (C) 2025 Ariel Frischer
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-
 package commands
 
 import (
@@ -14,45 +13,45 @@ import (
 
 func TestGenerateRunExample(t *testing.T) {
 	tests := []struct {
-		name           string
-		format         string
-		minimal        bool
+		name            string
+		format          string
+		minimal         bool
 		checkFieldOrder bool
 	}{
 		{
-			name:           "JSON minimal - repository first",
-			format:         "json",
-			minimal:        true,
+			name:            "JSON minimal - repository first",
+			format:          "json",
+			minimal:         true,
 			checkFieldOrder: true,
 		},
 		{
-			name:           "JSON full - repository first",
-			format:         "json",
-			minimal:        false,
+			name:            "JSON full - repository first",
+			format:          "json",
+			minimal:         false,
 			checkFieldOrder: true,
 		},
 		{
-			name:           "YAML minimal - repository first",
-			format:         "yaml",
-			minimal:        true,
+			name:            "YAML minimal - repository first",
+			format:          "yaml",
+			minimal:         true,
 			checkFieldOrder: true,
 		},
 		{
-			name:           "YAML full - repository first",
-			format:         "yaml",
-			minimal:        false,
+			name:            "YAML full - repository first",
+			format:          "yaml",
+			minimal:         false,
 			checkFieldOrder: true,
 		},
 		{
-			name:           "Markdown minimal - repository first",
-			format:         "md",
-			minimal:        true,
+			name:            "Markdown minimal - repository first",
+			format:          "md",
+			minimal:         true,
 			checkFieldOrder: true,
 		},
 		{
-			name:           "Markdown full - repository first",
-			format:         "md",
-			minimal:        false,
+			name:            "Markdown full - repository first",
+			format:          "md",
+			minimal:         false,
 			checkFieldOrder: true,
 		},
 	}
@@ -66,11 +65,11 @@ func TestGenerateRunExample(t *testing.T) {
 			// Check field ordering - repository must come before prompt
 			if tt.checkFieldOrder {
 				lines := strings.Split(result, "\n")
-				
+
 				var repoIndex, promptIndex int = -1, -1
 				for i, line := range lines {
 					trimmed := strings.TrimSpace(line)
-					
+
 					// Check for repository field
 					if repoIndex == -1 {
 						switch tt.format {
@@ -84,8 +83,8 @@ func TestGenerateRunExample(t *testing.T) {
 							}
 						}
 					}
-					
-					// Check for prompt field  
+
+					// Check for prompt field
 					if promptIndex == -1 {
 						switch tt.format {
 						case "json":
@@ -103,9 +102,9 @@ func TestGenerateRunExample(t *testing.T) {
 				// Both fields must be found
 				require.NotEqual(t, -1, repoIndex, "repository field not found in %s format", tt.format)
 				require.NotEqual(t, -1, promptIndex, "prompt field not found in %s format", tt.format)
-				
+
 				// Repository should appear before prompt
-				assert.Less(t, repoIndex, promptIndex, 
+				assert.Less(t, repoIndex, promptIndex,
 					"repository field should appear before prompt field in %s format", tt.format)
 			}
 
@@ -152,10 +151,10 @@ func TestGenerateBulkExample(t *testing.T) {
 	assert.Contains(t, result, `"runs":`)
 	assert.Contains(t, result, `"repository":`)
 	assert.Contains(t, result, `"prompt":`)
-	
+
 	// Check field ordering in bulk runs - repository should come before prompt
 	lines := strings.Split(result, "\n")
-	
+
 	// Find first run's repository and prompt
 	var firstRepoIndex, firstPromptIndex int
 	inFirstRun := false
@@ -175,28 +174,28 @@ func TestGenerateBulkExample(t *testing.T) {
 			}
 		}
 	}
-	
-	assert.Less(t, firstRepoIndex, firstPromptIndex, 
+
+	assert.Less(t, firstRepoIndex, firstPromptIndex,
 		"repository field should appear before prompt field in bulk example")
 }
 
 func TestFieldOrderConsistency(t *testing.T) {
 	// Test that all formats maintain consistent field ordering
 	formats := []string{"json", "yaml", "md"}
-	
+
 	for _, format := range formats {
 		t.Run("format_"+format, func(t *testing.T) {
 			// Generate full example
 			result, err := generateRunExample(format, false)
 			require.NoError(t, err)
-			
+
 			// Convert to lines for easier checking
 			lines := strings.Split(result, "\n")
-			
+
 			// Find indices of key fields
 			fieldIndices := make(map[string]int)
 			expectedOrder := []string{"repository", "prompt", "source", "target", "title", "runType"}
-			
+
 			for i, line := range lines {
 				for _, field := range expectedOrder {
 					if _, found := fieldIndices[field]; !found {
@@ -214,17 +213,17 @@ func TestFieldOrderConsistency(t *testing.T) {
 					}
 				}
 			}
-			
+
 			// Verify ordering
 			for i := 0; i < len(expectedOrder)-1; i++ {
 				current := expectedOrder[i]
 				next := expectedOrder[i+1]
-				
+
 				currentIdx, currentFound := fieldIndices[current]
 				nextIdx, nextFound := fieldIndices[next]
-				
+
 				if currentFound && nextFound {
-					assert.Less(t, currentIdx, nextIdx, 
+					assert.Less(t, currentIdx, nextIdx,
 						"%s should appear before %s in %s format", current, next, format)
 				}
 			}
