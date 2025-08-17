@@ -706,6 +706,9 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case models.LayoutAllRuns:
 				// Handle navigation with shared scrollable list
 				d.allRunsList.Update(msg)
+			case models.LayoutRepositoriesOnly:
+				// Repositories-only layout doesn't need special navigation
+				// Just use standard repository list navigation
 				// Handle selection actions for all-runs layout
 				if key.Matches(msg, d.keys.Enter) {
 					selected := d.allRunsList.GetSelected()

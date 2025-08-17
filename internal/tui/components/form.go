@@ -118,6 +118,8 @@ func NewForm(opts ...FormOption) *FormComponent {
 				ta.Focus()
 			}
 			f.fields[i].textArea = ta
+		case Select:
+			// Select fields don't need initialization
 		}
 	}
 
@@ -223,6 +225,10 @@ func (f *FormComponent) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						field.textArea, cmd = field.textArea.Update(msg)
 						field.Value = field.textArea.Value()
 						cmds = append(cmds, cmd)
+					
+					case Select:
+						// Select fields handle updates differently
+						// No-op for now
 					}
 				}
 			}
@@ -347,6 +353,8 @@ func (f *FormComponent) SetValue(fieldName, value string) {
 				f.fields[i].textInput.SetValue(value)
 			case TextArea:
 				f.fields[i].textArea.SetValue(value)
+			case Select:
+				// Select value is already set above
 			}
 			break
 		}
@@ -408,6 +416,8 @@ func (f *FormComponent) focusCurrentField() {
 			field.textInput.Focus()
 		case TextArea:
 			field.textArea.Focus()
+		case Select:
+			// Select fields don't have focus in the same way
 		}
 	}
 }
@@ -421,6 +431,8 @@ func (f *FormComponent) blurCurrentField() {
 			field.textInput.Blur()
 		case TextArea:
 			field.textArea.Blur()
+		case Select:
+			// Select fields don't have blur in the same way
 		}
 	}
 }
@@ -478,6 +490,8 @@ func (f *FormComponent) ClearCurrentField() {
 			field.textInput.SetValue("")
 		case TextArea:
 			field.textArea.SetValue("")
+		case Select:
+			// Select field value is already cleared above
 		}
 	}
 }

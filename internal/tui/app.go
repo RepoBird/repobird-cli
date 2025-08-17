@@ -508,6 +508,11 @@ func (a *App) handleGlobalAction(action keymap.KeyAction, keyMsg tea.KeyMsg) (ha
 	case keymap.ActionGlobalHelp:
 		// Global help - could be implemented later
 		return false, a, nil
+	case keymap.ActionNavigateBack, keymap.ActionNavigateBulk, keymap.ActionNavigateNew,
+		keymap.ActionNavigateRefresh, keymap.ActionNavigateQuit, keymap.ActionNavigateHelp,
+		keymap.ActionNavigateToDashboard, keymap.ActionViewSpecific, keymap.ActionIgnore:
+		// These are navigation actions, not global actions
+		return false, a, nil
 	default:
 		return false, a, nil
 	}
@@ -546,6 +551,10 @@ func (a *App) handleNavigationAction(action keymap.KeyAction, keyMsg tea.KeyMsg)
 	case keymap.ActionNavigateHelp:
 		debug.LogToFilef("❓ NAV ACTION: Processing ActionNavigateHelp - creating NavigateToHelpMsg ❓\n")
 		navMsg = messages.NavigateToHelpMsg{}
+	case keymap.ActionViewSpecific, keymap.ActionIgnore, keymap.ActionGlobalQuit, keymap.ActionGlobalHelp:
+		// These are not navigation actions
+		debug.LogToFilef("❓ NAV ACTION: Non-navigation action %v ❓\n", action)
+		return false, a, nil
 	default:
 		debug.LogToFilef("❓ NAV ACTION: Unknown action %v ❓\n", action)
 		return false, a, nil

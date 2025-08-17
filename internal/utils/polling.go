@@ -125,6 +125,8 @@ func IsTerminalStatus(status models.RunStatus) bool {
 	switch status {
 	case models.StatusDone, models.StatusFailed:
 		return true
+	case models.StatusQueued, models.StatusInitializing, models.StatusProcessing, models.StatusPostProcess:
+		return false
 	case "CANCELLED", "CANCELED": // Handle both spellings
 		return true
 	default:

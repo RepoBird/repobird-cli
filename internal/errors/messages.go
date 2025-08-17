@@ -159,7 +159,6 @@ func createErrorFromStatusCode(statusCode int, message string) error {
 
 	switch statusCode {
 	case 401:
-		errorType = ErrorTypeAuth
 		if message == "" {
 			message = GetStatusMessages()["INVALID_API_KEY"]
 		}
@@ -169,7 +168,6 @@ func createErrorFromStatusCode(statusCode int, message string) error {
 		}
 
 	case 403:
-		errorType = ErrorTypeAuth
 		if message == "" {
 			message = GetStatusMessages()["FORBIDDEN"]
 		}
@@ -204,7 +202,6 @@ func createErrorFromStatusCode(statusCode int, message string) error {
 		}
 
 	case 422:
-		errorType = ErrorTypeValidation
 		if message == "" {
 			message = GetStatusMessages()["VALIDATION_ERROR"]
 		}

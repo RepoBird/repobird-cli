@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -61,12 +62,22 @@ func NewFileHashCacheForUser(userID *int) *FileHashCache {
 			// User-specific cache directory for real users
 			cacheDir = filepath.Join(baseDir, "repobird", "users", fmt.Sprintf("user-%d", *userID))
 		}
-		_ = os.MkdirAll(cacheDir, 0755)
+		if err := os.MkdirAll(cacheDir, 0755); err != nil {
+			// Log error but continue - actual write operations will handle failures
+			if os.Getenv("REPOBIRD_DEBUG_LOG") == "1" {
+				log.Printf("Warning: failed to create cache directory %s: %v", cacheDir, err)
+			}
+		}
 		cacheFile = filepath.Join(cacheDir, "file_hashes.json")
 	} else {
 		// Fallback to shared cache directory
 		cacheDir := filepath.Join(baseDir, "repobird", "shared")
-		_ = os.MkdirAll(cacheDir, 0755)
+		if err := os.MkdirAll(cacheDir, 0755); err != nil {
+			// Log error but continue - actual write operations will handle failures
+			if os.Getenv("REPOBIRD_DEBUG_LOG") == "1" {
+				log.Printf("Warning: failed to create cache directory %s: %v", cacheDir, err)
+			}
+		}
 		cacheFile = filepath.Join(cacheDir, "file_hashes.json")
 	}
 
@@ -101,7 +112,10 @@ func (c *FileHashCache) SetUserID(userID *int) {
 		// User-specific cache directory for real users
 		cacheDir = filepath.Join(baseDir, "repobird", "users", fmt.Sprintf("user-%d", *userID))
 	}
-	_ = os.MkdirAll(cacheDir, 0755)
+	if err := os.MkdirAll(cacheDir, 0755); err != nil {
+		// Log error but continue with the path - write may still fail later
+		fmt.Fprintf(os.Stderr, "Warning: failed to create cache directory %s: %v\n", cacheDir, err)
+	}
 	c.cacheFile = filepath.Join(cacheDir, "file_hashes.json")
 	c.userID = userID
 

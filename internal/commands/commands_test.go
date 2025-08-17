@@ -77,13 +77,11 @@ func TestRunCommand_Execute(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set up temporary directory
-			tempDir, err := os.MkdirTemp("", "run-cmd-test-*")
-			require.NoError(t, err)
-			defer func() { _ = os.RemoveAll(tempDir) }()
+			tempDir := t.TempDir()
 
 			originalWd, err := os.Getwd()
 			require.NoError(t, err)
-			defer func() { _ = os.Chdir(originalWd) }()
+			t.Cleanup(func() { _ = os.Chdir(originalWd) })
 
 			err = os.Chdir(tempDir)
 			require.NoError(t, err)
@@ -493,33 +491,19 @@ func TestCommandHelp(t *testing.T) {
 // Helper functions
 
 func setupTempHome(t *testing.T) string {
-	tempDir, err := os.MkdirTemp("", "repobird-cmd-test-*")
-	require.NoError(t, err)
-	return tempDir
+	return t.TempDir()
 }
 
 func setupTestEnvironment(t *testing.T) func() {
 	tempDir := setupTempHome(t)
 
-	originalHome := os.Getenv("HOME")
-	originalAPIKey := os.Getenv(config.EnvAPIKey)
-	originalAPIURL := os.Getenv(config.EnvAPIURL)
-
-	_ = os.Setenv("HOME", tempDir)
+	t.Setenv("HOME", tempDir)
 	_ = os.Unsetenv(config.EnvAPIKey)
 	_ = os.Unsetenv(config.EnvAPIURL)
 
 	return func() {
-		_ = os.RemoveAll(tempDir)
-		if originalHome != "" {
-			_ = os.Setenv("HOME", originalHome)
-		}
-		if originalAPIKey != "" {
-			_ = os.Setenv(config.EnvAPIKey, originalAPIKey)
-		}
-		if originalAPIURL != "" {
-			_ = os.Setenv(config.EnvAPIURL, originalAPIURL)
-		}
+		// Note: t.Setenv automatically restores HOME
+		// t.TempDir automatically removes tempDir
 	}
 }
 

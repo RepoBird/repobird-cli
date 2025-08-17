@@ -24,7 +24,7 @@ func TestDetectRepository_Integration(t *testing.T) {
 	// Test from repository root
 	originalWd, err := os.Getwd()
 	require.NoError(t, err)
-	defer func() { _ = os.Chdir(originalWd) }()
+	t.Cleanup(func() { _ = os.Chdir(originalWd) })
 
 	_ = os.Chdir(tempDir)
 	require.NoError(t, err)
@@ -56,7 +56,7 @@ func TestDetectRepository_SubDirectory(t *testing.T) {
 
 	originalWd, err := os.Getwd()
 	require.NoError(t, err)
-	defer func() { _ = os.Chdir(originalWd) }()
+	t.Cleanup(func() { _ = os.Chdir(originalWd) })
 
 	// Test from subdirectory
 	_ = os.Chdir(subDir)
@@ -72,13 +72,11 @@ func TestDetectRepository_SubDirectory(t *testing.T) {
 }
 
 func TestDetectRepository_NotGitRepo(t *testing.T) {
-	tempDir, err := os.MkdirTemp("", "not-git-repo-*")
-	require.NoError(t, err)
-	defer func() { _ = os.RemoveAll(tempDir) }()
+	tempDir := t.TempDir()
 
 	originalWd, err := os.Getwd()
 	require.NoError(t, err)
-	defer func() { _ = os.Chdir(originalWd) }()
+	t.Cleanup(func() { _ = os.Chdir(originalWd) })
 
 	_ = os.Chdir(tempDir)
 	require.NoError(t, err)
@@ -98,7 +96,7 @@ func TestGetCurrentBranch_Integration(t *testing.T) {
 
 	originalWd, err := os.Getwd()
 	require.NoError(t, err)
-	defer func() { _ = os.Chdir(originalWd) }()
+	t.Cleanup(func() { _ = os.Chdir(originalWd) })
 
 	_ = os.Chdir(tempDir)
 	require.NoError(t, err)
@@ -125,7 +123,7 @@ func TestGetCurrentBranch_DifferentBranches(t *testing.T) {
 
 	originalWd, err := os.Getwd()
 	require.NoError(t, err)
-	defer func() { _ = os.Chdir(originalWd) }()
+	t.Cleanup(func() { _ = os.Chdir(originalWd) })
 
 	_ = os.Chdir(tempDir)
 	require.NoError(t, err)
@@ -160,7 +158,7 @@ func TestGetCurrentBranch_DetachedHead(t *testing.T) {
 
 	originalWd, err := os.Getwd()
 	require.NoError(t, err)
-	defer func() { _ = os.Chdir(originalWd) }()
+	t.Cleanup(func() { _ = os.Chdir(originalWd) })
 
 	_ = os.Chdir(tempDir)
 	require.NoError(t, err)
@@ -201,7 +199,7 @@ func TestGetGitInfo_Integration(t *testing.T) {
 
 	originalWd, err := os.Getwd()
 	require.NoError(t, err)
-	defer func() { _ = os.Chdir(originalWd) }()
+	t.Cleanup(func() { _ = os.Chdir(originalWd) })
 
 	_ = os.Chdir(tempDir)
 	require.NoError(t, err)
@@ -343,7 +341,7 @@ func TestGitFunctions_ErrorConditions(t *testing.T) {
 				defer func() { _ = os.RemoveAll(tempDir) }()
 
 				originalWd, _ := os.Getwd()
-				defer func() { _ = os.Chdir(originalWd) }()
+				t.Cleanup(func() { _ = os.Chdir(originalWd) })
 
 				_ = os.Chdir(tempDir)
 				_, err = DetectRepository()
@@ -360,7 +358,7 @@ func TestGitFunctions_ErrorConditions(t *testing.T) {
 				defer func() { _ = os.RemoveAll(tempDir) }()
 
 				originalWd, _ := os.Getwd()
-				defer func() { _ = os.Chdir(originalWd) }()
+				t.Cleanup(func() { _ = os.Chdir(originalWd) })
 
 				_ = os.Chdir(tempDir)
 				_, err = GetCurrentBranch()
@@ -403,17 +401,12 @@ func FuzzParseGitURL(f *testing.F) {
 func createTempGitRepo(t *testing.T) string {
 	t.Helper()
 
-	tempDir, err := os.MkdirTemp("", "git-repo-test-*")
-	require.NoError(t, err)
-
-	t.Cleanup(func() {
-		_ = os.RemoveAll(tempDir)
-	})
+	tempDir := t.TempDir()
 
 	// Initialize git repository
 	cmd := exec.Command("git", "init")
 	cmd.Dir = tempDir
-	err = cmd.Run()
+	err := cmd.Run()
 	if err != nil {
 		t.Skip("Git not available")
 	}

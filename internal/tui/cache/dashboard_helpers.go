@@ -76,7 +76,7 @@ func (c *SimpleCache) BuildRepositoryOverviewFromRuns(runs []*models.RunResponse
 		switch run.Status {
 		case models.StatusDone:
 			repo.RunCounts.Completed++
-		case models.StatusProcessing, models.StatusInitializing:
+		case models.StatusProcessing, models.StatusInitializing, models.StatusPostProcess:
 			repo.RunCounts.Running++
 		case models.StatusQueued:
 			repo.RunCounts.Running++ // Count queued as running for now

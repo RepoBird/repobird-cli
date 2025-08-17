@@ -658,11 +658,11 @@ func (s *StatusView) loadSystemInfo() tea.Cmd {
 
 		for _, run := range allRuns {
 			switch run.Status {
-			case "RUNNING", "PENDING":
+			case models.StatusProcessing, models.StatusInitializing, models.StatusQueued, models.StatusPostProcess:
 				runningRuns++
-			case "DONE":
+			case models.StatusDone:
 				completedRuns++
-			case "FAILED", "CANCELLED":
+			case models.StatusFailed:
 				failedRuns++
 			}
 		}

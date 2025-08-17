@@ -145,8 +145,7 @@ func TestSecureStorage_EnvironmentVariable(t *testing.T) {
 
 	// Set environment variable
 	envKey := "env-api-key-123"
-	_ = os.Setenv(EnvAPIKey, envKey)
-	defer os.Unsetenv(EnvAPIKey)
+	t.Setenv(EnvAPIKey, envKey)
 
 	// Get API key should return env var first
 	retrievedKey, err := storage.GetAPIKey()

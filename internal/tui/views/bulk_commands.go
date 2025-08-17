@@ -6,7 +6,6 @@ package views
 import (
 	"context"
 	"fmt"
-	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/repobird/repobird-cli/internal/api/dto"
@@ -135,43 +134,5 @@ func (v *BulkView) submitBulkRuns() tea.Cmd {
 			results: results,
 			err:     nil,
 		}
-	}
-}
-
-// pollProgress polls for bulk operation progress updates
-func (v *BulkView) pollProgress() tea.Cmd {
-	return func() tea.Msg {
-		ctx := context.Background()
-		statusChan, err := v.client.PollBulkStatus(ctx, v.batchID, 2*time.Second)
-		if err != nil {
-			return errMsg{err}
-		}
-
-		// Get first status update
-		status := <-statusChan
-
-		// Check if completed
-		completed := status.Status == "completed" ||
-			status.Status == "failed" ||
-			status.Status == "cancelled"
-
-		return bulkProgressMsg{
-			batchID:    v.batchID,
-			statistics: status.Statistics,
-			runs:       status.Runs,
-			completed:  completed,
-		}
-	}
-}
-
-// cancelBatch cancels a bulk operation
-func (v *BulkView) cancelBatch() tea.Cmd {
-	return func() tea.Msg {
-		ctx := context.Background()
-		err := v.client.CancelBulkRuns(ctx, v.batchID)
-		if err != nil {
-			return errMsg{err}
-		}
-		return bulkCancelledMsg{}
 	}
 }

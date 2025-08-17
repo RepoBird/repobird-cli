@@ -490,15 +490,3 @@ func (v *CreateRunView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Mo
 	return false, v, nil
 }
 
-// clearCurrentField clears the text of the currently focused field
-func (v *CreateRunView) clearCurrentField() {
-	// Clear the current field using the form's new method
-	v.form.ClearCurrentField()
-
-	// Log which field was cleared
-	fieldName := v.form.GetCurrentFieldName()
-	debug.LogToFilef("🗑️ CREATE VIEW: Cleared field '%s'", fieldName)
-
-	// Auto-save the form state after clearing
-	v.saveFormData()
-}

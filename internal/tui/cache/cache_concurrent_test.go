@@ -5,7 +5,6 @@ package cache
 
 import (
 	"fmt"
-	"os"
 	"sync"
 	"testing"
 	"time"
@@ -18,12 +17,8 @@ import (
 // TestNoCacheDeadlock tests that SetRepositoryData doesn't cause deadlocks
 func TestNoCacheDeadlock(t *testing.T) {
 	// Set up temporary config directory for test
-	tmpDir, err := os.MkdirTemp("", "cache-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
-
-	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
-	defer os.Unsetenv("XDG_CONFIG_HOME")
+	tmpDir := t.TempDir() // Automatically cleaned up
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
 	cache := NewSimpleCache()
 	defer cache.Stop()
@@ -62,12 +57,8 @@ func TestNoCacheDeadlock(t *testing.T) {
 
 // TestConcurrentGetSetRuns tests concurrent access to GetRuns and SetRuns
 func TestConcurrentGetSetRuns(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "cache-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
-
-	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
-	defer os.Unsetenv("XDG_CONFIG_HOME")
+	tmpDir := t.TempDir() // Automatically cleaned up
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
 	cache := NewSimpleCache()
 	defer cache.Stop()
@@ -109,12 +100,8 @@ func TestConcurrentGetSetRuns(t *testing.T) {
 
 // TestParallelCacheOperations tests multiple cache operations in parallel
 func TestParallelCacheOperations(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "cache-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
-
-	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
-	defer os.Unsetenv("XDG_CONFIG_HOME")
+	tmpDir := t.TempDir() // Automatically cleaned up
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
 	cache := NewSimpleCache()
 	defer cache.Stop()
@@ -194,12 +181,8 @@ func TestParallelCacheOperations(t *testing.T) {
 
 // TestHybridCacheParallelFetch tests parallel fetching in HybridCache.GetRuns
 func TestHybridCacheParallelFetch(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "cache-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
-
-	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
-	defer os.Unsetenv("XDG_CONFIG_HOME")
+	tmpDir := t.TempDir() // Automatically cleaned up
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
 	hybrid, err := NewHybridCache("test-user")
 	require.NoError(t, err)
@@ -247,12 +230,8 @@ func TestHybridCacheParallelFetch(t *testing.T) {
 
 // TestAtomicFileWrites tests that PermanentCache handles concurrent writes safely
 func TestAtomicFileWrites(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "cache-test-*")
-	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
-
-	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
-	defer os.Unsetenv("XDG_CONFIG_HOME")
+	tmpDir := t.TempDir() // Automatically cleaned up
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
 	perm, err := NewPermanentCache("test-user")
 	require.NoError(t, err)

@@ -19,28 +19,10 @@ func (d *DashboardView) copyToClipboard(text string) tea.Cmd {
 	return cmd
 }
 
-// copyToClipboardWithDescription copies text with a description for feedback
-func (d *DashboardView) copyToClipboardWithDescription(text, description string) tea.Cmd {
-	cmd, err := d.clipboardManager.CopyWithBlink(text, description)
-	if err != nil {
-		// Handle error - could set error message
-		return nil
-	}
-	return cmd
-}
-
 // startMessageClearTimer starts a timer to trigger UI refresh when message expires
 func (d *DashboardView) startMessageClearTimer(duration time.Duration) tea.Cmd {
 	return func() tea.Msg {
 		time.Sleep(duration)
 		return messageClearMsg{}
-	}
-}
-
-// startClearStatusTimer starts a timer to clear the status message
-func (d *DashboardView) startClearStatusTimer() tea.Cmd {
-	return func() tea.Msg {
-		time.Sleep(250 * time.Millisecond)
-		return clearStatusMsg{}
 	}
 }

@@ -14,11 +14,7 @@ import (
 
 func TestPersistentCache(t *testing.T) {
 	// Create a temporary cache directory for testing
-	tempDir, err := os.MkdirTemp("", "repobird-cache-test")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer func() { _ = os.RemoveAll(tempDir) }()
+	tempDir := t.TempDir()
 
 	// Create cache with temp directory
 	pc := &PersistentCache{
@@ -156,11 +152,7 @@ func TestPersistentCache(t *testing.T) {
 
 func TestCacheFileCorruption(t *testing.T) {
 	// Create a temporary cache directory for testing
-	tempDir, err := os.MkdirTemp("", "repobird-cache-corrupt-test")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer func() { _ = os.RemoveAll(tempDir) }()
+	tempDir := t.TempDir()
 
 	// Create cache with temp directory
 	pc := &PersistentCache{

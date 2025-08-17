@@ -343,6 +343,8 @@ func (v *BulkView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cmds = append(cmds, cmd)
 				return v, tea.Batch(cmds...)
 			}
+		case ModeInstructions, ModeRunList, ModeRunEdit, ModeProgress, ModeResults:
+			// These modes don't need special raw key input handling
 		}
 
 		// SECOND: Handle view-specific navigation keys
@@ -356,6 +358,10 @@ func (v *BulkView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case ModeRunList:
 			debug.LogToFilef("DEBUG: BulkView - delegating to handleRunListKeys, key='%s'\n", msg.String())
 			return v.handleRunListKeys(msg)
+		case ModeRunEdit, ModeProgress, ModeResults:
+			// These modes have their own specific key handling
+			// but we're not in those flows currently
+			return v, nil
 		}
 
 	case components.BulkFileSelectedMsg:
@@ -1402,6 +1408,9 @@ func (v *BulkView) renderStatusLineWithScroll(layoutName string, scrollIndicator
 			mode = "NAV"
 			helpText = "↑↓/j/k:nav space:select i:input mode esc:back enter:confirm"
 		}
+	case ModeRunEdit, ModeProgress, ModeResults:
+		// These modes would have their own help text
+		helpText = "[h]back [q]dashboard"
 	case ModeRunList:
 		if v.focusMode == "buttons" {
 			helpText = "↑↓:nav enter:select tab:switch-to-runs [q]dashboard"

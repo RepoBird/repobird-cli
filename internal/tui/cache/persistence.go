@@ -42,19 +42,6 @@ func (c *SimpleCache) LoadFromDisk() error {
 	return nil
 }
 
-// gatherFileHashes collects all file hashes from cache (internal use, assumes lock held)
-func (c *SimpleCache) gatherFileHashes() map[string]string {
-	// Use the hybrid cache to get all file hashes
-	return c.hybrid.GetAllFileHashes()
-}
-
-// getDashboardDataUnsafe gets dashboard data without locking (internal use)
-func (c *SimpleCache) getDashboardDataUnsafe() *DashboardData {
-	// Use the hybrid cache to get dashboard data
-	data, _ := c.hybrid.GetDashboardData()
-	return data
-}
-
 // GetCacheFilePath returns the path where cache is stored
 func GetCacheFilePath() string {
 	// Respect XDG_CONFIG_HOME environment variable for testing

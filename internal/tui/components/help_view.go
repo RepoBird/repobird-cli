@@ -575,51 +575,6 @@ func (h *HelpView) buildScrollbarLines(totalHeight int) []string {
 	return lines
 }
 
-// buildSimpleScrollbar creates a standalone scrollbar as a single string
-func (h *HelpView) buildSimpleScrollbar(height int) string {
-	if height <= 0 {
-		return ""
-	}
-
-	// Calculate scrollbar metrics
-	totalLines := len(h.contentLines)
-	visibleLines := h.viewport.Height
-
-	// Calculate thumb size and position
-	thumbSize := max(1, (visibleLines*height)/totalLines)
-	if thumbSize > height {
-		thumbSize = height
-	}
-
-	percentScrolled := h.viewport.ScrollPercent()
-	maxThumbPos := height - thumbSize
-	thumbPos := int(float64(maxThumbPos) * percentScrolled)
-	if thumbPos < 0 {
-		thumbPos = 0
-	}
-	if thumbPos > maxThumbPos {
-		thumbPos = maxThumbPos
-	}
-
-	// Build scrollbar as array of lines
-	var lines []string
-	for i := 0; i < height; i++ {
-		if i >= thumbPos && i < thumbPos+thumbSize {
-			// Thumb
-			lines = append(lines, lipgloss.NewStyle().
-				Foreground(lipgloss.Color("63")).
-				Render("█"))
-		} else {
-			// Track
-			lines = append(lines, lipgloss.NewStyle().
-				Foreground(lipgloss.Color("238")).
-				Render("│"))
-		}
-	}
-
-	return strings.Join(lines, "\n")
-}
-
 // max returns the maximum of two integers
 func max(a, b int) int {
 	if a > b {

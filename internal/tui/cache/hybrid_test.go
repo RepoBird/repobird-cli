@@ -4,7 +4,6 @@
 package cache
 
 import (
-	"os"
 	"testing"
 	"time"
 
@@ -15,13 +14,11 @@ import (
 
 func TestHybridCache_StatusTransition(t *testing.T) {
 	// Setup test directory
-	tmpDir := t.TempDir()
-	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
-	defer os.Unsetenv("XDG_CONFIG_HOME")
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 
 	cache, err := NewHybridCache("test-user")
 	require.NoError(t, err)
-	defer func() { _ = cache.Close() }()
+	t.Cleanup(func() { _ = cache.Close() })
 
 	// Start with active run
 	run := models.RunResponse{
@@ -59,13 +56,11 @@ func TestHybridCache_StatusTransition(t *testing.T) {
 
 func TestHybridCache_MixedRunStates(t *testing.T) {
 	// Setup test directory
-	tmpDir := t.TempDir()
-	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
-	defer os.Unsetenv("XDG_CONFIG_HOME")
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 
 	cache, err := NewHybridCache("test-user")
 	require.NoError(t, err)
-	defer func() { _ = cache.Close() }()
+	t.Cleanup(func() { _ = cache.Close() })
 
 	// Create runs with different states and unique times
 	runs := []models.RunResponse{
@@ -105,13 +100,11 @@ func TestHybridCache_MixedRunStates(t *testing.T) {
 
 func TestHybridCache_UserInfo(t *testing.T) {
 	// Setup test directory
-	tmpDir := t.TempDir()
-	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
-	defer os.Unsetenv("XDG_CONFIG_HOME")
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 
 	cache, err := NewHybridCache("test-user")
 	require.NoError(t, err)
-	defer func() { _ = cache.Close() }()
+	t.Cleanup(func() { _ = cache.Close() })
 
 	// Initially no user info
 	_, found := cache.GetUserInfo()
@@ -144,13 +137,11 @@ func TestHybridCache_UserInfo(t *testing.T) {
 
 func TestHybridCache_FileHashes(t *testing.T) {
 	// Setup test directory
-	tmpDir := t.TempDir()
-	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
-	defer os.Unsetenv("XDG_CONFIG_HOME")
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 
 	cache, err := NewHybridCache("test-user")
 	require.NoError(t, err)
-	defer func() { _ = cache.Close() }()
+	t.Cleanup(func() { _ = cache.Close() })
 
 	// Set file hashes
 	err = cache.SetFileHash("file1.go", "abc123")
@@ -181,13 +172,11 @@ func TestHybridCache_FileHashes(t *testing.T) {
 
 func TestHybridCache_RepositoryList(t *testing.T) {
 	// Setup test directory
-	tmpDir := t.TempDir()
-	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
-	defer os.Unsetenv("XDG_CONFIG_HOME")
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 
 	cache, err := NewHybridCache("test-user")
 	require.NoError(t, err)
-	defer func() { _ = cache.Close() }()
+	t.Cleanup(func() { _ = cache.Close() })
 
 	// Set repository list
 	repos := []string{"org/repo1", "org/repo2", "user/repo3"}
@@ -211,13 +200,11 @@ func TestHybridCache_RepositoryList(t *testing.T) {
 
 func TestHybridCache_DashboardData(t *testing.T) {
 	// Setup test directory
-	tmpDir := t.TempDir()
-	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
-	defer os.Unsetenv("XDG_CONFIG_HOME")
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 
 	cache, err := NewHybridCache("test-user")
 	require.NoError(t, err)
-	defer func() { _ = cache.Close() }()
+	t.Cleanup(func() { _ = cache.Close() })
 
 	// Create dashboard data
 	dashData := &DashboardData{
@@ -252,13 +239,11 @@ func TestHybridCache_DashboardData(t *testing.T) {
 
 func TestHybridCache_InvalidateRun(t *testing.T) {
 	// Setup test directory
-	tmpDir := t.TempDir()
-	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
-	defer os.Unsetenv("XDG_CONFIG_HOME")
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 
 	cache, err := NewHybridCache("test-user")
 	require.NoError(t, err)
-	defer func() { _ = cache.Close() }()
+	t.Cleanup(func() { _ = cache.Close() })
 
 	// Add both active and terminal runs
 	activeRun := models.RunResponse{
@@ -302,13 +287,11 @@ func TestHybridCache_InvalidateRun(t *testing.T) {
 
 func TestHybridCache_Clear(t *testing.T) {
 	// Setup test directory
-	tmpDir := t.TempDir()
-	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
-	defer os.Unsetenv("XDG_CONFIG_HOME")
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 
 	cache, err := NewHybridCache("test-user")
 	require.NoError(t, err)
-	defer func() { _ = cache.Close() }()
+	t.Cleanup(func() { _ = cache.Close() })
 
 	// Add various data
 	_ = cache.SetRun(models.RunResponse{
@@ -345,13 +328,11 @@ func TestHybridCache_Clear(t *testing.T) {
 
 func TestHybridCache_GetStats(t *testing.T) {
 	// Setup test directory
-	tmpDir := t.TempDir()
-	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
-	defer os.Unsetenv("XDG_CONFIG_HOME")
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 
 	cache, err := NewHybridCache("test-user")
 	require.NoError(t, err)
-	defer func() { _ = cache.Close() }()
+	t.Cleanup(func() { _ = cache.Close() })
 
 	// Add data
 	runs := []models.RunResponse{
@@ -377,7 +358,7 @@ func TestHybridCache_FallbackToSessionOnly(t *testing.T) {
 		permanent: nil, // Simulate failed permanent cache
 		userID:    "test-user",
 	}
-	defer func() { _ = cache.Close() }()
+	t.Cleanup(func() { _ = cache.Close() })
 
 	// Should still work with session-only
 	run := models.RunResponse{
@@ -408,13 +389,11 @@ func TestHybridCache_FallbackToSessionOnly(t *testing.T) {
 
 func TestHybridCache_OldStuckRunRouting(t *testing.T) {
 	// Setup test directory
-	tmpDir := t.TempDir()
-	_ = os.Setenv("XDG_CONFIG_HOME", tmpDir)
-	defer os.Unsetenv("XDG_CONFIG_HOME")
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 
 	cache, err := NewHybridCache("test-user")
 	require.NoError(t, err)
-	defer func() { _ = cache.Close() }()
+	t.Cleanup(func() { _ = cache.Close() })
 
 	// Old stuck run (should go to permanent)
 	oldRun := models.RunResponse{

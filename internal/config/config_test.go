@@ -349,17 +349,11 @@ func TestConfig_EdgeCases(t *testing.T) {
 
 // setupTempHome creates a temporary directory and sets HOME to it
 func setupTempHome(t *testing.T) string {
-	tempDir, err := os.MkdirTemp("", "repobird-config-test-*")
-	require.NoError(t, err)
+	tempDir := t.TempDir()
 
-	originalHome := os.Getenv("HOME")
-	originalXDGConfig := os.Getenv("XDG_CONFIG_HOME")
-	originalAPIURL := os.Getenv("REPOBIRD_API_URL")
-	originalAPIKey := os.Getenv("REPOBIRD_API_KEY")
-
-	_ = os.Setenv("HOME", tempDir)
-	_ = os.Setenv("XDG_CONFIG_HOME", tempDir) // Also set XDG for complete isolation
-	_ = os.Unsetenv("REPOBIRD_API_URL")       // Clear any env vars that might affect config
+	t.Setenv("HOME", tempDir)
+	t.Setenv("XDG_CONFIG_HOME", tempDir) // Also set XDG for complete isolation
+	_ = os.Unsetenv("REPOBIRD_API_URL")  // Clear any env vars that might affect config
 	_ = os.Unsetenv("REPOBIRD_API_KEY")
 
 	// Create a new viper instance to avoid global state pollution
@@ -369,15 +363,8 @@ func setupTempHome(t *testing.T) string {
 	viper.Reset()
 
 	t.Cleanup(func() {
-		_ = os.Setenv("HOME", originalHome)
-		_ = os.Setenv("XDG_CONFIG_HOME", originalXDGConfig)
-		if originalAPIURL != "" {
-			_ = os.Setenv("REPOBIRD_API_URL", originalAPIURL)
-		}
-		if originalAPIKey != "" {
-			_ = os.Setenv("REPOBIRD_API_KEY", originalAPIKey)
-		}
-		_ = os.RemoveAll(tempDir)
+		// Note: t.Setenv automatically restores original values
+		// t.TempDir automatically removes directory
 		viper.Reset() // Reset viper after test
 	})
 

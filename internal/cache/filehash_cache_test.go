@@ -391,10 +391,7 @@ func TestFileHashCache_FetchFromAPI_Error(t *testing.T) {
 
 func TestFileHashCache_EnsureLoaded(t *testing.T) {
 	// Use temp directory to avoid cache pollution - IMPORTANT: isolate completely from real cache
-	tmpDir := t.TempDir()
-	oldCacheHome := os.Getenv("XDG_CACHE_HOME")
-	_ = os.Setenv("XDG_CACHE_HOME", tmpDir)
-	defer os.Setenv("XDG_CACHE_HOME", oldCacheHome)
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
 
 	// Create cache with a test user ID to ensure isolation
 	testUserID := -9999 // Negative ID for test/debug mode

@@ -217,9 +217,9 @@ func BuildRepositoryOverviewFromRuns(runs []*models.RunResponse) []models.Reposi
 			repoIDNameMap[run.RepoID] = repoName
 		}
 
-		repo, exists := repoMap[repoName]
+		_, exists := repoMap[repoName]
 		if !exists {
-			repo = &models.Repository{
+			repo := &models.Repository{
 				Name:         repoName,
 				RunCounts:    models.RunStats{},
 				LastActivity: run.UpdatedAt,

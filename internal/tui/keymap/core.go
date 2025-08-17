@@ -131,6 +131,8 @@ func IsNavigationAction(action KeyAction) bool {
 		ActionNavigateRefresh, ActionNavigateQuit, ActionNavigateHelp,
 		ActionNavigateToDashboard:
 		return true
+	case ActionViewSpecific, ActionIgnore, ActionGlobalQuit, ActionGlobalHelp:
+		return false
 	default:
 		return false
 	}
@@ -141,6 +143,10 @@ func IsGlobalAction(action KeyAction) bool {
 	switch action {
 	case ActionGlobalQuit, ActionGlobalHelp:
 		return true
+	case ActionNavigateBack, ActionNavigateBulk, ActionNavigateNew,
+		ActionNavigateRefresh, ActionNavigateQuit, ActionNavigateHelp,
+		ActionNavigateToDashboard, ActionViewSpecific, ActionIgnore:
+		return false
 	default:
 		return false
 	}

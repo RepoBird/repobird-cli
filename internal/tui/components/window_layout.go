@@ -149,6 +149,9 @@ func (w *WindowLayout) GetLayoutForType(layoutType LayoutType) *WindowLayout {
 	case LayoutSplit:
 		// Split views might need different height calculations
 		return w
+	case LayoutStandard:
+		// Standard layout uses default calculations
+		return w
 	default:
 		return w
 	}
