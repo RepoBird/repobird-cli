@@ -56,3 +56,6 @@ run-tasks/prod/
 
 # Development run task files
 run-tasks/dev/
+
+# Git backup directories (from git filter-repo operations)
+.git-backup-*
