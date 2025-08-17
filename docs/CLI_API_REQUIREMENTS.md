@@ -246,11 +246,11 @@ interface ListResponse<T> {
 
 # 1. Verify API key (obtained from https://repobird.ai/dashboard/user-profile)
 curl -X GET https://repobird.ai/api/v1/auth/verify \
-  -H "Authorization: Bearer YOUR_API_KEY"
+  -H "Authorization: Bearer <your-api-key>"
 
 # 2. Create a run (minimal)
 curl -X POST https://repobird.ai/api/v1/runs \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Authorization: Bearer <your-api-key>" \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "Fix the login bug in auth.js",
@@ -259,7 +259,7 @@ curl -X POST https://repobird.ai/api/v1/runs \
 
 # 2b. Create a run (with options)
 curl -X POST https://repobird.ai/api/v1/runs \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Authorization: Bearer <your-api-key>" \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "Fix the login bug in auth.js",
@@ -272,15 +272,15 @@ curl -X POST https://repobird.ai/api/v1/runs \
 
 # 3. Check status
 curl -X GET https://repobird.ai/api/v1/runs/12345 \
-  -H "Authorization: Bearer YOUR_API_KEY"
+  -H "Authorization: Bearer <your-api-key>"
 
 # 4. Get logs
 curl -X GET https://repobird.ai/api/v1/runs/12345/logs \
-  -H "Authorization: Bearer YOUR_API_KEY"
+  -H "Authorization: Bearer <your-api-key>"
 
 # 5. List all runs
 curl -X GET https://repobird.ai/api/v1/runs?page=1&limit=10 \
-  -H "Authorization: Bearer YOUR_API_KEY"
+  -H "Authorization: Bearer <your-api-key>"
 ```
 
 ## Required Documentation

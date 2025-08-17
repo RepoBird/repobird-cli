@@ -1,303 +1,332 @@
 # RepoBird CLI
 
-CLI and TUI (Terminal User Interface) for [RepoBird.ai](https://repobird.ai) - trigger AI coding agents, submit batch runs, and monitor your AI agent runs through an interactive dashboard.
+[![Go Version](https://img.shields.io/badge/Go-1.20+-00ADD8?style=flat&logo=go)](https://go.dev)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![CI Status](https://img.shields.io/github/actions/workflow/status/repobird/repobird-cli/ci.yml?branch=main)](https://github.com/repobird/repobird-cli/actions)
+[![Release](https://img.shields.io/github/v/release/repobird/repobird-cli)](https://github.com/repobird/repobird-cli/releases)
 
-## Quick Start
+RepoBird CLI is a powerful command-line interface and terminal UI for [RepoBird.ai](https://repobird.ai) - the AI-powered code generation platform. Submit coding tasks to AI agents, track progress in real-time, and manage your development workflows efficiently from your terminal.
 
-### Installation
+## 🎯 What is RepoBird?
 
-#### From Source
+RepoBird is an AI platform that automates code generation and software development tasks. Simply describe what you want to build or fix, and RepoBird's AI agents will create pull requests with the changes. The CLI tool gives you full control over this process directly from your terminal.
+
+### Key Features
+
+- 🤖 **AI-Powered Development**: Submit tasks in natural language and get production-ready code
+- 📊 **Real-Time Monitoring**: Track AI agent progress with live updates
+- 🎨 **Interactive Dashboard**: Rich terminal UI with intuitive navigation
+- 🔄 **Batch Operations**: Submit and manage multiple tasks simultaneously
+- 🔍 **Smart Search**: Fuzzy search across repositories and runs
+- 🛡️ **Duplicate Prevention**: Automatic detection prevents accidental re-submissions
+- 🔐 **Secure Authentication**: Safe API key management with multiple auth methods
+
+## 📦 Installation
+
+### macOS
+
+#### Using Homebrew (Recommended)
 ```bash
-# Clone the repository
+brew tap repobird/tap
+brew install repobird-cli
+```
+
+#### Direct Download
+```bash
+# Download latest release for macOS (Apple Silicon)
+curl -L https://github.com/repobird/repobird-cli/releases/latest/download/repobird-darwin-arm64 -o repobird
+chmod +x repobird
+sudo mv repobird /usr/local/bin/
+
+# For Intel Macs
+curl -L https://github.com/repobird/repobird-cli/releases/latest/download/repobird-darwin-amd64 -o repobird
+chmod +x repobird
+sudo mv repobird /usr/local/bin/
+```
+
+### Linux
+
+#### Using Script
+```bash
+curl -sSL https://raw.githubusercontent.com/repobird/repobird-cli/main/install.sh | bash
+```
+
+#### Direct Download
+```bash
+# Download latest release for Linux
+curl -L https://github.com/repobird/repobird-cli/releases/latest/download/repobird-linux-amd64 -o repobird
+chmod +x repobird
+sudo mv repobird /usr/local/bin/
+```
+
+### Windows
+
+#### Using Scoop
+```powershell
+scoop bucket add repobird https://github.com/repobird/scoop-bucket
+scoop install repobird
+```
+
+#### Direct Download
+Download the latest Windows executable from the [releases page](https://github.com/repobird/repobird-cli/releases).
+
+### Build from Source
+
+```bash
+# Requires Go 1.20+
 git clone https://github.com/repobird/repobird-cli.git
 cd repobird-cli
-
-# Build the binary
 make build
 
-# Install to PATH (optional)
+# Install globally (optional)
 sudo cp build/repobird /usr/local/bin/
 ```
 
-#### Download Binary
-Download the latest release from the [releases page](https://github.com/yourusername/repobird-cli/releases).
+## 🚀 Quick Start
 
-### Configuration
+### 1. Get Your API Key
 
-#### Authentication
+Sign up for a free account at [RepoBird.ai](https://repobird.ai) to get your API key.
+
+### 2. Authenticate
+
 ```bash
-# Secure login (recommended)
+# Interactive login (recommended)
 repobird login
+# Enter your API key when prompted
 
-# Verify your API key
+# Verify authentication
 repobird verify
-
-# Check authentication status
-repobird info
-
-# Logout (remove stored API key)
-repobird logout
 ```
 
-#### Alternative Methods
+### 3. Submit Your First Task
+
 ```bash
-# Set API key via config command
-repobird config set api-key YOUR_API_KEY
+# Create a simple task file
+echo '{
+  "repository": "your-org/your-repo",
+  "prompt": "Add a README file with project documentation"
+}' > task.json
 
-# Or use environment variable
-export REPOBIRD_API_KEY=YOUR_API_KEY
-```
-
-### Basic Usage
-
-#### Generate Example Configurations
-```bash
-# View configuration schema and examples
-repobird examples schema
-
-# Generate example files
-repobird examples generate minimal -o task.json
-repobird examples generate run -f yaml -o task.yaml
-repobird examples generate bulk -o bulk.json
-```
-
-#### Submit a Task
-```bash
-# Run a single task from a JSON file
-repobird run task.json
-
-# Run and follow progress
+# Submit the task
 repobird run task.json --follow
-
-# Run from YAML or Markdown file
-repobird run task.yaml
-repobird run task.md
-
-# Run multiple tasks (bulk) from a file with runs array
-repobird run tasks.json  # Automatically detects bulk format
 ```
 
-#### Check Status
-```bash
-# View all runs
-repobird status
+### 4. Monitor Progress
 
-# Check specific run
-repobird status RUN_ID
-
-# Follow run progress
-repobird status --follow RUN_ID
-```
-
-#### Interactive TUI
 ```bash
 # Launch the interactive dashboard
 repobird tui
 
-# TUI Navigation:
-# - Tab/Arrow keys: Navigate between columns
-# - Enter: Select item and move to next column
-# - f: Activate fuzzy search (FZF mode) for current column
-# - n: Create new run
-# - s: Show status info
-# - r: Refresh data
-# - ?: Toggle help
-# - q: Quit
+# Or check status via CLI
+repobird status
 ```
 
-### Task Configuration Formats
+## 📖 Usage Guide
 
-The `repobird run` command supports multiple formats and automatically detects single vs bulk runs:
-- **JSON/YAML** - Single or bulk runs with `prompt` (required) and `repository` (required)
-- **Markdown** - YAML frontmatter with documentation in body
-- **JSONL** - JSON Lines for bulk operations
-- **Stdin** - Pipe JSON directly
+### Authentication Management
 
-#### Required Fields
-- `repository` - Repository name in format "owner/repo"
-- `prompt` - Task description/instructions for the AI
+```bash
+repobird login          # Interactive login with API key
+repobird verify         # Verify your API key is valid
+repobird info           # Show authentication status
+repobird logout         # Remove stored credentials
 
-#### Optional Fields
-- `source` - Source branch (defaults to repository's default branch if not specified)
-- `target` - Target branch name (auto-generated if not specified)
-- `title` - Human-readable title (auto-generated if not specified)
-- `runType` - Type: "run" or "plan" (default: "run")
-- `context` - Additional context or instructions
-- `files` - List of specific files to include
+# Alternative: Use environment variable
+export REPOBIRD_API_KEY=your-api-key
+```
 
-#### Example: Minimal Configuration
+### Submitting Tasks
+
+```bash
+# Single task
+repobird run task.json --follow
+
+# From different formats
+repobird run task.yaml          # YAML format
+repobird run task.md            # Markdown with frontmatter
+cat task.json | repobird run -  # From stdin
+
+# Bulk operations
+repobird bulk tasks.json        # Submit multiple tasks
+```
+
+### Monitoring & Management
+
+```bash
+# Check status
+repobird status                 # List all runs
+repobird status RUN_ID          # Check specific run
+repobird status --follow RUN_ID # Live updates
+
+# Interactive dashboard
+repobird tui                    # Launch terminal UI
+```
+
+### Terminal UI Navigation
+
+The interactive dashboard provides a rich interface for managing your runs:
+
+| Key | Action |
+|-----|--------|
+| `Tab` / `→` | Navigate forward between columns |
+| `Shift+Tab` / `←` | Navigate backward |
+| `↑` / `↓` | Move selection up/down |
+| `Enter` | Select item |
+| `f` | Fuzzy search in current column |
+| `n` | Create new run |
+| `r` | Refresh data |
+| `?` | Show help |
+| `q` | Quit |
+
+### Example Templates
+
+```bash
+# Generate example configurations
+repobird examples generate minimal -o task.json
+repobird examples generate bulk -o bulk.json
+repobird examples schema  # View full schema documentation
+```
+
+## 📝 Task Configuration
+
+Tasks are defined in JSON, YAML, or Markdown files with two required fields:
+
+- `repository` - Target repository (format: "owner/repo")
+- `prompt` - Task description for the AI
+
+### Simple Example
+
 ```json
 {
   "repository": "myorg/webapp",
-  "prompt": "Fix the authentication bug where users cannot log in after 5 failed attempts"
+  "prompt": "Add user authentication with JWT tokens"
 }
 ```
 
-#### Example: Full Configuration
+### Advanced Example
+
 ```json
 {
   "repository": "myorg/webapp",
-  "prompt": "Add user authentication to the application",
+  "prompt": "Implement OAuth2 authentication",
   "source": "main",
-  "target": "feature/auth",
-  "title": "Add authentication system",
-  "runType": "run",
-  "context": "Use JWT tokens and bcrypt for password hashing",
-  "files": ["src/auth.js", "src/models/user.js"]
+  "target": "feature/oauth",
+  "title": "Add OAuth2 support",
+  "context": "Use Google and GitHub as providers",
+  "files": ["src/auth/", "config/oauth.json"]
 }
 ```
 
-#### Example: Bulk Configuration
+### Bulk Operations
+
+Submit multiple tasks in a single file:
+
 ```json
 {
   "repository": "myorg/webapp",
-  "source": "main",
-  "runType": "run",
   "runs": [
-    {
-      "prompt": "Fix authentication bug",
-      "title": "Fix auth issue",
-      "target": "fix/auth"
-    },
-    {
-      "prompt": "Add logging to API",
-      "title": "Add API logging",
-      "target": "feature/logging"
-    }
+    {"prompt": "Fix login bug", "target": "fix/login"},
+    {"prompt": "Add password reset", "target": "feature/reset"},
+    {"prompt": "Improve error handling", "target": "fix/errors"}
   ]
 }
 ```
 
-#### Example: YAML Format
-```yaml
-repository: myorg/webapp
-prompt: Add user authentication to the application
-source: main
-target: feature/auth
-title: Add authentication system
-runType: run
-context: Use JWT tokens and bcrypt for password hashing
-files:
-  - src/auth.js
-  - src/models/user.js
-```
+For complete configuration options and examples, see the [Run Configuration Guide](docs/RUN-CONFIG-FORMATS.md).
 
-#### Example: Markdown Format
-```markdown
----
-repository: myorg/webapp
-prompt: Add user authentication to the application
----
+## 🛡️ Advanced Features
 
-# Additional Context
+### Duplicate Prevention
 
-Implement a secure authentication system using:
-- JWT tokens for session management
-- bcrypt for password hashing
-- Rate limiting for login attempts
-```
+RepoBird automatically prevents accidental duplicate submissions:
+- File content hashing detects when you're re-running the same task
+- Visual indicators in the TUI show duplicate status
+- Easy override option when you intentionally want to re-run
 
-For complete format documentation and more examples, see [Run Config Formats](docs/run-config-formats.md).
+### Smart Caching
 
-### Duplicate Run Prevention
+- Local caching reduces API calls and improves performance
+- Repository and run data cached for quick access
+- Automatic cache invalidation on updates
 
-RepoBird CLI automatically detects and prevents duplicate task submissions using file hashing:
+### Retry Logic
 
-- **Universal File Support**: Works with JSON, YAML, Markdown, or any file type - calculates SHA-256 hash of file content
-- **Visual Indicator**: The TUI shows a validation status indicator next to the Submit button:
-  - ✓ Ready to submit (green) - Task is valid and not a duplicate
-  - ⚠️ Duplicate detected (yellow) - This task file has already been submitted
-- **User-Friendly Override**: When a duplicate is detected during submission:
-  - **No Error Page**: Instead of showing a confusing error, you get a clear prompt
-  - **Yellow Status Bar**: `[DUPLICATE] ⚠️ DUPLICATE RUN DETECTED (ID: 123) - Override? [y] yes [n] no`
-  - **One-Click Retry**: Press `y` to automatically override and submit, or `n` to cancel
-- **Smart Caching**: File hashes are cached locally and synced with the server to prevent accidental re-submissions
+- Automatic exponential backoff for transient failures
+- Configurable retry attempts and timeouts
+- Graceful handling of rate limits
 
-This feature helps prevent:
-- Accidental double-clicks or re-submissions
-- Running the same task file multiple times by mistake
-- Wasting API credits on duplicate runs
+## 📚 Documentation
 
-The duplicate detection works across all your devices as the hash tracking is server-side.
+### Getting Started
+- [Installation Guide](https://repobird.ai/docs/cli/installation) - Platform-specific setup instructions
+- [Quick Start Tutorial](https://repobird.ai/docs/cli/quickstart) - Your first RepoBird task
+- [Configuration Guide](docs/CONFIGURATION-GUIDE.md) - Authentication and settings
 
-### Common Commands
+### User Guides
+- [Terminal UI Guide](docs/TUI-GUIDE.md) - Master the interactive dashboard
+- [Run Configuration Formats](docs/RUN-CONFIG-FORMATS.md) - Task file examples
+- [Bulk Operations Guide](docs/BULK-RUNS.md) - Managing multiple tasks
+- [Troubleshooting Guide](docs/TROUBLESHOOTING.md) - Common issues and solutions
+
+### Reference
+- [CLI Command Reference](docs/cli-reference.md) - Complete command documentation
+- [API Reference](docs/API-REFERENCE.md) - REST API integration
+- [Keyboard Shortcuts](docs/QUICK-REFERENCE.md) - TUI navigation cheat sheet
+
+### Development
+- [Architecture Overview](docs/ARCHITECTURE.md) - System design and components
+- [Development Guide](docs/DEVELOPMENT-GUIDE.md) - Setup for contributors
+- [Testing Guide](docs/TESTING-GUIDE.md) - Test strategies and patterns
+
+## 🤝 Contributing
+
+We welcome contributions! RepoBird CLI is open source and community-driven.
+
+### How to Contribute
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to your branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+Please read our [Contributing Guidelines](CONTRIBUTING.md) for details on our code of conduct and development process.
+
+### Development Setup
 
 ```bash
-# View help
-repobird --help
-repobird run --help
+# Clone your fork
+git clone https://github.com/your-username/repobird-cli.git
+cd repobird-cli
 
-# Check version
-repobird version
+# Install dependencies
+make deps
 
-# List configuration
-repobird config list
+# Run tests
+make test
 
-# Authentication commands
-repobird login      # Secure login with API key
-repobird logout     # Remove stored API key
-repobird verify     # Verify API key is valid
-repobird info       # Show authentication status
+# Build locally
+make build
 ```
 
-## Features
+## 📄 License
 
-- 🚀 Submit AI-powered code generation tasks
-- 📊 Real-time status tracking with progress updates
-- 🎨 Rich terminal UI with interactive dashboard
-- 🔍 Fuzzy search (FZF) for quick navigation and selection
-- 🔐 Secure API key management
-- 🔄 Automatic retry with exponential backoff
-- 📝 Support for both run and approval workflows
-- 🛡️ Duplicate run prevention with file hash tracking
-- 🌍 Cross-platform support (Linux, macOS, Windows)
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-### Terminal UI Features
+## 🌟 Support
 
-#### Dashboard View
-- **Miller Columns Layout**: Navigate repositories, runs, and details in three columns
-- **Fuzzy Search**: Press `f` on any column to activate FZF mode for quick filtering
-- **Keyboard Navigation**: Vim-style keys (h/j/k/l) or arrow keys
-- **Real-time Updates**: Auto-refresh with customizable intervals
-- **Status Indicators**: Visual icons for run status (✓ success, ⚡ running, ✗ failed)
+- **Documentation**: [repobird.ai/docs](https://repobird.ai/docs)
+- **Issues**: [GitHub Issues](https://github.com/repobird/repobird-cli/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/repobird/repobird-cli/discussions)
 
-#### Create Run View
-- **Repository Selection**: Fuzzy search through repository history
-- **Form Validation**: Real-time validation with helpful error messages
-- **Keyboard Shortcuts**:
-  - `Ctrl+F`: Activate fuzzy search for repository field
-  - `f` (in normal mode): Fuzzy search when on repository field
-  - `Ctrl+S`: Submit run
-  - `Tab`: Navigate between fields
+## 🙏 Acknowledgments
 
-## Requirements
+Built with:
+- [Cobra](https://github.com/spf13/cobra) - CLI framework
+- [Bubble Tea](https://github.com/charmbracelet/bubbletea) - Terminal UI framework
+- [Lipgloss](https://github.com/charmbracelet/lipgloss) - Terminal styling
 
-- Go 1.20+ (for building from source)
-- Git (for repository operations)
-- Internet connection
+---
 
-## Development
-
-For development information, see [DEV.md](DEV.md).
-
-## Contributing
-
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-## Documentation
-
-- [Quick Reference](docs/quick-reference.md) - Keyboard shortcuts and commands cheat sheet
-- [Terminal UI Guide](docs/tui-guide.md) - Complete guide to the interactive interface
-- [Architecture Overview](docs/architecture.md)
-- [API Reference](docs/api-reference.md)
-- [Configuration Guide](docs/configuration-guide.md)
-- [Development Guide](docs/development-guide.md)
-- [Troubleshooting Guide](docs/troubleshooting.md)
-
-## License
-
-[Add your license here]
-
-## Support
-
-For issues and feature requests, please use the [GitHub issue tracker](https://github.com/yourusername/repobird-cli/issues).
+Made with ❤️ by the RepoBird team

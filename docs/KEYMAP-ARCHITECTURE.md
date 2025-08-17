@@ -5,9 +5,9 @@
 Centralized key processing system providing consistent, extensible key handling across all TUI views.
 
 ## Related Documentation
-- **[TUI Guide](tui-guide.md)** - Complete TUI navigation and usage
-- **[Architecture Overview](architecture.md)** - System design patterns
-- **[Dashboard Layouts](dashboard-layouts.md)** - View-specific key handling
+- **[TUI Guide](TUI-GUIDE.md)** - Complete TUI navigation and usage
+- **[Architecture Overview](ARCHITECTURE.md)** - System design patterns
+- **[Dashboard Layouts](DASHBOARD-LAYOUTS.md)** - View-specific key handling
 
 ## Architecture
 

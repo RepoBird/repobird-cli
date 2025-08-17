@@ -5,9 +5,9 @@
 Comprehensive testing strategies and patterns for RepoBird CLI.
 
 ## Related Documentation
-- **[Development Guide](development-guide.md)** - Development setup and workflow
-- **[Architecture Overview](architecture.md)** - System design for testability
-- **[TUI Guide](tui-guide.md)** - TUI testing patterns
+- **[Development Guide](DEVELOPMENT-GUIDE.md)** - Development setup and workflow
+- **[Architecture Overview](ARCHITECTURE.md)** - System design for testability
+- **[TUI Guide](TUI-GUIDE.md)** - TUI testing patterns
 
 ## Quick Start
 

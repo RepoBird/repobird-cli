@@ -19,11 +19,11 @@ RepoBird CLI is a Go-based terminal application for interacting with the RepoBir
 ```
 
 ## Related Documentation
-- **[TUI Guide](tui-guide.md)** - Terminal UI implementation details
-- **[API Reference](api-reference.md)** - REST API client implementation  
-- **[Configuration Guide](configuration-guide.md)** - Settings and authentication
-- **[Testing Guide](testing-guide.md)** - Testing patterns and strategies
-- **[Development Guide](development-guide.md)** - Setup and contributing
+- **[TUI Guide](TUI-GUIDE.md)** - Terminal UI implementation details
+- **[API Reference](API-REFERENCE.md)** - REST API client implementation  
+- **[Configuration Guide](CONFIGURATION-GUIDE.md)** - Settings and authentication
+- **[Testing Guide](TESTING-GUIDE.md)** - Testing patterns and strategies
+- **[Development Guide](DEVELOPMENT-GUIDE.md)** - Setup and contributing
 
 ## Core Components
 
@@ -54,7 +54,7 @@ Bubble Tea-based terminal UI with message-driven navigation:
 - Global WindowLayout for consistent sizing
 - FZF fuzzy search integration
 
-See **[TUI Guide](tui-guide.md)** and **[Keymap Architecture](keymap-architecture.md)** for implementation details.
+See **[TUI Guide](TUI-GUIDE.md)** and **[Keymap Architecture](KEYMAP-ARCHITECTURE.md)** for implementation details.
 
 ### 3. API Client (`/internal/api/`)
 HTTP client with resilience patterns:
@@ -64,7 +64,7 @@ HTTP client with resilience patterns:
 - Request/response logging (debug mode)
 - Structured error handling
 
-See **[API Reference](api-reference.md)** for endpoints and methods.
+See **[API Reference](API-REFERENCE.md)** for endpoints and methods.
 
 ### 4. Domain Layer (`/internal/domain/`)
 Business logic and models:
@@ -93,7 +93,7 @@ Multi-backend secure configuration:
 2. System keyring (secure desktop storage)
 3. Encrypted file fallback (`~/.repobird/config.yaml`)
 
-See **[Configuration Guide](configuration-guide.md)** for details.
+See **[Configuration Guide](CONFIGURATION-GUIDE.md)** for details.
 
 ### 7. Error Handling (`/internal/errors/`)
 Structured errors with user-friendly messages:
@@ -156,7 +156,7 @@ Structured errors with user-friendly messages:
 - Test isolation via `XDG_CONFIG_HOME`
 - Coverage target: 70%+
 
-See **[Testing Guide](testing-guide.md)** for patterns and best practices.
+See **[Testing Guide](TESTING-GUIDE.md)** for patterns and best practices.
 
 ## Deployment & Operations
 
@@ -166,7 +166,7 @@ See **[Testing Guide](testing-guide.md)** for patterns and best practices.
 
 **Monitoring:** Logs to `/tmp/repobird_debug.log` when debug enabled
 
-See **[Troubleshooting Guide](troubleshooting.md)** for debugging techniques.
+See **[Troubleshooting Guide](TROUBLESHOOTING.md)** for debugging techniques.
 
 ## Key Architectural Patterns
 

@@ -51,11 +51,11 @@ logs/
 # Individual log files outside logs/ should not be committed
 *.log
 
-# Production run task files
-run-tasks/prod/
+# Production example files (sensitive)
+examples/prod/
 
-# Development run task files
-run-tasks/dev/
+# Development example files (sensitive)
+examples/dev/
 
 # Git backup directories (from git filter-repo operations)
 .git-backup-*

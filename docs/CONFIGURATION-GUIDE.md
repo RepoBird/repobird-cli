@@ -5,9 +5,9 @@
 Multi-layered configuration system with secure API key management.
 
 ## Related Documentation
-- **[Development Guide](development-guide.md)** - Environment setup
-- **[API Reference](api-reference.md)** - API configuration
-- **[Troubleshooting Guide](troubleshooting.md)** - Configuration issues
+- **[Development Guide](DEVELOPMENT-GUIDE.md)** - Environment setup
+- **[API Reference](API-REFERENCE.md)** - API configuration
+- **[Troubleshooting Guide](TROUBLESHOOTING.md)** - Configuration issues
 
 ## Configuration Priority
 
@@ -21,10 +21,10 @@ Multi-layered configuration system with secure API key management.
 ### Quick Setup
 ```bash
 # Set via command
-repobird config set api-key YOUR_KEY
+repobird config set api-key <your-api-key>
 
 # Or via environment
-export REPOBIRD_API_KEY=YOUR_KEY
+export REPOBIRD_API_KEY=<your-api-key>
 
 # Verify
 repobird config get api-key
@@ -45,7 +45,7 @@ repobird config get api-key
 
 **Environment Variable:**
 ```bash
-export REPOBIRD_API_KEY=your_key
+export REPOBIRD_API_KEY=<your-api-key>
 ```
 
 ## Configuration File
@@ -83,7 +83,7 @@ tui:
 ### Managing Configuration
 ```bash
 # Set values
-repobird config set api-key YOUR_KEY
+repobird config set api-key <your-api-key>
 repobird config set api-url https://custom.url
 
 # Get values
@@ -241,7 +241,7 @@ chmod 600 ~/.repobird/config.yaml
 ### Keyring Issues
 ```bash
 # Fall back to encrypted file
-repobird config set --no-keyring api-key YOUR_KEY
+repobird config set --no-keyring api-key <your-api-key>
 ```
 
-See **[Troubleshooting Guide](troubleshooting.md)** for more solutions.
+See **[Troubleshooting Guide](TROUBLESHOOTING.md)** for more solutions.

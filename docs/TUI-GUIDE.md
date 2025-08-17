@@ -5,10 +5,10 @@
 Rich terminal interface for managing AI runs with Bubble Tea framework and message-based navigation.
 
 ## Related Documentation
-- **[Architecture Overview](architecture.md)** - TUI layer design
-- **[Keymap Architecture](keymap-architecture.md)** - Key handling system
-- **[Dashboard Layouts](dashboard-layouts.md)** - Miller columns implementation
-- **[Troubleshooting Guide](troubleshooting.md)** - Debug logging
+- **[Architecture Overview](ARCHITECTURE.md)** - TUI layer design
+- **[Keymap Architecture](KEYMAP-ARCHITECTURE.md)** - Key handling system
+- **[Dashboard Layouts](DASHBOARD-LAYOUTS.md)** - Miller columns implementation
+- **[Troubleshooting Guide](TROUBLESHOOTING.md)** - Debug logging
 
 ## Quick Start
 
@@ -67,6 +67,7 @@ func (v *View) Init() tea.Cmd {
 ### Shared Components
 - **ScrollableList** - Multi-column lists (`internal/tui/components/scrollable_list.go`)
 - **Form** - Input forms with validation (`internal/tui/components/form.go`)
+- **CustomCreateForm** - Advanced form with vim-style modal editing (`internal/tui/views/create_custom_form.go`)
 - **WindowLayout** - Global sizing system (`internal/tui/components/window_layout.go`)
 - **FZFSelector** - Fuzzy search overlay (`internal/tui/components/fzf_selector.go`)
 

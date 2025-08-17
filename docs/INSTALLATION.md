@@ -218,7 +218,7 @@ Set up your RepoBird API key:
 
 ```bash
 # Set API key
-repobird config set api-key YOUR_API_KEY
+repobird config set api-key <your-api-key>
 
 # Verify configuration
 repobird config get api-key

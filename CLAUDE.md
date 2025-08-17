@@ -5,16 +5,16 @@ RepoBird CLI is a Go-based command-line tool for interacting with the RepoBird A
 
 ## Documentation
 Core documentation is in the `docs/` directory:
-- **[Architecture Overview](docs/architecture.md)** - System design and components
-- **[API Reference](docs/api-reference.md)** - REST endpoints and client
-- **[TUI Guide](docs/tui-guide.md)** - Terminal UI implementation
-- **[Keymap Architecture](docs/keymap-architecture.md)** - Key handling system
-- **[Development Guide](docs/development-guide.md)** - Setup and contributing
-- **[Testing Guide](docs/testing-guide.md)** - Testing strategies
-- **[Configuration Guide](docs/configuration-guide.md)** - Settings and auth
-- **[Troubleshooting Guide](docs/troubleshooting.md)** - Common issues
-- **[Bulk Runs Guide](docs/bulk-runs.md)** - Batch operations
-- **[Dashboard Layouts](docs/dashboard-layouts.md)** - Miller columns UI
+- **[Architecture Overview](docs/ARCHITECTURE.md)** - System design and components
+- **[API Reference](docs/API-REFERENCE.md)** - REST endpoints and client
+- **[TUI Guide](docs/TUI-GUIDE.md)** - Terminal UI implementation
+- **[Keymap Architecture](docs/KEYMAP-ARCHITECTURE.md)** - Key handling system
+- **[Development Guide](docs/DEVELOPMENT-GUIDE.md)** - Setup and contributing
+- **[Testing Guide](docs/TESTING-GUIDE.md)** - Testing strategies
+- **[Configuration Guide](docs/CONFIGURATION-GUIDE.md)** - Settings and auth
+- **[Troubleshooting Guide](docs/TROUBLESHOOTING.md)** - Common issues
+- **[Bulk Runs Guide](docs/BULK-RUNS.md)** - Batch operations
+- **[Dashboard Layouts](docs/DASHBOARD-LAYOUTS.md)** - Miller columns UI
 
 ## Quick Reference
 
@@ -191,7 +191,7 @@ The `repobird run` command supports multiple formats for task definitions:
 
 **Bulk runs**: Top-level `repository` + `runs` array, each with its own `prompt`
 
-See [Run Config Formats](docs/run-config-formats.md) for complete examples.
+See [Run Config Formats](docs/RUN-CONFIG-FORMATS.md) for complete examples.
 
 ## Testing Requirements
 - **All changes must have comprehensive unit tests** - aim for full coverage
@@ -201,13 +201,13 @@ See [Run Config Formats](docs/run-config-formats.md) for complete examples.
 - Use `XDG_CONFIG_HOME` for test isolation
 - Test both success and error paths
 - Include edge cases and boundary conditions
-See [Testing Guide](docs/testing-guide.md) for patterns.
+See [Testing Guide](docs/TESTING-GUIDE.md) for patterns.
 
 ## Configuration
 - API key via environment (`REPOBIRD_API_KEY`) or config
 - Debug logging: `REPOBIRD_DEBUG_LOG=1`
 - Cache location: `~/.config/repobird/cache/`
-See [Configuration Guide](docs/configuration-guide.md) for details.
+See [Configuration Guide](docs/CONFIGURATION-GUIDE.md) for details.
 
 ## Known Limitations
 - Maximum 45-minute timeout for operations

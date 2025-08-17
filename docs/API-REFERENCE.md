@@ -5,10 +5,10 @@
 REST API client implementation for RepoBird AI platform with resilience patterns and enterprise features.
 
 ## Related Documentation
-- **[Architecture Overview](architecture.md)** - System design and patterns
-- **[Configuration Guide](configuration-guide.md)** - API key and environment setup
-- **[Troubleshooting Guide](troubleshooting.md)** - Debug mode and error handling
-- **[Development Guide](development-guide.md)** - Client usage examples
+- **[Architecture Overview](ARCHITECTURE.md)** - System design and patterns
+- **[Configuration Guide](CONFIGURATION-GUIDE.md)** - API key and environment setup
+- **[Troubleshooting Guide](TROUBLESHOOTING.md)** - Debug mode and error handling
+- **[Development Guide](DEVELOPMENT-GUIDE.md)** - Client usage examples
 
 ## Configuration
 
@@ -163,11 +163,11 @@ err := poller.Poll(ctx, func() (bool, error) {
 ### Initialization
 ```go
 // Simple
-client := api.NewClient("your_api_key")
+client := api.NewClient("<your-api-key>")
 
 // With custom config
 client := api.NewClient(api.Config{
-    APIKey:  "your_api_key",
+    APIKey:  "<your-api-key>",
     BaseURL: "https://custom.api.url",
     Timeout: 30 * time.Second,
 })
@@ -175,7 +175,7 @@ client := api.NewClient(api.Config{
 
 ### Environment Variables
 ```bash
-REPOBIRD_API_KEY=your_key
+REPOBIRD_API_KEY=<your-api-key>
 REPOBIRD_API_URL=https://custom.url  # Optional
 REPOBIRD_DEBUG=true                  # Enable debug logging
 ```
@@ -224,4 +224,4 @@ REPOBIRD_DEBUG_LOG=1 repobird status
 # Logs written to /tmp/repobird_debug.log
 ```
 
-See **[Troubleshooting Guide](troubleshooting.md)** for debugging techniques.
+See **[Troubleshooting Guide](TROUBLESHOOTING.md)** for debugging techniques.

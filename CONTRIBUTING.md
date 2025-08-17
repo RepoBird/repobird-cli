@@ -43,7 +43,7 @@ Enhancement suggestions are welcome! Please:
 
 1. **Discuss First**: For significant changes, open an issue first
 2. **Check Issues**: Look for issues tagged `good first issue` or `help wanted`
-3. **Read Documentation**: Familiarize yourself with [DEV.md](DEV.md) and [CLAUDE.md](CLAUDE.md)
+3. **Read Documentation**: Familiarize yourself with [CLAUDE.md](CLAUDE.md) and project documentation in [docs/](docs/)
 
 #### Development Process
 
@@ -154,6 +154,114 @@ Brief description of changes
 - [ ] All tests passing
 ```
 
+## Development Guide
+
+### Prerequisites
+- Go 1.20 or higher
+- Git
+- Make
+- golangci-lint (for linting)
+
+### Initial Setup
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/repobird-cli.git
+cd repobird-cli
+
+# Install dependencies
+go mod download
+
+# Verify setup
+make test
+make build
+```
+
+### Project Structure
+
+```
+repobird-cli/
+├── cmd/repobird/          # Main application entry point
+│   └── main.go           # CLI initialization and command setup
+├── internal/              # Private application code
+│   ├── api/              # API client and communication
+│   │   ├── client.go     # HTTP client implementation
+│   │   └── models.go     # API request/response types
+│   ├── commands/         # Cobra command implementations
+│   │   ├── config.go     # Configuration management commands
+│   │   ├── run.go        # Task submission command
+│   │   ├── status.go     # Status checking command
+│   │   └── tui.go        # Terminal UI command
+│   ├── config/           # Configuration management
+│   │   └── config.go     # Viper-based config handling
+│   ├── errors/           # Error handling
+│   │   └── errors.go     # Custom error types and formatting
+│   ├── models/           # Data models
+│   │   └── types.go      # Core data structures
+│   ├── retry/            # Retry logic
+│   │   └── retry.go      # Exponential backoff implementation
+│   ├── tui/              # Terminal UI components
+│   │   ├── dashboard/    # Main dashboard view
+│   │   ├── components/   # Reusable UI components
+│   │   └── models/       # TUI-specific models
+│   └── utils/            # Utility functions
+│       ├── git.go        # Git operations
+│       ├── polling.go    # Status polling
+│       └── security.go   # Security utilities
+├── pkg/                   # Public library code
+│   ├── utils/            # Exported utilities
+│   └── version/          # Version information
+├── docs/                  # Documentation
+├── tasks/                 # Example task files
+└── build/                 # Build artifacts
+```
+
+### Build System
+
+#### Makefile Targets
+
+```bash
+# Core build commands
+make build          # Build binary for current OS/arch
+make build-all      # Build for all platforms
+make install        # Build and install to /usr/local/bin
+
+# Testing
+make test           # Run all tests
+make test-verbose   # Run tests with verbose output
+make coverage       # Generate coverage report
+make test-race      # Run tests with race detector
+
+# Code quality
+make lint           # Run golangci-lint
+make lint-fix       # Auto-fix linting issues
+make fmt            # Format code with gofmt
+make fmt-check      # Check if code is formatted
+make vet            # Run go vet
+
+# Composite commands
+make check          # Run fmt-check, vet, and lint
+make ci             # Run all CI checks
+make all            # Clean, check, test, and build
+
+# Utilities
+make clean          # Remove build artifacts
+make deps           # Download dependencies
+make mod-tidy       # Clean up go.mod and go.sum
+make run            # Build and run with debug flag
+```
+
+#### Cross-Platform Building
+
+```bash
+# Build for specific platforms
+GOOS=linux GOARCH=amd64 make build
+GOOS=darwin GOARCH=arm64 make build
+GOOS=windows GOARCH=amd64 make build
+
+# Or use the convenience target
+make build-all
+```
+
 ### Code Style Guidelines
 
 #### Go Code Standards
@@ -190,100 +298,356 @@ Brief description of changes
    }
    ```
 
-#### Testing Standards
+6. **Context Usage**:
+   ```go
+   // Always accept context for cancellation
+   func FetchData(ctx context.Context, id string) (*Data, error) {
+       select {
+       case <-ctx.Done():
+           return nil, ctx.Err()
+       default:
+           // Proceed with operation
+       }
+   }
+   ```
 
-1. **Test Files**: Place alongside source files with `_test.go` suffix
-2. **Test Names**: Use descriptive names starting with `Test`
-3. **Table-Driven Tests**: Preferred for multiple test cases
-4. **Mocking**: Mock external dependencies
-5. **Coverage**: Aim for >70% on new code
+### Testing
 
-Example:
+#### Test Structure
+- Unit tests: Alongside source files (`*_test.go`)
+- Integration tests: In `test/integration/`
+- Mocks: Generated in `mocks/` directory
+
+#### Writing Tests
+
 ```go
-func TestCreateRun(t *testing.T) {
+// Table-driven test example
+func TestParseTask(t *testing.T) {
     tests := []struct {
         name    string
-        task    *Task
-        want    *Run
+        input   string
+        want    *Task
         wantErr bool
     }{
         {
-            name: "valid task",
-            task: &Task{Prompt: "test"},
-            want: &Run{ID: "123"},
+            name:  "valid task",
+            input: `{"prompt": "test"}`,
+            want:  &Task{Prompt: "test"},
         },
-        {
-            name:    "nil task",
-            task:    nil,
-            wantErr: true,
-        },
+        // Add more test cases
     }
     
     for _, tt := range tests {
         t.Run(tt.name, func(t *testing.T) {
-            got, err := CreateRun(tt.task)
+            got, err := ParseTask(tt.input)
             if (err != nil) != tt.wantErr {
-                t.Errorf("CreateRun() error = %v, wantErr %v", err, tt.wantErr)
+                t.Errorf("ParseTask() error = %v, wantErr %v", err, tt.wantErr)
             }
             if !reflect.DeepEqual(got, tt.want) {
-                t.Errorf("CreateRun() = %v, want %v", got, tt.want)
+                t.Errorf("ParseTask() = %v, want %v", got, tt.want)
             }
         })
     }
 }
 ```
 
-### Documentation
+#### Running Tests
 
-#### When to Update Documentation
+```bash
+# Run all tests
+make test
 
-Update docs when you:
-- Add new features
-- Change existing behavior
-- Add new configuration options
-- Modify command-line interface
-- Fix documentation errors
+# Run specific package tests
+go test ./internal/api
 
-#### Documentation Standards
+# Run with coverage
+make coverage
 
-1. **Clarity**: Write for users who may be new to the project
-2. **Examples**: Include practical examples
-3. **Accuracy**: Ensure docs match actual behavior
-4. **Formatting**: Use proper Markdown formatting
-5. **Links**: Verify all links work
+# Run with race detection
+make test-race
 
-### Review Process
+# Run specific test
+go test -run TestParseTask ./internal/models
+```
 
-#### What to Expect
+### Debugging
 
-1. **Initial Review**: Maintainers will review within 2-3 business days
-2. **Feedback**: You may receive suggestions or change requests
-3. **Discussion**: Feel free to discuss feedback if you disagree
-4. **Approval**: Once approved, your PR will be merged
-5. **Recognition**: Contributors are credited in release notes
+#### Debug Mode
 
-#### Review Criteria
+Enable debug output:
+```bash
+# Via flag
+repobird --debug status
 
-Your PR will be evaluated on:
-- Code quality and style
-- Test coverage
-- Documentation updates
-- Commit message quality
-- CI/CD checks passing
-- Alignment with project goals
+# Via environment
+export REPOBIRD_DEBUG=true
+repobird status
+```
 
-### Getting Help
+#### Local Development
 
-If you need help:
-1. Check existing documentation
-2. Search closed issues
-3. Ask in PR comments
-4. Open a discussion issue
+```bash
+# Run with local API server
+export REPOBIRD_API_URL=http://localhost:8080
+./build/repobird status
 
-### Development Setup Tips
+# Use debug TUI script
+./debug-tui.sh
+```
 
-#### Recommended Tools
+#### Logging
 
+Debug logging locations:
+- API requests/responses: When `--debug` flag is set
+- Config operations: `~/.repobird/debug.log` (when enabled)
+- TUI events: Stderr when run with `--debug`
+
+### API Integration
+
+#### Client Methods
+
+The API client provides these core methods:
+- `CreateRun(task)` - Submit a new task
+- `GetRun(id)` - Fetch run details
+- `ListRuns()` - List all runs
+- `GetUserInfo()` - Get user information
+- `VerifyAuth()` - Verify API key
+
+All methods support:
+- Automatic retry with exponential backoff
+- Context cancellation
+- Structured error responses
+
+#### Adding New Endpoints
+
+1. Define models in `internal/api/models.go`
+2. Add client method in `internal/api/client.go`
+3. Implement retry wrapper if needed
+4. Add command in `internal/commands/`
+5. Write tests for all components
+
+### TUI Development
+
+#### Bubble Tea Framework
+
+The TUI uses [Bubble Tea](https://github.com/charmbracelet/bubbletea) for the interactive interface.
+
+Key concepts:
+- **Model**: Application state
+- **Update**: Handle messages and update state
+- **View**: Render the UI
+
+#### Adding TUI Features
+
+1. Create component in `internal/tui/components/`
+2. Define messages in `internal/tui/messages/`
+3. Update dashboard model in `internal/tui/dashboard/`
+4. Handle updates in dashboard update function
+5. Render in dashboard view function
+
+### Configuration Management
+
+#### Viper Configuration
+
+Configuration hierarchy (highest to lowest priority):
+1. Command-line flags
+2. Environment variables
+3. Config file (`~/.repobird/config.yaml`)
+4. Default values
+
+#### Adding Configuration Options
+
+```go
+// In internal/config/config.go
+func init() {
+    viper.SetDefault("new_option", "default_value")
+    viper.BindEnv("new_option", "REPOBIRD_NEW_OPTION")
+}
+
+// In command
+flags.String("new-option", "", "Description")
+viper.BindPFlag("new_option", cmd.Flags().Lookup("new-option"))
+```
+
+### Performance Profiling
+
+#### CPU Profiling
+
+```go
+import _ "net/http/pprof"
+
+func init() {
+    go func() {
+        log.Println(http.ListenAndServe("localhost:6060", nil))
+    }()
+}
+```
+
+Access profiles at `http://localhost:6060/debug/pprof/`
+
+#### Memory Profiling
+
+```bash
+# Run with memory profiling
+go test -memprofile=mem.prof -bench=.
+
+# Analyze profile
+go tool pprof mem.prof
+```
+
+### CI/CD Pipeline
+
+#### GitHub Actions Workflow
+
+The CI pipeline runs:
+1. Linting checks
+2. Format verification
+3. Unit tests with coverage
+4. Integration tests
+5. Cross-platform builds
+6. Security scanning
+
+#### Pre-commit Hooks
+
+Install pre-commit hooks:
+```bash
+cat > .git/hooks/pre-commit << 'EOF'
+#!/bin/sh
+make check
+EOF
+chmod +x .git/hooks/pre-commit
+```
+
+### Security Considerations
+
+#### API Key Handling
+- Never log API keys
+- Use secure storage (OS keychain when possible)
+- Clear sensitive data from memory after use
+- Validate API keys before storage
+
+#### Input Validation
+- Sanitize all user inputs
+- Validate JSON schemas
+- Check file paths for directory traversal
+- Limit request sizes
+
+## Development Roadmap
+
+### High Priority Tasks
+
+#### Enhanced Pagination for 100+ Runs
+- [ ] Implement cache infrastructure for run pagination
+- [ ] Add API pagination enhancement with retry logic  
+- [ ] Modify TUI navigation to prevent wrap-around behavior
+- [ ] Add Load More button for manual pagination
+- [ ] Show "X of Y total runs loaded" in status line
+- [ ] Test with users having 1000+ runs
+
+**Current Status:** ✅ Simple fix implemented - increased limit to 1000 runs
+
+#### Usage Progress Display
+- [ ] Fix usage progress bar showing 0.00% on status page
+- [ ] Hard-code free/pro tier usage limits
+- [ ] Allow admin-credited extra runs to exceed limits
+
+### Medium Priority Tasks
+
+#### Global Configuration Support
+- [ ] Implement global config file support (~/.repobird/global.yaml)
+- [ ] Add environment-specific configurations (dev, staging, prod)
+- [ ] Support config inheritance and overrides
+- [ ] Add config validation and schema
+
+#### Improve FZF Integration
+- [ ] Add inline FZF selection for run IDs
+- [ ] Implement FZF for task file selection
+- [ ] Add FZF preview for task JSON files
+- [ ] Support FZF for branch selection
+- [ ] Handle FZF binary detection gracefully
+
+#### Enhanced TUI Features
+- [ ] Add real-time log streaming in TUI
+- [ ] Implement split pane view for multiple runs
+- [ ] Add keyboard shortcuts for common actions
+- [ ] Support theme customization
+- [ ] Add TUI configuration persistence
+
+#### Batch Operations Support
+- [ ] Support running multiple tasks from directory
+- [ ] Add batch status checking
+- [ ] Implement parallel task execution
+- [ ] Add batch cancellation support
+- [ ] Create batch results summary view
+
+#### Offline Mode Implementation
+- [ ] Cache run data locally
+- [ ] Queue tasks for later submission
+- [ ] Sync when connection restored
+- [ ] Add offline status indicators
+- [ ] Implement conflict resolution
+
+### Low Priority Tasks
+
+#### Plugin System
+- [ ] Design plugin architecture
+- [ ] Add plugin discovery mechanism
+- [ ] Implement plugin API
+- [ ] Create example plugins
+- [ ] Add plugin marketplace support
+
+#### Multi-Repository Support
+- [ ] Support GitLab repositories
+- [ ] Add Bitbucket integration
+- [ ] Implement generic Git support
+- [ ] Add repository switching
+- [ ] Create repository profiles
+
+See the full roadmap and detailed task descriptions in [docs/roadmap.md](docs/roadmap.md).
+
+## Release Process
+
+### Version Management
+
+1. Update version in `pkg/version/version.go`
+2. Update CHANGELOG.md
+3. Commit changes: `git commit -m "chore: bump version to vX.Y.Z"`
+4. Tag release: `git tag vX.Y.Z`
+5. Push with tags: `git push origin main --tags`
+
+### Building Release Binaries
+
+```bash
+# Build all platforms
+make build-all
+
+# Creates binaries in build/
+# - repobird-linux-amd64
+# - repobird-linux-arm64
+# - repobird-darwin-amd64
+# - repobird-darwin-arm64
+# - repobird-windows-amd64.exe
+```
+
+### GitHub Release
+
+1. Create release on GitHub
+2. Upload binaries from `build/` directory
+3. Include changelog in release notes
+4. Mark as pre-release if applicable
+
+## Troubleshooting Development Issues
+
+### Common Issues
+
+1. **Module errors**: Run `go mod tidy`
+2. **Build failures**: Check Go version with `go version`
+3. **Test failures**: Ensure clean state with `make clean`
+4. **Lint errors**: Run `make lint-fix`
+
+### Development Tools
+
+Recommended tools:
 ```bash
 # Install development tools
 go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
@@ -291,7 +655,7 @@ go install golang.org/x/tools/cmd/goimports@latest
 go install github.com/cosmtrek/air@latest  # For live reload
 ```
 
-#### Useful Commands
+### Useful Commands
 
 ```bash
 # Quick development cycle
@@ -307,30 +671,28 @@ make ci
 air -c .air.toml
 ```
 
-### Community
+## Getting Help
 
-#### Communication Channels
+If you need help:
+1. Check existing documentation
+2. Search closed issues
+3. Ask in PR comments
+4. Open a discussion issue
+
+## Community
+
+### Communication Channels
 
 - **Issues**: Bug reports and feature requests
 - **Pull Requests**: Code contributions and discussions
 - **Discussions**: General questions and ideas
 
-#### Recognition
+### Recognition
 
 Contributors are recognized in:
 - Release notes
 - Contributors file
 - Project documentation
-
-### Release Cycle
-
-- **Major releases**: Significant features or breaking changes
-- **Minor releases**: New features, backward compatible
-- **Patch releases**: Bug fixes and minor improvements
-
-### Legal
-
-By contributing, you agree that your contributions will be licensed under the same license as the project.
 
 ## Quick Checklist for Contributors
 
@@ -345,6 +707,15 @@ Before submitting your PR, ensure:
 - [ ] Commit messages follow guidelines
 - [ ] PR description is complete
 - [ ] CI checks are passing
+
+## Additional Resources
+
+- [Project Documentation](docs/)
+- [Architecture Overview](docs/architecture.md)
+- [API Reference](docs/api-reference.md)
+- [Testing Guide](docs/testing-guide.md)
+- [TUI Guide](docs/tui-guide.md)
+- [Configuration Guide](docs/configuration-guide.md)
 
 ## Thank You!
 

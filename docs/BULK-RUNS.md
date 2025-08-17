@@ -5,9 +5,9 @@
 Execute multiple AI-powered tasks simultaneously for efficient batch processing.
 
 ## Related Documentation
-- **[TUI Guide](tui-guide.md)** - Bulk view in TUI
-- **[API Reference](api-reference.md)** - Bulk API endpoints
-- **[Configuration Guide](configuration-guide.md)** - Bulk configuration
+- **[TUI Guide](TUI-GUIDE.md)** - Bulk view in TUI
+- **[API Reference](API-REFERENCE.md)** - Bulk API endpoints
+- **[Configuration Guide](CONFIGURATION-GUIDE.md)** - Bulk configuration
 
 ## Quick Start
 

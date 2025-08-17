@@ -5,10 +5,10 @@
 Complete guide for setting up, building, and contributing to RepoBird CLI.
 
 ## Related Documentation
-- **[Architecture Overview](architecture.md)** - System design and structure
-- **[Testing Guide](testing-guide.md)** - Testing patterns and coverage
-- **[API Reference](api-reference.md)** - API client implementation
-- **[TUI Guide](tui-guide.md)** - Terminal UI development
+- **[Architecture Overview](ARCHITECTURE.md)** - System design and structure
+- **[Testing Guide](TESTING-GUIDE.md)** - Testing patterns and coverage
+- **[API Reference](API-REFERENCE.md)** - API client implementation
+- **[TUI Guide](TUI-GUIDE.md)** - Terminal UI development
 
 ## Prerequisites
 

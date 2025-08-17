@@ -1,6 +1,8 @@
 # Package Manager Testing Guide
 
-This document explains how to test RepoBird CLI across different package managers and platforms using GitHub Actions CI and local testing methods.
+**⚠️ EXPERIMENTAL DOCUMENTATION - NOT YET TESTED**
+
+This document was AI-generated and has not been validated or tested by the author. All procedures, workflows, and commands described here are theoretical and should be treated as experimental drafts requiring verification before use.
 
 ## Overview
 

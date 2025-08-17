@@ -1,165 +1,130 @@
-# Security - RepoBird CLI
+# Security Policy
 
-## API Key Storage
+## Secure API Key Storage
 
-The RepoBird CLI uses a multi-layered approach to securely store your API key, automatically choosing the most secure method available on your system.
+RepoBird CLI implements multiple layers of security for API key storage, automatically selecting the most secure method available on your system.
 
 ### Storage Methods (in order of preference)
 
-#### 1. Environment Variable (Most Secure for CI/CD)
-- **Variable**: `REPOBIRD_API_KEY`
-- **Best for**: CI/CD pipelines, containers, automated scripts
-- **Security**: ✅ Never written to disk
-- **Example**:
-  ```bash
-  export REPOBIRD_API_KEY="your-api-key"
-  rb status
-  ```
-
-#### 2. System Keyring (Desktop Systems)
-- **macOS**: Keychain Access
+#### 1. System Keyring (Most Secure)
+- **macOS**: Keychain
 - **Windows**: Credential Manager  
-- **Linux**: GNOME Keyring/KWallet (only on desktop environments)
-- **Security**: ✅ OS-level encryption and access control
-- **Automatic**: Selected automatically when available
+- **Linux**: GNOME Keyring, KWallet, or Secret Service (when desktop environment is available)
 
-#### 3. Encrypted File (Universal Fallback)
-- **Location**: `~/.repobird/.api_key.enc`
-- **Encryption**: AES-256-GCM
-- **Key Derivation**: Machine-specific (hostname + username + machine ID)
-- **Permissions**: 0600 (owner read/write only)
-- **Security**: ✅ Encrypted at rest
-- **Best for**: Linux servers, headless systems, containers
+This is the default and most secure storage method when available.
 
-### Linux-Specific Behavior
+#### 2. Encrypted File Storage (Secure Fallback)
+- Uses AES-256-GCM encryption
+- Key derived from machine-specific identifiers
+- File permissions set to 0600 (owner read/write only)
+- Location: `~/.repobird/.api_key.enc`
 
-On Linux systems, the CLI is conservative about using desktop keyrings:
-- **Desktop Environment**: Uses keyring if GNOME/KDE is detected
-- **Servers/Containers**: Defaults to encrypted file storage
-- **SSH Sessions**: Always uses encrypted file storage
-- **Docker/Kubernetes**: Always uses encrypted file storage
+Automatically used on headless servers, containers, or when keyring is unavailable.
 
-This ensures the CLI works reliably on all Linux systems without requiring GUI dependencies.
-
-### Commands
-
-```bash
-# Set API key (automatically selects best storage method)
-rb config set api-key YOUR_KEY
-
-# Check current storage method
-rb config get
-
-# View detailed storage information
-rb config get storage
-
-# Delete API key from all storage locations
-rb config delete api-key
-```
+#### 3. Environment Variable (CI/CD)
+- Set `REPOBIRD_API_KEY` environment variable
+- Suitable for CI/CD pipelines and containerized environments
+- Takes precedence over stored keys for flexibility
 
 ### Security Best Practices
 
-1. **Never commit API keys to version control**
-2. **Use environment variables in CI/CD pipelines**
-3. **Rotate API keys regularly**
-4. **Use different keys for development and production**
-5. **Monitor API key usage in the RepoBird dashboard**
+#### For Users
 
-### Migration from Plain Text
+1. **Never share your API key**
+   - Treat it like a password
+   - Don't commit it to version control
+   - Don't include it in scripts or documentation
 
-If you have an existing API key stored in plain text (`~/.repobird/config.yaml`), it will be automatically migrated to secure storage on first use. The plain text version is then removed.
+2. **Use the secure login command**
+   ```bash
+   repobird login
+   ```
+   This ensures your key is stored using the most secure method available.
 
-### Troubleshooting
+3. **Check your storage method**
+   ```bash
+   repobird info
+   ```
+   This shows where and how your API key is stored.
 
-#### API Key Not Found
+4. **Rotate keys regularly**
+   - Generate new API keys periodically
+   - Remove old keys after rotation
+
+5. **Use environment variables for CI/CD only**
+   - Environment variables are suitable for automated systems
+   - For development, use `repobird login` instead
+
+#### For Developers
+
+1. **API keys are masked in logs**
+   - Debug output shows only first 4 characters
+   - Full keys are never logged
+
+2. **Memory clearing**
+   - Sensitive data is cleared from memory after use (best effort)
+   - Go's garbage collector may retain copies
+
+3. **File permissions**
+   - Config files: 0644 (readable, no secrets)
+   - Encrypted key files: 0600 (owner only)
+
+4. **No command-line API keys**
+   - API keys should not be passed as command arguments
+   - They may appear in shell history or process lists
+
+## Reporting Security Vulnerabilities
+
+If you discover a security vulnerability in RepoBird CLI, please report it responsibly:
+
+- **Email**: security@repobird.ai
+- **Response Time**: We aim to respond within 48 hours
+- **Please DO NOT**: Create public GitHub issues for security vulnerabilities
+
+We appreciate your help in keeping RepoBird secure for all users.
+
+### Migration from Insecure Storage
+
+If you have an API key stored in plain text (legacy versions), it will be automatically migrated to secure storage on first use. You can manually trigger migration:
+
 ```bash
-# Check if key is set
-rb config get api-key
-
-# Verify storage location
-rb config get storage
+repobird login
 ```
 
-#### Permission Denied
-```bash
-# Fix permissions on config directory
-chmod 700 ~/.repobird
-chmod 600 ~/.repobird/.api_key.enc
+## Compliance
+
+RepoBird CLI's security implementation follows industry best practices:
+- Encryption at rest for stored credentials
+- Platform-specific security integration (Keychain, Credential Manager, Keyring)
+- Secure defaults with automatic fallback mechanisms
+- Clear security warnings when using less secure methods
+
+### Security Warnings
+
+The CLI will warn you when:
+- Using environment variables (less secure than keyring)
+- API key is stored in plain text (legacy config)
+- Keyring is unavailable (falling back to encrypted file)
+
+Example warnings:
+```
+⚠️  Using API key from environment variable. For better security, use 'repobird login'
+⚠️  API key stored in plain text. Run 'repobird login' to secure it
 ```
 
-#### Encrypted File Issues
-If the encrypted file becomes corrupted:
-```bash
-# Delete and re-set the key
-rb config delete api-key
-rb config set api-key YOUR_KEY
-```
+## Frequently Asked Questions
 
-### Technical Details
+**Q: Is my API key encrypted?**  
+A: Yes, when stored via `repobird login`, your key is either stored in the system keyring or encrypted with AES-256-GCM.
 
-#### Encryption Specifications
-- **Algorithm**: AES-256-GCM (Authenticated Encryption)
-- **Key Size**: 256 bits
-- **Key Derivation**: SHA-256 hash of machine-specific identifiers
-- **Nonce**: Random 12 bytes per encryption
-- **Authentication**: GCM mode provides built-in authentication
+**Q: Can I use the same API key on multiple machines?**  
+A: Yes, but for better security, consider using different keys for different machines and revoking access when needed.
 
-#### Machine-Specific Key Components
-The encryption key is derived from:
-- Hostname
-- Username (`$USER` or `$USERNAME` environment variable)
-- Home directory path
-- Machine ID (Linux: `/etc/machine-id` or `/var/lib/dbus/machine-id`)
-- Application salt: `"RepoBird-CLI-2024-Secure"`
+**Q: What happens if I forget my API key?**  
+A: You can generate a new one from the RepoBird web interface at https://repobird.ai. The old key should be revoked.
 
-This ensures the encrypted file can only be decrypted on the same machine by the same user.
+**Q: Is the environment variable method secure?**  
+A: It's suitable for CI/CD where keys are injected securely. For development machines, use the keyring storage instead.
 
-#### How Encryption/Decryption Works
-
-##### Encryption Process (when setting API key):
-1. **Key Generation**: The system combines all machine-specific identifiers listed above
-2. **Hashing**: SHA-256 hash of the combined string produces a consistent 32-byte key
-3. **Encryption**: AES-256-GCM encrypts the API key with:
-   - The derived key
-   - A random 12-byte nonce (stored with ciphertext)
-   - Built-in authentication tag (prevents tampering)
-4. **Storage**: Base64-encoded ciphertext saved to `~/.repobird/.api_key.enc` with 0600 permissions
-
-##### Decryption Process (when TUI runs):
-1. **Key Regeneration**: The same machine identifiers are collected and hashed
-2. **File Read**: Encrypted data loaded from `~/.repobird/.api_key.enc`
-3. **Decryption**: AES-256-GCM decrypts using:
-   - The regenerated key (must match encryption key)
-   - The nonce extracted from ciphertext
-   - Authentication verification (fails if data was modified)
-4. **API Key Retrieved**: Decrypted key is used for API calls
-
-##### Security Properties:
-- **No Stored Salt/Key**: The decryption key is derived at runtime - nothing secret is stored
-- **Machine-Bound**: The encrypted file cannot be decrypted on a different machine since the derived key would differ
-- **User-Bound**: Different users on the same machine generate different keys
-- **Tamper-Proof**: GCM authentication tag detects any modifications to the encrypted file
-- **Forward Secrecy**: Each encryption uses a new random nonce
-
-##### Why This Design:
-- **No password required**: Users don't need to remember/enter a master password
-- **Automatic**: Works transparently without user intervention  
-- **Portable within machine**: Works across different RepoBird CLI sessions on the same machine
-- **Secure against copying**: Stolen encrypted files are useless on other machines
-
-The key insight: The machine itself becomes the "secret" - the combination of machine identifiers acts as a hardware-bound key that cannot be replicated elsewhere.
-
-### Compliance
-
-The RepoBird CLI's secure storage implementation follows industry best practices:
-- ✅ Encryption at rest
-- ✅ Principle of least privilege (0600 file permissions)
-- ✅ No plain text storage
-- ✅ Automatic secure migration
-- ✅ Support for hardware security modules (via OS keyrings)
-
-### Reporting Security Issues
-
-If you discover a security vulnerability, please report it to:
-- Email: security@repobird.ai
-- Do not create public GitHub issues for security vulnerabilities
+**Q: How do I remove my API key completely?**  
+A: Run `repobird logout` to remove it from all storage locations.

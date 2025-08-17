@@ -149,7 +149,7 @@ func (b *BulkFileSelector) LoadFilesProgressiveCmd() tea.Cmd {
 			return FilesLoadedMsg{files: nil, err: err}
 		}
 
-		// Start with a reasonable depth to find files in subdirectories like run-tasks/
+		// Start with a reasonable depth to find files in subdirectories like examples/
 		opts := utils.FileDiscoveryOptions{
 			MaxDepth:       5, // Increase depth to find files in subdirectories
 			IgnorePatterns: utils.DefaultIgnorePatterns,
@@ -187,7 +187,7 @@ func (b *BulkFileSelector) findConfigFiles() ([]FileItem, error) {
 
 	// Use utils.FindFiles with proper options for config files
 	opts := utils.FileDiscoveryOptions{
-		MaxDepth:       5,                           // Increase depth to find files in subdirectories like run-tasks/
+		MaxDepth:       5,                           // Increase depth to find files in subdirectories like examples/
 		IgnorePatterns: utils.DefaultIgnorePatterns, // Use the default ignore patterns
 		FileExtensions: []string{".json", ".yaml", ".yml", ".jsonl", ".md", ".markdown"},
 		SortByModTime:  true,

@@ -5,9 +5,9 @@
 Miller Columns layout system for efficient hierarchical navigation in RepoBird TUI.
 
 ## Related Documentation
-- **[TUI Guide](tui-guide.md)** - Complete TUI documentation
-- **[Keymap Architecture](keymap-architecture.md)** - Key handling
-- **[Architecture Overview](architecture.md)** - TUI layer design
+- **[TUI Guide](TUI-GUIDE.md)** - Complete TUI documentation
+- **[Keymap Architecture](KEYMAP-ARCHITECTURE.md)** - Key handling
+- **[Architecture Overview](ARCHITECTURE.md)** - TUI layer design
 
 ## Miller Columns Design
 

@@ -1,11 +1,11 @@
-# RepoBird CLI Test Tasks
+# RepoBird CLI Examples
 
-This directory contains organized test configurations for RepoBird CLI bulk runs implementation.
+This directory contains example configurations for RepoBird CLI, demonstrating various use cases and features.
 
 ## Directory Structure
 
 ```
-run-tasks/
+examples/
 ├── single-runs/           # Individual run configurations
 ├── bulk-runs/             # Bulk/batch run configurations  
 ├── continuous-tasks/      # Tasks that always produce changes
@@ -14,7 +14,7 @@ run-tasks/
 
 ## Single Run Configurations
 
-Located in `single-runs/`, these test individual run functionality:
+Located in `single-runs/`, these demonstrate individual run configurations:
 
 - `test-improvement.json` - Ruby test coverage improvements
 - `refactor-code.yaml` - Code refactoring and optimization
@@ -29,7 +29,7 @@ repobird run single-runs/refactor-code.yaml
 
 ## Bulk Run Configurations
 
-Located in `bulk-runs/`, these test bulk/batch functionality:
+Located in `bulk-runs/`, these demonstrate bulk/batch operations:
 
 - `comprehensive-improvements.json` - Multiple quality improvements
 - `quality-improvements.yaml` - Code quality focused tasks
@@ -69,17 +69,17 @@ repobird bulk continuous-tasks/multi-continuous.json
 repobird bulk continuous-tasks/sequence-tasks.jsonl
 ```
 
-## Repository Target
+## Repository Configuration
 
-All tasks target the same repository for consistency:
-- **Repository:** `support-rb/test-ruby`
-- **Source Branch:** `main` 
-- **Target Branches:** Various feature branches
+These examples use placeholder repository names. Replace them with your actual repository:
+- **Repository:** `your-org/your-repo` (update in each example file)
+- **Source Branch:** Your default branch (usually `main` or `master`)
+- **Target Branches:** Feature branches for the changes
 
-## Testing Strategy
+## Usage Examples
 
-### 1. Continuous Testing
-Run continuous tasks multiple times to verify they always produce changes:
+### 1. Continuous Tasks
+Run tasks that continuously generate changes (useful for testing and demonstrations):
 
 ```bash
 # These can be run indefinitely and will always make changes
@@ -88,8 +88,8 @@ repobird run continuous-tasks/counter-increment.yaml --follow
 repobird bulk continuous-tasks/multi-continuous.json --follow
 ```
 
-### 2. Format Testing
-Test different file formats:
+### 2. Different File Formats
+RepoBird supports multiple configuration formats:
 
 ```bash
 # JSON format
@@ -105,8 +105,8 @@ repobird run single-runs/security-audit.md
 repobird bulk bulk-runs/feature-additions.jsonl
 ```
 
-### 3. Bulk Testing
-Test bulk operations with multiple runs:
+### 3. Bulk Operations
+Run multiple tasks in batch mode:
 
 ```bash
 # Single bulk file
@@ -119,7 +119,7 @@ repobird bulk single-runs/test-improvement.json single-runs/refactor-code.yaml
 repobird bulk single-runs/*.json single-runs/*.yaml
 ```
 
-## Key Features Tested
+## Supported Features
 
 - ✅ **JSON, YAML, Markdown, JSONL formats**
 - ✅ **Single and bulk run configurations** 
@@ -130,13 +130,13 @@ repobird bulk single-runs/*.json single-runs/*.yaml
 - ✅ **Consistent repository targeting**
 - ✅ **Various branch targeting strategies**
 
-## Continuous Task Benefits
+## About Continuous Tasks
 
-The continuous tasks solve the testing challenge of "what happens when AI has already implemented everything?" by creating tasks that:
+The continuous tasks demonstrate RepoBird's ability to handle iterative improvements and ongoing maintenance:
 
-1. **Always have work to do** - Mathematical sequences, counters, and cycles never end
-2. **Produce unique changes** - Each run creates distinct modifications
-3. **Never reach completion** - There's always a "next" item to generate
-4. **Enable infinite testing** - Can run the same prompt thousands of times
+1. **Iterative Development** - Tasks that build upon previous results
+2. **Unique Changes** - Each run produces distinct modifications
+3. **Long-running Operations** - Demonstrates handling of extended workflows
+4. **Automation Testing** - Useful for testing CI/CD integrations
 
-This ensures robust testing of the bulk runs implementation under realistic conditions where the AI continuously has meaningful work to perform.
+These examples show how RepoBird can handle both one-time fixes and ongoing development tasks.

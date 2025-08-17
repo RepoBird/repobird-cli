@@ -384,6 +384,6 @@ repobird run feature-impl.yaml --follow
 
 ## See Also
 
-- [Bulk Runs Guide](bulk-runs.md) - Running multiple tasks in batch
-- [Configuration Guide](configuration-guide.md) - Setting up RepoBird CLI
-- [API Reference](api-reference.md) - Complete API documentation
+- [Bulk Runs Guide](BULK-RUNS.md) - Running multiple tasks in batch
+- [Configuration Guide](CONFIGURATION-GUIDE.md) - Setting up RepoBird CLI
+- [API Reference](API-REFERENCE.md) - Complete API documentation

@@ -5,10 +5,10 @@
 Common issues and solutions for RepoBird CLI.
 
 ## Related Documentation
-- **[Configuration Guide](configuration-guide.md)** - Configuration setup
-- **[API Reference](api-reference.md)** - API errors
-- **[TUI Guide](tui-guide.md)** - TUI issues
-- **[Development Guide](development-guide.md)** - Debug techniques
+- **[Configuration Guide](CONFIGURATION-GUIDE.md)** - Configuration setup
+- **[API Reference](API-REFERENCE.md)** - API errors
+- **[TUI Guide](TUI-GUIDE.md)** - TUI issues
+- **[Development Guide](DEVELOPMENT-GUIDE.md)** - Debug techniques
 
 ## Quick Diagnostics
 
@@ -35,7 +35,7 @@ repobird config get api-key
 echo $REPOBIRD_API_KEY
 
 # Set API key
-repobird config set api-key YOUR_KEY
+repobird config set api-key <your-api-key>
 ```
 
 #### Invalid API Key
@@ -230,7 +230,7 @@ rm -rf ~/.config/repobird/
 
 # Reinitialize
 repobird config init
-repobird config set api-key YOUR_KEY
+repobird config set api-key <your-api-key>
 ```
 
 ### Cache Recovery
