@@ -166,15 +166,11 @@ func (v *RunDetailsView) handleWindowSizeMsg(msg tea.WindowSizeMsg) {
 		v.layout.Update(msg.Width, msg.Height)
 	}
 
-	// Debug: Log window size changes
-
 	// Get viewport dimensions from global layout
 	viewportWidth, viewportHeight := v.layout.GetViewportDimensions()
 	v.viewport.Width = viewportWidth
 	v.viewport.Height = viewportHeight
 	v.help.Width = msg.Width
-
-	// Debug: Log viewport dimensions from layout
 
 	// Update content to reflow for new width
 	v.updateContent()
@@ -346,8 +342,6 @@ func (v *RunDetailsView) View() string {
 		v.layout = components.NewWindowLayout(v.width, v.height)
 	}
 
-	// Debug: Log rendering dimensions
-
 	// For very small terminals, render minimal content
 	if !v.layout.IsValidDimensions() {
 		return v.layout.GetMinimalView("Run ID: " + v.run.GetIDString())
@@ -355,8 +349,6 @@ func (v *RunDetailsView) View() string {
 
 	// Get dimensions from global layout
 	boxWidth, _ := v.layout.GetBoxDimensions()
-
-	// Debug: Log box dimensions from layout
 
 	// Create standard box using global layout
 	boxStyle := v.layout.CreateStandardBox()
@@ -422,8 +414,6 @@ func (v *RunDetailsView) View() string {
 		v.viewport.Width = viewportWidth
 		v.viewport.Height = viewportHeight
 
-		// Debug: Log viewport dimensions during rendering
-
 		// Get content with highlighting
 		contentLines := v.renderContentWithCursor()
 		content := strings.Join(contentLines, "\n")
@@ -440,12 +430,9 @@ func (v *RunDetailsView) View() string {
 	// Place the box at the top without centering, statusline at bottom
 	statusLine := v.renderStatusBar()
 
-	// Debug: Log final layout dimensions
-
 	// Ensure the final view doesn't exceed terminal height
 	finalView := lipgloss.JoinVertical(lipgloss.Left, boxedContent, statusLine)
 
-	// Debug: Check if the final view height matches expected
 	return finalView
 }
 
@@ -632,7 +619,6 @@ func (v *RunDetailsView) loadRunDetailsWithCacheCheck(forceAPI bool) tea.Cmd {
 
 	return func() tea.Msg {
 		if runID == "" {
-			// Debug: Log empty run ID issue
 			debug.LogToFile("DEBUG: LoadRunDetails called with empty runID - returning error\n")
 			return runDetailsLoadedMsg{run: v.run, err: fmt.Errorf("invalid run ID: empty string")}
 		}
@@ -651,7 +637,6 @@ func (v *RunDetailsView) loadRunDetailsWithCacheCheck(forceAPI bool) tea.Cmd {
 			}
 		}
 
-		// Debug: Log API call for run details
 		debug.LogToFilef("DEBUG: LoadRunDetails calling GetRun for runID='%s' (forced=%t)\n", runID, forceAPI)
 
 		runPtr, err := v.client.GetRun(runID)

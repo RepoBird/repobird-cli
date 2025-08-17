@@ -4,8 +4,6 @@
 package views
 
 import (
-	"time"
-
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/repobird/repobird-cli/internal/tui/cache"
 	"github.com/repobird/repobird-cli/internal/tui/components"
@@ -183,12 +181,6 @@ func (h *HelpView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Model, 
 
 // Helper methods
 
-// startMessageClearTimer starts a timer to clear the copied message
-func (h *HelpView) startMessageClearTimer(duration time.Duration) tea.Cmd {
-	return tea.Tick(duration, func(t time.Time) tea.Msg {
-		return helpClearMessageMsg{}
-	})
-}
 
 // helpClearMessageMsg is used to clear temporary messages in help view
 type helpClearMessageMsg struct{}

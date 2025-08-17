@@ -1410,7 +1410,7 @@ func (v *BulkView) renderStatusLineWithScroll(layoutName string, scrollIndicator
 		}
 	case ModeRunEdit, ModeProgress, ModeResults:
 		// These modes would have their own help text
-		helpText = "[h]back [q]dashboard"
+		helpText = "[h]back [q]dashboard ?:help"
 	case ModeRunList:
 		if v.focusMode == "buttons" {
 			helpText = "↑↓:nav enter:select tab:switch-to-runs [q]dashboard"

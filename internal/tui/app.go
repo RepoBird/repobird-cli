@@ -5,7 +5,6 @@ package tui
 
 import (
 	"context"
-	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -416,13 +415,7 @@ func (a *App) View() string {
 		return a.renderInitializingView()
 	}
 
-	// Debug: Log app view rendering
-
 	view := a.current.View()
-
-	// Debug: Log the length of the returned view string
-	lines := strings.Count(view, "\n") + 1
-	_ = lines // Suppress unused variable warning
 
 	return view
 }

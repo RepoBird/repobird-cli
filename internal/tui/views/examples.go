@@ -381,11 +381,6 @@ func (v *ExamplesView) View() string {
 
 	finalView := lipgloss.JoinVertical(lipgloss.Left, contentWithMargin, statusLine)
 
-	// Debug: Check final line count
-	finalLines := strings.Count(finalView, "\n") + 1
-	debug.LogToFilef("🎯 EXAMPLES FINAL CHECK: view has %d lines, terminal height=%d (should match!) 🎯\n",
-		finalLines, v.height)
-
 	return finalView
 }
 
