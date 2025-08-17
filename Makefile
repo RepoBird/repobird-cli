@@ -283,12 +283,12 @@ fmt-check:
 ## lint: Run linter
 lint:
 	@which $(GOLINT) > /dev/null || (echo "golangci-lint not installed. Run 'make init'"; exit 1)
-	$(GOLINT) run --timeout 5m ./...
+	$(GOLINT) run --config=.golangci.yml --timeout 5m ./...
 
 ## lint-fix: Run linter and fix issues where possible
 lint-fix:
 	@which $(GOLINT) > /dev/null || (echo "golangci-lint not installed. Run 'make init'"; exit 1)
-	$(GOLINT) run --fix --timeout 5m ./...
+	$(GOLINT) run --config=.golangci.yml --fix --timeout 5m ./...
 
 ## vet: Run go vet
 vet:

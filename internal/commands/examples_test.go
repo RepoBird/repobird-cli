@@ -66,7 +66,7 @@ func TestGenerateRunExample(t *testing.T) {
 			if tt.checkFieldOrder {
 				lines := strings.Split(result, "\n")
 
-				var repoIndex, promptIndex int = -1, -1
+				var repoIndex, promptIndex = -1, -1
 				for i, line := range lines {
 					trimmed := strings.TrimSpace(line)
 

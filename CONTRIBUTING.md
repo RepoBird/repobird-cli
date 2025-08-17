@@ -655,7 +655,6 @@ Recommended tools:
 # Install development tools
 go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 go install golang.org/x/tools/cmd/goimports@latest
-go install github.com/cosmtrek/air@latest  # For live reload
 ```
 
 ### Useful Commands
@@ -669,9 +668,6 @@ make ci
 
 # Debug mode
 ./build/repobird --debug status
-
-# Live reload during development
-air -c .air.toml
 ```
 
 ## Getting Help

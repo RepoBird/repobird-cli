@@ -78,7 +78,6 @@ func (e *ErrorView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // View implements tea.Model
 func (e *ErrorView) View() string {
-
 	// Check if layout is initialized and dimensions are valid
 	if e.layout == nil || e.width == 0 || e.height == 0 {
 		return "" // Wait for proper dimensions

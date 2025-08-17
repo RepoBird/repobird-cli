@@ -356,7 +356,6 @@ func ParseJSONFromStdin() (*models.RunConfig, error) {
 
 // ParseJSONFromStdinWithPrompts parses JSON from stdin with validation prompts
 func ParseJSONFromStdinWithPrompts() (*models.RunConfig, *prompts.ValidationPromptHandler, error) {
-
 	// First, read all stdin data
 	data, err := io.ReadAll(os.Stdin)
 	if err != nil {
