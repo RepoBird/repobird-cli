@@ -395,7 +395,7 @@ func FuzzRunRequestJSON(f *testing.F) {
 	f.Fuzz(func(t *testing.T, input string) {
 		var req RunRequest
 		// Should not panic, even with malformed JSON
-		json.Unmarshal([]byte(input), &req)
+		_ = json.Unmarshal([]byte(input), &req)
 	})
 }
 
@@ -414,6 +414,6 @@ func FuzzRunResponseJSON(f *testing.F) {
 	f.Fuzz(func(t *testing.T, input string) {
 		var resp RunResponse
 		// Should not panic, even with malformed JSON
-		json.Unmarshal([]byte(input), &resp)
+		_ = json.Unmarshal([]byte(input), &resp)
 	})
 }

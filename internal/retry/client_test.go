@@ -211,7 +211,7 @@ func TestCircuitBreaker_Reset(t *testing.T) {
 	cb := NewCircuitBreaker(1, 100*time.Millisecond)
 
 	// Trigger circuit breaker
-	cb.Call(func() error {
+	_ = cb.Call(func() error {
 		return errors.New("failure")
 	})
 
@@ -239,7 +239,7 @@ func TestCircuitBreaker_HalfOpen(t *testing.T) {
 	cb := NewCircuitBreaker(1, 50*time.Millisecond)
 
 	// Trigger circuit breaker
-	cb.Call(func() error {
+	_ = cb.Call(func() error {
 		return errors.New("failure")
 	})
 
@@ -261,7 +261,7 @@ func TestCircuitBreaker_HalfOpen(t *testing.T) {
 
 	// Multiple successes should close the circuit
 	for i := 0; i < 3; i++ {
-		cb.Call(func() error {
+		_ = cb.Call(func() error {
 			return nil
 		})
 	}

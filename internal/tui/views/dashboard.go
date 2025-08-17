@@ -242,13 +242,13 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Handle force quit regardless of state
 		if keyMsg.String() == "Q" || (keyMsg.Type == tea.KeyCtrlC) {
 			debug.LogToFilef("  FORCE QUIT requested\n")
-			d.cache.SaveToDisk()
+			_ = d.cache.SaveToDisk()
 			return d, tea.Quit
 		}
 		// Handle normal quit when not in special modes
 		if keyMsg.String() == "q" && !d.showURLSelectionPrompt && d.fzfMode == nil {
 			debug.LogToFilef("  Normal quit requested\n")
-			d.cache.SaveToDisk()
+			_ = d.cache.SaveToDisk()
 			return d, tea.Quit
 		}
 	}

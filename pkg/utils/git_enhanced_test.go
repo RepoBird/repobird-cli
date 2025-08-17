@@ -24,9 +24,9 @@ func TestDetectRepository_Integration(t *testing.T) {
 	// Test from repository root
 	originalWd, err := os.Getwd()
 	require.NoError(t, err)
-	defer os.Chdir(originalWd)
+	defer func() { _ = os.Chdir(originalWd) }()
 
-	err = os.Chdir(tempDir)
+	_ = os.Chdir(tempDir)
 	require.NoError(t, err)
 
 	repo, err := DetectRepository()
@@ -56,10 +56,10 @@ func TestDetectRepository_SubDirectory(t *testing.T) {
 
 	originalWd, err := os.Getwd()
 	require.NoError(t, err)
-	defer os.Chdir(originalWd)
+	defer func() { _ = os.Chdir(originalWd) }()
 
 	// Test from subdirectory
-	err = os.Chdir(subDir)
+	_ = os.Chdir(subDir)
 	require.NoError(t, err)
 
 	repo, err := DetectRepository()
@@ -74,13 +74,13 @@ func TestDetectRepository_SubDirectory(t *testing.T) {
 func TestDetectRepository_NotGitRepo(t *testing.T) {
 	tempDir, err := os.MkdirTemp("", "not-git-repo-*")
 	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	originalWd, err := os.Getwd()
 	require.NoError(t, err)
-	defer os.Chdir(originalWd)
+	defer func() { _ = os.Chdir(originalWd) }()
 
-	err = os.Chdir(tempDir)
+	_ = os.Chdir(tempDir)
 	require.NoError(t, err)
 
 	repo, err := DetectRepository()
@@ -98,9 +98,9 @@ func TestGetCurrentBranch_Integration(t *testing.T) {
 
 	originalWd, err := os.Getwd()
 	require.NoError(t, err)
-	defer os.Chdir(originalWd)
+	defer func() { _ = os.Chdir(originalWd) }()
 
-	err = os.Chdir(tempDir)
+	_ = os.Chdir(tempDir)
 	require.NoError(t, err)
 
 	branch, err := GetCurrentBranch()
@@ -125,9 +125,9 @@ func TestGetCurrentBranch_DifferentBranches(t *testing.T) {
 
 	originalWd, err := os.Getwd()
 	require.NoError(t, err)
-	defer os.Chdir(originalWd)
+	defer func() { _ = os.Chdir(originalWd) }()
 
-	err = os.Chdir(tempDir)
+	_ = os.Chdir(tempDir)
 	require.NoError(t, err)
 
 	// Create and switch to a feature branch
@@ -160,9 +160,9 @@ func TestGetCurrentBranch_DetachedHead(t *testing.T) {
 
 	originalWd, err := os.Getwd()
 	require.NoError(t, err)
-	defer os.Chdir(originalWd)
+	defer func() { _ = os.Chdir(originalWd) }()
 
-	err = os.Chdir(tempDir)
+	_ = os.Chdir(tempDir)
 	require.NoError(t, err)
 
 	// Get current commit hash
@@ -201,9 +201,9 @@ func TestGetGitInfo_Integration(t *testing.T) {
 
 	originalWd, err := os.Getwd()
 	require.NoError(t, err)
-	defer os.Chdir(originalWd)
+	defer func() { _ = os.Chdir(originalWd) }()
 
-	err = os.Chdir(tempDir)
+	_ = os.Chdir(tempDir)
 	require.NoError(t, err)
 
 	repo, branch, err := GetGitInfo()
@@ -340,10 +340,10 @@ func TestGitFunctions_ErrorConditions(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				defer os.RemoveAll(tempDir)
+				defer func() { _ = os.RemoveAll(tempDir) }()
 
 				originalWd, _ := os.Getwd()
-				defer os.Chdir(originalWd)
+				defer func() { _ = os.Chdir(originalWd) }()
 
 				os.Chdir(tempDir)
 				_, err = DetectRepository()
@@ -357,10 +357,10 @@ func TestGitFunctions_ErrorConditions(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				defer os.RemoveAll(tempDir)
+				defer func() { _ = os.RemoveAll(tempDir) }()
 
 				originalWd, _ := os.Getwd()
-				defer os.Chdir(originalWd)
+				defer func() { _ = os.Chdir(originalWd) }()
 
 				os.Chdir(tempDir)
 				_, err = GetCurrentBranch()

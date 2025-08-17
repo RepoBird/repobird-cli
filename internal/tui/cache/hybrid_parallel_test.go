@@ -22,7 +22,7 @@ func TestHybridCacheParallelFetchNoDeadlock(t *testing.T) {
 
 	hybrid, err := NewHybridCache("test-user")
 	require.NoError(t, err)
-	defer hybrid.Close()
+	defer func() { _ = hybrid.Close() }()
 
 	// Add runs to both caches
 	for i := 0; i < 50; i++ {
@@ -81,7 +81,7 @@ func TestHybridCacheRouterStress(t *testing.T) {
 
 	hybrid, err := NewHybridCache("test-user")
 	require.NoError(t, err)
-	defer hybrid.Close()
+	defer func() { _ = hybrid.Close() }()
 
 	var wg sync.WaitGroup
 	numGoroutines := 100
@@ -160,7 +160,7 @@ func TestHybridCacheSetRunsParallelRouting(t *testing.T) {
 
 	hybrid, err := NewHybridCache("test-user")
 	require.NoError(t, err)
-	defer hybrid.Close()
+	defer func() { _ = hybrid.Close() }()
 
 	// Create large batch of mixed runs
 	runs := make([]models.RunResponse, 500)
@@ -207,7 +207,7 @@ func TestHybridCacheConcurrentInvalidation(t *testing.T) {
 
 	hybrid, err := NewHybridCache("test-user")
 	require.NoError(t, err)
-	defer hybrid.Close()
+	defer func() { _ = hybrid.Close() }()
 
 	// Add runs
 	numRuns := 100
@@ -262,7 +262,7 @@ func TestHybridCacheMixedOperationsStress(t *testing.T) {
 
 	hybrid, err := NewHybridCache("test-user")
 	require.NoError(t, err)
-	defer hybrid.Close()
+	defer func() { _ = hybrid.Close() }()
 
 	stopCh := make(chan struct{})
 	var wg sync.WaitGroup

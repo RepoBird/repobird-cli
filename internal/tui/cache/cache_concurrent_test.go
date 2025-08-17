@@ -203,7 +203,7 @@ func TestHybridCacheParallelFetch(t *testing.T) {
 
 	hybrid, err := NewHybridCache("test-user")
 	require.NoError(t, err)
-	defer hybrid.Close()
+	defer func() { _ = hybrid.Close() }()
 
 	// Add some terminal runs to permanent cache
 	for i := 0; i < 10; i++ {
@@ -256,7 +256,7 @@ func TestAtomicFileWrites(t *testing.T) {
 
 	perm, err := NewPermanentCache("test-user")
 	require.NoError(t, err)
-	defer perm.Close()
+	defer func() { _ = perm.Close() }()
 
 	var wg sync.WaitGroup
 

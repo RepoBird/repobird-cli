@@ -18,7 +18,7 @@ import (
 // TestSessionCacheNoMutex verifies SessionCache works without extra mutex
 func TestSessionCacheNoMutex(t *testing.T) {
 	session := NewSessionCache()
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 
 	// Concurrent operations that would reveal mutex issues
 	var wg sync.WaitGroup
@@ -64,7 +64,7 @@ func TestSessionCacheNoMutex(t *testing.T) {
 // TestSessionCacheActiveRunsOnly verifies session cache only stores active runs
 func TestSessionCacheActiveRunsOnly(t *testing.T) {
 	session := NewSessionCache()
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 
 	// Try to store terminal run
 	terminalRun := models.RunResponse{
@@ -100,7 +100,7 @@ func TestSessionCacheActiveRunsOnly(t *testing.T) {
 // TestSessionCacheOldRunFiltering verifies old runs are filtered out
 func TestSessionCacheOldRunFiltering(t *testing.T) {
 	session := NewSessionCache()
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 
 	// Old run (should be filtered)
 	oldRun := models.RunResponse{
@@ -126,7 +126,7 @@ func TestSessionCacheTTL(t *testing.T) {
 	}
 
 	session := NewSessionCache()
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 
 	// Store run with 5-minute TTL
 	run := models.RunResponse{
@@ -150,7 +150,7 @@ func TestSessionCacheTTL(t *testing.T) {
 // TestSessionCacheConcurrentSetRuns tests concurrent SetRuns operations
 func TestSessionCacheConcurrentSetRuns(t *testing.T) {
 	session := NewSessionCache()
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 
 	var wg sync.WaitGroup
 	numBatches := 50
@@ -186,7 +186,7 @@ func TestSessionCacheConcurrentSetRuns(t *testing.T) {
 // TestSessionCacheInvalidateRun tests run invalidation
 func TestSessionCacheInvalidateRun(t *testing.T) {
 	session := NewSessionCache()
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 
 	// Add run
 	run := models.RunResponse{
@@ -213,7 +213,7 @@ func TestSessionCacheInvalidateRun(t *testing.T) {
 // TestSessionCacheInvalidateActiveRuns tests clearing all active runs
 func TestSessionCacheInvalidateActiveRuns(t *testing.T) {
 	session := NewSessionCache()
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 
 	// Add multiple runs
 	for i := 0; i < 10; i++ {
@@ -243,7 +243,7 @@ func TestSessionCacheInvalidateActiveRuns(t *testing.T) {
 // TestSessionCacheFormData tests form data caching
 func TestSessionCacheFormData(t *testing.T) {
 	session := NewSessionCache()
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 
 	// Store form data
 	formData := map[string]string{
@@ -266,7 +266,7 @@ func TestSessionCacheFormData(t *testing.T) {
 // TestSessionCacheDashboardData tests dashboard data caching
 func TestSessionCacheDashboardData(t *testing.T) {
 	session := NewSessionCache()
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 
 	// Store dashboard data
 	dashData := &DashboardData{
@@ -291,7 +291,7 @@ func TestSessionCacheDashboardData(t *testing.T) {
 // TestSessionCacheClear tests clearing all data
 func TestSessionCacheClear(t *testing.T) {
 	session := NewSessionCache()
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 
 	// Add various data
 	_ = session.SetRun(models.RunResponse{
@@ -320,7 +320,7 @@ func TestSessionCacheClear(t *testing.T) {
 // TestSessionCacheConcurrentStress stress tests all operations
 func TestSessionCacheConcurrentStress(t *testing.T) {
 	session := NewSessionCache()
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 
 	stopCh := make(chan struct{})
 	var wg sync.WaitGroup
@@ -415,7 +415,7 @@ func TestSessionCacheConcurrentStress(t *testing.T) {
 // BenchmarkSessionCacheSetRun benchmarks SetRun performance
 func BenchmarkSessionCacheSetRun(b *testing.B) {
 	session := NewSessionCache()
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
@@ -435,7 +435,7 @@ func BenchmarkSessionCacheSetRun(b *testing.B) {
 // BenchmarkSessionCacheGetRun benchmarks GetRun performance
 func BenchmarkSessionCacheGetRun(b *testing.B) {
 	session := NewSessionCache()
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 
 	// Populate with runs
 	for i := 0; i < 100; i++ {

@@ -207,7 +207,7 @@ func LoadRunConfigFromFileWithPrompts(filepath string) (*RunConfig, *prompts.Val
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to open file: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	return parseJSONWithUnknownFieldsAndPrompts(file)
 }

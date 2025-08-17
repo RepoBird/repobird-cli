@@ -21,7 +21,7 @@ func TestHybridCache_StatusTransition(t *testing.T) {
 
 	cache, err := NewHybridCache("test-user")
 	require.NoError(t, err)
-	defer cache.Close()
+	defer func() { _ = cache.Close() }()
 
 	// Start with active run
 	run := models.RunResponse{
@@ -50,7 +50,7 @@ func TestHybridCache_StatusTransition(t *testing.T) {
 	// Should persist across cache recreation
 	cache2, err := NewHybridCache("test-user")
 	require.NoError(t, err)
-	defer cache2.Close()
+	defer func() { _ = cache2.Close() }()
 
 	cached, found = cache2.GetRun("test-1")
 	assert.True(t, found, "terminal run should persist")
@@ -65,7 +65,7 @@ func TestHybridCache_MixedRunStates(t *testing.T) {
 
 	cache, err := NewHybridCache("test-user")
 	require.NoError(t, err)
-	defer cache.Close()
+	defer func() { _ = cache.Close() }()
 
 	// Create runs with different states and unique times
 	runs := []models.RunResponse{
@@ -111,7 +111,7 @@ func TestHybridCache_UserInfo(t *testing.T) {
 
 	cache, err := NewHybridCache("test-user")
 	require.NoError(t, err)
-	defer cache.Close()
+	defer func() { _ = cache.Close() }()
 
 	// Initially no user info
 	_, found := cache.GetUserInfo()
@@ -135,7 +135,7 @@ func TestHybridCache_UserInfo(t *testing.T) {
 	// Should persist
 	cache2, err := NewHybridCache("test-user")
 	require.NoError(t, err)
-	defer cache2.Close()
+	defer func() { _ = cache2.Close() }()
 
 	cached, found = cache2.GetUserInfo()
 	assert.True(t, found)
@@ -150,7 +150,7 @@ func TestHybridCache_FileHashes(t *testing.T) {
 
 	cache, err := NewHybridCache("test-user")
 	require.NoError(t, err)
-	defer cache.Close()
+	defer func() { _ = cache.Close() }()
 
 	// Set file hashes
 	err = cache.SetFileHash("file1.go", "abc123")
@@ -172,7 +172,7 @@ func TestHybridCache_FileHashes(t *testing.T) {
 	// Should persist
 	cache2, err := NewHybridCache("test-user")
 	require.NoError(t, err)
-	defer cache2.Close()
+	defer func() { _ = cache2.Close() }()
 
 	hash, found = cache2.GetFileHash("file1.go")
 	assert.True(t, found)
@@ -187,7 +187,7 @@ func TestHybridCache_RepositoryList(t *testing.T) {
 
 	cache, err := NewHybridCache("test-user")
 	require.NoError(t, err)
-	defer cache.Close()
+	defer func() { _ = cache.Close() }()
 
 	// Set repository list
 	repos := []string{"org/repo1", "org/repo2", "user/repo3"}
@@ -202,7 +202,7 @@ func TestHybridCache_RepositoryList(t *testing.T) {
 	// Should persist
 	cache2, err := NewHybridCache("test-user")
 	require.NoError(t, err)
-	defer cache2.Close()
+	defer func() { _ = cache2.Close() }()
 
 	cached, found = cache2.GetRepositoryList()
 	assert.True(t, found)
@@ -217,7 +217,7 @@ func TestHybridCache_DashboardData(t *testing.T) {
 
 	cache, err := NewHybridCache("test-user")
 	require.NoError(t, err)
-	defer cache.Close()
+	defer func() { _ = cache.Close() }()
 
 	// Create dashboard data
 	dashData := &DashboardData{
@@ -244,7 +244,7 @@ func TestHybridCache_DashboardData(t *testing.T) {
 	// Dashboard data should NOT persist (it's session-only)
 	cache2, err := NewHybridCache("test-user")
 	require.NoError(t, err)
-	defer cache2.Close()
+	defer func() { _ = cache2.Close() }()
 
 	_, found = cache2.GetDashboardData()
 	assert.False(t, found, "dashboard data should not persist")
@@ -258,7 +258,7 @@ func TestHybridCache_InvalidateRun(t *testing.T) {
 
 	cache, err := NewHybridCache("test-user")
 	require.NoError(t, err)
-	defer cache.Close()
+	defer func() { _ = cache.Close() }()
 
 	// Add both active and terminal runs
 	activeRun := models.RunResponse{
@@ -308,7 +308,7 @@ func TestHybridCache_Clear(t *testing.T) {
 
 	cache, err := NewHybridCache("test-user")
 	require.NoError(t, err)
-	defer cache.Close()
+	defer func() { _ = cache.Close() }()
 
 	// Add various data
 	_ = cache.SetRun(models.RunResponse{
@@ -326,7 +326,7 @@ func TestHybridCache_Clear(t *testing.T) {
 	// Create new cache instance
 	cache2, err := NewHybridCache("test-user")
 	require.NoError(t, err)
-	defer cache2.Close()
+	defer func() { _ = cache2.Close() }()
 
 	// All data should be gone
 	_, found := cache2.GetRun("test-run")
@@ -351,7 +351,7 @@ func TestHybridCache_GetStats(t *testing.T) {
 
 	cache, err := NewHybridCache("test-user")
 	require.NoError(t, err)
-	defer cache.Close()
+	defer func() { _ = cache.Close() }()
 
 	// Add data
 	runs := []models.RunResponse{
@@ -377,7 +377,7 @@ func TestHybridCache_FallbackToSessionOnly(t *testing.T) {
 		permanent: nil, // Simulate failed permanent cache
 		userID:    "test-user",
 	}
-	defer cache.Close()
+	defer func() { _ = cache.Close() }()
 
 	// Should still work with session-only
 	run := models.RunResponse{
@@ -414,7 +414,7 @@ func TestHybridCache_OldStuckRunRouting(t *testing.T) {
 
 	cache, err := NewHybridCache("test-user")
 	require.NoError(t, err)
-	defer cache.Close()
+	defer func() { _ = cache.Close() }()
 
 	// Old stuck run (should go to permanent)
 	oldRun := models.RunResponse{
@@ -448,7 +448,7 @@ func TestHybridCache_OldStuckRunRouting(t *testing.T) {
 	// Create new cache instance - old run should persist
 	cache2, err := NewHybridCache("test-user")
 	require.NoError(t, err)
-	defer cache2.Close()
+	defer func() { _ = cache2.Close() }()
 
 	// Old run should persist (from permanent cache)
 	cached, found = cache2.GetRun("old-stuck")
