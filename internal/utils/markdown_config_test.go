@@ -110,7 +110,7 @@ Content`,
 			errorContains: "invalid runType",
 		},
 		{
-			name: "defaults source to main if not specified",
+			name: "does not default source when not specified",
 			input: `---
 prompt: "Fix bug"
 repository: "acme/webapp"
@@ -129,7 +129,7 @@ Content`,
 					RunType    string
 					Title      string
 				})
-				assert.Equal(t, "main", config.Source)
+				assert.Equal(t, "", config.Source) // Should remain empty, not defaulted
 			},
 		},
 		{

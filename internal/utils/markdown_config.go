@@ -129,9 +129,7 @@ func ValidateRunConfig(config *models.RunConfig) error {
 	}
 
 	// Apply defaults
-	if config.Source == "" {
-		config.Source = "main" // Default to main if not specified
-	}
+	// DO NOT default source - let the server handle it based on repo's default branch
 
 	// Target branch is optional - server will handle defaults
 

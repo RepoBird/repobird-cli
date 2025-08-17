@@ -36,20 +36,21 @@ func (s *runService) CreateRun(ctx context.Context, req domain.CreateRunRequest)
 		return nil, fmt.Errorf("validation failed: %w", err)
 	}
 
-	// Auto-detect git information if needed
-	if req.RepositoryName == "" && s.git.IsGitRepository() {
-		repoName, err := s.git.GetRepositoryName()
-		if err == nil {
-			req.RepositoryName = repoName
-		}
-	}
+	// Auto-detection disabled - experimental feature
+	// TODO: Enable when feature is ready and properly tested
+	// if req.RepositoryName == "" && s.git.IsGitRepository() {
+	// 	repoName, err := s.git.GetRepositoryName()
+	// 	if err == nil {
+	// 		req.RepositoryName = repoName
+	// 	}
+	// }
 
-	if req.SourceBranch == "" && s.git.IsGitRepository() {
-		branch, err := s.git.GetCurrentBranch()
-		if err == nil {
-			req.SourceBranch = branch
-		}
-	}
+	// if req.SourceBranch == "" && s.git.IsGitRepository() {
+	// 	branch, err := s.git.GetCurrentBranch()
+	// 	if err == nil {
+	// 		req.SourceBranch = branch
+	// 	}
+	// }
 
 	// Create run via repository
 	run, err := s.repo.Create(ctx, req)

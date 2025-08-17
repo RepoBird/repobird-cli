@@ -218,10 +218,7 @@ func validateYAMLConfigForPrompts(config *YAMLConfig) error {
 	}
 
 	// Apply defaults first
-	if runConfig.Source == "" {
-		runConfig.Source = "main"
-		config.Source = "main"
-	}
+	// DO NOT default source - let the server handle it based on repo's default branch
 	if runConfig.RunType == "" {
 		runConfig.RunType = "run"
 		config.RunType = "run"
@@ -231,7 +228,6 @@ func validateYAMLConfigForPrompts(config *YAMLConfig) error {
 	validationErr := ValidateRunConfig(runConfig)
 
 	// Apply any additional defaults that were set during validation
-	config.Source = runConfig.Source
 	config.RunType = runConfig.RunType
 
 	return validationErr
