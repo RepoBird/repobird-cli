@@ -12,9 +12,13 @@ import (
 func (c *SimpleCache) BuildRepositoryOverviewFromRuns(runs []*models.RunResponse) []models.Repository {
 	repoMap := make(map[string]*models.Repository)
 	repoIDNameMap := make(map[int]string)
+	repoLatestRunCreation := make(map[string]time.Time) // Track latest run creation time per repo
 
 	// First pass: extract unique repository names and create repository objects
 	for _, run := range runs {
+		if run == nil {
+			continue
+		}
 		repoName := run.GetRepositoryName()
 		if repoName == "" {
 			continue
@@ -34,19 +38,29 @@ func (c *SimpleCache) BuildRepositoryOverviewFromRuns(runs []*models.RunResponse
 			}
 			repoMap[repoName] = repo
 		}
+		
+		// Track the latest run creation time for this repository
+		if latestTime, exists := repoLatestRunCreation[repoName]; !exists || run.CreatedAt.After(latestTime) {
+			repoLatestRunCreation[repoName] = run.CreatedAt
+		}
 	}
 
 	// Second pass: update statistics, including runs that only have repo ID
 	for _, run := range runs {
+		if run == nil {
+			continue
+		}
 		var repo *models.Repository
+		var repoName string
 
 		// Try to find repo by name first
-		repoName := run.GetRepositoryName()
+		repoName = run.GetRepositoryName()
 		if repoName != "" {
 			repo = repoMap[repoName]
 		} else if run.RepoID > 0 {
 			// Try to find by repo ID mapping
 			if mappedName, exists := repoIDNameMap[run.RepoID]; exists {
+				repoName = mappedName
 				repo = repoMap[mappedName]
 			}
 		}
@@ -72,19 +86,45 @@ func (c *SimpleCache) BuildRepositoryOverviewFromRuns(runs []*models.RunResponse
 		if run.UpdatedAt.After(repo.LastActivity) {
 			repo.LastActivity = run.UpdatedAt
 		}
+		
+		// Update latest run creation time if newer
+		if repoName != "" {
+			if latestTime, exists := repoLatestRunCreation[repoName]; !exists || run.CreatedAt.After(latestTime) {
+				repoLatestRunCreation[repoName] = run.CreatedAt
+			}
+		}
 
 		// Note: API repository info would be stored here if available
 		// Currently RunResponse doesn't have RepositoryObj field
 	}
 
-	// Convert map to slice and sort by last activity
+	// Convert map to slice
 	repositories := make([]models.Repository, 0, len(repoMap))
 	for _, repo := range repoMap {
 		repositories = append(repositories, *repo)
 	}
 
+	// Sort repositories by most recent run creation time
+	// Repos with runs sorted by latest run creation, repos without runs at the bottom
 	sort.Slice(repositories, func(i, j int) bool {
-		return repositories[i].LastActivity.After(repositories[j].LastActivity)
+		iTime, iHasRuns := repoLatestRunCreation[repositories[i].Name]
+		jTime, jHasRuns := repoLatestRunCreation[repositories[j].Name]
+		
+		// If both have runs, sort by most recent run creation
+		if iHasRuns && jHasRuns {
+			return iTime.After(jTime)
+		}
+		
+		// Repos with runs come before repos without runs
+		if iHasRuns && !jHasRuns {
+			return true
+		}
+		if !iHasRuns && jHasRuns {
+			return false
+		}
+		
+		// If neither has runs, sort alphabetically by name
+		return repositories[i].Name < repositories[j].Name
 	})
 
 	return repositories

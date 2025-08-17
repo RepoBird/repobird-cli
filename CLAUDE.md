@@ -194,10 +194,13 @@ The `repobird run` command supports multiple formats for task definitions:
 See [Run Config Formats](docs/run-config-formats.md) for complete examples.
 
 ## Testing Requirements
-- Minimum 70% coverage for new code
-- Use table-driven tests
+- **All changes must have comprehensive unit tests** - aim for full coverage
+- Minimum 70% coverage for new code, target 100% where feasible
+- Use table-driven tests for exhaustive scenario coverage
 - Mock external dependencies
 - Use `XDG_CONFIG_HOME` for test isolation
+- Test both success and error paths
+- Include edge cases and boundary conditions
 See [Testing Guide](docs/testing-guide.md) for patterns.
 
 ## Configuration
@@ -219,7 +222,7 @@ When working on this codebase:
 ### Development Rules
 1. **Maintain backward compatibility** for CLI commands
 2. **Follow established patterns** - study existing code first
-3. **Write tests** for new functionality (70%+ coverage)
+3. **Write comprehensive tests** for all changes - aim for full coverage
 4. **Use message-based navigation** in TUI - never create views directly
 5. **Prefer editing existing files** over creating new ones
 6. **Handle errors explicitly** with user-friendly messages

@@ -11,6 +11,14 @@ info:
     ## Rate Limiting
     API requests are rate-limited to 100 requests per minute per API key.
 
+    ## Repository Filtering
+    All API endpoints that return repository data automatically filter out:
+    - Disabled repositories (isEnabled=false)
+    - Repositories without GitHub App installation (installationId is null or empty)
+    - Deleted repositories (deletedAt is not null)
+    
+    This ensures that only active, properly configured repositories are accessible via the API.
+
     ## File Hash Tracking
     The API supports file hash tracking for audit and debugging purposes.
     When submitting a run with a fileHash, the system logs if an identical hash was previously used
@@ -63,6 +71,8 @@ components:
           example: developer@example.com
         name:
           type: string
+          nullable: true
+          description: User's full name (empty string if not provided)
           example: John Doe
         githubUsername:
           type: string
@@ -302,15 +312,15 @@ components:
             1. Fetch the repository's current default branch from GitHub
             2. Update the repository record with the latest default branch
             3. Use that branch as the source
-            
+
             If provided, the branch must exist in the repository or the request will be rejected with a BRANCH_NOT_FOUND error.
           example: feature/auth
         targetBranch:
           type: string
           description: |
-            Target branch where the PR will merge to. If not provided, defaults to the source branch 
+            Target branch where the PR will merge to. If not provided, defaults to the source branch
             (creating a PR that merges back to the same branch).
-            
+
             If provided, the branch must exist in the repository or the request will be rejected with a BRANCH_NOT_FOUND error.
             Note: Empty string is treated as undefined and will default to source branch.
           example: main
@@ -360,15 +370,15 @@ components:
             1. Fetch the repository's current default branch from GitHub
             2. Update the repository record with the latest default branch
             3. Use that branch as the source for all runs
-            
+
             If provided, the branch must exist in the repository or all runs will be rejected with a BRANCH_NOT_FOUND error.
           example: main
         targetBranch:
           type: string
           description: |
-            Base target branch where PRs will merge to. If not provided, defaults to the source branch 
+            Base target branch where PRs will merge to. If not provided, defaults to the source branch
             (creating PRs that merge back to the same branch). Individual runs can override this.
-            
+
             If provided, the branch must exist in the repository or all runs will be rejected with a BRANCH_NOT_FOUND error.
             Note: Empty string is treated as undefined and will default to source branch.
           example: feature/bulk
@@ -585,6 +595,8 @@ paths:
                         example: developer@example.com
                       name:
                         type: string
+                        nullable: true
+                        description: User's full name (empty string if not provided)
                         example: John Doe
                       githubUsername:
                         type: string
@@ -816,7 +828,7 @@ paths:
                     error: INVALID_INPUT
                     message: Either repoId or repositoryName is required
         '403':
-          description: Forbidden (no runs remaining or repo disabled)
+          description: Forbidden (no runs remaining, repo disabled, or repo lacks GitHub App installation)
           content:
             application/json:
               schema:
@@ -1239,7 +1251,7 @@ paths:
                         error:
                           type: string
         '403':
-          description: Forbidden (quota exceeded, repo disabled, or all runs failed)
+          description: Forbidden (quota exceeded, repo disabled, repo lacks GitHub App installation, or all runs failed)
           content:
             application/json:
               schema:

@@ -311,10 +311,10 @@ func (s *StatusView) renderStatusContent() string {
 		value := s.statusFields[i]
 
 		// Add section breaks
-		if key == "Account Tier:" && currentSection != "account" {
-			if currentSection != "" {
-				lines = append(lines, "") // Empty line between sections
-			}
+		// Check for Account Information section (triggered by Name, Email, or Account Tier)
+		if (key == "Name:" || key == "Email:" || key == "Account Tier:") && currentSection != "account" {
+			// Add empty line before Account Information section for spacing
+			lines = append(lines, "") // Empty line before section
 			lines = append(lines, s.renderSectionHeader("Account Information"))
 			currentSection = "account"
 		} else if key == "Repositories:" && currentSection != "system" {

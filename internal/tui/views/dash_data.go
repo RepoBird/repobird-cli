@@ -3,6 +3,7 @@ package views
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -350,6 +351,7 @@ func (d *DashboardView) updateRepositoryStats(repositories []models.Repository, 
 	// Create maps for quick lookup
 	repoMap := make(map[string]*models.Repository)
 	repoIDMap := make(map[int]*models.Repository) // Map by repo ID
+	repoLatestRunCreation := make(map[string]time.Time) // Track latest run creation time per repo
 
 	for i := range repositories {
 		repoMap[repositories[i].Name] = &repositories[i]
@@ -371,10 +373,14 @@ func (d *DashboardView) updateRepositoryStats(repositories []models.Repository, 
 
 	// Update statistics from runs
 	for _, run := range allRuns {
+		if run == nil {
+			continue
+		}
 		var repo *models.Repository
+		var repoName string
 
 		// First try to match by repository name
-		repoName := run.GetRepositoryName()
+		repoName = run.GetRepositoryName()
 		if repoName != "" {
 			repo = repoMap[repoName]
 		}
@@ -382,6 +388,10 @@ func (d *DashboardView) updateRepositoryStats(repositories []models.Repository, 
 		// If not found and we have a repo ID, try to match by ID
 		if repo == nil && run.RepoID > 0 {
 			repo = repoIDMap[run.RepoID]
+			// Get the repo name from the matched repo
+			if repo != nil {
+				repoName = repo.Name
+			}
 		}
 
 		if repo == nil {
@@ -391,6 +401,13 @@ func (d *DashboardView) updateRepositoryStats(repositories []models.Repository, 
 		// Update last activity if this run is more recent
 		if run.UpdatedAt.After(repo.LastActivity) {
 			repo.LastActivity = run.UpdatedAt
+		}
+
+		// Track the latest run creation time for this repository
+		if repoName != "" {
+			if latestTime, exists := repoLatestRunCreation[repoName]; !exists || run.CreatedAt.After(latestTime) {
+				repoLatestRunCreation[repoName] = run.CreatedAt
+			}
 		}
 
 		// Update run counts
@@ -404,6 +421,29 @@ func (d *DashboardView) updateRepositoryStats(repositories []models.Repository, 
 			repo.RunCounts.Failed++
 		}
 	}
+
+	// Sort repositories by most recent run creation time
+	// Repos with runs sorted by latest run creation, repos without runs at the bottom
+	sort.Slice(repositories, func(i, j int) bool {
+		iTime, iHasRuns := repoLatestRunCreation[repositories[i].Name]
+		jTime, jHasRuns := repoLatestRunCreation[repositories[j].Name]
+		
+		// If both have runs, sort by most recent run creation
+		if iHasRuns && jHasRuns {
+			return iTime.After(jTime)
+		}
+		
+		// Repos with runs come before repos without runs
+		if iHasRuns && !jHasRuns {
+			return true
+		}
+		if !iHasRuns && jHasRuns {
+			return false
+		}
+		
+		// If neither has runs, sort alphabetically by name
+		return repositories[i].Name < repositories[j].Name
+	})
 
 	debug.LogToFilef("    [updateRepositoryStats] Completed, returning %d repos\n", len(repositories))
 	return repositories
