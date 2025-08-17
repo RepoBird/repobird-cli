@@ -298,14 +298,21 @@ components:
         sourceBranch:
           type: string
           description: |
-            Source branch (defaults to repo default).
-            The branch must exist in the repository or the request will be rejected with a BRANCH_NOT_FOUND error.
+            Source branch to start from. If not provided, the system will:
+            1. Fetch the repository's current default branch from GitHub
+            2. Update the repository record with the latest default branch
+            3. Use that branch as the source
+            
+            If provided, the branch must exist in the repository or the request will be rejected with a BRANCH_NOT_FOUND error.
           example: feature/auth
         targetBranch:
           type: string
           description: |
-            Target branch (defaults to repo default).
-            If specified, the branch must exist in the repository or the request will be rejected with a BRANCH_NOT_FOUND error.
+            Target branch where the PR will merge to. If not provided, defaults to the source branch 
+            (creating a PR that merges back to the same branch).
+            
+            If provided, the branch must exist in the repository or the request will be rejected with a BRANCH_NOT_FOUND error.
+            Note: Empty string is treated as undefined and will default to source branch.
           example: main
         fileHash:
           type: string
@@ -349,14 +356,21 @@ components:
         sourceBranch:
           type: string
           description: |
-            Source branch for all runs (defaults to repo default).
-            The branch must exist in the repository or all runs will be rejected with a BRANCH_NOT_FOUND error.
+            Source branch for all runs to start from. If not provided, the system will:
+            1. Fetch the repository's current default branch from GitHub
+            2. Update the repository record with the latest default branch
+            3. Use that branch as the source for all runs
+            
+            If provided, the branch must exist in the repository or all runs will be rejected with a BRANCH_NOT_FOUND error.
           example: main
         targetBranch:
           type: string
           description: |
-            Base target branch (individual runs can override).
-            If specified, the branch must exist in the repository or all runs will be rejected with a BRANCH_NOT_FOUND error.
+            Base target branch where PRs will merge to. If not provided, defaults to the source branch 
+            (creating PRs that merge back to the same branch). Individual runs can override this.
+            
+            If provided, the branch must exist in the repository or all runs will be rejected with a BRANCH_NOT_FOUND error.
+            Note: Empty string is treated as undefined and will default to source branch.
           example: feature/bulk
         force:
           type: boolean
@@ -385,8 +399,8 @@ components:
               target:
                 type: string
                 description: |
-                  Target branch for this specific run (overrides bulk targetBranch).
-                  If specified, the branch must exist in the repository or this run will fail with a BRANCH_NOT_FOUND error.
+                  Target branch for this specific run (overrides bulk targetBranch, defaults to repository's default branch).
+                  This branch does not need to exist and can be created during the PR process.
                 example: fix/auth-bug-1
               fileHash:
                 type: string
@@ -725,11 +739,26 @@ paths:
               $ref: '#/components/schemas/CreateRunRequest'
             examples:
               basic:
-                summary: Basic run request
+                summary: Basic run request (uses repository default branch)
                 value:
                   repositoryName: acme/webapp
                   prompt: Fix the login bug in auth.js
                   title: Fix authentication issue
+              withBranches:
+                summary: Run with specific branches
+                value:
+                  repositoryName: acme/webapp
+                  prompt: Implement new feature
+                  title: Add user dashboard
+                  sourceBranch: develop
+                  targetBranch: main
+              withSourceOnly:
+                summary: Run with source branch only (PR merges back to same branch)
+                value:
+                  repositoryName: acme/webapp
+                  prompt: Refactor authentication module
+                  title: Clean up auth code
+                  sourceBranch: feature/auth-refactor
               withHash:
                 summary: Run with file hash for tracking
                 value:
@@ -771,7 +800,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
               examples:
-                branchNotFound:
+                sourceBranchNotFound:
                   summary: Source branch not found
                   value:
                     error: BRANCH_NOT_FOUND
@@ -780,7 +809,7 @@ paths:
                   summary: Target branch not found
                   value:
                     error: BRANCH_NOT_FOUND
-                    message: "Target branch 'invalid-branch' does not exist in acme/webapp"
+                    message: "Target branch 'release/v2' does not exist in acme/webapp. Please create it first, or leave target empty to merge back to source branch."
                 invalidInput:
                   summary: Missing repository identifier
                   value:
@@ -1198,7 +1227,8 @@ paths:
                     type: string
                     example: Bulk request validation failed
                   batchId:
-                    type: null
+                    type: string
+                    nullable: true
                   details:
                     type: array
                     items:

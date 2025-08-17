@@ -39,7 +39,7 @@ The `repobird run` command supports multiple configuration file formats to defin
 | Field | Type | Description |
 |-------|------|-------------|
 | `repository` | string | Repository for all runs (required) |
-| `source` | string | Source branch for all runs (defaults to `main`) |
+| `source` | string | Source branch for all runs (defaults to repository's default branch if not specified) |
 | `runType` | string | Type for all runs: `run` or `plan` (defaults to `run`) |
 | `runs` | array | Array of run configurations (required) |
 

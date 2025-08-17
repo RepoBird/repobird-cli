@@ -129,7 +129,7 @@ repobird examples generate bulk -o bulk.json
 - `prompt` - Task description
 
 ### Optional Fields
-- `source` - Source branch (default: main)
+- `source` - Source branch (defaults to repository's default branch if not specified)
 - `target` - Target branch (auto-generated)
 - `title` - Run title (auto-generated)
 - `runType` - "run" or "plan" (default: run)

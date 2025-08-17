@@ -118,7 +118,7 @@ The `repobird run` command supports multiple formats and automatically detects s
 - `prompt` - Task description/instructions for the AI
 
 #### Optional Fields
-- `source` - Source branch (default: "main")
+- `source` - Source branch (defaults to repository's default branch if not specified)
 - `target` - Target branch name (auto-generated if not specified)
 - `title` - Human-readable title (auto-generated if not specified)
 - `runType` - Type: "run" or "plan" (default: "run")

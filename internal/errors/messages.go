@@ -53,7 +53,13 @@ func ParseAPIError(statusCode int, body []byte) error {
 
 func createErrorFromAPIResponse(statusCode int, apiErr APIErrorResponse) error {
 	// Check for specific error codes
-	switch strings.ToUpper(apiErr.Code) {
+	// Note: API may send error code in either "code" or "error" field
+	errorCode := strings.ToUpper(apiErr.Code)
+	if errorCode == "" {
+		errorCode = strings.ToUpper(apiErr.Error)
+	}
+	
+	switch errorCode {
 	case "NO_RUNS_REMAINING":
 		tier := ""
 		limit := 0
@@ -90,6 +96,20 @@ func createErrorFromAPIResponse(statusCode int, apiErr APIErrorResponse) error {
 			if repo, ok := apiErr.Details["repository"].(string); ok {
 				message = fmt.Sprintf("Repository '%s' not found or not connected. Connect it at: %s", repo, config.GetURLs().ReposURL)
 			}
+		}
+		return &APIError{
+			StatusCode: statusCode,
+			Status:     apiErr.Status,
+			Message:    message,
+			ErrorType:  ErrorTypeNotFound,
+		}
+
+	case "BRANCH_NOT_FOUND":
+		// Use the full error message from the API which includes branch name and repository
+		// Example: "Target branch 'jdfsjdfksdf' does not exist in test-acc-254/youtube-music. Please create it first, or leave target empty to merge back to source branch."
+		message := apiErr.Message
+		if message == "" {
+			message = "Branch not found in repository"
 		}
 		return &APIError{
 			StatusCode: statusCode,
