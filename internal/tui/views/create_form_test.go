@@ -6,6 +6,7 @@ package views
 import (
 	"context"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/repobird/repobird-cli/internal/models"
@@ -139,11 +140,13 @@ func TestCreateRunView_InitFallbackToRecentRun(t *testing.T) {
 			ID:         "run1",
 			Repository: "recent/repo1",
 			Status:     "completed",
+			CreatedAt:  time.Now().Add(-1 * time.Minute), // Newer run
 		},
 		{
 			ID:         "run2",
 			Repository: "recent/repo2",
 			Status:     "running",
+			CreatedAt:  time.Now().Add(-2 * time.Minute), // Older run
 		},
 	}
 	cache.SetRuns(runs)

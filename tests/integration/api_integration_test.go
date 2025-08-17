@@ -157,19 +157,19 @@ func TestAPIClient_WithEnvironment(t *testing.T) {
 
 	defer func() {
 		if originalAPIURL != "" {
-			os.Setenv(config.EnvAPIURL, originalAPIURL)
+			_ = os.Setenv(config.EnvAPIURL, originalAPIURL)
 		} else {
-			os.Unsetenv(config.EnvAPIURL)
+			_ = os.Unsetenv(config.EnvAPIURL)
 		}
 		if originalAPIKey != "" {
-			os.Setenv(config.EnvAPIKey, originalAPIKey)
+			_ = os.Setenv(config.EnvAPIKey, originalAPIKey)
 		} else {
-			os.Unsetenv(config.EnvAPIKey)
+			_ = os.Unsetenv(config.EnvAPIKey)
 		}
 	}()
 
-	os.Setenv(config.EnvAPIURL, mockServer.URL())
-	os.Setenv(config.EnvAPIKey, "env-test-key")
+	_ = os.Setenv(config.EnvAPIURL, mockServer.URL())
+	_ = os.Setenv(config.EnvAPIKey, "env-test-key")
 
 	mockServer.SetAuthVerifyResponse(true)
 
