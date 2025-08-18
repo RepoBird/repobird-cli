@@ -222,7 +222,7 @@ func processSingleRun(runConfig *models.RunConfig, additionalContext string) err
 
 	fmt.Printf("Run created successfully!\n")
 	fmt.Printf("ID: %s\n", run.ID)
-	fmt.Printf("Status: %s\n", run.Status)
+	fmt.Printf("Status: %s\n", formatStatusForDisplay(run.Status))
 	fmt.Printf("Repository: %s\n", run.RepositoryName)
 	fmt.Printf("Source: %s → Target: %s\n", run.SourceBranch, run.TargetBranch)
 
@@ -286,22 +286,44 @@ func processBulkRuns(filename string) error {
 	return executeBulkRuns(bulkConfig)
 }
 
+// formatStatusForDisplay converts domain status to uppercase display format
+func formatStatusForDisplay(status string) string {
+	switch status {
+	case domain.StatusCompleted:
+		return "DONE"
+	case domain.StatusQueued:
+		return "QUEUED"
+	case domain.StatusRunning:
+		return "PROCESSING"
+	case domain.StatusFailed:
+		return "FAILED"
+	case domain.StatusCancelled:
+		return "CANCELLED"
+	case domain.StatusCreated:
+		return "CREATED"
+	default:
+		// Return uppercase version of unknown statuses
+		return strings.ToUpper(status)
+	}
+}
+
 func followRunStatus(runService domain.RunService, runID string) error {
 	ctx := context.Background()
 	startTime := time.Now()
 	lastStatus := ""
 
 	callback := func(status string, message string) {
-		if status != lastStatus {
+		displayStatus := formatStatusForDisplay(status)
+		if displayStatus != lastStatus {
 			fmt.Printf("\r\033[K") // Clear line
-			fmt.Printf("[%s] Status: %s\n", time.Now().Format("15:04:05"), status)
-			lastStatus = status
+			fmt.Printf("[%s] Status: %s\n", time.Now().Format("15:04:05"), displayStatus)
+			lastStatus = displayStatus
 		} else {
 			elapsed := time.Since(startTime)
 			if message != "" {
-				fmt.Printf("\r[%s] %s - %s", formatDuration(elapsed), status, message)
+				fmt.Printf("\r[%s] %s - %s", formatDuration(elapsed), displayStatus, message)
 			} else {
-				fmt.Printf("\r[%s] %s", formatDuration(elapsed), status)
+				fmt.Printf("\r[%s] %s", formatDuration(elapsed), displayStatus)
 			}
 		}
 	}
@@ -315,7 +337,7 @@ func followRunStatus(runService domain.RunService, runID string) error {
 	if finalRun.Status == domain.StatusFailed && finalRun.Error != "" {
 		fmt.Printf("Run failed: %s\n", finalRun.Error)
 	} else {
-		fmt.Printf("Run completed with status: %s\n", finalRun.Status)
+		fmt.Printf("Run completed with status: %s\n", formatStatusForDisplay(finalRun.Status))
 	}
 	return nil
 }
@@ -486,7 +508,10 @@ func executeBulkRuns(bulkConfig *bulk.BulkConfig) error {
 	// Follow progress if requested
 	if follow && len(bulkResp.Data.Successful) > 0 {
 		fmt.Println("\nFollowing batch progress...")
-		return followBulkProgress(ctx, client, bulkResp.Data.BatchID)
+		// Create context with 1h 30m timeout
+		followCtx, cancel := context.WithTimeout(context.Background(), 90*time.Minute)
+		defer cancel()
+		return followBulkProgress(followCtx, client, bulkResp.Data.BatchID)
 	}
 
 	fmt.Printf("\nBatch ID: %s\n", bulkResp.Data.BatchID)

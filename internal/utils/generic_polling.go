@@ -96,7 +96,7 @@ func (p *GenericPoller[T]) PollUntilComplete(
 	for {
 		select {
 		case <-pollCtx.Done():
-			return zero, fmt.Errorf("polling timeout after %v", FormatDuration(time.Since(p.startTime)))
+			return zero, fmt.Errorf("polling timeout exceeded (maximum wait time: %v). The run may still be processing on the server", p.config.Timeout)
 
 		case <-sigChan:
 			if p.config.Debug {

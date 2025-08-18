@@ -125,7 +125,10 @@ func runBulk(cmd *cobra.Command, args []string) error {
 	// Follow progress if requested
 	if bulkFollow && len(bulkResp.Data.Successful) > 0 {
 		fmt.Println("\nFollowing batch progress...")
-		return followBulkProgress(context.Background(), client, bulkResp.Data.BatchID)
+		// Create context with 1h 30m timeout
+		ctx, cancel := context.WithTimeout(context.Background(), 90*time.Minute)
+		defer cancel()
+		return followBulkProgress(ctx, client, bulkResp.Data.BatchID)
 	}
 
 	fmt.Printf("\nBatch ID: %s\n", bulkResp.Data.BatchID)
@@ -381,26 +384,42 @@ func followBulkProgress(ctx context.Context, client *api.Client, batchID string)
 
 	spinner := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 	spinnerIdx := 0
+	startTime := time.Now()
 
-	for status := range statusChan {
-		// Clear previous line
-		fmt.Print("\033[2K\r")
+	for {
+		select {
+		case status, ok := <-statusChan:
+			if !ok {
+				// Channel closed - check if it was due to timeout
+				if ctx.Err() == context.DeadlineExceeded {
+					fmt.Print("\033[2K\r") // Clear line
+					return fmt.Errorf("polling timeout exceeded (maximum wait time: 1h 30m). The batch may still be processing on the server")
+				}
+				return nil
+			}
 
-		// Display progress
-		progressBar := makeProgressBar(status.Statistics)
-		fmt.Printf("%s %s", spinner[spinnerIdx], progressBar)
+			// Clear previous line
+			fmt.Print("\033[2K\r")
 
-		spinnerIdx = (spinnerIdx + 1) % len(spinner)
+			// Display progress
+			progressBar := makeProgressBar(status.Statistics)
+			fmt.Printf("%s %s", spinner[spinnerIdx], progressBar)
 
-		// Check for completion
-		if status.Status == "completed" || status.Status == "failed" || status.Status == "cancelled" {
-			fmt.Println("\n\nBatch completed!")
-			displayBulkResults(status)
-			break
+			spinnerIdx = (spinnerIdx + 1) % len(spinner)
+
+			// Check for completion
+			if status.Status == "completed" || status.Status == "failed" || status.Status == "cancelled" {
+				fmt.Println("\n\nBatch completed!")
+				displayBulkResults(status)
+				return nil
+			}
+
+		case <-ctx.Done():
+			fmt.Print("\033[2K\r") // Clear line
+			elapsed := time.Since(startTime)
+			return fmt.Errorf("polling timeout exceeded after %v (maximum wait time: 1h 30m). The batch may still be processing on the server", elapsed)
 		}
 	}
-
-	return nil
 }
 
 func makeProgressBar(stats dto.BulkStatistics) string {
