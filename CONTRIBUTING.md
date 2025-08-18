@@ -548,8 +548,8 @@ chmod +x .git/hooks/pre-commit
 
 #### Usage Progress Display
 - [ ] Fix usage progress bar showing 0.00% on status page
-- [ ] Hard-code free/pro tier usage limits
-- [ ] Allow admin-credited extra runs to exceed limits
+- [X] Hard-code free/pro tier usage limits
+- [X] Allow admin-credited extra runs to exceed limits
 
 ### Medium Priority Tasks
 

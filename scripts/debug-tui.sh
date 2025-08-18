@@ -36,4 +36,4 @@ if ! make build; then
     echo "Build failed. Cannot run TUI."
     exit 1
 fi
-REPOBIRD_ENV=dev ./build/repobird tui
+REPOBIRD_ENV=dev REPOBIRD_DEBUG_LOG=1 ./build/repobird tui

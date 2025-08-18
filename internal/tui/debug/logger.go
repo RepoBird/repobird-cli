@@ -9,8 +9,12 @@ import (
 
 // getDebugLogPath returns the debug log path, configurable via environment variable
 func getDebugLogPath() string {
-	if path := os.Getenv("REPOBIRD_DEBUG_LOG"); path != "" {
-		return path
+	// Check if debug logging is enabled (REPOBIRD_DEBUG_LOG=1 or any value)
+	debugEnv := os.Getenv("REPOBIRD_DEBUG_LOG")
+	
+	// If it's a path (contains / or \), use it as the log path
+	if debugEnv != "" && (filepath.IsAbs(debugEnv) || filepath.Dir(debugEnv) != ".") {
+		return debugEnv
 	}
 
 	// Find project root by looking for go.mod file
@@ -56,8 +60,9 @@ func findProjectRoot() string {
 
 // LogToFile writes a debug message to the debug log file
 func LogToFile(message string) {
-	// Only log if debug logging is enabled
-	if os.Getenv("REPOBIRD_DEBUG_LOG") == "" {
+	// Only log if debug logging is enabled (any non-empty value)
+	debugEnv := os.Getenv("REPOBIRD_DEBUG_LOG")
+	if debugEnv == "" || debugEnv == "0" || debugEnv == "false" {
 		return
 	}
 	

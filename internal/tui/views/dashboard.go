@@ -111,14 +111,50 @@ type DashboardView struct {
 // NewDashboardViewWithState creates a new dashboard view with restored state
 func NewDashboardViewWithState(client APIClient, cache *cache.SimpleCache, selectedRepoIdx, selectedRunIdx, selectedDetailLine, focusedColumn int) *DashboardView {
 	dashboard := NewDashboardView(client, cache)
+	
+	// Get the saved window size if available
+	width, height := 80, 24 // defaults
+	if stateData := cache.GetNavigationContext("dashboardState"); stateData != nil {
+		if state, ok := stateData.(map[string]interface{}); ok {
+			if w, ok := state["width"].(int); ok && w > 0 {
+				width = w
+			}
+			if h, ok := state["height"].(int); ok && h > 0 {
+				height = h
+			}
+		}
+	}
+	
 	// Set the state that will be restored after data loads
-	debug.LogToFilef("🔧 DASHBOARD: Creating dashboard with restored state - repo=%d, run=%d, detail=%d, column=%d 🔧\n",
-		selectedRepoIdx, selectedRunIdx, selectedDetailLine, focusedColumn)
+	debug.LogToFilef("🔧 DASHBOARD: Creating dashboard with restored state - repo=%d, run=%d, detail=%d, column=%d, size=%dx%d 🔧\n",
+		selectedRepoIdx, selectedRunIdx, selectedDetailLine, focusedColumn, width, height)
 	dashboard.selectedRepoIdx = selectedRepoIdx
 	dashboard.selectedRunIdx = selectedRunIdx
 	dashboard.selectedDetailLine = selectedDetailLine
 	dashboard.focusedColumn = focusedColumn
-	debug.LogToFilef("✅ DASHBOARD: State applied to new dashboard instance ✅\n")
+	dashboard.width = width
+	dashboard.height = height
+	
+	// Keep loading state true until data is loaded
+	dashboard.loading = true
+	dashboard.initializing = true
+	
+	// Update viewport sizes immediately to prevent panic
+	dashboard.updateViewportSizes()
+	
+	// CRITICAL: Set initial content BEFORE any other operations to prevent panic
+	// Must have actual newline-separated content to avoid capacity 1 issue
+	safeContent := strings.Repeat("Loading...\n", 50) // Create 50 lines of safe content
+	dashboard.repoViewport.SetContent(safeContent)
+	dashboard.runsViewport.SetContent(safeContent)
+	dashboard.detailsViewport.SetContent(safeContent)
+	
+	// NOW reset viewport scroll positions after content is set
+	dashboard.repoViewport.GotoTop()
+	dashboard.runsViewport.GotoTop()  
+	dashboard.detailsViewport.GotoTop()
+	
+	debug.LogToFilef("✅ DASHBOARD: State applied with viewports reset to top (preventing panic) ✅\n")
 	return dashboard
 }
 
@@ -168,6 +204,12 @@ func NewDashboardView(client APIClient, cache *cache.SimpleCache) *DashboardView
 		components.WithKeymaps(components.DefaultKeyMap),
 	)
 
+	// Initialize viewports with safe content to prevent panic
+	safeContent := strings.Repeat("Loading...\n", 50)
+	dashboard.repoViewport.SetContent(safeContent)
+	dashboard.runsViewport.SetContent(safeContent)
+	dashboard.detailsViewport.SetContent(safeContent)
+
 	return dashboard
 }
 
@@ -182,6 +224,15 @@ func (d *DashboardView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Mo
 	switch keyMsg.String() {
 	case "b":
 		// Dashboard handles 'b' specially for bulk view navigation (overrides back navigation)
+		// Save dashboard state before navigating
+		debug.LogToFilef("💾 DASHBOARD: Saving state before BULK navigation - repo=%d, run=%d, detail=%d, column=%d 💾\n",
+			d.selectedRepoIdx, d.selectedRunIdx, d.selectedDetailLine, d.focusedColumn)
+		d.cache.SetNavigationContext("dashboardState", map[string]interface{}{
+			"selectedRepoIdx":    d.selectedRepoIdx,
+			"selectedRunIdx":     d.selectedRunIdx,
+			"selectedDetailLine": d.selectedDetailLine,
+			"focusedColumn":      d.focusedColumn,
+		})
 		// Navigate to bulk view
 		return true, d, func() tea.Msg {
 			return messages.NavigateToBulkMsg{}
@@ -968,13 +1019,15 @@ func (d *DashboardView) startFZFMode() tea.Cmd {
 func (d *DashboardView) navigateToDetails() tea.Cmd {
 	if d.selectedRunData != nil {
 		// Save dashboard state before navigating
-		debug.LogToFilef("💾 DASHBOARD: Saving state before navigation - repo=%d, run=%d, detail=%d, column=%d 💾\n",
-			d.selectedRepoIdx, d.selectedRunIdx, d.selectedDetailLine, d.focusedColumn)
+		debug.LogToFilef("💾 DASHBOARD: Saving state before navigation - repo=%d, run=%d, detail=%d, column=%d, size=%dx%d 💾\n",
+			d.selectedRepoIdx, d.selectedRunIdx, d.selectedDetailLine, d.focusedColumn, d.width, d.height)
 		d.cache.SetNavigationContext("dashboardState", map[string]interface{}{
 			"selectedRepoIdx":    d.selectedRepoIdx,
 			"selectedRunIdx":     d.selectedRunIdx,
 			"selectedDetailLine": d.selectedDetailLine,
 			"focusedColumn":      d.focusedColumn,
+			"width":              d.width,
+			"height":             d.height,
 		})
 		
 		return func() tea.Msg {
@@ -986,6 +1039,16 @@ func (d *DashboardView) navigateToDetails() tea.Cmd {
 
 // handleStatusCommand handles the status command
 func (d *DashboardView) handleStatusCommand() tea.Cmd {
+	// Save dashboard state before navigating
+	debug.LogToFilef("💾 DASHBOARD: Saving state before STATUS navigation - repo=%d, run=%d, detail=%d, column=%d 💾\n",
+		d.selectedRepoIdx, d.selectedRunIdx, d.selectedDetailLine, d.focusedColumn)
+	d.cache.SetNavigationContext("dashboardState", map[string]interface{}{
+		"selectedRepoIdx":    d.selectedRepoIdx,
+		"selectedRunIdx":     d.selectedRunIdx,
+		"selectedDetailLine": d.selectedDetailLine,
+		"focusedColumn":      d.focusedColumn,
+	})
+	
 	return func() tea.Msg {
 		return messages.NavigateToStatusMsg{}
 	}
@@ -995,6 +1058,17 @@ func (d *DashboardView) handleStatusCommand() tea.Cmd {
 func (d *DashboardView) navigateToCreateForm() tea.Cmd {
 	if d.selectedRepo != nil {
 		repositoryName := d.selectedRepo.Name
+		
+		// Save dashboard state before navigating
+		debug.LogToFilef("💾 DASHBOARD: Saving state before CREATE navigation - repo=%d, run=%d, detail=%d, column=%d 💾\n",
+			d.selectedRepoIdx, d.selectedRunIdx, d.selectedDetailLine, d.focusedColumn)
+		d.cache.SetNavigationContext("dashboardState", map[string]interface{}{
+			"selectedRepoIdx":    d.selectedRepoIdx,
+			"selectedRunIdx":     d.selectedRunIdx,
+			"selectedDetailLine": d.selectedDetailLine,
+			"focusedColumn":      d.focusedColumn,
+		})
+		
 		return func() tea.Msg {
 			return messages.NavigateToCreateMsg{
 				SelectedRepository: repositoryName,

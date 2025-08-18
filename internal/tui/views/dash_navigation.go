@@ -103,19 +103,44 @@ func (d *DashboardView) cycleLayout() {
 func (d *DashboardView) scrollToSelected(column int) {
 	var selectedIdx int
 	var viewport *viewport.Model
+	var totalItems int
 
 	switch column {
 	case 0:
 		selectedIdx = d.selectedRepoIdx
 		viewport = &d.repoViewport
+		totalItems = len(d.repositories)
 	case 1:
 		selectedIdx = d.selectedRunIdx
 		viewport = &d.runsViewport
+		totalItems = len(d.filteredRuns)
 	case 2:
 		selectedIdx = d.selectedDetailLine
 		viewport = &d.detailsViewport
+		totalItems = len(d.detailLines)
 	default:
 		return
+	}
+
+	// CRITICAL FIX: Validate bounds before scrolling to prevent panic
+	// If selected index is beyond content, reset to safe position
+	if totalItems == 0 {
+		viewport.YOffset = 0
+		return
+	}
+	
+	// Ensure selected index is within bounds
+	if selectedIdx >= totalItems {
+		selectedIdx = totalItems - 1
+	}
+	if selectedIdx < 0 {
+		selectedIdx = 0
+	}
+
+	// Calculate maximum safe YOffset based on content
+	maxYOffset := totalItems - 1
+	if maxYOffset < 0 {
+		maxYOffset = 0
 	}
 
 	// Calculate if we need to scroll
@@ -128,6 +153,16 @@ func (d *DashboardView) scrollToSelected(column int) {
 	} else if selectedIdx > visibleEnd {
 		// Scroll down to show selected item
 		viewport.YOffset = selectedIdx - viewport.Height + 1
+	}
+	
+	// CRITICAL: Ensure YOffset doesn't exceed content bounds
+	if viewport.YOffset > maxYOffset {
+		debug.LogToFilef("🚨 SCROLL FIX: Clamping YOffset from %d to %d (max for %d items) 🚨\n", 
+			viewport.YOffset, maxYOffset, totalItems)
+		viewport.YOffset = maxYOffset
+	}
+	if viewport.YOffset < 0 {
+		viewport.YOffset = 0
 	}
 }
 

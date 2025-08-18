@@ -253,7 +253,26 @@ func (d *DashboardView) renderRepositoriesColumn(width, height int) string {
 			Padding(0, 1)
 		parts = append(parts, searchStyle.Render(searchBar))
 	}
-	parts = append(parts, contentStyle.Render(d.repoViewport.View()))
+	
+	// CRITICAL SAFETY CHECK: Validate viewport state before calling View() to prevent panic
+	viewportContent := ""
+	if d.repoViewport.Height > 0 && d.repoViewport.Width > 0 {
+		// Additional check: ensure YOffset is within bounds of total lines
+		totalLines := d.repoViewport.TotalLineCount()
+		if d.repoViewport.YOffset >= totalLines && totalLines > 0 {
+			debug.LogToFilef("🚨 RENDER SAFETY: Resetting repo viewport YOffset %d >= totalLines %d 🚨\n", 
+				d.repoViewport.YOffset, totalLines)
+			d.repoViewport.YOffset = totalLines - 1
+			if d.repoViewport.YOffset < 0 {
+				d.repoViewport.YOffset = 0
+			}
+		}
+		viewportContent = d.repoViewport.View()
+	} else {
+		// Fallback if viewport not properly initialized
+		viewportContent = "Loading..."
+	}
+	parts = append(parts, contentStyle.Render(viewportContent))
 	
 	return lipgloss.JoinVertical(lipgloss.Left, parts...)
 }
@@ -367,7 +386,30 @@ func (d *DashboardView) renderRunsColumn(width, height int) string {
 			Padding(0, 1)
 		parts = append(parts, searchStyle.Render(searchBar))
 	}
-	parts = append(parts, contentStyle.Render(d.runsViewport.View()))
+	
+	// CRITICAL SAFETY CHECK: Validate viewport state before calling View() to prevent panic
+	viewportContent := ""
+	if d.runsViewport.Height > 0 && d.runsViewport.Width > 0 {
+		// Only validate bounds if we actually have content to avoid disrupting normal scrolling
+		totalLines := d.runsViewport.TotalLineCount()
+		if d.runsViewport.YOffset >= totalLines && totalLines > 0 {
+			// Only reset if the offset is WAY beyond content (emergency fix)
+			if d.runsViewport.YOffset >= totalLines + 10 {
+				debug.LogToFilef("🚨 RENDER EMERGENCY: Resetting runs viewport YOffset %d >> totalLines %d 🚨\n", 
+					d.runsViewport.YOffset, totalLines)
+				if totalLines > 1 {
+					d.runsViewport.YOffset = totalLines - 1
+				} else {
+					d.runsViewport.YOffset = 0
+				}
+			}
+		}
+		viewportContent = d.runsViewport.View()
+	} else {
+		// Fallback if viewport not properly initialized
+		viewportContent = "Loading..."
+	}
+	parts = append(parts, contentStyle.Render(viewportContent))
 	
 	return lipgloss.JoinVertical(lipgloss.Left, parts...)
 }
@@ -518,7 +560,26 @@ func (d *DashboardView) renderDetailsColumn(width, height int) string {
 			Padding(0, 1)
 		parts = append(parts, searchStyle.Render(searchBar))
 	}
-	parts = append(parts, contentStyle.Render(d.detailsViewport.View()))
+	
+	// CRITICAL SAFETY CHECK: Validate viewport state before calling View() to prevent panic
+	viewportContent := ""
+	if d.detailsViewport.Height > 0 && d.detailsViewport.Width > 0 {
+		// Additional check: ensure YOffset is within bounds of total lines
+		totalLines := d.detailsViewport.TotalLineCount()
+		if d.detailsViewport.YOffset >= totalLines && totalLines > 0 {
+			debug.LogToFilef("🚨 RENDER SAFETY: Resetting details viewport YOffset %d >= totalLines %d 🚨\n", 
+				d.detailsViewport.YOffset, totalLines)
+			d.detailsViewport.YOffset = totalLines - 1
+			if d.detailsViewport.YOffset < 0 {
+				d.detailsViewport.YOffset = 0
+			}
+		}
+		viewportContent = d.detailsViewport.View()
+	} else {
+		// Fallback if viewport not properly initialized
+		viewportContent = "Loading..."
+	}
+	parts = append(parts, contentStyle.Render(viewportContent))
 	
 	return lipgloss.JoinVertical(lipgloss.Left, parts...)
 }
