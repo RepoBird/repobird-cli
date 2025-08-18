@@ -4,6 +4,7 @@
 package utils
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"time"
 )
 
 // URL pattern matching - covers HTTP/HTTPS URLs
@@ -51,8 +53,8 @@ func ExtractURL(text string) string {
 	return ""
 }
 
-// OpenURL opens a URL in the default browser
-func OpenURL(urlStr string) error {
+// OpenURL opens a URL in the default browser with context support
+func OpenURL(ctx context.Context, urlStr string) error {
 	if urlStr == "" {
 		return nil
 	}
@@ -63,20 +65,27 @@ func OpenURL(urlStr string) error {
 		return nil
 	}
 
-	return openURLSilent(cleanURL)
+	return openURLSilent(ctx, cleanURL)
+}
+
+// OpenURLWithTimeout is a convenience function that creates a context with default timeout
+func OpenURLWithTimeout(urlStr string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	return OpenURL(ctx, urlStr)
 }
 
 // openURLSilent opens a URL while suppressing stderr to prevent GTK theme warnings
-func openURLSilent(url string) error {
+func openURLSilent(ctx context.Context, url string) error {
 	var cmd *exec.Cmd
 
 	switch runtime.GOOS {
 	case "darwin":
-		cmd = exec.Command("open", url)
+		cmd = exec.CommandContext(ctx, "open", url)
 	case "windows":
-		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
+		cmd = exec.CommandContext(ctx, "rundll32", "url.dll,FileProtocolHandler", url)
 	default: // linux, freebsd, openbsd, netbsd, etc.
-		cmd = exec.Command("xdg-open", url)
+		cmd = exec.CommandContext(ctx, "xdg-open", url)
 	}
 
 	// Suppress stderr to prevent GTK theme warnings from cluttering the terminal

@@ -32,9 +32,9 @@ func (c *SimpleCache) BuildRepositoryOverviewFromRuns(runs []*models.RunResponse
 			repoIDNameMap[run.RepoID] = repoName
 		}
 
-		repo, exists := repoMap[repoName]
+		_, exists := repoMap[repoName]
 		if !exists {
-			repo = &models.Repository{
+			repo := &models.Repository{
 				Name:         repoName,
 				RunCounts:    models.RunStats{},
 				LastActivity: run.UpdatedAt,

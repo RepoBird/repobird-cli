@@ -4,7 +4,9 @@
 package utils
 
 import (
+	"context"
 	"testing"
+	"time"
 )
 
 func TestInitClipboard(t *testing.T) {
@@ -60,7 +62,9 @@ func TestWriteToClipboard(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := WriteToClipboard(tt.text)
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			err := WriteToClipboard(ctx, tt.text)
 
 			// In CI environments, clipboard operations might fail
 			// We allow failures but test that the function doesn't panic
@@ -89,7 +93,9 @@ func TestWriteToClipboardFallback(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Test the fallback directly
-			err := writeToClipboardFallback(tt.text)
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			err := writeToClipboardFallback(ctx, tt.text)
 
 			// In CI environments or systems without clipboard tools,
 			// this might fail. We just ensure it doesn't panic.
@@ -108,7 +114,7 @@ func TestClipboardWithoutCGO(t *testing.T) {
 	cgoAvailable = false
 
 	testText := "Test without CGO"
-	err := WriteToClipboard(testText)
+	err := WriteToClipboardWithTimeout(testText)
 
 	// We don't expect this to succeed in all environments,
 	// but it should not panic

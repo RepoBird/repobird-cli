@@ -258,7 +258,7 @@ func (v *ExamplesView) handleYank() tea.Cmd {
 		content := selectedConfig.Content
 
 		// Try to copy to clipboard
-		err := utils.WriteToClipboard(content)
+		err := utils.WriteToClipboardWithTimeout(content)
 		if err != nil {
 			debug.LogToFilef("DEBUG: Failed to copy to clipboard: %v\n", err)
 			v.clipboardMsg = fmt.Sprintf("⚠ Copy failed: %v", err)

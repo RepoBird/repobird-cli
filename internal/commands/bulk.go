@@ -210,10 +210,9 @@ func runBulk(cmd *cobra.Command, args []string) error {
 			case <-ticker.C:
 				elapsed := time.Since(startTime)
 				fmt.Printf("\r%s Processing... (%.0fs)", spinner[spinnerIdx], elapsed.Seconds())
-				if err := os.Stdout.Sync(); err != nil {
-					// If sync fails, the spinner may not update smoothly, but that's acceptable
-					// We don't want to interrupt the bulk operation for a UI issue
-				}
+				// Try to sync stdout for smooth spinner updates, but ignore errors
+				// as we don't want to interrupt the bulk operation for a UI issue
+				_ = os.Stdout.Sync()
 				spinnerIdx = (spinnerIdx + 1) % len(spinner)
 			}
 		}

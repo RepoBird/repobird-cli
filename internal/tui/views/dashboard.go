@@ -505,7 +505,7 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				d.pendingRepoForURL = nil
 				d.pendingAPIRepoForURL = nil
 
-				if err := utils.OpenURL(urlText); err == nil {
+				if err := utils.OpenURLWithTimeout(urlText); err == nil {
 					d.statusLine.SetTemporaryMessageWithType(message, components.MessageSuccess, 1*time.Second)
 				} else {
 					d.statusLine.SetTemporaryMessageWithType(fmt.Sprintf("✗ Failed to open URL: %v", err), components.MessageError, 1*time.Second)
@@ -524,7 +524,7 @@ func (d *DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				d.pendingRepoForURL = nil
 				d.pendingAPIRepoForURL = nil
 
-				if err := utils.OpenURL(urlText); err == nil {
+				if err := utils.OpenURLWithTimeout(urlText); err == nil {
 					d.statusLine.SetTemporaryMessageWithType(message, components.MessageSuccess, 1*time.Second)
 				} else {
 					d.statusLine.SetTemporaryMessageWithType(fmt.Sprintf("✗ Failed to open URL: %v", err), components.MessageError, 1*time.Second)

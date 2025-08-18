@@ -4,10 +4,12 @@
 package utils
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -129,7 +131,9 @@ func TestGetCurrentBranch_DifferentBranches(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create and switch to a feature branch
-	cmd := exec.Command("git", "checkout", "-b", "feature-branch")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "git", "checkout", "-b", "feature-branch")
 	err = cmd.Run()
 	if err != nil {
 		t.Skip("Cannot create git branch")
@@ -140,7 +144,9 @@ func TestGetCurrentBranch_DifferentBranches(t *testing.T) {
 	assert.Equal(t, "feature-branch", branch)
 
 	// Switch back to main/master
-	cmd = exec.Command("git", "checkout", "-")
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel2()
+	cmd = exec.CommandContext(ctx2, "git", "checkout", "-")
 	err = cmd.Run()
 	require.NoError(t, err)
 
@@ -164,7 +170,9 @@ func TestGetCurrentBranch_DetachedHead(t *testing.T) {
 	require.NoError(t, err)
 
 	// Get current commit hash
-	cmd := exec.Command("git", "rev-parse", "HEAD")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "git", "rev-parse", "HEAD")
 	output, err := cmd.Output()
 	if err != nil {
 		t.Skip("Cannot get git commit hash")
@@ -176,7 +184,9 @@ func TestGetCurrentBranch_DetachedHead(t *testing.T) {
 	}
 
 	// Checkout commit directly (detached HEAD)
-	cmd = exec.Command("git", "checkout", commitHash)
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel2()
+	cmd = exec.CommandContext(ctx2, "git", "checkout", commitHash)
 	err = cmd.Run()
 	if err != nil {
 		t.Skip("Cannot checkout commit")
@@ -403,8 +413,12 @@ func createTempGitRepo(t *testing.T) string {
 
 	tempDir := t.TempDir()
 
+	// Create context for git operations with reasonable timeout for tests
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
 	// Initialize git repository
-	cmd := exec.Command("git", "init")
+	cmd := exec.CommandContext(ctx, "git", "init")
 	cmd.Dir = tempDir
 	err := cmd.Run()
 	if err != nil {
@@ -412,11 +426,11 @@ func createTempGitRepo(t *testing.T) string {
 	}
 
 	// Configure git user (required for commits)
-	cmd = exec.Command("git", "config", "user.name", "Test User")
+	cmd = exec.CommandContext(ctx, "git", "config", "user.name", "Test User")
 	cmd.Dir = tempDir
 	_ = cmd.Run() // Ignore errors
 
-	cmd = exec.Command("git", "config", "user.email", "test@example.com")
+	cmd = exec.CommandContext(ctx, "git", "config", "user.email", "test@example.com")
 	cmd.Dir = tempDir
 	_ = cmd.Run() // Ignore errors
 
@@ -425,14 +439,14 @@ func createTempGitRepo(t *testing.T) string {
 	err = os.WriteFile(readmePath, []byte("# Test Repository"), 0644)
 	require.NoError(t, err)
 
-	cmd = exec.Command("git", "add", "README.md")
+	cmd = exec.CommandContext(ctx, "git", "add", "README.md")
 	cmd.Dir = tempDir
 	err = cmd.Run()
 	if err != nil {
 		t.Skip("Cannot add file to git")
 	}
 
-	cmd = exec.Command("git", "commit", "-m", "Initial commit")
+	cmd = exec.CommandContext(ctx, "git", "commit", "-m", "Initial commit")
 	cmd.Dir = tempDir
 	err = cmd.Run()
 	if err != nil {
@@ -440,7 +454,7 @@ func createTempGitRepo(t *testing.T) string {
 	}
 
 	// Add fake remote origin
-	cmd = exec.Command("git", "remote", "add", "origin", "git@github.com:test/repo.git")
+	cmd = exec.CommandContext(ctx, "git", "remote", "add", "origin", "git@github.com:test/repo.git")
 	cmd.Dir = tempDir
 	_ = cmd.Run() // Ignore errors - this is for testing URL parsing
 

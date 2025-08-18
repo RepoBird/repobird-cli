@@ -391,7 +391,7 @@ func (h *HelpView) Update(msg tea.Msg) (*HelpView, tea.Cmd) {
 			// Copy current visible line at cursor position
 			if h.viewport.YOffset < len(h.contentLines) {
 				line := h.contentLines[h.viewport.YOffset]
-				if err := utils.WriteToClipboard(line); err == nil {
+				if err := utils.WriteToClipboardWithTimeout(line); err == nil {
 					h.copiedMessage = fmt.Sprintf("📋 Copied: %s", truncateString(line, 40))
 					h.copiedTime = time.Now()
 					h.yankBlink = true
@@ -401,7 +401,7 @@ func (h *HelpView) Update(msg tea.Msg) (*HelpView, tea.Cmd) {
 		case "Y":
 			// Copy all content
 			allContent := strings.Join(h.contentLines, "\n")
-			if err := utils.WriteToClipboard(allContent); err == nil {
+			if err := utils.WriteToClipboardWithTimeout(allContent); err == nil {
 				h.copiedMessage = "📋 Copied all help content"
 				h.copiedTime = time.Now()
 				h.yankBlink = true
@@ -410,7 +410,7 @@ func (h *HelpView) Update(msg tea.Msg) (*HelpView, tea.Cmd) {
 		case "D":
 			// Debug: Copy the entire rendered view to clipboard for debugging
 			renderedView := h.View()
-			if err := utils.WriteToClipboard(renderedView); err == nil {
+			if err := utils.WriteToClipboardWithTimeout(renderedView); err == nil {
 				h.copiedMessage = "🐛 Copied debug snapshot to clipboard"
 				h.copiedTime = time.Now()
 				debug.LogToFilef("DEBUG SNAPSHOT: View copied to clipboard, %d chars\n", len(renderedView))

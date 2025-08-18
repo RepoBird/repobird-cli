@@ -365,7 +365,7 @@ func (d *DashboardView) handleMillerColumnsNavigation(msg tea.KeyMsg) tea.Cmd {
 		}
 
 		if urlText != "" {
-			if err := utils.OpenURL(urlText); err == nil {
+			if err := utils.OpenURLWithTimeout(urlText); err == nil {
 				d.statusLine.SetTemporaryMessageWithType("🌐 Opened URL in browser", components.MessageSuccess, 1*time.Second)
 			} else {
 				d.statusLine.SetTemporaryMessageWithType(fmt.Sprintf("✗ Failed to open URL: %v", err), components.MessageError, 1*time.Second)

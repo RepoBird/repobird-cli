@@ -31,7 +31,7 @@ func (c *ClipboardManager) CopyWithBlink(text, description string) (tea.Cmd, err
 	}
 
 	// Attempt to copy to clipboard
-	if err := utils.WriteToClipboard(text); err != nil {
+	if err := utils.WriteToClipboardWithTimeout(text); err != nil {
 		return nil, err
 	}
 

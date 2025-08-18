@@ -220,9 +220,7 @@ func (d *DashboardView) renderRepositoriesColumn(width, height int) string {
 		items = append(items, item)
 	}
 
-	if len(items) == 0 {
-		items = []string{"No repositories"}
-	}
+	// Note: if len(items) == 0, we handle this via updateRepoViewportContent()
 
 	// Update viewport content if needed
 	d.updateRepoViewportContent()

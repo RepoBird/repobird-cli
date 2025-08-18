@@ -4,6 +4,7 @@
 package utils
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -52,50 +53,59 @@ func InitClipboard() error {
 	return nil
 }
 
-// WriteToClipboard writes text to the system clipboard
+// WriteToClipboard writes text to the system clipboard with context support
 // It uses CGO clipboard if available, otherwise falls back to OS commands
-func WriteToClipboard(text string) error {
+func WriteToClipboard(ctx context.Context, text string) error {
 	if !clipboardInitialized {
 		_ = InitClipboard()
 	}
 
 	if cgoAvailable {
-		// Use CGO clipboard
+		// Use CGO clipboard with context awareness
 		done := clipboard.Write(clipboard.FmtText, []byte(text))
 		select {
 		case <-done:
 			return nil
+		case <-ctx.Done():
+			return ctx.Err()
 		case <-time.After(2 * time.Second):
 			return fmt.Errorf("clipboard write timeout")
 		}
 	}
 
 	// Fallback to OS-specific commands
-	return writeToClipboardFallback(text)
+	return writeToClipboardFallback(ctx, text)
 }
 
-// writeToClipboardFallback uses OS-specific commands to write to clipboard
-func writeToClipboardFallback(text string) error {
+// WriteToClipboardWithTimeout is a convenience function that creates a context with default timeout
+func WriteToClipboardWithTimeout(text string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	return WriteToClipboard(ctx, text)
+}
+
+// writeToClipboardFallback uses OS-specific commands to write to clipboard with context support
+func writeToClipboardFallback(ctx context.Context, text string) error {
 	var cmd *exec.Cmd
 
 	switch runtime.GOOS {
 	case "darwin":
-		cmd = exec.Command("pbcopy")
+		cmd = exec.CommandContext(ctx, "pbcopy")
 	case "linux":
 		// Check if we're on Wayland or X11
 		if os.Getenv("WAYLAND_DISPLAY") != "" {
 			// Wayland - use wl-copy
-			cmd = exec.Command("wl-copy")
+			cmd = exec.CommandContext(ctx, "wl-copy")
 		} else if os.Getenv("DISPLAY") != "" {
 			// X11 - use xclip
-			cmd = exec.Command("xclip", "-selection", "clipboard")
+			cmd = exec.CommandContext(ctx, "xclip", "-selection", "clipboard")
 		} else {
 			// Try xclip as fallback
-			cmd = exec.Command("xclip", "-selection", "clipboard")
+			cmd = exec.CommandContext(ctx, "xclip", "-selection", "clipboard")
 		}
 	case "windows":
 		// Use PowerShell on Windows
-		cmd = exec.Command("powershell", "-command", "Set-Clipboard", "-Value", text)
+		cmd = exec.CommandContext(ctx, "powershell", "-command", "Set-Clipboard", "-Value", text)
 		return cmd.Run()
 	default:
 		return fmt.Errorf("unsupported operating system: %s", runtime.GOOS)

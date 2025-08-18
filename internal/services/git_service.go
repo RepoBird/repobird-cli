@@ -4,8 +4,10 @@
 package services
 
 import (
+	"context"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/repobird/repobird-cli/internal/domain"
 	"github.com/repobird/repobird-cli/pkg/utils"
@@ -31,7 +33,9 @@ func (g *gitService) GetRepositoryName() (string, error) {
 
 // IsGitRepository checks if the current directory is a git repository
 func (g *gitService) IsGitRepository() bool {
-	cmd := exec.Command("git", "rev-parse", "--git-dir")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "git", "rev-parse", "--git-dir")
 	output, err := cmd.Output()
 	return err == nil && strings.TrimSpace(string(output)) != ""
 }

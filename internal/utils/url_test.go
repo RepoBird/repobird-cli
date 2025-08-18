@@ -4,8 +4,10 @@
 package utils
 
 import (
+	"context"
 	"os"
 	"testing"
+	"time"
 )
 
 func TestIsURL(t *testing.T) {
@@ -98,7 +100,9 @@ func TestOpenURLSilent(t *testing.T) {
 	// This should not panic or error on valid URL
 	// In actual usage, we'd mock exec.Command, but for this simple test
 	// we'll just verify the function exists and can be called
-	err := openURLSilent(testURL)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	err := openURLSilent(ctx, testURL)
 
 	// The command might fail in CI/test environments, but it shouldn't panic
 	// and should return some kind of result (either nil or an error)
@@ -107,7 +111,9 @@ func TestOpenURLSilent(t *testing.T) {
 	}
 
 	// Test with empty URL
-	err = openURLSilent("")
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel2()
+	err = openURLSilent(ctx2, "")
 	if err != nil {
 		t.Logf("openURLSilent with empty URL returned error: %v", err)
 	}
@@ -131,7 +137,7 @@ func TestOpenURL(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := OpenURL(tt.input)
+			err := OpenURLWithTimeout(tt.input)
 			if (err != nil) != tt.wantErr {
 				// In test environments, commands might fail - that's expected
 				t.Logf("OpenURL(%q) error = %v (may be expected in test environment)", tt.input, err)
