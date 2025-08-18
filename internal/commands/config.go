@@ -237,7 +237,8 @@ Note: Only the API key can be deleted. Other settings can be changed with 'confi
 	},
 }
 
-func init() {
+// InitConfigSubcommands adds subcommands to configCmd
+func InitConfigSubcommands() {
 	configCmd.AddCommand(configSetCmd)
 	configCmd.AddCommand(configGetCmd)
 	configCmd.AddCommand(configDeleteCmd)

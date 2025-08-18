@@ -82,6 +82,4 @@ Troubleshooting:
 	},
 }
 
-func init() {
-	rootCmd.AddCommand(completionCmd)
-}
+// completionCmd is now added to rootCmd in root.go init() function

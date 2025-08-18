@@ -56,6 +56,7 @@ For configuration examples and field descriptions:
 	SilenceUsage:  false, // Let Cobra show usage for arg/flag errors
 }
 
+//nolint:gochecknoinits // Required for CLI command registration
 func init() {
 	runCmd.Flags().BoolVar(&dryRun, "dry-run", false, "validate input without creating a run")
 	runCmd.Flags().BoolVar(&follow, "follow", false, "follow the run status after creation")

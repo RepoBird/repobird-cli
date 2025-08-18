@@ -367,6 +367,33 @@ bump-major:
 	echo $$NEW > VERSION; \
 	echo "Version bumped: $$CURRENT → $$NEW"
 
+## tag: Create a git tag from VERSION file (does not push)
+tag:
+	@if [ ! -f VERSION ]; then \
+		echo "Error: VERSION file not found"; \
+		exit 1; \
+	fi; \
+	VERSION=$$(cat VERSION); \
+	TAG="v$$VERSION"; \
+	if git rev-parse $$TAG >/dev/null 2>&1; then \
+		echo "Error: Tag $$TAG already exists"; \
+		echo "Use 'git tag -d $$TAG' to delete it first if needed"; \
+		exit 1; \
+	fi; \
+	echo "Creating tag $$TAG from VERSION file ($$VERSION)"; \
+	git tag -a $$TAG -m "Release version $$VERSION"; \
+	echo "✓ Tag $$TAG created successfully"; \
+	echo "To push this tag, run: git push origin $$TAG"; \
+	echo "To push all tags, run: git push --tags"
+
+## tag-push: Create and push a git tag from VERSION file
+tag-push: tag
+	@VERSION=$$(cat VERSION); \
+	TAG="v$$VERSION"; \
+	echo "Pushing tag $$TAG to origin..."; \
+	git push origin $$TAG; \
+	echo "✓ Tag $$TAG pushed successfully"
+
 # Shortcuts
 b: build
 t: test

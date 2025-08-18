@@ -136,6 +136,7 @@ Get API Key: %s`, config.GetAPIKeysURL()),
 	},
 }
 
+//nolint:gochecknoinits // Required for CLI command registration
 func init() {
 	docsCmd.AddCommand(manCmd)
 	docsCmd.AddCommand(markdownCmd)

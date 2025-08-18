@@ -90,7 +90,7 @@ func (us *UserService) IsUserCacheValid() bool {
 // Global user service instance
 var globalUserService *UserService
 
-// Initialize the global user service
+//nolint:gochecknoinits // Required for global service initialization
 func init() {
 	globalUserService = NewUserService()
 }

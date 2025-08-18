@@ -39,6 +39,7 @@ If no run ID is provided, lists recent runs.`,
 	RunE: statusCommand,
 }
 
+//nolint:gochecknoinits // Required for CLI command registration
 func init() {
 	statusCmd.Flags().BoolVar(&statusAll, "all", false, "list all runs")
 	statusCmd.Flags().IntVar(&statusLimit, "limit", 10, "number of runs to display")

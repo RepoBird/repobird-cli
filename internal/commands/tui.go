@@ -31,6 +31,7 @@ The TUI provides:
 	RunE: runTUI,
 }
 
+//nolint:gochecknoinits // Required for CLI command registration
 func init() {
 	rootCmd.AddCommand(tuiCmd)
 }

@@ -68,6 +68,7 @@ func Execute() {
 	}
 }
 
+//nolint:gochecknoinits // Required for CLI root command initialization
 func init() {
 	// Set custom version template to show just the version info
 	rootCmd.SetVersionTemplate(version.GetBuildInfo() + "\n")
@@ -82,6 +83,7 @@ func init() {
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(runCmd)
 	rootCmd.AddCommand(statusCmd)
+	InitConfigSubcommands() // Initialize config subcommands
 	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(loginCmd)
 	rootCmd.AddCommand(logoutCmd)
@@ -89,6 +91,7 @@ func init() {
 	rootCmd.AddCommand(infoCmd)
 	rootCmd.AddCommand(NewBulkCommand())
 	rootCmd.AddCommand(examplesCmd)
+	rootCmd.AddCommand(completionCmd)
 }
 
 var versionCmd = &cobra.Command{

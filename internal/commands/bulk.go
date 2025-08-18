@@ -83,30 +83,16 @@ func runBulk(cmd *cobra.Command, args []string) error {
 		return runBulkInteractive()
 	}
 
-	// Load configuration
-	cfg, err := config.LoadConfig()
+	// Load and validate configuration
+	cfg, err := loadAndValidateConfig()
 	if err != nil {
-		return fmt.Errorf("%s", errors.FormatUserError(err))
+		return err
 	}
 
-	// Validate API key
-	if cfg.APIKey == "" {
-		return errors.NoAPIKeyError()
-	}
-
-	// Expand glob patterns and resolve paths
-	var files []string
-	for _, pattern := range args {
-		matches, err := filepath.Glob(pattern)
-		if err != nil {
-			return fmt.Errorf("invalid glob pattern %s: %w", pattern, err)
-		}
-		if len(matches) == 0 {
-			// If no glob matches, treat as literal file
-			files = append(files, pattern)
-		} else {
-			files = append(files, matches...)
-		}
+	// Expand file paths from arguments
+	files, err := expandFilePaths(args)
+	if err != nil {
+		return err
 	}
 
 	// Load bulk configuration
@@ -115,34 +101,121 @@ func runBulk(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("%s", errors.FormatUserError(err))
 	}
 
-	// Validate configuration
+	// Handle dry run
 	if bulkDryRun {
-		fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Render("✓ Configuration valid"))
-		fmt.Printf("Repository: %s\n", bulkConfig.Repository)
-		fmt.Printf("Total runs: %d\n", len(bulkConfig.Runs))
-		for i, run := range bulkConfig.Runs {
-			title := run.Title
-			if title == "" {
-				title = fmt.Sprintf("Run %d", i+1)
-			}
-			fmt.Printf("  - %s\n", title)
-		}
-		return nil
+		return printDryRunSummary(bulkConfig)
 	}
-
-	// Note: force flag is deprecated and has no effect
-	// File hashes are now for tracking purposes only
 
 	// Create API client
 	apiURL := utils.GetAPIURL(cfg.APIURL)
 	client := api.NewClient(cfg.APIKey, apiURL, debug)
 
-	// Generate file hashes for tracking purposes (always generated now)
+	// Prepare bulk request
+	bulkRequest := prepareBulkRequest(bulkConfig)
+
+	// Submit with progress indicator
+	bulkResp, err := submitBulkRunsWithProgress(client, bulkRequest, bulkConfig)
+	if err != nil {
+		return err
+	}
+
+	// Display results
+	displayBulkSubmissionResults(bulkResp)
+
+	// Follow progress if requested
+	if bulkFollow && len(bulkResp.Data.Successful) > 0 {
+		fmt.Println("\nFollowing batch progress...")
+		return followBulkProgress(context.Background(), client, bulkResp.Data.BatchID)
+	}
+
+	fmt.Printf("\nBatch ID: %s\n", bulkResp.Data.BatchID)
+	fmt.Println("Use 'repobird bulk status " + bulkResp.Data.BatchID + "' to check progress")
+
+	return nil
+}
+
+func loadAndValidateConfig() (*config.Config, error) {
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		return nil, fmt.Errorf("%s", errors.FormatUserError(err))
+	}
+
+	if cfg.APIKey == "" {
+		return nil, errors.NoAPIKeyError()
+	}
+
+	return cfg, nil
+}
+
+func expandFilePaths(args []string) ([]string, error) {
+	var files []string
+	for _, pattern := range args {
+		matches, err := filepath.Glob(pattern)
+		if err != nil {
+			return nil, fmt.Errorf("invalid glob pattern %s: %w", pattern, err)
+		}
+		if len(matches) == 0 {
+			// If no glob matches, treat as literal file
+			files = append(files, pattern)
+		} else {
+			files = append(files, matches...)
+		}
+	}
+	return files, nil
+}
+
+func printDryRunSummary(bulkConfig *bulk.BulkConfig) error {
+	fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Render("✓ Configuration valid"))
+	fmt.Printf("Repository: %s\n", bulkConfig.Repository)
+	fmt.Printf("Total runs: %d\n", len(bulkConfig.Runs))
+	for i, run := range bulkConfig.Runs {
+		title := run.Title
+		if title == "" {
+			title = fmt.Sprintf("Run %d", i+1)
+		}
+		fmt.Printf("  - %s\n", title)
+	}
+	return nil
+}
+
+func prepareBulkRequest(bulkConfig *bulk.BulkConfig) *dto.BulkRunRequest {
+	// Generate file hashes for tracking purposes
+	runHashes := generateRunHashes(bulkConfig)
+
+	// Convert to API request format
+	bulkRequest := &dto.BulkRunRequest{
+		RepositoryName: bulkConfig.Repository,
+		RepoID:         bulkConfig.RepoID,
+		RunType:        bulkConfig.RunType,
+		SourceBranch:   bulkConfig.Source,
+		BatchTitle:     bulkConfig.BatchTitle,
+		Force:          false, // Deprecated
+		Runs:           make([]dto.RunItem, len(bulkConfig.Runs)),
+		Options:        dto.BulkOptions{},
+	}
+
+	for i, run := range bulkConfig.Runs {
+		item := dto.RunItem{
+			Prompt:  run.Prompt,
+			Title:   run.Title,
+			Target:  run.Target,
+			Context: run.Context,
+		}
+		if i < len(runHashes) {
+			item.FileHash = runHashes[i]
+		}
+		bulkRequest.Runs[i] = item
+	}
+
+	return bulkRequest
+}
+
+func generateRunHashes(bulkConfig *bulk.BulkConfig) []string {
 	var runHashes []string
 	fileHashCache := cache.NewFileHashCache()
+	
 	for i, run := range bulkConfig.Runs {
 		// Create a hash based on the run content for tracking
-		// This helps with audit and debugging but won't block duplicate runs
 		hashContent := fmt.Sprintf("%s-%s-%s-%s",
 			bulkConfig.Repository,
 			run.Prompt,
@@ -155,35 +228,11 @@ func runBulk(cmd *cobra.Command, args []string) error {
 		// Cache the hash for tracking
 		fileHashCache.Set(fmt.Sprintf("bulk-run-%d", i), hash)
 	}
+	
+	return runHashes
+}
 
-	// Convert to API request format
-	bulkRequest := &dto.BulkRunRequest{
-		RepositoryName: bulkConfig.Repository,
-		RepoID:         bulkConfig.RepoID,
-		RunType:        bulkConfig.RunType,
-		SourceBranch:   bulkConfig.Source,
-		BatchTitle:     bulkConfig.BatchTitle,
-		// Force is deprecated but kept for backwards compatibility
-		Force:   false,
-		Runs:    make([]dto.RunItem, len(bulkConfig.Runs)),
-		Options: dto.BulkOptions{},
-	}
-
-	for i, run := range bulkConfig.Runs {
-		item := dto.RunItem{
-			Prompt:  run.Prompt,
-			Title:   run.Title,
-			Target:  run.Target,
-			Context: run.Context,
-		}
-		// Always include file hash for tracking purposes
-		if i < len(runHashes) {
-			item.FileHash = runHashes[i]
-		}
-		bulkRequest.Runs[i] = item
-	}
-
-	// Submit bulk runs
+func submitBulkRunsWithProgress(client *api.Client, bulkRequest *dto.BulkRunRequest, bulkConfig *bulk.BulkConfig) (*dto.BulkRunResponse, error) {
 	ctx := context.Background()
 
 	// Display submission info
@@ -192,7 +241,21 @@ func runBulk(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Total runs: %d\n", len(bulkConfig.Runs))
 	fmt.Println("\nThis may take up to 5 minutes. Please wait...")
 
-	// Show a progress indicator with elapsed time
+	// Show progress spinner
+	done := showProgressSpinner()
+
+	bulkResp, err := client.CreateBulkRuns(ctx, bulkRequest)
+	done <- true // Stop spinner
+	close(done)  // Clean up channel
+
+	if err != nil {
+		return nil, handleBulkSubmissionError(err, ctx, bulkConfig)
+	}
+
+	return bulkResp, nil
+}
+
+func showProgressSpinner() chan bool {
 	startTime := time.Now()
 	spinner := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 	spinnerIdx := 0
@@ -210,69 +273,44 @@ func runBulk(cmd *cobra.Command, args []string) error {
 			case <-ticker.C:
 				elapsed := time.Since(startTime)
 				fmt.Printf("\r%s Processing... (%.0fs)", spinner[spinnerIdx], elapsed.Seconds())
-				// Try to sync stdout for smooth spinner updates, but ignore errors
-				// as we don't want to interrupt the bulk operation for a UI issue
 				_ = os.Stdout.Sync()
 				spinnerIdx = (spinnerIdx + 1) % len(spinner)
 			}
 		}
 	}()
 
-	bulkResp, err := client.CreateBulkRuns(ctx, bulkRequest)
-	done <- true // Stop spinner
-	close(done)  // Clean up channel
+	return done
+}
 
-	if err != nil {
-		// Check for timeout error
-		if ctx.Err() == context.DeadlineExceeded || stderrors.Is(err, context.DeadlineExceeded) {
-			return fmt.Errorf("bulk submission timed out after 5 minutes. The server may still be processing your runs.\nTry checking the status later with 'repobird status'")
-		}
-
-		// Check if this is a 403 error which might indicate duplicate runs or quota issues
-		var authErr *errors.AuthError
-		if stderrors.As(err, &authErr) {
-			errMsg := errors.FormatUserError(err)
-			// Check for quota-related messages
-			if strings.Contains(strings.ToLower(errMsg), "insufficient run") ||
-				strings.Contains(strings.ToLower(errMsg), "no runs remaining") {
-				return fmt.Errorf("%s\n\nUpgrade your plan at %s", errMsg, config.GetPricingURL())
-			}
-			// For other 403 errors, just return the error message
-			if !bulkConfig.Force {
-				return fmt.Errorf("%s", errMsg)
-			}
-		}
-		return fmt.Errorf("%s", errors.FormatUserError(err))
+func handleBulkSubmissionError(err error, ctx context.Context, bulkConfig *bulk.BulkConfig) error {
+	// Check for timeout error
+	if ctx.Err() == context.DeadlineExceeded || stderrors.Is(err, context.DeadlineExceeded) {
+		return fmt.Errorf("bulk submission timed out after 5 minutes. The server may still be processing your runs.\nTry checking the status later with 'repobird status'")
 	}
 
-	// Handle different status codes
+	// Check if this is a 403 error which might indicate quota issues
+	var authErr *errors.AuthError
+	if stderrors.As(err, &authErr) {
+		errMsg := errors.FormatUserError(err)
+		// Check for quota-related messages
+		if strings.Contains(strings.ToLower(errMsg), "insufficient run") ||
+			strings.Contains(strings.ToLower(errMsg), "no runs remaining") {
+			return fmt.Errorf("%s\n\nUpgrade your plan at %s", errMsg, config.GetPricingURL())
+		}
+		// For other 403 errors, just return the error message
+		if !bulkConfig.Force {
+			return fmt.Errorf("%s", errMsg)
+		}
+	}
+	return fmt.Errorf("%s", errors.FormatUserError(err))
+}
+
+func displayBulkSubmissionResults(bulkResp *dto.BulkRunResponse) {
 	if bulkResp.StatusCode == http.StatusMultiStatus {
-		// 207 Multi-Status: Some runs still processing
-		fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render("\n⚠ Bulk submission in progress:"))
-		fmt.Printf("The server is still processing your runs. This is normal for large batches.\n")
-		fmt.Printf("Created: %d/%d runs so far\n", bulkResp.Data.Metadata.TotalSuccessful, bulkResp.Data.Metadata.TotalRequested)
-
-		if len(bulkResp.Data.Failed) > 0 {
-			fmt.Println("\nFailed runs:")
-			for _, runErr := range bulkResp.Data.Failed {
-				fmt.Printf("  ✗ Run %d: %s\n", runErr.RequestIndex+1, runErr.Message)
-			}
-		}
-
-		fmt.Println("\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("14")).Render("ℹ  The remaining runs are being processed in the background."))
-		fmt.Println("Use --follow or check status to monitor progress.")
+		displayMultiStatusResult(bulkResp)
 	} else if len(bulkResp.Data.Failed) > 0 {
-		// Some runs failed
-		fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render("\n⚠ Partial success:"))
-		fmt.Printf("Created: %d/%d runs\n", bulkResp.Data.Metadata.TotalSuccessful, bulkResp.Data.Metadata.TotalRequested)
-
-		// Check if failures are due to duplicates
-		for _, runErr := range bulkResp.Data.Failed {
-			fmt.Printf("  ✗ Run %d: %s\n", runErr.RequestIndex+1, runErr.Message)
-			// Note: Duplicates are no longer blocked as --force is deprecated
-		}
+		displayPartialSuccessResult(bulkResp)
 	} else {
-		// All runs created successfully
 		fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Render("\n✓ All runs created successfully"))
 	}
 
@@ -283,17 +321,31 @@ func runBulk(cmd *cobra.Command, args []string) error {
 			fmt.Printf("  • %s (ID: %d)\n", run.Title, run.ID)
 		}
 	}
+}
 
-	// Follow progress if requested
-	if bulkFollow && len(bulkResp.Data.Successful) > 0 {
-		fmt.Println("\nFollowing batch progress...")
-		return followBulkProgress(ctx, client, bulkResp.Data.BatchID)
+func displayMultiStatusResult(bulkResp *dto.BulkRunResponse) {
+	fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render("\n⚠ Bulk submission in progress:"))
+	fmt.Printf("The server is still processing your runs. This is normal for large batches.\n")
+	fmt.Printf("Created: %d/%d runs so far\n", bulkResp.Data.Metadata.TotalSuccessful, bulkResp.Data.Metadata.TotalRequested)
+
+	if len(bulkResp.Data.Failed) > 0 {
+		fmt.Println("\nFailed runs:")
+		for _, runErr := range bulkResp.Data.Failed {
+			fmt.Printf("  ✗ Run %d: %s\n", runErr.RequestIndex+1, runErr.Message)
+		}
 	}
 
-	fmt.Printf("\nBatch ID: %s\n", bulkResp.Data.BatchID)
-	fmt.Println("Use 'repobird bulk status " + bulkResp.Data.BatchID + "' to check progress")
+	fmt.Println("\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("14")).Render("ℹ  The remaining runs are being processed in the background."))
+	fmt.Println("Use --follow or check status to monitor progress.")
+}
 
-	return nil
+func displayPartialSuccessResult(bulkResp *dto.BulkRunResponse) {
+	fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render("\n⚠ Partial success:"))
+	fmt.Printf("Created: %d/%d runs\n", bulkResp.Data.Metadata.TotalSuccessful, bulkResp.Data.Metadata.TotalRequested)
+
+	for _, runErr := range bulkResp.Data.Failed {
+		fmt.Printf("  ✗ Run %d: %s\n", runErr.RequestIndex+1, runErr.Message)
+	}
 }
 
 func runBulkInteractive() error {

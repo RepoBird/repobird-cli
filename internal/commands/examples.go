@@ -57,6 +57,7 @@ Examples:
 	RunE: generateExample,
 }
 
+//nolint:gochecknoinits // Required for CLI command registration
 func init() {
 	generateCmd.Flags().StringVarP(&outputFile, "output", "o", "", "output file path")
 	generateCmd.Flags().StringVarP(&formatType, "format", "f", "json", "output format: json, yaml, or md (markdown)")
