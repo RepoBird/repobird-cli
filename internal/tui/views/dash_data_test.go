@@ -14,9 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// mockDashDataAPIClient is a minimal mock for testing dashboard data functions
-type mockDashDataAPIClient struct{}
-
 func TestUpdateRepositoryStats_SortingByCreatedAt(t *testing.T) {
 	baseTime := time.Now()
 

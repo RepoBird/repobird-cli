@@ -36,9 +36,6 @@ type messageClearMsg struct{}
 // syncFileHashesMsg is sent when file hash sync is completed
 type syncFileHashesMsg struct{}
 
-// yankBlinkMsg triggers yank blink animation
-type yankBlinkMsg struct{}
-
 // clearStatusMsg clears the status message
 type clearStatusMsg time.Time
 

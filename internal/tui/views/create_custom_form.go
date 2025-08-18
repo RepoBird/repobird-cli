@@ -174,153 +174,202 @@ func (f *CustomCreateForm) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	keyString := msg.String()
 	debug.LogToFilef("🎨 CUSTOM FORM handleKeyMsg: key='%s', insertMode=%v, focusIndex=%d", keyString, f.insertMode, f.focusIndex)
 
-	currentField := &f.fields[f.focusIndex]
-
-	// Handle insert mode
 	if f.insertMode {
-		debug.LogToFilef("📝 CUSTOM FORM: Processing key '%s' in INSERT mode", keyString)
-		switch keyString {
-		case "esc":
-			// ESC should not reach here if HandleKey is working correctly
-			// But if it does, we should handle it to prevent issues
-			debug.LogToFilef("⚠️ CUSTOM FORM: ESC in insert mode reached form (should have been handled by HandleKey)")
-			// Exit insert mode as a fallback
-			f.insertMode = false
-			f.blurCurrentField()
-			return f, nil
-
-		case "tab":
-			f.insertMode = false
-			f.nextField()
-			// Re-enter insert mode if on text field
-			if f.fields[f.focusIndex].Type == "text" || f.fields[f.focusIndex].Type == "textarea" {
-				f.insertMode = true
-				f.focusCurrentField()
-			}
-			return f, nil
-
-		case "shift+tab":
-			f.insertMode = false
-			f.prevField()
-			// Re-enter insert mode if on text field
-			if f.fields[f.focusIndex].Type == "text" || f.fields[f.focusIndex].Type == "textarea" {
-				f.insertMode = true
-				f.focusCurrentField()
-			}
-			return f, nil
-
-		case "ctrl+s":
-			// Submit form
-			if f.validate() {
-				return f, f.submitCmd()
-			}
-			return f, nil
-
-		default:
-			// Pass to the focused field if it's a text input
-			if currentField.Type == "text" || currentField.Type == "textarea" {
-				var cmd tea.Cmd
-				switch currentField.Type {
-				case "text":
-					currentField.textInput, cmd = currentField.textInput.Update(msg)
-					currentField.Value = currentField.textInput.Value()
-				case "textarea":
-					currentField.textArea, cmd = currentField.textArea.Update(msg)
-					currentField.Value = currentField.textArea.Value()
-				}
-				return f, cmd
-			}
-		}
-	} else {
-		// Normal mode navigation
-		debug.LogToFilef("🔑 CUSTOM FORM: Normal mode key: '%s'", msg.String())
-
-		switch msg.String() {
-		case "q", "b":
-			// These should be handled by the keymap registry for navigation
-			// If they reach here, just pass them through
-			debug.LogToFilef("🔑 CUSTOM FORM: Navigation key '%s' in normal mode - passing through", msg.String())
-			// Don't process - let keymap registry handle navigation
-			return f, nil
-
-		case "i":
-			// Enter insert mode for text fields
-			if currentField.Type == "text" || currentField.Type == "textarea" {
-				f.insertMode = true
-				f.focusCurrentField()
-				debug.LogToFilef("✏️ CUSTOM FORM: Entering insert mode for field '%s'", currentField.Name)
-				return f, textinput.Blink
-			}
-			return f, nil
-
-		case "d":
-			// Delete current field's text (vim-like)
-			if currentField.Type == "text" || currentField.Type == "textarea" {
-				f.ClearCurrentField()
-				debug.LogToFilef("✂️ CUSTOM FORM: Deleted field '%s' content", currentField.Name)
-			}
-			return f, nil
-
-		case "c":
-			// Change - delete current field and enter insert mode (vim-like)
-			if currentField.Type == "text" || currentField.Type == "textarea" {
-				f.ClearCurrentField()
-				f.insertMode = true
-				f.focusCurrentField()
-				debug.LogToFilef("✏️ CUSTOM FORM: Change mode - cleared field '%s' and entering insert", currentField.Name)
-				return f, textinput.Blink
-			}
-			return f, nil
-
-		case "j", "down":
-			f.nextField()
-			debug.LogToFilef("⬇️ CUSTOM FORM: Moving to next field")
-			return f, nil
-
-		case "k", "up":
-			f.prevField()
-			debug.LogToFilef("⬆️ CUSTOM FORM: Moving to previous field")
-			return f, nil
-
-		case "enter", " ":
-			// Handle special field types
-			switch currentField.Type {
-			case "toggle":
-				// Toggle the runtype
-				if currentField.Name == "runtype" {
-					f.runTypeIndex = (f.runTypeIndex + 1) % len(currentField.Options)
-					currentField.Value = currentField.Options[f.runTypeIndex]
-					debug.LogToFilef("🔄 CUSTOM FORM: Toggled runtype to %s", currentField.Value)
-				}
-			case "button":
-				// Submit the form
-				if currentField.Name == "submit" && f.validate() {
-					debug.LogToFilef("🚀 CUSTOM FORM: Submit button pressed")
-					return f, f.submitCmd()
-				}
-			default:
-				// Enter insert mode for text fields
-				f.insertMode = true
-				f.focusCurrentField()
-				debug.LogToFilef("✏️ CUSTOM FORM: ENTER pressed - entering insert mode for field '%s'", currentField.Name)
-				return f, textinput.Blink
-			}
-			return f, nil
-
-		case "ctrl+s":
-			// Submit from any field
-			if f.validate() {
-				debug.LogToFilef("💾 CUSTOM FORM: CTRL+S pressed - submitting form")
-				return f, f.submitCmd()
-			}
-			debug.LogToFilef("⚠️ CUSTOM FORM: CTRL+S pressed but validation failed")
-			return f, nil
-
-		default:
-			debug.LogToFilef("❓ CUSTOM FORM: Unhandled key in normal mode: '%s'", msg.String())
-		}
+		return f.handleInsertMode(msg)
 	}
+	return f.handleNormalMode(msg)
+}
 
+// handleInsertMode handles keys when in insert mode
+func (f *CustomCreateForm) handleInsertMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	keyString := msg.String()
+	debug.LogToFilef("📝 CUSTOM FORM: Processing key '%s' in INSERT mode", keyString)
+	
+	switch keyString {
+	case "esc":
+		return f.exitInsertMode()
+	case "tab":
+		return f.handleTabInInsertMode(false)
+	case "shift+tab":
+		return f.handleTabInInsertMode(true)
+	case "ctrl+s":
+		return f.trySubmit()
+	default:
+		return f.updateTextField(msg)
+	}
+}
+
+// handleNormalMode handles keys when in normal mode
+func (f *CustomCreateForm) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	keyString := msg.String()
+	debug.LogToFilef("🔑 CUSTOM FORM: Normal mode key: '%s'", keyString)
+
+	switch keyString {
+	case "q", "b":
+		return f.handleNavigationKeys(keyString)
+	case "i":
+		return f.enterInsertMode()
+	case "d":
+		return f.deleteFieldContent()
+	case "c":
+		return f.changeFieldContent()
+	case "j", "down":
+		return f.moveToNextField()
+	case "k", "up":
+		return f.moveToPreviousField()
+	case "enter", " ":
+		return f.handleEnterOrSpace()
+	case "ctrl+s":
+		return f.trySubmit()
+	default:
+		debug.LogToFilef("❓ CUSTOM FORM: Unhandled key in normal mode: '%s'", keyString)
+		return f, nil
+	}
+}
+
+// exitInsertMode exits insert mode
+func (f *CustomCreateForm) exitInsertMode() (tea.Model, tea.Cmd) {
+	debug.LogToFilef("⚠️ CUSTOM FORM: ESC in insert mode reached form (should have been handled by HandleKey)")
+	f.insertMode = false
+	f.blurCurrentField()
+	return f, nil
+}
+
+// handleTabInInsertMode handles tab navigation in insert mode
+func (f *CustomCreateForm) handleTabInInsertMode(reverse bool) (tea.Model, tea.Cmd) {
+	f.insertMode = false
+	if reverse {
+		f.prevField()
+	} else {
+		f.nextField()
+	}
+	
+	// Re-enter insert mode if on text field
+	if f.fields[f.focusIndex].Type == "text" || f.fields[f.focusIndex].Type == "textarea" {
+		f.insertMode = true
+		f.focusCurrentField()
+	}
+	return f, nil
+}
+
+// trySubmit attempts to submit the form if validation passes
+func (f *CustomCreateForm) trySubmit() (tea.Model, tea.Cmd) {
+	if f.validate() {
+		debug.LogToFilef("💾 CUSTOM FORM: Submitting form")
+		return f, f.submitCmd()
+	}
+	debug.LogToFilef("⚠️ CUSTOM FORM: Validation failed")
+	return f, nil
+}
+
+// updateTextField updates the current text field with input
+func (f *CustomCreateForm) updateTextField(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	currentField := &f.fields[f.focusIndex]
+	if currentField.Type != "text" && currentField.Type != "textarea" {
+		return f, nil
+	}
+	
+	var cmd tea.Cmd
+	switch currentField.Type {
+	case "text":
+		currentField.textInput, cmd = currentField.textInput.Update(msg)
+		currentField.Value = currentField.textInput.Value()
+	case "textarea":
+		currentField.textArea, cmd = currentField.textArea.Update(msg)
+		currentField.Value = currentField.textArea.Value()
+	}
+	return f, cmd
+}
+
+// handleNavigationKeys handles q and b keys for navigation
+func (f *CustomCreateForm) handleNavigationKeys(key string) (tea.Model, tea.Cmd) {
+	debug.LogToFilef("🔑 CUSTOM FORM: Navigation key '%s' in normal mode - passing through", key)
+	return f, nil
+}
+
+// enterInsertMode enters insert mode for text fields
+func (f *CustomCreateForm) enterInsertMode() (tea.Model, tea.Cmd) {
+	currentField := &f.fields[f.focusIndex]
+	if currentField.Type == "text" || currentField.Type == "textarea" {
+		f.insertMode = true
+		f.focusCurrentField()
+		debug.LogToFilef("✏️ CUSTOM FORM: Entering insert mode for field '%s'", currentField.Name)
+		return f, textinput.Blink
+	}
+	return f, nil
+}
+
+// deleteFieldContent deletes the current field's content
+func (f *CustomCreateForm) deleteFieldContent() (tea.Model, tea.Cmd) {
+	currentField := &f.fields[f.focusIndex]
+	if currentField.Type == "text" || currentField.Type == "textarea" {
+		f.ClearCurrentField()
+		debug.LogToFilef("✂️ CUSTOM FORM: Deleted field '%s' content", currentField.Name)
+	}
+	return f, nil
+}
+
+// changeFieldContent clears field and enters insert mode
+func (f *CustomCreateForm) changeFieldContent() (tea.Model, tea.Cmd) {
+	currentField := &f.fields[f.focusIndex]
+	if currentField.Type == "text" || currentField.Type == "textarea" {
+		f.ClearCurrentField()
+		f.insertMode = true
+		f.focusCurrentField()
+		debug.LogToFilef("✏️ CUSTOM FORM: Change mode - cleared field '%s' and entering insert", currentField.Name)
+		return f, textinput.Blink
+	}
+	return f, nil
+}
+
+// moveToNextField moves focus to the next field
+func (f *CustomCreateForm) moveToNextField() (tea.Model, tea.Cmd) {
+	f.nextField()
+	debug.LogToFilef("⬇️ CUSTOM FORM: Moving to next field")
+	return f, nil
+}
+
+// moveToPreviousField moves focus to the previous field
+func (f *CustomCreateForm) moveToPreviousField() (tea.Model, tea.Cmd) {
+	f.prevField()
+	debug.LogToFilef("⬆️ CUSTOM FORM: Moving to previous field")
+	return f, nil
+}
+
+// handleEnterOrSpace handles enter or space key press
+func (f *CustomCreateForm) handleEnterOrSpace() (tea.Model, tea.Cmd) {
+	currentField := &f.fields[f.focusIndex]
+	
+	switch currentField.Type {
+	case "toggle":
+		return f.handleToggleField(currentField)
+	case "button":
+		return f.handleButtonField(currentField)
+	default:
+		// Enter insert mode for text fields
+		f.insertMode = true
+		f.focusCurrentField()
+		debug.LogToFilef("✏️ CUSTOM FORM: ENTER pressed - entering insert mode for field '%s'", currentField.Name)
+		return f, textinput.Blink
+	}
+}
+
+// handleToggleField handles toggle field activation
+func (f *CustomCreateForm) handleToggleField(field *CustomFormField) (tea.Model, tea.Cmd) {
+	if field.Name == "runtype" {
+		f.runTypeIndex = (f.runTypeIndex + 1) % len(field.Options)
+		field.Value = field.Options[f.runTypeIndex]
+		debug.LogToFilef("🔄 CUSTOM FORM: Toggled runtype to %s", field.Value)
+	}
+	return f, nil
+}
+
+// handleButtonField handles button field activation
+func (f *CustomCreateForm) handleButtonField(field *CustomFormField) (tea.Model, tea.Cmd) {
+	if field.Name == "submit" && f.validate() {
+		debug.LogToFilef("🚀 CUSTOM FORM: Submit button pressed")
+		return f, f.submitCmd()
+	}
 	return f, nil
 }
 

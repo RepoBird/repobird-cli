@@ -4,7 +4,6 @@
 package views
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -14,52 +13,8 @@ import (
 	"github.com/repobird/repobird-cli/internal/tui/cache"
 	"github.com/repobird/repobird-cli/internal/tui/messages"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
-
-// mockAPIClientForBulk extends the mock to satisfy api.Client interface
-type mockAPIClientForBulk struct {
-	mock.Mock
-}
-
-func (m *mockAPIClientForBulk) GetRunsWithLimit(limit int) ([]models.RunResponse, error) {
-	args := m.Called(limit)
-	return args.Get(0).([]models.RunResponse), args.Error(1)
-}
-
-func (m *mockAPIClientForBulk) GetUserInfo() (*models.UserInfo, error) {
-	args := m.Called()
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*models.UserInfo), args.Error(1)
-}
-
-func (m *mockAPIClientForBulk) CreateRunAPI(request *models.APIRunRequest) (*models.RunResponse, error) {
-	args := m.Called(request)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*models.RunResponse), args.Error(1)
-}
-
-func (m *mockAPIClientForBulk) GetRun(id string) (*models.RunResponse, error) {
-	args := m.Called(id)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*models.RunResponse), args.Error(1)
-}
-
-// Additional methods to satisfy api.Client interface
-func (m *mockAPIClientForBulk) CreateBulkRuns(ctx context.Context, req *dto.BulkRunRequest) (*dto.BulkRunResponse, error) {
-	args := m.Called(ctx, req)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*dto.BulkRunResponse), args.Error(1)
-}
 
 // TestBulkResultsView_QuitKeySetsDashboardRefreshFlag tests 'q' key navigation
 func TestBulkResultsView_QuitKeySetsDashboardRefreshFlag(t *testing.T) {

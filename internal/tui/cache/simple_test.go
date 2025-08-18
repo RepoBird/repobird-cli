@@ -339,37 +339,37 @@ func TestSimpleCacheNoLockOnHybridCalls(t *testing.T) {
 			wg.Add(5)
 
 			// GetRuns
-			go func(id int) {
+			go func() {
 				defer wg.Done()
 				_ = cache.GetRuns()
-			}(i)
+			}()
 
 			// SetRuns
-			go func(id int) {
+			go func(idx int) {
 				defer wg.Done()
 				runs := []models.RunResponse{
-					{ID: fmt.Sprintf("run-%d", id), Status: models.StatusProcessing},
+					{ID: fmt.Sprintf("run-%d", idx), Status: models.StatusProcessing},
 				}
 				cache.SetRuns(runs)
 			}(i)
 
 			// GetRun
-			go func(id int) {
+			go func(idx int) {
 				defer wg.Done()
-				_ = cache.GetRun(fmt.Sprintf("run-%d", id))
+				_ = cache.GetRun(fmt.Sprintf("run-%d", idx))
 			}(i)
 
 			// SetRun
-			go func(id int) {
+			go func(idx int) {
 				defer wg.Done()
-				run := models.RunResponse{ID: fmt.Sprintf("new-%d", id), Status: models.StatusDone}
+				run := models.RunResponse{ID: fmt.Sprintf("new-%d", idx), Status: models.StatusDone}
 				cache.SetRun(run)
 			}(i)
 
 			// Mixed operations
-			go func(id int) {
+			go func(idx int) {
 				defer wg.Done()
-				cache.SetUserInfo(&models.UserInfo{ID: id})
+				cache.SetUserInfo(&models.UserInfo{ID: idx})
 				_ = cache.GetUserInfo()
 			}(i)
 		}

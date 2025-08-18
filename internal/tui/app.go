@@ -469,7 +469,7 @@ func (a *App) processKeyWithFiltering(keyMsg tea.KeyMsg) (handled bool, model te
 }
 
 // handleGlobalAction processes global actions like force quit
-func (a *App) handleGlobalAction(action keymap.KeyAction, keyMsg tea.KeyMsg) (handled bool, model tea.Model, cmd tea.Cmd) {
+func (a *App) handleGlobalAction(action keymap.KeyAction, _ tea.KeyMsg) (handled bool, model tea.Model, cmd tea.Cmd) {
 	switch action {
 	case keymap.ActionGlobalQuit:
 		// Force quit - always works

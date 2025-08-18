@@ -384,7 +384,7 @@ func (v *ExamplesView) View() string {
 	return finalView
 }
 
-func (v *ExamplesView) renderExamplesList(width, height int) string {
+func (v *ExamplesView) renderExamplesList(_, height int) string {
 	var content strings.Builder
 
 	// Title with copy instruction
@@ -434,7 +434,7 @@ func (v *ExamplesView) renderExamplesList(width, height int) string {
 	return content.String()
 }
 
-func (v *ExamplesView) renderPreview(width, height int) string {
+func (v *ExamplesView) renderPreview(_, _ int) string {
 	var content strings.Builder
 
 	// Title with selected example name
@@ -481,7 +481,7 @@ func (v *ExamplesView) getScrollIndicators() string {
 	}
 }
 
-func (v *ExamplesView) renderDescription(width, height int) string {
+func (v *ExamplesView) renderDescription(_, _ int) string {
 	// No title, no padding - just compact content
 	if v.selectedExample >= 0 && v.selectedExample < len(v.examples) {
 		selectedConfig := v.examples[v.selectedExample]

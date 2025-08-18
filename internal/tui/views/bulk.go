@@ -253,172 +253,22 @@ func (v *BulkView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		debug.LogToFilef("DEBUG: BulkView - handling WindowSizeMsg: %dx%d\n", msg.Width, msg.Height)
-		v.width = msg.Width
-		v.height = msg.Height
-		v.help.Width = msg.Width
-
-		// Create layout for proper sizing
-		v.layout = components.NewWindowLayout(msg.Width, msg.Height)
-
-		// Update viewport dimensions from layout
-		// The viewport needs the content area dimensions
-		viewportWidth, viewportHeight := v.layout.GetContentDimensions()
-		debug.LogToFilef("🎯 BULK WindowSize: terminal=%dx%d, content=%dx%d\n",
-			msg.Width, msg.Height, viewportWidth, viewportHeight)
-
-		// The viewport needs to fit inside the box's content area
-		// Box has border (2 chars) and horizontal padding (2 chars)
-		v.viewport.Width = viewportWidth - 2 // Account for horizontal padding
-		// Set viewport height properly - account for status line
-		v.viewport.Height = msg.Height - 4 // Terminal height minus borders and status line
-
-		debug.LogToFilef("🎯 BULK WindowSize: viewport set to %dx%d\n",
-			v.viewport.Width, v.viewport.Height)
-
-		// Update file selector dimensions
-		if v.fileSelector != nil {
-			v.fileSelector.SetDimensions(msg.Width, msg.Height)
-		}
+		return v.handleWindowSizeMsg(msg)
 
 	case components.FilesLoadedMsg:
-		// Forward file loading message to file selector if it exists
-		debug.LogToFilef("DEBUG: BulkView - received FilesLoadedMsg, forwarding to file selector\n")
-		if v.fileSelector != nil {
-			newFileSelector, cmd := v.fileSelector.Update(msg)
-			v.fileSelector = newFileSelector
-			cmds = append(cmds, cmd)
-		}
+		return v.handleFilesLoadedMsg(msg)
 
 	case tea.KeyMsg:
-		debug.LogToFilef("DEBUG: BulkView - handling KeyMsg: '%s', mode=%d\n", msg.String(), v.mode)
-
-		// Handle global quit keys regardless of mode
-		if msg.String() == "Q" || msg.Type == tea.KeyCtrlC {
-			return v, tea.Quit
-		}
-
-		// Handle submission confirmation prompt first
-		if v.showSubmissionPrompt {
-			switch msg.String() {
-			case "y":
-				// Confirmed submission
-				v.showSubmissionPrompt = false
-				v.submissionPromptActive = false
-				v.statusLine.ResetStyle() // Reset status line style
-				return v, v.submitBulkRuns()
-			case "n", "esc":
-				// Cancel submission
-				v.showSubmissionPrompt = false
-				v.submissionPromptActive = false
-				v.statusLine.ResetStyle() // Reset status line style
-				return v, nil
-			default:
-				// Block all other keys when prompt is active
-				return v, nil
-			}
-		}
-
-		// FIRST: Handle components that need raw key input (like FZF)
-		switch v.mode {
-		case ModeFileBrowser:
-			if v.fileSelector != nil {
-				// The CoreViewKeymap.HandleKey will handle INPUT mode keys like 'q', 'b', 'backspace'
-				// So here we only need to handle the remaining keys
-
-				// In NAV mode, check if this is a navigation key we should handle
-				if !v.fileSelector.GetInputMode() {
-					if msg.Type == tea.KeyEsc || msg.String() == "q" || msg.String() == "L" {
-						// Handle navigation keys in NAV mode
-						debug.LogToFile("DEBUG: BulkView.Update - handling navigation key in FileBrowser (NAV mode)\n")
-						return v.handleFileBrowserKeys(msg)
-					}
-				}
-
-				// For all other keys, pass to file selector
-				// Note: Keys handled by HandleKey() won't reach here
-				debug.LogToFilef("DEBUG: BulkView.Update - passing key '%s' to file selector\n", msg.String())
-				newFileSelector, cmd := v.fileSelector.Update(msg)
-				v.fileSelector = newFileSelector
-				cmds = append(cmds, cmd)
-				return v, tea.Batch(cmds...)
-			}
-		case ModeInstructions, ModeRunList, ModeRunEdit, ModeProgress, ModeResults:
-			// These modes don't need special raw key input handling
-		}
-
-		// SECOND: Handle view-specific navigation keys
-		switch v.mode {
-		case ModeInstructions:
-			debug.LogToFile("DEBUG: BulkView - delegating to handleInstructionsKeys\n")
-			return v.handleInstructionsKeys(msg)
-		case ModeFileBrowser:
-			debug.LogToFile("DEBUG: BulkView - delegating to handleFileBrowserKeys\n")
-			return v.handleFileBrowserKeys(msg)
-		case ModeRunList:
-			debug.LogToFilef("DEBUG: BulkView - delegating to handleRunListKeys, key='%s'\n", msg.String())
-			return v.handleRunListKeys(msg)
-		case ModeRunEdit, ModeProgress, ModeResults:
-			// These modes have their own specific key handling
-			// but we're not in those flows currently
-			return v, nil
-		}
+		return v.handleKeyMsg(msg)
 
 	case components.BulkFileSelectedMsg:
-		// File(s) selected, load configurations from actual files
-		debug.LogToFilef("DEBUG: BulkView - files selected: %v, canceled: %v\n", msg.Files, msg.Canceled)
-		if msg.Canceled {
-			// User canceled file selection
-			debug.LogToFile("DEBUG: BulkView - file selection canceled, returning to parent BULK mode\n")
-			v.fileSelector = nil // Clear file selector
-
-			// Always go back to the parent view (where we came from)
-			// If we have runs already, we came from run list, otherwise from instructions
-			if len(v.runs) > 0 {
-				debug.LogToFile("DEBUG: BulkView - returning to ModeRunList (has runs)\n")
-				v.mode = ModeRunList
-				v.focusMode = "runs"
-				v.updateRunListViewport()
-			} else {
-				debug.LogToFile("DEBUG: BulkView - returning to ModeInstructions (no runs)\n")
-				v.mode = ModeInstructions
-			}
-			return v, nil
-		}
-		if len(msg.Files) > 0 {
-			return v.loadFiles(msg.Files)
-		}
-		return v, nil
+		return v.handleBulkFileSelectedMsg(msg)
 
 	case bulkRunsLoadedMsg:
-		// Runs loaded from files
-		debug.LogToFilef("DEBUG: BulkView - runs loaded: %d\n", len(msg.runs))
-		v.runs = msg.runs
-		v.repository = msg.repository
-		v.repoID = msg.repoID
-		v.sourceBranch = msg.source
-		v.runType = msg.runType
-		v.batchTitle = msg.batchTitle
-		v.mode = ModeRunList
-		v.selectedRun = 0
-		v.focusMode = "runs" // Start with runs focused
-		// Update viewport content for run list
-		v.updateRunListViewport()
-		return v, nil
+		return v.handleBulkRunsLoadedMsg(msg)
 
 	case bulkSubmittedMsg:
-		// Bulk submission completed
-		v.submitting = false
-		v.batchID = msg.batchID
-		v.results = msg.results
-		if msg.err != nil {
-			v.error = msg.err
-			// Navigate to results view to show error
-			return v, v.navigateToResults(msg)
-		} else {
-			// Navigate to results view to show submission results
-			return v, v.navigateToResults(msg)
-		}
+		return v.handleBulkSubmittedMsg(msg)
 
 	case bulkProgressMsg:
 		// Progress update received - this should not happen anymore as we navigate immediately
@@ -431,21 +281,7 @@ func (v *BulkView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return v, nil
 
 	case errMsg:
-		// Error occurred
-		debug.LogToFilef("DEBUG: BulkView - error occurred: %v\n", msg.err)
-		v.error = msg.err
-		v.fileSelector = nil // Clear file selector
-
-		// If we have runs already loaded, stay in run list mode
-		// Otherwise go to instructions to show the error
-		if len(v.runs) > 0 {
-			v.mode = ModeRunList
-			v.focusMode = "runs"
-			v.updateRunListViewport()
-		} else {
-			v.mode = ModeInstructions
-		}
-		return v, nil
+		return v.handleErrMsg(msg)
 
 	case spinner.TickMsg:
 		var cmd tea.Cmd
@@ -457,6 +293,205 @@ func (v *BulkView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	debug.LogToFilef("DEBUG: BulkView.Update() - returning with %d commands\n", len(cmds))
 	return v, tea.Batch(cmds...)
+}
+
+// handleWindowSizeMsg handles window resize events
+func (v *BulkView) handleWindowSizeMsg(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
+	debug.LogToFilef("DEBUG: BulkView - handling WindowSizeMsg: %dx%d\n", msg.Width, msg.Height)
+	v.width = msg.Width
+	v.height = msg.Height
+	v.help.Width = msg.Width
+
+	// Create layout for proper sizing
+	v.layout = components.NewWindowLayout(msg.Width, msg.Height)
+
+	// Update viewport dimensions from layout
+	// The viewport needs the content area dimensions
+	viewportWidth, viewportHeight := v.layout.GetContentDimensions()
+	debug.LogToFilef("🎯 BULK WindowSize: terminal=%dx%d, content=%dx%d\n",
+		msg.Width, msg.Height, viewportWidth, viewportHeight)
+
+	// The viewport needs to fit inside the box's content area
+	// Box has border (2 chars) and horizontal padding (2 chars)
+	v.viewport.Width = viewportWidth - 2 // Account for horizontal padding
+	// Set viewport height properly - account for status line
+	v.viewport.Height = msg.Height - 4 // Terminal height minus borders and status line
+
+	debug.LogToFilef("🎯 BULK WindowSize: viewport set to %dx%d\n",
+		v.viewport.Width, v.viewport.Height)
+
+	// Update file selector dimensions
+	if v.fileSelector != nil {
+		v.fileSelector.SetDimensions(msg.Width, msg.Height)
+	}
+	return v, nil
+}
+
+// handleFilesLoadedMsg handles file loading messages
+func (v *BulkView) handleFilesLoadedMsg(msg components.FilesLoadedMsg) (tea.Model, tea.Cmd) {
+	// Forward file loading message to file selector if it exists
+	debug.LogToFilef("DEBUG: BulkView - received FilesLoadedMsg, forwarding to file selector\n")
+	if v.fileSelector != nil {
+		newFileSelector, cmd := v.fileSelector.Update(msg)
+		v.fileSelector = newFileSelector
+		return v, cmd
+	}
+	return v, nil
+}
+
+// handleKeyMsg handles keyboard input
+func (v *BulkView) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	debug.LogToFilef("DEBUG: BulkView - handling KeyMsg: '%s', mode=%d\n", msg.String(), v.mode)
+
+	// Handle global quit keys regardless of mode
+	if msg.String() == "Q" || msg.Type == tea.KeyCtrlC {
+		return v, tea.Quit
+	}
+
+	// Handle submission confirmation prompt first
+	if v.showSubmissionPrompt {
+		return v.handleSubmissionPrompt(msg)
+	}
+
+	// Handle file browser mode
+	if v.mode == ModeFileBrowser {
+		return v.handleFileBrowserMode(msg)
+	}
+
+	// Handle view-specific navigation keys
+	switch v.mode {
+	case ModeInstructions:
+		debug.LogToFile("DEBUG: BulkView - delegating to handleInstructionsKeys\n")
+		return v.handleInstructionsKeys(msg)
+	case ModeFileBrowser:
+		debug.LogToFile("DEBUG: BulkView - delegating to handleFileBrowserKeys\n")
+		return v.handleFileBrowserKeys(msg)
+	case ModeRunList:
+		debug.LogToFilef("DEBUG: BulkView - delegating to handleRunListKeys, key='%s'\n", msg.String())
+		return v.handleRunListKeys(msg)
+	case ModeRunEdit, ModeProgress, ModeResults:
+		// These modes have their own specific key handling
+		// but we're not in those flows currently
+		return v, nil
+	}
+	return v, nil
+}
+
+// handleSubmissionPrompt handles submission confirmation prompt input
+func (v *BulkView) handleSubmissionPrompt(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "y":
+		// Confirmed submission
+		v.showSubmissionPrompt = false
+		v.submissionPromptActive = false
+		v.statusLine.ResetStyle() // Reset status line style
+		return v, v.submitBulkRuns()
+	case "n", "esc":
+		// Cancel submission
+		v.showSubmissionPrompt = false
+		v.submissionPromptActive = false
+		v.statusLine.ResetStyle() // Reset status line style
+		return v, nil
+	default:
+		// Block all other keys when prompt is active
+		return v, nil
+	}
+}
+
+// handleFileBrowserMode handles keys in file browser mode
+func (v *BulkView) handleFileBrowserMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if v.fileSelector == nil {
+		return v, nil
+	}
+
+	// In NAV mode, check if this is a navigation key we should handle
+	if !v.fileSelector.GetInputMode() {
+		if msg.Type == tea.KeyEsc || msg.String() == "q" || msg.String() == "L" {
+			// Handle navigation keys in NAV mode
+			debug.LogToFile("DEBUG: BulkView.Update - handling navigation key in FileBrowser (NAV mode)\n")
+			return v.handleFileBrowserKeys(msg)
+		}
+	}
+
+	// For all other keys, pass to file selector
+	debug.LogToFilef("DEBUG: BulkView.Update - passing key '%s' to file selector\n", msg.String())
+	newFileSelector, cmd := v.fileSelector.Update(msg)
+	v.fileSelector = newFileSelector
+	return v, cmd
+}
+
+// handleBulkFileSelectedMsg handles file selection messages
+func (v *BulkView) handleBulkFileSelectedMsg(msg components.BulkFileSelectedMsg) (tea.Model, tea.Cmd) {
+	debug.LogToFilef("DEBUG: BulkView - files selected: %v, canceled: %v\n", msg.Files, msg.Canceled)
+	if msg.Canceled {
+		// User canceled file selection
+		debug.LogToFile("DEBUG: BulkView - file selection canceled, returning to parent BULK mode\n")
+		v.fileSelector = nil // Clear file selector
+
+		// Always go back to the parent view (where we came from)
+		// If we have runs already, we came from run list, otherwise from instructions
+		if len(v.runs) > 0 {
+			debug.LogToFile("DEBUG: BulkView - returning to ModeRunList (has runs)\n")
+			v.mode = ModeRunList
+			v.focusMode = "runs"
+			v.updateRunListViewport()
+		} else {
+			debug.LogToFile("DEBUG: BulkView - returning to ModeInstructions (no runs)\n")
+			v.mode = ModeInstructions
+		}
+		return v, nil
+	}
+	if len(msg.Files) > 0 {
+		return v.loadFiles(msg.Files)
+	}
+	return v, nil
+}
+
+// handleBulkRunsLoadedMsg handles bulk runs loaded messages
+func (v *BulkView) handleBulkRunsLoadedMsg(msg bulkRunsLoadedMsg) (tea.Model, tea.Cmd) {
+	debug.LogToFilef("DEBUG: BulkView - runs loaded: %d\n", len(msg.runs))
+	v.runs = msg.runs
+	v.repository = msg.repository
+	v.repoID = msg.repoID
+	v.sourceBranch = msg.source
+	v.runType = msg.runType
+	v.batchTitle = msg.batchTitle
+	v.mode = ModeRunList
+	v.selectedRun = 0
+	v.focusMode = "runs" // Start with runs focused
+	// Update viewport content for run list
+	v.updateRunListViewport()
+	return v, nil
+}
+
+// handleBulkSubmittedMsg handles bulk submission completed messages
+func (v *BulkView) handleBulkSubmittedMsg(msg bulkSubmittedMsg) (tea.Model, tea.Cmd) {
+	v.submitting = false
+	v.batchID = msg.batchID
+	v.results = msg.results
+	if msg.err != nil {
+		v.error = msg.err
+	}
+	// Navigate to results view to show submission results or error
+	return v, v.navigateToResults(msg)
+}
+
+// handleErrMsg handles error messages
+func (v *BulkView) handleErrMsg(msg errMsg) (tea.Model, tea.Cmd) {
+	debug.LogToFilef("DEBUG: BulkView - error occurred: %v\n", msg.err)
+	v.error = msg.err
+	v.fileSelector = nil // Clear file selector
+
+	// If we have runs already loaded, stay in run list mode
+	// Otherwise go to instructions to show the error
+	if len(v.runs) > 0 {
+		v.mode = ModeRunList
+		v.focusMode = "runs"
+		v.updateRunListViewport()
+	} else {
+		v.mode = ModeInstructions
+	}
+	return v, nil
 }
 
 // Event handlers for different modes
@@ -591,231 +626,242 @@ func (v *BulkView) handleRunListKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	switch {
 	case key.Matches(msg, v.keys.Quit):
-		// Navigate back to dashboard instead of quitting directly
-		return v, func() tea.Msg {
-			return messages.NavigateBackMsg{}
-		}
+		return v, func() tea.Msg { return messages.NavigateBackMsg{} }
 
 	case key.Matches(msg, v.keys.Up), msg.String() == "k":
-		// Navigate up in runs or to buttons
-		if v.focusMode == "runs" {
-			if v.selectedRun > 0 {
-				v.selectedRun--
-				v.updateRunListViewport()
-				v.ensureSelectedVisible()
-			} else {
-				// At top of runs, switch to buttons - select last available button
-				v.focusMode = "buttons"
-				// Count selected runs to determine max button
-				selectedRunCount := 0
-				for _, run := range v.runs {
-					if run.Selected {
-						selectedRunCount++
-					}
-				}
-				if selectedRunCount > 0 {
-					v.selectedButton = 4 // DASH is button 4 when SUBMIT exists
-				} else {
-					v.selectedButton = 3 // DASH is button 3 when no SUBMIT
-				}
-				v.ensureButtonsVisible()
-			}
-		} else {
-			// In buttons mode, navigate up
-			if v.selectedButton > 1 {
-				v.selectedButton--
-				v.ensureButtonsVisible()
-			} else {
-				// At top button, wrap to runs if available
-				if len(v.runs) > 0 {
-					v.focusMode = "runs"
-					v.selectedRun = len(v.runs) - 1
-					v.ensureSelectedVisible()
-				}
-			}
-		}
+		return v.handleUpNavigation()
 
 	case key.Matches(msg, v.keys.Down), msg.String() == "j":
-		// Navigate down in runs or to buttons
-		if v.focusMode == "runs" {
-			if v.selectedRun < len(v.runs)-1 {
-				v.selectedRun++
-				v.updateRunListViewport()
-				v.ensureSelectedVisible()
-			} else {
-				// At bottom of runs, switch to buttons
-				v.focusMode = "buttons"
-				v.selectedButton = 1 // Select [FILES] button
-				v.ensureButtonsVisible()
-			}
-		} else {
-			// In buttons mode, navigate down
-			// Calculate max button based on current layout
-			selectedRunCount := 0
-			for _, run := range v.runs {
-				if run.Selected {
-					selectedRunCount++
-				}
-			}
-			maxButton := 3 // Default: FILES, EXAMPLES, DASH
-			if selectedRunCount > 0 {
-				maxButton = 4 // With SUBMIT: SUBMIT, FILES, EXAMPLES, DASH
-			}
-
-			if v.selectedButton < maxButton {
-				v.selectedButton++
-				v.ensureButtonsVisible()
-			} else {
-				// At bottom button, wrap to runs if available
-				if len(v.runs) > 0 {
-					v.focusMode = "runs"
-					v.selectedRun = 0
-					v.ensureSelectedVisible()
-				}
-			}
-		}
+		return v.handleDownNavigation()
 
 	case msg.String() == "tab":
-		// Toggle between runs and buttons
-		if v.focusMode == "runs" {
-			v.focusMode = "buttons"
-			v.selectedButton = 1
-			v.ensureButtonsVisible()
-		} else {
-			v.focusMode = "runs"
-			if len(v.runs) == 0 {
-				v.selectedRun = 0
-			} else if v.selectedRun >= len(v.runs) {
-				v.selectedRun = len(v.runs) - 1
-			}
-			v.ensureSelectedVisible()
-		}
+		return v.handleTabNavigation()
 
 	case key.Matches(msg, v.keys.PageUp):
 		v.viewport.HalfPageUp()
+		return v, nil
 
 	case key.Matches(msg, v.keys.PageDown):
 		v.viewport.HalfPageDown()
-
-	case key.Matches(msg, v.keys.Select), msg.String() == " ":
-		// Toggle selection for current run (only in runs mode)
-		if v.focusMode == "runs" && v.selectedRun < len(v.runs) {
-			v.runs[v.selectedRun].Selected = !v.runs[v.selectedRun].Selected
-			v.updateRunListViewport()
-
-			// Automatically move to next run after toggling
-			if v.selectedRun < len(v.runs)-1 {
-				v.selectedRun++
-				v.ensureSelectedVisible()
-			}
-		}
-
-	case msg.String() == "enter":
-		debug.LogToFile("DEBUG: Enter key pressed in handleRunListKeys\n")
-		debug.LogToFilef("DEBUG: focusMode=%s, selectedButton=%d\n", v.focusMode, v.selectedButton)
-
-		if v.focusMode == "buttons" {
-			// Handle button selection with dynamic layout
-			debug.LogToFile("DEBUG: In buttons mode\n")
-
-			// Count selected runs to determine button layout
-			selectedRunCount := 0
-			for _, run := range v.runs {
-				if run.Selected {
-					selectedRunCount++
-				}
-			}
-
-			// Button layout depends on whether we have selected runs
-			// Handle buttons based on what's actually displayed
-			switch v.selectedButton {
-			case 1:
-				// Button 1: SUBMIT (if runs selected) or FILES (if no runs)
-				if selectedRunCount > 0 {
-					// [SUBMIT] button - show confirmation prompt
-					debug.LogToFile("DEBUG: Submit button selected - showing confirmation prompt\n")
-					v.showSubmissionPrompt = true
-					v.submissionPromptActive = true
-					return v, nil
-				} else {
-					// [FILES] button when no runs
-					debug.LogToFile("DEBUG: Files button selected\n")
-					v.mode = ModeFileBrowser
-					if v.fileSelector == nil {
-						v.fileSelector = components.NewBulkFileSelector(v.width, v.height)
-					}
-					return v, v.fileSelector.Activate()
-				}
-			case 2:
-				// Button 2: FILES (if runs selected) or EXAMPLES (if no runs)
-				if selectedRunCount > 0 {
-					// [FILES] button when runs selected
-					v.mode = ModeFileBrowser
-					if v.fileSelector == nil {
-						v.fileSelector = components.NewBulkFileSelector(v.width, v.height)
-					}
-					return v, v.fileSelector.Activate()
-				} else {
-					// [EXAMPLES] button when no runs
-					return v, func() tea.Msg {
-						return messages.NavigateToExamplesMsg{}
-					}
-				}
-			case 3:
-				// Button 3: EXAMPLES (if runs selected) or DASH (if no runs)
-				if selectedRunCount > 0 {
-					// [EXAMPLES] button when runs selected
-					return v, func() tea.Msg {
-						return messages.NavigateToExamplesMsg{}
-					}
-				} else {
-					// [DASH] button when no runs
-					return v, func() tea.Msg {
-						return messages.NavigateToDashboardMsg{}
-					}
-				}
-			case 4:
-				// Button 4: DASH (only when runs selected)
-				if selectedRunCount > 0 {
-					return v, func() tea.Msg {
-						return messages.NavigateToDashboardMsg{}
-					}
-				}
-			}
-			return v, nil
-		}
-
-		// In runs mode - show submission confirmation prompt
-		debug.LogToFile("DEBUG: In runs mode, showing submission confirmation prompt\n")
-		v.showSubmissionPrompt = true
-		v.submissionPromptActive = true
 		return v, nil
 
+	case key.Matches(msg, v.keys.Select), msg.String() == " ":
+		return v.handleSpaceSelection()
+
+	case msg.String() == "enter":
+		return v.handleEnterKey()
+
 	case key.Matches(msg, v.keys.FZF), msg.String() == "f":
-		// Switch back to file browser mode
-		v.mode = ModeFileBrowser
-		if v.fileSelector == nil {
-			v.fileSelector = components.NewBulkFileSelector(v.width, v.height)
-		}
-		return v, v.fileSelector.Activate()
+		return v.switchToFileBrowser()
 
 	case msg.String() == "d":
-		// Quick dashboard navigation
-		return v, func() tea.Msg {
-			return messages.NavigateToDashboardMsg{}
-		}
+		return v, func() tea.Msg { return messages.NavigateToDashboardMsg{} }
 
 	case key.Matches(msg, v.keys.Submit):
-		// Submit selected bulk runs
 		return v, v.submitBulkRuns()
+
 	default:
-		// Pass other keys to viewport
 		var vpCmd tea.Cmd
 		v.viewport, vpCmd = v.viewport.Update(msg)
 		cmds = append(cmds, vpCmd)
 	}
 
 	return v, tea.Batch(cmds...)
+}
+
+// handleUpNavigation handles up arrow/k key navigation
+func (v *BulkView) handleUpNavigation() (tea.Model, tea.Cmd) {
+	if v.focusMode == "runs" {
+		if v.selectedRun > 0 {
+			v.selectedRun--
+			v.updateRunListViewport()
+			v.ensureSelectedVisible()
+		} else {
+			// At top of runs, switch to buttons - select last available button
+			v.focusMode = "buttons"
+			selectedRunCount := v.countSelectedRuns()
+			if selectedRunCount > 0 {
+				v.selectedButton = 4 // DASH is button 4 when SUBMIT exists
+			} else {
+				v.selectedButton = 3 // DASH is button 3 when no SUBMIT
+			}
+			v.ensureButtonsVisible()
+		}
+	} else {
+		// In buttons mode, navigate up
+		if v.selectedButton > 1 {
+			v.selectedButton--
+			v.ensureButtonsVisible()
+		} else {
+			// At top button, wrap to runs if available
+			if len(v.runs) > 0 {
+				v.focusMode = "runs"
+				v.selectedRun = len(v.runs) - 1
+				v.ensureSelectedVisible()
+			}
+		}
+	}
+	return v, nil
+}
+
+// handleDownNavigation handles down arrow/j key navigation
+func (v *BulkView) handleDownNavigation() (tea.Model, tea.Cmd) {
+	if v.focusMode == "runs" {
+		if v.selectedRun < len(v.runs)-1 {
+			v.selectedRun++
+			v.updateRunListViewport()
+			v.ensureSelectedVisible()
+		} else {
+			// At bottom of runs, switch to buttons
+			v.focusMode = "buttons"
+			v.selectedButton = 1 // Select first button
+			v.ensureButtonsVisible()
+		}
+	} else {
+		// In buttons mode, navigate down
+		selectedRunCount := v.countSelectedRuns()
+		maxButton := 3 // Default: FILES, EXAMPLES, DASH
+		if selectedRunCount > 0 {
+			maxButton = 4 // With SUBMIT: SUBMIT, FILES, EXAMPLES, DASH
+		}
+
+		if v.selectedButton < maxButton {
+			v.selectedButton++
+			v.ensureButtonsVisible()
+		} else {
+			// At bottom button, wrap to runs if available
+			if len(v.runs) > 0 {
+				v.focusMode = "runs"
+				v.selectedRun = 0
+				v.ensureSelectedVisible()
+			}
+		}
+	}
+	return v, nil
+}
+
+// handleTabNavigation handles tab key to toggle between runs and buttons
+func (v *BulkView) handleTabNavigation() (tea.Model, tea.Cmd) {
+	if v.focusMode == "runs" {
+		v.focusMode = "buttons"
+		v.selectedButton = 1
+		v.ensureButtonsVisible()
+	} else {
+		v.focusMode = "runs"
+		if len(v.runs) == 0 {
+			v.selectedRun = 0
+		} else if v.selectedRun >= len(v.runs) {
+			v.selectedRun = len(v.runs) - 1
+		}
+		v.ensureSelectedVisible()
+	}
+	return v, nil
+}
+
+// handleSpaceSelection handles space key to toggle run selection
+func (v *BulkView) handleSpaceSelection() (tea.Model, tea.Cmd) {
+	if v.focusMode == "runs" && v.selectedRun < len(v.runs) {
+		v.runs[v.selectedRun].Selected = !v.runs[v.selectedRun].Selected
+		v.updateRunListViewport()
+
+		// Automatically move to next run after toggling
+		if v.selectedRun < len(v.runs)-1 {
+			v.selectedRun++
+			v.ensureSelectedVisible()
+		}
+	}
+	return v, nil
+}
+
+// handleEnterKey handles enter key press
+func (v *BulkView) handleEnterKey() (tea.Model, tea.Cmd) {
+	debug.LogToFile("DEBUG: Enter key pressed in handleRunListKeys\n")
+	debug.LogToFilef("DEBUG: focusMode=%s, selectedButton=%d\n", v.focusMode, v.selectedButton)
+
+	if v.focusMode == "buttons" {
+		return v.handleButtonActivation()
+	}
+
+	// In runs mode - show submission confirmation prompt
+	debug.LogToFile("DEBUG: In runs mode, showing submission confirmation prompt\n")
+	v.showSubmissionPrompt = true
+	v.submissionPromptActive = true
+	return v, nil
+}
+
+// handleButtonActivation handles button selection with enter key
+func (v *BulkView) handleButtonActivation() (tea.Model, tea.Cmd) {
+	debug.LogToFile("DEBUG: In buttons mode\n")
+	selectedRunCount := v.countSelectedRuns()
+
+	// Button layout depends on whether we have selected runs
+	switch v.selectedButton {
+	case 1:
+		return v.handleButton1(selectedRunCount)
+	case 2:
+		return v.handleButton2(selectedRunCount)
+	case 3:
+		return v.handleButton3(selectedRunCount)
+	case 4:
+		if selectedRunCount > 0 {
+			return v, func() tea.Msg { return messages.NavigateToDashboardMsg{} }
+		}
+	}
+	return v, nil
+}
+
+// handleButton1 handles the first button (SUBMIT or FILES)
+func (v *BulkView) handleButton1(selectedRunCount int) (tea.Model, tea.Cmd) {
+	if selectedRunCount > 0 {
+		// [SUBMIT] button - show confirmation prompt
+		debug.LogToFile("DEBUG: Submit button selected - showing confirmation prompt\n")
+		v.showSubmissionPrompt = true
+		v.submissionPromptActive = true
+		return v, nil
+	}
+	// [FILES] button when no runs
+	return v.switchToFileBrowser()
+}
+
+// handleButton2 handles the second button (FILES or EXAMPLES)
+func (v *BulkView) handleButton2(selectedRunCount int) (tea.Model, tea.Cmd) {
+	if selectedRunCount > 0 {
+		// [FILES] button when runs selected
+		return v.switchToFileBrowser()
+	}
+	// [EXAMPLES] button when no runs
+	return v, func() tea.Msg { return messages.NavigateToExamplesMsg{} }
+}
+
+// handleButton3 handles the third button (EXAMPLES or DASH)
+func (v *BulkView) handleButton3(selectedRunCount int) (tea.Model, tea.Cmd) {
+	if selectedRunCount > 0 {
+		// [EXAMPLES] button when runs selected
+		return v, func() tea.Msg { return messages.NavigateToExamplesMsg{} }
+	}
+	// [DASH] button when no runs
+	return v, func() tea.Msg { return messages.NavigateToDashboardMsg{} }
+}
+
+// switchToFileBrowser switches to file browser mode
+func (v *BulkView) switchToFileBrowser() (tea.Model, tea.Cmd) {
+	debug.LogToFile("DEBUG: Files button selected\n")
+	v.mode = ModeFileBrowser
+	if v.fileSelector == nil {
+		v.fileSelector = components.NewBulkFileSelector(v.width, v.height)
+	}
+	return v, v.fileSelector.Activate()
+}
+
+// countSelectedRuns counts how many runs are currently selected
+func (v *BulkView) countSelectedRuns() int {
+	count := 0
+	for _, run := range v.runs {
+		if run.Selected {
+			count++
+		}
+	}
+	return count
 }
 
 // navigateToResults prepares navigation context and returns navigation command

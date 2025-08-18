@@ -263,9 +263,8 @@ func (v *RunDetailsView) handleKeyInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	default:
 		// Handle navigation in navigation mode
 		if v.navigationMode {
-			if cmd := v.handleRowNavigation(msg); cmd != nil {
-				cmds = append(cmds, cmd)
-			} else if cmd := v.handleClipboardOperations(msg.String()); cmd != nil {
+			v.handleRowNavigation(msg)
+			if cmd := v.handleClipboardOperations(msg.String()); cmd != nil {
 				cmds = append(cmds, cmd)
 			} else {
 				// Handle viewport navigation as fallback

@@ -359,9 +359,7 @@ func (v *RunListView) handleNewRunKey() (tea.Model, tea.Cmd) {
 }
 
 // handleRunsLoaded handles the runsLoadedMsg message
-func (v *RunListView) handleRunsLoaded(msg runsLoadedMsg) []tea.Cmd {
-	var cmds []tea.Cmd
-
+func (v *RunListView) handleRunsLoaded(msg runsLoadedMsg) {
 	debug.LogToFilef("DEBUG: ENTERED runsLoadedMsg case - %d runs loaded\n", len(msg.runs))
 
 	v.loading = false
@@ -372,8 +370,6 @@ func (v *RunListView) handleRunsLoaded(msg runsLoadedMsg) []tea.Cmd {
 		v.cache.SetRuns(msg.runs)
 		v.filterRuns()
 	}
-
-	return cmds
 }
 
 // handlePolling handles the pollTickMsg message
@@ -396,7 +392,7 @@ func (v *RunListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return v.handleKeyMsg(msg)
 
 	case runsLoadedMsg:
-		cmds = append(cmds, v.handleRunsLoaded(msg)...)
+		v.handleRunsLoaded(msg)
 
 	case userInfoLoadedMsg:
 		if msg.err == nil && msg.userInfo != nil {

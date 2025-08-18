@@ -9,54 +9,10 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/repobird/repobird-cli/internal/tui/components"
 	"github.com/repobird/repobird-cli/internal/tui/styles"
 	"github.com/repobird/repobird-cli/internal/utils"
 )
-
-// renderHeader renders the header of the details view
-func (v *RunDetailsView) renderHeader() string {
-	statusIcon := styles.GetStatusIcon(string(v.run.Status))
-	statusStyle := styles.GetStatusStyle(string(v.run.Status))
-	status := statusStyle.Render(fmt.Sprintf("%s %s", statusIcon, v.run.Status))
-
-	idStr := v.run.GetIDString()
-	if len(idStr) > 8 {
-		idStr = idStr[:8]
-	}
-	title := fmt.Sprintf("Run #%s", idStr)
-	if v.run.Title != "" {
-		title += " - " + v.run.Title
-	}
-
-	// Truncate title if too long for terminal width
-	if v.width > 25 && len(title) > v.width-20 {
-		maxLen := v.width - 23
-		if maxLen > 0 && maxLen < len(title) {
-			title = title[:maxLen] + "..."
-		}
-	}
-
-	header := styles.TitleStyle.MaxWidth(v.width).Render(title)
-
-	if models.IsActiveStatus(string(v.run.Status)) {
-		if v.pollingStatus {
-			// Show active polling indicator
-			pollingIndicator := styles.ProcessingStyle.Render(" [Fetching... " + v.spinner.View() + "]")
-			header += pollingIndicator
-		} else {
-			// Show passive polling indicator
-			pollingIndicator := styles.ProcessingStyle.Render(" [Monitoring ⟳]")
-			header += pollingIndicator
-		}
-	}
-
-	rightAlign := lipgloss.NewStyle().Align(lipgloss.Right).Width(v.width - lipgloss.Width(header))
-	header += rightAlign.Render("Status: " + status)
-
-	return header
-}
 
 // renderStatusBar renders the status bar at the bottom of the view
 func (v *RunDetailsView) renderStatusBar() string {

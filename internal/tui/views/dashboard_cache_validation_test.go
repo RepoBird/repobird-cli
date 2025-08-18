@@ -370,7 +370,3 @@ func TestCacheValidationIntegration(t *testing.T) {
 	assert.Empty(t, clearedRuns, "Cache should be empty after clear")
 }
 
-// Helper function to test string prefix logic
-func strings_HasPrefix(s, prefix string) bool {
-	return len(s) >= len(prefix) && s[0:len(prefix)] == prefix
-}

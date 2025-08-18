@@ -9,7 +9,7 @@ import (
 )
 
 // handleRowNavigation handles navigation between selectable rows/fields
-func (v *RunDetailsView) handleRowNavigation(msg tea.KeyMsg) tea.Cmd {
+func (v *RunDetailsView) handleRowNavigation(msg tea.KeyMsg) {
 	switch msg.String() {
 	case "j", "down":
 		if v.selectedRow < len(v.fieldValues)-1 {
@@ -40,7 +40,6 @@ func (v *RunDetailsView) handleRowNavigation(msg tea.KeyMsg) tea.Cmd {
 			v.scrollToSelectedField()
 		}
 	}
-	return nil
 }
 
 // scrollToSelectedField ensures the selected field is visible in the viewport

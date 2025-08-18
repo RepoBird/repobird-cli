@@ -68,11 +68,11 @@ func TestConcurrentGetSetRuns(t *testing.T) {
 	// Multiple writers
 	for i := 0; i < 50; i++ {
 		wg.Add(1)
-		go func(idx int) {
+		go func() {
 			defer wg.Done()
 			runs := generateTestRuns(5)
 			cache.SetRuns(runs)
-		}(i)
+		}()
 	}
 
 	// Multiple readers

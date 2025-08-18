@@ -4,37 +4,11 @@
 package views
 
 import (
-	"fmt"
 	"strings"
-	"time"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/repobird/repobird-cli/internal/models"
 )
-
-// truncateString truncates a string to the specified width with ellipsis
-func (d *DashboardView) truncateString(s string, maxWidth int) string {
-	// Handle newlines by taking only the first line
-	lines := strings.Split(s, "\n")
-	if len(lines) > 0 {
-		s = lines[0]
-	}
-
-	// Convert tabs to spaces for consistent display
-	s = strings.ReplaceAll(s, "\t", "    ")
-
-	// Use rune counting for proper unicode handling
-	runes := []rune(s)
-	if len(runes) <= maxWidth {
-		return s
-	}
-
-	// Leave room for ellipsis
-	if maxWidth > 3 {
-		return string(runes[:maxWidth-3]) + "..."
-	}
-	return "..."
-}
 
 // getRepositoryStatusIcon returns an icon based on repository status
 func (d *DashboardView) getRepositoryStatusIcon(repo *models.Repository) string {
@@ -58,26 +32,6 @@ func (d *DashboardView) getRunStatusIcon(status models.RunStatus) string {
 		return "❌"
 	default:
 		return "❓"
-	}
-}
-
-// formatTimeAgo formats time in a human-readable way
-func (d *DashboardView) formatTimeAgo(t time.Time) string {
-	if t.IsZero() {
-		return "Never"
-	}
-
-	now := time.Now()
-	diff := now.Sub(t)
-
-	if diff < time.Minute {
-		return "now"
-	} else if diff < time.Hour {
-		return fmt.Sprintf("%dm ago", int(diff.Minutes()))
-	} else if diff < 24*time.Hour {
-		return fmt.Sprintf("%dh ago", int(diff.Hours()))
-	} else {
-		return fmt.Sprintf("%dd ago", int(diff.Hours()/24))
 	}
 }
 
@@ -138,39 +92,6 @@ func (d *DashboardView) wrapTextWithLimit(text string, width int, maxLines int) 
 	return result
 }
 
-// renderRepositoriesTable renders a table of repositories with real data
-func (d *DashboardView) renderRepositoriesTable() string {
-	// Header
-	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("63"))
-	header := fmt.Sprintf("%-25s %-8s %-8s %-10s %-8s %-15s",
-		"Repository", "Total", "Running", "Completed", "Failed", "Last Activity")
-
-	var rows []string
-	rows = append(rows, headerStyle.Render(header))
-	rows = append(rows, strings.Repeat("-", d.width-4))
-
-	for _, repo := range d.repositories {
-		statusIcon := d.getRepositoryStatusIcon(&repo)
-		repoName := fmt.Sprintf("%s %s", statusIcon, repo.Name)
-		lastActivity := d.formatTimeAgo(repo.LastActivity)
-
-		row := fmt.Sprintf("%-25s %-8d %-8d %-10d %-8d %-15s",
-			repoName,
-			repo.RunCounts.Total,
-			repo.RunCounts.Running,
-			repo.RunCounts.Completed,
-			repo.RunCounts.Failed,
-			lastActivity)
-
-		rows = append(rows, row)
-	}
-
-	if len(d.repositories) == 0 {
-		rows = append(rows, "No repositories found")
-	}
-
-	return strings.Join(rows, "\n")
-}
 
 // applyItemHighlight applies the appropriate highlighting style to an item based on selection and focus state
 func (d *DashboardView) applyItemHighlight(item string, isSelected bool, isFocused bool, maxWidth int) string {
