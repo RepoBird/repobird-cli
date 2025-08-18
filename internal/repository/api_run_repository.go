@@ -212,10 +212,31 @@ func (r *apiRunRepository) doRequest(ctx context.Context, method, path string, b
 }
 
 // toDomainRun converts a DTO RunResponse to a domain Run
+// mapAPIStatusToDomain converts API status strings to domain status constants
+func mapAPIStatusToDomain(apiStatus string) string {
+	switch apiStatus {
+	case "DONE":
+		return domain.StatusCompleted
+	case "QUEUED":
+		return domain.StatusQueued
+	case "INITIALIZING", "PROCESSING", "POST_PROCESS":
+		return domain.StatusRunning
+	case "FAILED":
+		return domain.StatusFailed
+	case "CANCELLED":
+		return domain.StatusCancelled
+	case "CREATED":
+		return domain.StatusCreated
+	default:
+		// Return the status as-is if not mapped
+		return apiStatus
+	}
+}
+
 func (r *apiRunRepository) toDomainRun(resp *dto.RunResponse) *domain.Run {
 	return &domain.Run{
 		ID:             resp.ID.String(),
-		Status:         resp.Status,
+		Status:         mapAPIStatusToDomain(resp.Status),
 		StatusMessage:  resp.StatusMessage,
 		Prompt:         resp.Prompt,
 		RepositoryName: resp.RepositoryName,

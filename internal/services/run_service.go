@@ -120,7 +120,7 @@ func (s *runService) WaitForCompletion(ctx context.Context, id string, callback 
 		Interval:      5 * time.Second,
 		MaxInterval:   30 * time.Second,
 		BackoffFactor: 1.5,
-		Timeout:       45 * time.Minute,
+		Timeout:       90 * time.Minute, // 1h 30m timeout
 	})
 
 	pollFunc := func(ctx context.Context) (*domain.Run, error) {

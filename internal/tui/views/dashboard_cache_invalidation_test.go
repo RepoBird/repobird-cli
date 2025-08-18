@@ -192,10 +192,19 @@ func TestCacheInvalidateActiveRuns(t *testing.T) {
 		},
 	}
 
+	// Clear any existing runs first
+	testCache.Clear()
+	
 	testCache.SetRuns(runs)
 
 	// Verify all runs are cached
 	cachedRuns := testCache.GetRuns()
+	if len(cachedRuns) != 4 {
+		t.Logf("Expected 4 runs, got %d runs", len(cachedRuns))
+		for i, run := range cachedRuns {
+			t.Logf("Run %d: ID=%s, Status=%s", i, run.ID, run.Status)
+		}
+	}
 	assert.Len(t, cachedRuns, 4, "Should have all 4 runs cached initially")
 
 	// Invalidate active runs
