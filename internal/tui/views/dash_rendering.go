@@ -177,7 +177,7 @@ func (d *DashboardView) renderRepositoriesColumn(width, height int) string {
 	titleText := fmt.Sprintf("Repositories [%d]", len(d.repositories))
 	title := titleStyle.Render(titleText)
 
-	// Build items list
+	// Build items list (for potential future use - currently handled by updateRepoViewportContent)
 	var items []string
 	for i, repo := range d.repositories {
 		statusIcon := d.getRepositoryStatusIcon(&repo)
@@ -217,10 +217,10 @@ func (d *DashboardView) renderRepositoriesColumn(width, height int) string {
 			}
 		}
 
-		items = append(items, item)
+		_ = item // This item building is currently unused as updateRepoViewportContent handles content
 	}
 
-	// Note: if len(items) == 0, we handle this via updateRepoViewportContent()
+	_ = items // This items list is currently unused as updateRepoViewportContent handles content
 
 	// Update viewport content if needed
 	d.updateRepoViewportContent()

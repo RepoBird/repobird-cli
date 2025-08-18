@@ -25,7 +25,7 @@ func readMaskedInput() (string, error) {
 	fmt.Print("Enter your API key: ")
 
 	// Set terminal to raw mode to read char by char
-	oldState, err := term.MakeRaw(int(syscall.Stdin))
+	oldState, err := term.MakeRaw(syscall.Stdin)
 	if err != nil {
 		return "", err
 	}
@@ -36,7 +36,7 @@ func readMaskedInput() (string, error) {
 		if interrupted {
 			fmt.Print("\r\033[K")
 		}
-		_ = term.Restore(int(syscall.Stdin), oldState)
+		_ = term.Restore(syscall.Stdin, oldState)
 		if !interrupted {
 			fmt.Println() // Only add newline if not interrupted
 		}
@@ -115,7 +115,7 @@ or in an encrypted file as a fallback.`,
 				}
 				// Fallback to regular password input if custom reader fails
 				fmt.Print("Enter your API key: ")
-				bytePassword, err := term.ReadPassword(int(syscall.Stdin))
+				bytePassword, err := term.ReadPassword(syscall.Stdin)
 				if err != nil {
 					// Final fallback to regular input
 					reader := bufio.NewReader(os.Stdin)
