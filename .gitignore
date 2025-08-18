@@ -62,3 +62,7 @@ examples/dev/
 
 ai_tasks/
 ai_docs/
+
+# Personal development scripts
+scripts/kitty-dev.local.sh
+scripts/*.local.sh

@@ -1,5 +1,15 @@
 #!/bin/bash
 
+# Personal development setup for RepoBird CLI with Kitty terminal
+# This script sets up a multi-window development environment
+# 
+# TRUE VIBE CODING: 3 Claude windows, 1 editor, 0 Stack Overflow tabs
+# Because who needs documentation when you have AI pair programmers everywhere?
+# 
+# NOTE: This is a personal development script that may contain user-specific paths.
+# Feel free to modify for your own setup or create your own version.
+# Consider copying this to kitty-dev.local.sh and customizing there.
+
 # Save the current working directory
 current_dir=$(pwd)
 
