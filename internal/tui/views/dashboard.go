@@ -787,27 +787,38 @@ func (d *DashboardView) handleTripleColumnKeys(msg tea.KeyMsg) (tea.Model, tea.C
 		if !d.inlineFZF.IsActive() {
 			// If Enter was pressed, handle selection
 			if msg.String() == "enter" {
-				selected, idx := d.inlineFZF.GetSelected()
-				if selected != "" && idx >= 0 {
-					// Process the selection based on column
+				// Use GetLastSelection since FZF has already been deactivated
+				selected, originalIdx := d.inlineFZF.GetLastSelection()
+				if selected != "" && originalIdx >= 0 {
+					// Process the selection based on column using the original index
 					switch d.fzfColumn {
 					case 0: // Repository column
-						if idx < len(d.repositories) {
-							d.selectedRepoIdx = idx
-							d.selectedRepo = &d.repositories[idx]
+						// Use the original index directly
+						if originalIdx < len(d.repositories) {
+							d.selectedRepoIdx = originalIdx
+							d.selectedRepo = &d.repositories[originalIdx]
+							// Move focus to runs column BEFORE selecting repository
+							d.focusedColumn = 1
+							// Now select the repository which will load its runs
 							cmd = d.selectRepository(d.selectedRepo)
 						}
 					case 1: // Runs column
-						if idx < len(d.filteredRuns) {
-							d.selectedRunIdx = idx
-							d.selectedRunData = d.filteredRuns[idx]
+						// For runs, we need to find in the filtered runs list
+						// The FZF items were built from filteredRuns, so originalIdx maps to filteredRuns
+						if originalIdx < len(d.filteredRuns) {
+							d.selectedRunIdx = originalIdx
+							d.selectedRunData = d.filteredRuns[originalIdx]
 							d.updateDetailLines()
 							d.restoreOrInitDetailSelection()
+							// Move focus to details column
+							d.focusedColumn = 2
 						}
 					case 2: // Details column
-						if idx < len(d.detailLines) {
-							d.selectedDetailLine = idx
+						// Details column uses the original index directly
+						if originalIdx < len(d.detailLines) {
+							d.selectedDetailLine = originalIdx
 						}
+						// Details column is already the last, no need to move focus
 					}
 				}
 			}

@@ -22,6 +22,10 @@ type InlineFZF struct {
 	Query         string         // Current search query
 	Placeholder   string         // Placeholder text
 	Width         int            // Width for rendering
+	
+	// Store the last selection before deactivating
+	LastSelected      string
+	LastSelectedIndex int
 }
 
 // NewInlineFZF creates a new inline FZF component
@@ -87,7 +91,18 @@ func (f *InlineFZF) Update(msg tea.Msg) (*InlineFZF, tea.Cmd) {
 			return f, nil
 			
 		case "enter":
-			// Selection is handled by parent, just deactivate
+			// Save selection before deactivating
+			if f.SelectedIndex >= 0 && f.SelectedIndex < len(f.FilteredItems) {
+				f.LastSelected = f.FilteredItems[f.SelectedIndex]
+				// Find original index
+				for i, item := range f.Items {
+					if item == f.LastSelected {
+						f.LastSelectedIndex = i
+						break
+					}
+				}
+			}
+			// Now deactivate
 			f.Deactivate()
 			return f, nil
 			
@@ -150,6 +165,11 @@ func (f *InlineFZF) GetSelected() (string, int) {
 		}
 	}
 	return selected, -1
+}
+
+// GetLastSelection returns the last selected item before deactivation
+func (f *InlineFZF) GetLastSelection() (string, int) {
+	return f.LastSelected, f.LastSelectedIndex
 }
 
 // RenderSearchBar renders just the search input bar
