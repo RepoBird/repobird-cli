@@ -13,6 +13,7 @@ import (
 	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/repobird/repobird-cli/internal/tui/components"
 	"github.com/repobird/repobird-cli/internal/tui/debug"
+	"github.com/repobird/repobird-cli/internal/tui/messages"
 	"github.com/repobird/repobird-cli/internal/utils"
 )
 
@@ -446,6 +447,9 @@ func (d *DashboardView) handleEnterNavigation() tea.Cmd {
 			// Moving to details column, restore or init selection
 			d.restoreOrInitDetailSelection()
 		}
+	} else if d.focusedColumn == 2 && d.selectedRunData != nil {
+		// In details column with a selected run - navigate to details view
+		return d.navigateToDetailsView(d.selectedRunData)
 	}
 	return nil
 }
@@ -647,4 +651,14 @@ func (d *DashboardView) openURL(urlText string) tea.Cmd {
 		d.statusLine.SetTemporaryMessageWithType(fmt.Sprintf("✗ Failed to open URL: %v", err), components.MessageError, 1*time.Second)
 	}
 	return d.startMessageClearTimer(1 * time.Second)
+}
+
+// navigateToDetailsView navigates to the details view for a specific run
+func (d *DashboardView) navigateToDetailsView(run *models.RunResponse) tea.Cmd {
+	if run != nil {
+		return func() tea.Msg {
+			return messages.NavigateToDetailsMsg{RunData: run}
+		}
+	}
+	return nil
 }
