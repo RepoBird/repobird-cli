@@ -5,13 +5,22 @@ package utils
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 func DetectRepository() (string, error) {
-	cmd := exec.Command("git", "config", "--get", "remote.origin.url")
+	// Create context with timeout for quick git operation
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	return DetectRepositoryWithContext(ctx)
+}
+
+func DetectRepositoryWithContext(ctx context.Context) (string, error) {
+	cmd := exec.CommandContext(ctx, "git", "config", "--get", "remote.origin.url")
 	var out bytes.Buffer
 	cmd.Stdout = &out
 
@@ -144,7 +153,14 @@ func parseGitURL(url string) string {
 }
 
 func GetCurrentBranch() (string, error) {
-	cmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
+	// Create context with timeout for quick git operation
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	return GetCurrentBranchWithContext(ctx)
+}
+
+func GetCurrentBranchWithContext(ctx context.Context) (string, error) {
+	cmd := exec.CommandContext(ctx, "git", "rev-parse", "--abbrev-ref", "HEAD")
 	var out bytes.Buffer
 	cmd.Stdout = &out
 
