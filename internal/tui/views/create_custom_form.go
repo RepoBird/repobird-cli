@@ -213,9 +213,9 @@ func (f *CustomCreateForm) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 		return f.deleteFieldContent()
 	case "c":
 		return f.changeFieldContent()
-	case "j", "down":
+	case "j", "down", "tab":
 		return f.moveToNextField()
-	case "k", "up":
+	case "k", "up", "shift+tab":
 		return f.moveToPreviousField()
 	case "enter", " ":
 		return f.handleEnterOrSpace()

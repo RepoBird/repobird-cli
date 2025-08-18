@@ -176,6 +176,18 @@ func (d *DashboardView) renderRepositoriesColumn(width, height int) string {
 	}
 	titleText := fmt.Sprintf("Repositories [%d]", len(d.repositories))
 	title := titleStyle.Render(titleText)
+	
+	// Calculate content height (subtract title height)
+	contentHeight := height - 2
+	
+	// If FZF is active for this column, add search bar
+	var searchBar string
+	if d.inlineFZF != nil && d.inlineFZF.IsActive() && d.fzfColumn == 0 {
+		searchBar = d.inlineFZF.RenderSearchBar()
+		if searchBar != "" {
+			contentHeight -= 1  // Only subtract when we actually have a search bar
+		}
+	}
 
 	// Build items list (for potential future use - currently handled by updateRepoViewportContent)
 	var items []string
@@ -222,11 +234,8 @@ func (d *DashboardView) renderRepositoriesColumn(width, height int) string {
 
 	_ = items // This items list is currently unused as updateRepoViewportContent handles content
 
-	// Update viewport content if needed
+	// Update viewport content (will use filtered items if FZF is active)
 	d.updateRepoViewportContent()
-
-	// Calculate content height (subtract title height)
-	contentHeight := height - 2
 
 	// Render viewport content with padding
 	contentStyle := lipgloss.NewStyle().
@@ -234,7 +243,19 @@ func (d *DashboardView) renderRepositoriesColumn(width, height int) string {
 		Height(contentHeight).
 		Padding(0, 1)
 
-	return lipgloss.JoinVertical(lipgloss.Left, title, contentStyle.Render(d.repoViewport.View()))
+	// Build the column content
+	var parts []string
+	parts = append(parts, title)
+	if searchBar != "" {
+		// Add search bar with padding
+		searchStyle := lipgloss.NewStyle().
+			Width(width).
+			Padding(0, 1)
+		parts = append(parts, searchStyle.Render(searchBar))
+	}
+	parts = append(parts, contentStyle.Render(d.repoViewport.View()))
+	
+	return lipgloss.JoinVertical(lipgloss.Left, parts...)
 }
 
 // renderRunsColumn renders the center column with runs for selected repository
@@ -258,6 +279,18 @@ func (d *DashboardView) renderRunsColumn(width, height int) string {
 		titleText = fmt.Sprintf("Runs [%d]", len(d.filteredRuns))
 	}
 	title := titleStyle.Render(titleText)
+	
+	// Calculate content height (subtract title height)
+	contentHeight := height - 2
+	
+	// If FZF is active for this column, add search bar
+	var searchBar string
+	if d.inlineFZF != nil && d.inlineFZF.IsActive() && d.fzfColumn == 1 {
+		searchBar = d.inlineFZF.RenderSearchBar()
+		if searchBar != "" {
+			contentHeight -= 1
+		}
+	}
 
 	var items []string
 	if d.selectedRepo == nil {
@@ -315,11 +348,8 @@ func (d *DashboardView) renderRunsColumn(width, height int) string {
 		}
 	}
 
-	// Update viewport content if needed
+	// Update viewport content (will use filtered items if FZF is active)
 	d.updateRunsViewportContent()
-
-	// Calculate content height (subtract title height)
-	contentHeight := height - 2
 
 	// Render viewport content with padding
 	contentStyle := lipgloss.NewStyle().
@@ -327,7 +357,19 @@ func (d *DashboardView) renderRunsColumn(width, height int) string {
 		Height(contentHeight).
 		Padding(0, 1)
 
-	return lipgloss.JoinVertical(lipgloss.Left, title, contentStyle.Render(d.runsViewport.View()))
+	// Build the column content
+	var parts []string
+	parts = append(parts, title)
+	if searchBar != "" {
+		// Add search bar with padding
+		searchStyle := lipgloss.NewStyle().
+			Width(width).
+			Padding(0, 1)
+		parts = append(parts, searchStyle.Render(searchBar))
+	}
+	parts = append(parts, contentStyle.Render(d.runsViewport.View()))
+	
+	return lipgloss.JoinVertical(lipgloss.Left, parts...)
 }
 
 // renderDetailsColumn renders the right column with run details
@@ -347,6 +389,18 @@ func (d *DashboardView) renderDetailsColumn(width, height int) string {
 		titleStyle = titleStyle.Foreground(lipgloss.Color("240"))
 	}
 	title := titleStyle.Render("Run Details")
+	
+	// Calculate content height (subtract title height)
+	contentHeight := height - 2
+	
+	// If FZF is active for this column, add search bar
+	var searchBar string
+	if d.inlineFZF != nil && d.inlineFZF.IsActive() && d.fzfColumn == 2 {
+		searchBar = d.inlineFZF.RenderSearchBar()
+		if searchBar != "" {
+			contentHeight -= 1
+		}
+	}
 
 	var displayLines []string
 	if d.selectedRunData == nil {
@@ -445,23 +499,39 @@ func (d *DashboardView) renderDetailsColumn(width, height int) string {
 		}
 	}
 
-	// Update viewport content if needed
+	// Update viewport content (will use filtered items if FZF is active)
 	d.updateDetailsViewportContent()
 
-	// Calculate content height (subtract title height)
-	contentHeight := height - 2
-
-	// Render viewport content with padding
+	// Render viewport content with padding  
 	contentStyle := lipgloss.NewStyle().
 		Width(width).
 		Height(contentHeight).
 		Padding(0, 1)
 
-	return lipgloss.JoinVertical(lipgloss.Left, title, contentStyle.Render(d.detailsViewport.View()))
+	// Build the column content
+	var parts []string
+	parts = append(parts, title)
+	if searchBar != "" {
+		// Add search bar with padding
+		searchStyle := lipgloss.NewStyle().
+			Width(width).
+			Padding(0, 1)
+		parts = append(parts, searchStyle.Render(searchBar))
+	}
+	parts = append(parts, contentStyle.Render(d.detailsViewport.View()))
+	
+	return lipgloss.JoinVertical(lipgloss.Left, parts...)
 }
 
 // renderStatusLine renders the universal status line
 func (d *DashboardView) renderStatusLine(layoutName string) string {
+	// Modify layout name if in FZF mode
+	if d.inlineFZF != nil && d.inlineFZF.IsActive() {
+		layoutName = "[" + layoutName + "] [FZF]"
+	} else {
+		layoutName = "[" + layoutName + "]"
+	}
+	
 	// Create formatter for consistent formatting
 	formatter := components.NewStatusFormatter(layoutName, d.width)
 

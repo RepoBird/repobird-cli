@@ -45,7 +45,7 @@ And a dashboard for data visualization.`
 	}
 
 	// Initialize content
-	view.updateContent()
+	view.updateContentRefactored()
 
 	t.Run("MultilineFieldsTracked", func(t *testing.T) {
 		// Check that we have the expected fields
@@ -198,7 +198,7 @@ func TestRunDetailsView_ScrollingMultilineFields(t *testing.T) {
 	view.viewport.YOffset = 0
 
 	// Initialize content
-	view.updateContent()
+	view.updateContentRefactored()
 
 	t.Run("ScrollToLargeField", func(t *testing.T) {
 		// Find the plan field

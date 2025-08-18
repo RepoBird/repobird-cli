@@ -41,7 +41,7 @@ func TestRunDetailsView_CursorVisibility(t *testing.T) {
 	}
 
 	// Initialize content to populate field values
-	view.updateContent()
+	view.updateContentRefactored()
 
 	t.Run("RenderContentWithCursor", func(t *testing.T) {
 		// Get rendered lines with cursor
@@ -104,7 +104,7 @@ func TestRunDetailsView_HighlightStyle(t *testing.T) {
 		selectedRow:    0,
 	}
 
-	view.updateContent()
+	view.updateContentRefactored()
 
 	t.Run("HighlightApplied", func(t *testing.T) {
 		// Create a simple field range for testing
@@ -157,7 +157,7 @@ func TestRunDetailsView_MultilineFieldHighlight(t *testing.T) {
 		selectedRow:    0,
 	}
 
-	view.updateContent()
+	view.updateContentRefactored()
 
 	t.Run("MultilineFieldFullyHighlighted", func(t *testing.T) {
 		// Find the prompt field
@@ -203,7 +203,7 @@ func TestRunDetailsView_NavigationWithHighlight(t *testing.T) {
 		selectedRow:    0,
 	}
 
-	view.updateContent()
+	view.updateContentRefactored()
 
 	t.Run("NavigationUpdatesHighlight", func(t *testing.T) {
 		// Navigate down
@@ -242,7 +242,7 @@ func TestRunDetailsView_HighlightWidth(t *testing.T) {
 		selectedRow:    0,
 	}
 
-	view.updateContent()
+	view.updateContentRefactored()
 
 	t.Run("HighlightUsesFullWidth", func(t *testing.T) {
 		// The highlight style should use the full terminal width

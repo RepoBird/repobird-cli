@@ -223,7 +223,33 @@ func (d *DashboardView) updateViewportContent() {
 // updateRepoViewportContent updates the repository column viewport content
 func (d *DashboardView) updateRepoViewportContent() {
 	var items []string
-	for i, repo := range d.repositories {
+	
+	// Get filtered items if FZF is active
+	var repos []models.Repository
+	var filteredIndices []int
+	if d.inlineFZF != nil && d.inlineFZF.IsActive() && d.fzfColumn == 0 {
+		// Use filtered items from FZF
+		filteredItems := d.inlineFZF.GetFilteredItems()
+		for _, filteredItem := range filteredItems {
+			// Find matching repository
+			for i, repo := range d.repositories {
+				if repo.Name == filteredItem {
+					repos = append(repos, repo)
+					filteredIndices = append(filteredIndices, i)
+					break
+				}
+			}
+		}
+	} else {
+		// Use all repositories
+		repos = d.repositories
+		for i := range d.repositories {
+			filteredIndices = append(filteredIndices, i)
+		}
+	}
+	
+	for idx, repo := range repos {
+		originalIdx := filteredIndices[idx]
 		statusIcon := d.getRepositoryStatusIcon(&repo)
 		baseItem := fmt.Sprintf("%s %s", statusIcon, repo.Name)
 
@@ -244,8 +270,14 @@ func (d *DashboardView) updateRepoViewportContent() {
 			}
 		}
 
-		// Highlight selected repository
-		item = d.applyItemHighlight(item, i == d.selectedRepoIdx, d.focusedColumn == 0, maxWidth)
+		// Highlight selected repository (use filtered index for FZF mode)
+		isSelected := false
+		if d.inlineFZF != nil && d.inlineFZF.IsActive() && d.fzfColumn == 0 {
+			isSelected = idx == d.inlineFZF.GetSelectedIndex()
+		} else {
+			isSelected = originalIdx == d.selectedRepoIdx
+		}
+		item = d.applyItemHighlight(item, isSelected, d.focusedColumn == 0, maxWidth)
 
 		items = append(items, item)
 	}
@@ -335,7 +367,38 @@ func (d *DashboardView) updateRunsViewportContent() {
 
 		items = []string{msg}
 	} else {
-		for i, run := range d.filteredRuns {
+		// Get filtered items if FZF is active
+		var runs []*models.RunResponse
+		var filteredIndices []int
+		if d.inlineFZF != nil && d.inlineFZF.IsActive() && d.fzfColumn == 1 {
+			// Use filtered items from FZF
+			filteredItems := d.inlineFZF.GetFilteredItems()
+			for _, filteredItem := range filteredItems {
+				// Find matching run by parsing the formatted string
+				for i, run := range d.filteredRuns {
+					runID := run.GetIDString()
+					title := run.Title
+					if title == "" {
+						title = "Untitled"
+					}
+					expectedItem := fmt.Sprintf("%s - %s", runID, title)
+					if expectedItem == filteredItem {
+						runs = append(runs, run)
+						filteredIndices = append(filteredIndices, i)
+						break
+					}
+				}
+			}
+		} else {
+			// Use all runs
+			runs = d.filteredRuns
+			for i := range d.filteredRuns {
+				filteredIndices = append(filteredIndices, i)
+			}
+		}
+		
+		for idx, run := range runs {
+			originalIdx := filteredIndices[idx]
 			statusIcon := d.getRunStatusIcon(run.Status)
 			runID := run.GetIDString()
 			title := run.Title
@@ -359,7 +422,7 @@ func (d *DashboardView) updateRunsViewportContent() {
 					item = string(runes[:maxWidth-3]) + "..."
 				}
 				items = append(items, item)
-				debug.LogToFilef("Run[%d]: Truncated whole, width=%d\n", i, maxWidth)
+				debug.LogToFilef("Run[%d]: Truncated whole, width=%d\n", originalIdx, maxWidth)
 				continue
 			}
 
@@ -375,11 +438,17 @@ func (d *DashboardView) updateRunsViewportContent() {
 			finalRunes := []rune(item)
 			if len(finalRunes) > maxWidth {
 				item = string(finalRunes[:maxWidth-3]) + "..."
-				debug.LogToFilef("Run[%d]: Final safety truncation triggered\n", i)
+				debug.LogToFilef("Run[%d]: Final safety truncation triggered\n", originalIdx)
 			}
 
-			// Highlight selected run
-			item = d.applyItemHighlight(item, i == d.selectedRunIdx, d.focusedColumn == 1, maxWidth)
+			// Highlight selected run (use filtered index for FZF mode)
+			isSelected := false
+			if d.inlineFZF != nil && d.inlineFZF.IsActive() && d.fzfColumn == 1 {
+				isSelected = idx == d.inlineFZF.GetSelectedIndex()
+			} else {
+				isSelected = originalIdx == d.selectedRunIdx
+			}
+			item = d.applyItemHighlight(item, isSelected, d.focusedColumn == 1, maxWidth)
 
 			items = append(items, item)
 		}

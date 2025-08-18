@@ -113,7 +113,7 @@ func (v *RunDetailsView) Init() tea.Cmd {
 						v.run = *cachedRun
 						v.loading = false
 						v.updateStatusHistory(string(cachedRun.Status), false)
-						v.updateContent()
+						v.updateContentRefactored()
 					} else {
 						debug.LogToFilef("DEBUG: Cache hit for run '%s' but making API call (active run, age: %v)\n",
 							v.runID, time.Since(cachedRun.CreatedAt))
@@ -173,7 +173,7 @@ func (v *RunDetailsView) handleWindowSizeMsg(msg tea.WindowSizeMsg) {
 	v.help.Width = msg.Width
 
 	// Update content to reflow for new width
-	v.updateContent()
+	v.updateContentRefactored()
 }
 
 // IsKeyDisabled implements CoreViewKeymap interface
@@ -259,7 +259,7 @@ func (v *RunDetailsView) handleKeyInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Removed logs functionality - not supported yet
 	// case msg.String() == "l":
 	//	v.showLogs = !v.showLogs
-	//	v.updateContent()
+	//	v.updateContentRefactored()
 	default:
 		// Handle navigation in navigation mode
 		if v.navigationMode {
@@ -440,7 +440,7 @@ func (v *RunDetailsView) View() string {
 
 // Rendering helper methods are defined in details_rendering.go
 
-func (v *RunDetailsView) updateContent() {
+func (v *RunDetailsView) updateContentOld() {
 	var content strings.Builder
 	var lines []string
 	v.fieldLines = []string{}
@@ -717,7 +717,7 @@ func (v *RunDetailsView) handleRunDetailsLoaded(msg runDetailsLoadedMsg) {
 		v.cache.SetRun(msg.run)
 		debug.LogToFilef("DEBUG: Cached run details for ID '%s' (status: %s)\n", msg.run.GetIDString(), msg.run.Status)
 	}
-	v.updateContent()
+	v.updateContentRefactored()
 
 	// Debug logging for successful load
 	debug.LogToFilef("DEBUG: Successfully loaded run details for '%s'\n", msg.run.GetIDString())
@@ -730,7 +730,7 @@ func (v *RunDetailsView) handlePolling(msg pollTickMsg) []tea.Cmd {
 		// Mark that we're fetching status
 		v.pollingStatus = true
 		v.updateStatusHistory("Fetching status...", true)
-		v.updateContent()
+		v.updateContentRefactored()
 		cmds = append(cmds, v.loadRunDetails())
 		// Keep the polling going
 		cmds = append(cmds, v.startPolling())
@@ -744,4 +744,228 @@ func (v *RunDetailsView) handlePolling(msg pollTickMsg) []tea.Cmd {
 type runDetailsLoadedMsg struct {
 	run models.RunResponse
 	err error
+}
+
+// updateContentRefactored is the refactored version with reduced complexity
+func (v *RunDetailsView) updateContentRefactored() {
+	var content strings.Builder
+	var lines []string
+	v.fieldLines = []string{}
+	v.fieldValues = []string{}
+	v.fieldIndices = []int{}
+	v.fieldRanges = [][2]int{}
+	lineCount := 0
+
+	if v.showLogs {
+		v.renderLogs(&content)
+	} else {
+		lineCount = v.renderRunDetails(&content, &lines, lineCount)
+	}
+
+	// Store the full content for clipboard operations
+	v.fullContent = content.String()
+	// detailLines is not used in RunDetailsView, only in DashboardView
+	// lines are already added to viewport content above
+	_ = lines
+
+	// Update viewport with new content
+	v.viewport.SetContent(v.fullContent)
+}
+
+// renderLogs renders the logs view
+func (v *RunDetailsView) renderLogs(content *strings.Builder) {
+	content.WriteString("═══ Logs ═══\n\n")
+	if v.logs != "" {
+		content.WriteString(v.logs)
+	} else {
+		content.WriteString("No logs available yet...\n")
+	}
+}
+
+// renderRunDetails renders the run details view
+func (v *RunDetailsView) renderRunDetails(content *strings.Builder, lines *[]string, lineCount int) int {
+	// Create field adder closure
+	addField := func(label, value string) int {
+		if value != "" {
+			line := fmt.Sprintf("%s: %s", label, value)
+			content.WriteString(line + "\n")
+			*lines = append(*lines, line)
+			v.fieldLines = append(v.fieldLines, line)
+			v.fieldValues = append(v.fieldValues, value)
+			v.fieldIndices = append(v.fieldIndices, lineCount)
+			v.fieldRanges = append(v.fieldRanges, [2]int{lineCount, lineCount})
+			lineCount++
+		}
+		return lineCount
+	}
+
+	addSeparator := func(text string) int {
+		content.WriteString(text + "\n")
+		*lines = append(*lines, text)
+		lineCount++
+		return lineCount
+	}
+
+	// Render basic fields
+	lineCount = v.renderBasicFields(content, lines, lineCount, addField)
+	
+	// Render optional fields
+	lineCount = v.renderOptionalFields(content, lines, lineCount, addField)
+	
+	// Render status history
+	lineCount = v.renderStatusHistory(content, lines, lineCount, addSeparator)
+	
+	// Render multi-line fields
+	lineCount = v.renderMultilineFields(content, lines, lineCount, addSeparator)
+
+	return lineCount
+}
+
+// renderBasicFields renders basic run fields
+func (v *RunDetailsView) renderBasicFields(content *strings.Builder, lines *[]string, lineCount int, addField func(string, string) int) int {
+	// Display title only if it exists
+	if v.run.Title != "" {
+		lineCount = addField("Title", v.run.Title)
+	}
+	
+	// Display description if it exists
+	if v.run.Description != "" {
+		lineCount = v.renderDescription(content, lines, lineCount)
+	}
+	
+	lineCount = addField("Run ID", v.run.GetIDString())
+	lineCount = addField("Repository", v.run.Repository)
+	lineCount = addField("Source Branch", v.run.Source)
+	
+	return lineCount
+}
+
+// renderDescription renders the description field with truncation
+func (v *RunDetailsView) renderDescription(content *strings.Builder, lines *[]string, lineCount int) int {
+	originalDescription := v.run.Description
+	displayDescription := originalDescription
+	
+	// Truncate to single line with ellipsis if too long (for display only)
+	if len(displayDescription) > 60 {
+		displayDescription = displayDescription[:57] + "..."
+	}
+	// Remove newlines to keep it single line (for display only)
+	displayDescription = strings.ReplaceAll(displayDescription, "\n", " ")
+
+	// Add field with display text but store original value for copying
+	line := fmt.Sprintf("Description: %s", displayDescription)
+	content.WriteString(line + "\n")
+	*lines = append(*lines, line)
+	v.fieldLines = append(v.fieldLines, line)
+	v.fieldValues = append(v.fieldValues, originalDescription) // Store original for copying
+	v.fieldIndices = append(v.fieldIndices, lineCount)
+	v.fieldRanges = append(v.fieldRanges, [2]int{lineCount, lineCount})
+	
+	return lineCount + 1
+}
+
+// renderOptionalFields renders optional run fields
+func (v *RunDetailsView) renderOptionalFields(content *strings.Builder, lines *[]string, lineCount int, addField func(string, string) int) int {
+	if v.run.Target != "" && v.run.Target != v.run.Source {
+		lineCount = addField("Target Branch", v.run.Target)
+	}
+	if v.run.RunType != "" {
+		lineCount = addField("Run Type", v.run.RunType)
+	}
+	if v.run.PrURL != nil && *v.run.PrURL != "" {
+		lineCount = addField("PR URL", *v.run.PrURL)
+	}
+	if v.run.TriggerSource != nil && *v.run.TriggerSource != "" {
+		lineCount = addField("Trigger Source", *v.run.TriggerSource)
+	}
+	lineCount = addField("Created", v.run.CreatedAt.Format(time.RFC3339))
+
+	if v.run.UpdatedAt.After(v.run.CreatedAt) && (v.run.Status == models.StatusDone || v.run.Status == models.StatusFailed) {
+		duration := v.run.UpdatedAt.Sub(v.run.CreatedAt)
+		lineCount = addField("Duration", formatDurationDetails(duration))
+	}
+	
+	return lineCount
+}
+
+// renderStatusHistory renders the status history section
+func (v *RunDetailsView) renderStatusHistory(content *strings.Builder, lines *[]string, lineCount int, addSeparator func(string) int) int {
+	lineCount = addSeparator("\n═══ Status History ═══")
+	
+	// Display status history in reverse order (most recent first)
+	for i := len(v.statusHistory) - 1; i >= 0; i-- {
+		content.WriteString(v.statusHistory[i] + "\n")
+		*lines = append(*lines, v.statusHistory[i])
+		lineCount++
+	}
+	
+	return lineCount
+}
+
+// renderMultilineFields renders multi-line fields like prompt, plan, context, and error
+func (v *RunDetailsView) renderMultilineFields(content *strings.Builder, lines *[]string, lineCount int, addSeparator func(string) int) int {
+	// Helper to add multi-line field and track its range
+	addMultilineField := func(label, value string) int {
+		if value != "" {
+			v.fieldLines = append(v.fieldLines, label)
+			v.fieldValues = append(v.fieldValues, value)
+			v.fieldIndices = append(v.fieldIndices, lineCount)
+
+			startLine := lineCount
+			fieldLines := strings.Split(value, "\n")
+			for _, fieldLine := range fieldLines {
+				content.WriteString(fieldLine + "\n")
+				*lines = append(*lines, fieldLine)
+				lineCount++
+			}
+			endLine := lineCount - 1
+			v.fieldRanges = append(v.fieldRanges, [2]int{startLine, endLine})
+		}
+		return lineCount
+	}
+
+	if v.run.Prompt != "" {
+		lineCount = addSeparator("\n═══ Prompt ═══")
+		lineCount = addMultilineField("Prompt", v.run.Prompt)
+	}
+
+	// Show plan for plan-type runs that are completed
+	if strings.Contains(strings.ToLower(v.run.RunType), "plan") && v.run.Status == models.StatusDone && v.run.Plan != "" {
+		lineCount = addSeparator("\n═══ Plan ═══")
+		lineCount = addMultilineField("Plan", v.run.Plan)
+	}
+
+	if v.run.Context != "" {
+		lineCount = addSeparator("\n═══ Context ═══")
+		lineCount = addMultilineField("Context", v.run.Context)
+	}
+
+	if v.run.Error != "" {
+		lineCount = v.renderError(content, lines, lineCount, addSeparator)
+	}
+	
+	return lineCount
+}
+
+// renderError renders the error section with styling
+func (v *RunDetailsView) renderError(content *strings.Builder, lines *[]string, lineCount int, addSeparator func(string) int) int {
+	lineCount = addSeparator("\n═══ Error ═══")
+	
+	// Special handling for error to apply styling
+	v.fieldLines = append(v.fieldLines, "Error")
+	v.fieldValues = append(v.fieldValues, v.run.Error)
+	v.fieldIndices = append(v.fieldIndices, lineCount)
+
+	startLine := lineCount
+	errorLines := strings.Split(v.run.Error, "\n")
+	for _, errorLine := range errorLines {
+		styledLine := styles.ErrorStyle.Render(errorLine)
+		content.WriteString(styledLine + "\n")
+		*lines = append(*lines, errorLine)
+		lineCount++
+	}
+	endLine := lineCount - 1
+	v.fieldRanges = append(v.fieldRanges, [2]int{startLine, endLine})
+	
+	return lineCount
 }

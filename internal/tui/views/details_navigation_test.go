@@ -40,7 +40,7 @@ func TestRunDetailsView_Navigation(t *testing.T) {
 	}
 
 	// Initialize content to populate field values
-	view.updateContent()
+	view.updateContentRefactored()
 
 	t.Run("NavigateDown", func(t *testing.T) {
 		initialRow := view.selectedRow
@@ -124,7 +124,7 @@ func TestRunDetailsView_FieldExtraction(t *testing.T) {
 		height:         24,
 	}
 
-	view.updateContent()
+	view.updateContentRefactored()
 
 	t.Run("FieldValuesExtracted", func(t *testing.T) {
 		assert.Greater(t, len(view.fieldValues), 0, "Should have extracted field values")
@@ -186,7 +186,7 @@ func TestRunDetailsView_HighlightedContent(t *testing.T) {
 		height:         24,
 	}
 
-	view.updateContent()
+	view.updateContentRefactored()
 
 	t.Run("CreatesHighlightedContent", func(t *testing.T) {
 		lines := []string{

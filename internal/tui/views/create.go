@@ -359,7 +359,7 @@ func (v *CreateRunView) renderStatusLine(layoutName string) string {
 		helpText = "[esc]normal [tab]next [shift+tab]prev [ctrl+s]submit"
 	} else {
 		mode = ""
-		helpText = "[i]insert [d]delete [c]change [j/k/↑↓]nav [h]back [q]dashboard [ctrl+s]submit"
+		helpText = "[i]insert [d]delete [c]change [j/k/↑↓/tab]nav [h]back [q]dashboard [ctrl+s]submit"
 	}
 
 	// Format left content consistently

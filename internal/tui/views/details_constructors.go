@@ -87,7 +87,7 @@ func NewRunDetailsViewWithData(client APIClient, cache *cache.SimpleCache, run m
 
 	// Pre-populate the status history and content
 	v.updateStatusHistory(string(run.Status), false)
-	v.updateContent() // Initialize content with the run data
+	v.updateContentRefactored() // Initialize content with the run data
 
 	return v
 }
@@ -172,7 +172,7 @@ func NewRunDetailsViewWithFunctionalOptions(client APIClient, run models.RunResp
 		v.run = run
 		v.loading = false
 		v.updateStatusHistory(string(run.Status), false)
-		v.updateContent()
+		v.updateContentRefactored()
 	}
 
 	// Apply all options (mostly for backward compatibility)
@@ -230,7 +230,7 @@ func NewRunDetailsViewWithDashboardState(
 		view.run = run
 		view.loading = false
 		view.updateStatusHistory(string(run.Status), false)
-		view.updateContent()
+		view.updateContentRefactored()
 	}
 
 	// Dashboard state fields are deprecated - just log
@@ -275,7 +275,7 @@ func NewRunDetailsViewWithCacheAndDimensions(
 		v.run = run
 		v.loading = false
 		v.updateStatusHistory(string(run.Status), false)
-		v.updateContent()
+		v.updateContentRefactored()
 	}
 
 	// Parent run data is deprecated - ignored
@@ -316,7 +316,7 @@ func NewRunDetailsViewWithCache(
 		v.run = run
 		v.loading = false
 		v.updateStatusHistory(string(run.Status), false)
-		v.updateContent()
+		v.updateContentRefactored()
 	}
 
 	// Parent run data is deprecated - ignored

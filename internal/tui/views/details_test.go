@@ -136,7 +136,7 @@ func TestRunDetailsView_LoadingStateHandling(t *testing.T) {
 	view.run = updatedRun
 	view.error = nil
 	view.updateStatusHistory(string(updatedRun.Status), false)
-	view.updateContent()
+	view.updateContentRefactored()
 
 	// Should no longer be loading
 	assert.False(t, view.loading, "Should not be loading after update")
@@ -178,7 +178,7 @@ func TestRunDetailsView_TitleDisplayHandling(t *testing.T) {
 			testCache := cache.NewSimpleCache()
 			view := NewRunDetailsViewWithCache(client, run, nil, false, time.Time{}, nil, testCache)
 			view.loading = false // Simulate loaded state
-			view.updateContent()
+			view.updateContentRefactored()
 
 			content := view.viewport.View()
 
