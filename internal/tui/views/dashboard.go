@@ -956,6 +956,16 @@ func (d *DashboardView) startFZFMode() tea.Cmd {
 // navigateToDetails navigates to run details view
 func (d *DashboardView) navigateToDetails() tea.Cmd {
 	if d.selectedRunData != nil {
+		// Save dashboard state before navigating
+		debug.LogToFilef("💾 DASHBOARD: Saving state before navigation - repo=%d, run=%d, detail=%d, column=%d 💾\n",
+			d.selectedRepoIdx, d.selectedRunIdx, d.selectedDetailLine, d.focusedColumn)
+		d.cache.SetNavigationContext("dashboardState", map[string]interface{}{
+			"selectedRepoIdx":    d.selectedRepoIdx,
+			"selectedRunIdx":     d.selectedRunIdx,
+			"selectedDetailLine": d.selectedDetailLine,
+			"focusedColumn":      d.focusedColumn,
+		})
+		
 		return func() tea.Msg {
 			return messages.NavigateToDetailsMsg{RunData: d.selectedRunData}
 		}

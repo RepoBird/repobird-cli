@@ -656,6 +656,16 @@ func (d *DashboardView) openURL(urlText string) tea.Cmd {
 // navigateToDetailsView navigates to the details view for a specific run
 func (d *DashboardView) navigateToDetailsView(run *models.RunResponse) tea.Cmd {
 	if run != nil {
+		// Save dashboard state before navigating
+		debug.LogToFilef("💾 DASHBOARD: Saving state before navigation - repo=%d, run=%d, detail=%d, column=%d 💾\n",
+			d.selectedRepoIdx, d.selectedRunIdx, d.selectedDetailLine, d.focusedColumn)
+		d.cache.SetNavigationContext("dashboardState", map[string]interface{}{
+			"selectedRepoIdx":    d.selectedRepoIdx,
+			"selectedRunIdx":     d.selectedRunIdx,
+			"selectedDetailLine": d.selectedDetailLine,
+			"focusedColumn":      d.focusedColumn, // This should be 2 (details column)
+		})
+		
 		return func() tea.Msg {
 			return messages.NavigateToDetailsMsg{RunData: run}
 		}
