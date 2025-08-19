@@ -146,15 +146,15 @@ snapcrafts:
         command: repobird
         plugs: ["home", "network", "removable-media"]
 
-scoop:
-  name: repobird
-  repository:
-    owner: repobird
-    name: scoop-bucket
-    token: "{{ .Env.SCOOP_GITHUB_TOKEN }}"
-  homepage: "https://github.com/repobird/repobird-cli"
-  description: "Fast CLI for RepoBird AI agent platform"
-  license: MIT
+scoops:
+  - name: repobird
+    repository:
+      owner: repobird
+      name: scoop-bucket
+      token: "{{ .Env.SCOOP_GITHUB_TOKEN }}"
+    homepage: "https://github.com/repobird/repobird-cli"
+    description: "Fast CLI for RepoBird AI agent platform"
+    license: MIT
 
 chocolateys:
   - name: repobird
