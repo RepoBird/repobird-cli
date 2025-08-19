@@ -11,7 +11,7 @@ import (
 func getDebugLogPath() string {
 	// Check if debug logging is enabled (REPOBIRD_DEBUG_LOG=1 or any value)
 	debugEnv := os.Getenv("REPOBIRD_DEBUG_LOG")
-	
+
 	// If it's a path (contains / or \), use it as the log path
 	if debugEnv != "" && (filepath.IsAbs(debugEnv) || filepath.Dir(debugEnv) != ".") {
 		return debugEnv
@@ -65,7 +65,7 @@ func LogToFile(message string) {
 	if debugEnv == "" || debugEnv == "0" || debugEnv == "false" {
 		return
 	}
-	
+
 	if f, err := os.OpenFile(getDebugLogPath(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600); err == nil {
 		defer func() { _ = f.Close() }()
 		_, _ = f.WriteString(message)

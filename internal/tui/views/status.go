@@ -455,7 +455,6 @@ func (s *StatusView) renderStatusLine() string {
 	return statusLine.Render()
 }
 
-
 // initializeStatusFields populates the status fields from user info and system info
 func (s *StatusView) initializeStatusFields() {
 	s.statusFields = []string{}

@@ -95,4 +95,3 @@ func (d *DashboardView) hasCurrentSelectionURL() bool {
 }
 
 // State validation and index management helper methods
-

@@ -18,7 +18,6 @@ type BulkRunResult struct {
 	URL    string
 }
 
-
 // bulkRunsLoadedMsg is sent when bulk runs are loaded from configuration files
 type bulkRunsLoadedMsg struct {
 	runs       []BulkRunItem

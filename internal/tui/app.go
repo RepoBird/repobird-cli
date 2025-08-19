@@ -208,41 +208,41 @@ func (a *App) initViewWithDimensions() tea.Cmd {
 func (a *App) navigateToCreate(msg messages.NavigateToCreateMsg) (tea.Model, tea.Cmd) {
 	debug.LogToFile("DEBUG: App - handling NavigateToCreateMsg\n")
 	a.pushToStack()
-	
+
 	debug.LogToFile("DEBUG: App - creating new CreateRunView\n")
 	a.current = views.NewCreateRunView(a.client, a.cache)
-	
+
 	if msg.SelectedRepository != "" {
 		debug.LogToFilef("DEBUG: App - setting navigation context: selected_repo=%s\n", msg.SelectedRepository)
 		a.setNavigationContext("selected_repo", msg.SelectedRepository)
 	}
-	
+
 	return a, a.initViewWithDimensions()
 }
 
 // navigateToDetails handles navigation to the run details view
 func (a *App) navigateToDetails(msg messages.NavigateToDetailsMsg) (tea.Model, tea.Cmd) {
 	a.pushToStack()
-	
+
 	if msg.FromCreate {
 		debug.LogToFile("📝 APP: Setting from_create flag in navigation context\n")
 		a.cache.SetNavigationContext("from_create", true)
 	}
-	
+
 	if msg.RunData != nil {
 		a.current = views.NewRunDetailsViewWithData(a.client, a.cache, *msg.RunData)
 	} else {
 		debug.LogToFile("📡 APP: Creating Details view with RunID only - will load from cache/API 📡\n")
 		a.current = views.NewRunDetailsView(a.client, a.cache, msg.RunID)
 	}
-	
+
 	return a, a.initViewWithDimensions()
 }
 
 // navigateToDashboard handles navigation to the dashboard view
 func (a *App) navigateToDashboard() (tea.Model, tea.Cmd) {
 	a.viewStack = nil // Clear stack - dashboard is home
-	
+
 	if stateData := a.cache.GetNavigationContext("dashboardState"); stateData != nil {
 		debug.LogToFilef("🔍 APP: Found dashboard state in navigation context: %+v 🔍\n", stateData)
 		if state, ok := stateData.(map[string]interface{}); ok {
@@ -251,7 +251,7 @@ func (a *App) navigateToDashboard() (tea.Model, tea.Cmd) {
 			selectedRunIdx, _ := state["selectedRunIdx"].(int)
 			selectedDetailLine, _ := state["selectedDetailLine"].(int)
 			focusedColumn, _ := state["focusedColumn"].(int)
-			
+
 			debug.LogToFilef("🏠 APP: Restoring Dashboard with saved state - repo=%d, run=%d, detail=%d, column=%d 🏠\n",
 				selectedRepoIdx, selectedRunIdx, selectedDetailLine, focusedColumn)
 			a.current = views.NewDashboardViewWithState(a.client, a.cache, selectedRepoIdx, selectedRunIdx, selectedDetailLine, focusedColumn)
@@ -264,7 +264,7 @@ func (a *App) navigateToDashboard() (tea.Model, tea.Cmd) {
 		debug.LogToFile("🏠 APP: Creating Dashboard view - hybrid cache will handle data caching 🏠\n")
 		a.current = views.NewDashboardView(a.client, a.cache)
 	}
-	
+
 	a.clearAllNavigationContext()
 	return a, a.initViewWithDimensions()
 }
@@ -277,7 +277,7 @@ func (a *App) navigateBack() (tea.Model, tea.Cmd) {
 		debug.LogToFilef("🔙 HANDLE NAV: Popping from stack, going back to %T\n", previousView)
 		a.current = previousView
 		a.viewStack = a.viewStack[:len(a.viewStack)-1]
-		
+
 		debug.LogToFilef("🔄 HANDLE NAV: Initializing previous view %T\n", a.current)
 		return a, a.current.Init()
 	}
@@ -289,11 +289,11 @@ func (a *App) navigateBack() (tea.Model, tea.Cmd) {
 func (a *App) navigateToList(msg messages.NavigateToListMsg) (tea.Model, tea.Cmd) {
 	a.pushToStack()
 	a.current = views.NewRunListView(a.client)
-	
+
 	if msg.SelectedIndex > 0 {
 		a.setNavigationContext("list_selected_index", msg.SelectedIndex)
 	}
-	
+
 	return a, a.current.Init()
 }
 
@@ -310,14 +310,14 @@ func (a *App) navigateToBulk() (tea.Model, tea.Cmd) {
 	debug.LogToFilef("🏗️ BULK NAV: Attempting to navigate to bulk view 🏗️\n")
 	debug.LogToFilef("🔍 BULK NAV: Client type: %T 🔍\n", a.client)
 	a.pushToStack()
-	
+
 	// BulkView requires a concrete *api.Client, not the interface
 	if apiClient, ok := a.client.(*api.Client); ok {
 		debug.LogToFilef("✅ BULK NAV: Client type is correct, creating BulkView ✅\n")
 		a.current = views.NewBulkView(apiClient, a.cache)
 		return a, a.initViewWithDimensions()
 	}
-	
+
 	debug.LogToFilef("❌ BULK NAV: Client type is WRONG - cannot create BulkView! ❌\n")
 	return a, nil
 }
@@ -326,14 +326,14 @@ func (a *App) navigateToBulk() (tea.Model, tea.Cmd) {
 func (a *App) navigateToBulkResults() (tea.Model, tea.Cmd) {
 	debug.LogToFilef("📊 BULK RESULTS NAV: Navigating to bulk results view 📊\n")
 	a.pushToStack()
-	
+
 	// BulkResultsView requires a concrete *api.Client
 	if apiClient, ok := a.client.(*api.Client); ok {
 		debug.LogToFilef("✅ BULK RESULTS NAV: Creating BulkResultsView ✅\n")
 		a.current = views.NewBulkResultsView(apiClient, a.cache)
 		return a, a.initViewWithDimensions()
 	}
-	
+
 	debug.LogToFilef("❌ BULK RESULTS NAV: Client type is wrong - cannot create BulkResultsView! ❌\n")
 	return a, nil
 }
@@ -377,7 +377,7 @@ func (a *App) navigateToError(msg messages.NavigateToErrorMsg) (tea.Model, tea.C
 	} else {
 		a.viewStack = nil
 	}
-	
+
 	a.current = views.NewErrorView(msg.Error, msg.Message, msg.Recoverable)
 	return a, a.initViewWithDimensions()
 }

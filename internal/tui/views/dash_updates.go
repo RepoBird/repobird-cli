@@ -223,7 +223,7 @@ func (d *DashboardView) updateViewportContent() {
 // updateRepoViewportContent updates the repository column viewport content
 func (d *DashboardView) updateRepoViewportContent() {
 	var items []string
-	
+
 	// Get filtered items if FZF is active
 	var repos []models.Repository
 	var filteredIndices []int
@@ -247,7 +247,7 @@ func (d *DashboardView) updateRepoViewportContent() {
 			filteredIndices = append(filteredIndices, i)
 		}
 	}
-	
+
 	for idx, repo := range repos {
 		originalIdx := filteredIndices[idx]
 		statusIcon := d.getRepositoryStatusIcon(&repo)
@@ -316,13 +316,13 @@ func (d *DashboardView) updateRepoViewportContent() {
 	}
 
 	content := strings.Join(items, "\n")
-	
+
 	// CRITICAL FIX: Reset viewport position BEFORE setting content to prevent panic
 	if d.repoViewport.YOffset > len(items) {
 		debug.LogToFilef("🚨 VIEWPORT FIX: Resetting repo viewport - YOffset=%d > items=%d 🚨\n", d.repoViewport.YOffset, len(items))
 		d.repoViewport.GotoTop()
 	}
-	
+
 	d.repoViewport.SetContent(content)
 
 	// Auto-scroll to keep selected item visible
@@ -403,7 +403,7 @@ func (d *DashboardView) updateRunsViewportContent() {
 				filteredIndices = append(filteredIndices, i)
 			}
 		}
-		
+
 		for idx, run := range runs {
 			originalIdx := filteredIndices[idx]
 			statusIcon := d.getRunStatusIcon(run.Status)
@@ -493,7 +493,7 @@ func (d *DashboardView) updateRunsViewportContent() {
 	}
 
 	content := strings.Join(items, "\n")
-	
+
 	// CRITICAL FIX: Reset viewport AND selection if content is insufficient
 	if len(items) == 0 {
 		debug.LogToFilef("🚨 VIEWPORT FIX: No items for runs viewport, resetting completely 🚨\n")
@@ -502,26 +502,26 @@ func (d *DashboardView) updateRunsViewportContent() {
 		d.runsViewport.SetContent(content)
 		return // Don't try to scroll to selected
 	}
-	
+
 	// Reset viewport position only if it truly exceeds available content AND we have actual runs
 	// Don't reset during loading when items might be placeholder content
 	if len(items) > 0 && d.runsViewport.YOffset >= len(items) {
 		// Additional check: only reset if we actually have runs loaded
 		if d.selectedRepo != nil && len(d.filteredRuns) > 0 {
-			debug.LogToFilef("🚨 VIEWPORT FIX: Resetting runs viewport - YOffset=%d >= items=%d (runs: %d) 🚨\n", 
+			debug.LogToFilef("🚨 VIEWPORT FIX: Resetting runs viewport - YOffset=%d >= items=%d (runs: %d) 🚨\n",
 				d.runsViewport.YOffset, len(items), len(d.filteredRuns))
-			d.runsViewport.YOffset = 0  // More gentle reset instead of GotoTop()
+			d.runsViewport.YOffset = 0 // More gentle reset instead of GotoTop()
 		}
 	}
-	
+
 	// CRITICAL: Only clamp selectedRunIdx if we have actual run data and it's out of bounds
 	// Don't clamp during loading or when items are placeholder content
 	if d.selectedRepo != nil && len(d.filteredRuns) > 0 && d.selectedRunIdx >= len(d.filteredRuns) {
-		debug.LogToFilef("🚨 SELECTION FIX: Clamping selectedRunIdx from %d to %d (actual runs: %d) 🚨\n", 
+		debug.LogToFilef("🚨 SELECTION FIX: Clamping selectedRunIdx from %d to %d (actual runs: %d) 🚨\n",
 			d.selectedRunIdx, len(d.filteredRuns)-1, len(d.filteredRuns))
 		d.selectedRunIdx = len(d.filteredRuns) - 1
 	}
-	
+
 	d.runsViewport.SetContent(content)
 
 	// Auto-scroll to keep selected item visible (now safe because we validated bounds)
@@ -637,13 +637,13 @@ func (d *DashboardView) updateDetailsViewportContent() {
 	}
 
 	content := strings.Join(displayLines, "\n")
-	
+
 	// CRITICAL FIX: Reset viewport position BEFORE setting content to prevent panic
 	if d.detailsViewport.YOffset > len(displayLines) {
 		debug.LogToFilef("🚨 VIEWPORT FIX: Resetting details viewport - YOffset=%d > items=%d 🚨\n", d.detailsViewport.YOffset, len(displayLines))
 		d.detailsViewport.GotoTop()
 	}
-	
+
 	d.detailsViewport.SetContent(content)
 
 	// Auto-scroll to keep selected item visible
@@ -651,4 +651,3 @@ func (d *DashboardView) updateDetailsViewportContent() {
 }
 
 // Additional update helper methods
-

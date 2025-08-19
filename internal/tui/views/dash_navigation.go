@@ -128,7 +128,7 @@ func (d *DashboardView) scrollToSelected(column int) {
 		viewport.YOffset = 0
 		return
 	}
-	
+
 	// Ensure selected index is within bounds
 	if selectedIdx >= totalItems {
 		selectedIdx = totalItems - 1
@@ -154,10 +154,10 @@ func (d *DashboardView) scrollToSelected(column int) {
 		// Scroll down to show selected item
 		viewport.YOffset = selectedIdx - viewport.Height + 1
 	}
-	
+
 	// CRITICAL: Ensure YOffset doesn't exceed content bounds
 	if viewport.YOffset > maxYOffset {
-		debug.LogToFilef("🚨 SCROLL FIX: Clamping YOffset from %d to %d (max for %d items) 🚨\n", 
+		debug.LogToFilef("🚨 SCROLL FIX: Clamping YOffset from %d to %d (max for %d items) 🚨\n",
 			viewport.YOffset, maxYOffset, totalItems)
 		viewport.YOffset = maxYOffset
 	}
@@ -220,7 +220,7 @@ func (d *DashboardView) isOpenKey(msg tea.KeyMsg) bool {
 }
 
 func (d *DashboardView) isRightKey(msg tea.KeyMsg) bool {
-	return key.Matches(msg, d.keys.Right) || 
+	return key.Matches(msg, d.keys.Right) ||
 		(msg.Type == tea.KeyRunes && (string(msg.Runes) == "l" || string(msg.Runes) == "L"))
 }
 
@@ -700,7 +700,7 @@ func (d *DashboardView) navigateToDetailsView(run *models.RunResponse) tea.Cmd {
 			"selectedDetailLine": d.selectedDetailLine,
 			"focusedColumn":      d.focusedColumn, // This should be 2 (details column)
 		})
-		
+
 		return func() tea.Msg {
 			return messages.NavigateToDetailsMsg{RunData: run}
 		}

@@ -92,7 +92,6 @@ func (d *DashboardView) wrapTextWithLimit(text string, width int, maxLines int) 
 	return result
 }
 
-
 // applyItemHighlight applies the appropriate highlighting style to an item based on selection and focus state
 func (d *DashboardView) applyItemHighlight(item string, isSelected bool, isFocused bool, maxWidth int) string {
 	if isSelected {

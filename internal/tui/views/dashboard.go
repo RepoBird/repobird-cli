@@ -111,7 +111,7 @@ type DashboardView struct {
 // NewDashboardViewWithState creates a new dashboard view with restored state
 func NewDashboardViewWithState(client APIClient, cache *cache.SimpleCache, selectedRepoIdx, selectedRunIdx, selectedDetailLine, focusedColumn int) *DashboardView {
 	dashboard := NewDashboardView(client, cache)
-	
+
 	// Get the saved window size if available
 	width, height := 80, 24 // defaults
 	if stateData := cache.GetNavigationContext("dashboardState"); stateData != nil {
@@ -124,7 +124,7 @@ func NewDashboardViewWithState(client APIClient, cache *cache.SimpleCache, selec
 			}
 		}
 	}
-	
+
 	// Set the state that will be restored after data loads
 	debug.LogToFilef("🔧 DASHBOARD: Creating dashboard with restored state - repo=%d, run=%d, detail=%d, column=%d, size=%dx%d 🔧\n",
 		selectedRepoIdx, selectedRunIdx, selectedDetailLine, focusedColumn, width, height)
@@ -134,26 +134,26 @@ func NewDashboardViewWithState(client APIClient, cache *cache.SimpleCache, selec
 	dashboard.focusedColumn = focusedColumn
 	dashboard.width = width
 	dashboard.height = height
-	
+
 	// Keep loading state true until data is loaded
 	dashboard.loading = true
 	dashboard.initializing = true
-	
+
 	// Update viewport sizes immediately to prevent panic
 	dashboard.updateViewportSizes()
-	
+
 	// CRITICAL: Set initial content BEFORE any other operations to prevent panic
 	// Must have actual newline-separated content to avoid capacity 1 issue
 	safeContent := strings.Repeat("Loading...\n", 50) // Create 50 lines of safe content
 	dashboard.repoViewport.SetContent(safeContent)
 	dashboard.runsViewport.SetContent(safeContent)
 	dashboard.detailsViewport.SetContent(safeContent)
-	
+
 	// NOW reset viewport scroll positions after content is set
 	dashboard.repoViewport.GotoTop()
-	dashboard.runsViewport.GotoTop()  
+	dashboard.runsViewport.GotoTop()
 	dashboard.detailsViewport.GotoTop()
-	
+
 	debug.LogToFilef("✅ DASHBOARD: State applied with viewports reset to top (preventing panic) ✅\n")
 	return dashboard
 }
@@ -539,7 +539,7 @@ func (d *DashboardView) handleSpinnerTick(msg spinner.TickMsg) tea.Cmd {
 // handleWindowSize handles window resize messages
 func (d *DashboardView) handleWindowSize(msg tea.WindowSizeMsg) []tea.Cmd {
 	var cmds []tea.Cmd
-	
+
 	d.width = msg.Width
 	d.height = msg.Height
 
@@ -550,7 +550,7 @@ func (d *DashboardView) handleWindowSize(msg tea.WindowSizeMsg) []tea.Cmd {
 
 	// Update component sizes
 	d.updateComponentSizes(msg)
-	
+
 	return cmds
 }
 
@@ -583,22 +583,22 @@ func (d *DashboardView) updateComponentSizes(msg tea.WindowSizeMsg) {
 func (d *DashboardView) handleDataLoaded(msg dashboardDataLoadedMsg) (tea.Model, tea.Cmd) {
 	debug.LogToFilef("\n[DASHBOARD DATA LOADED MSG RECEIVED]\n")
 	debug.LogToFilef("🔄 REFRESH: Data loaded - setting loading state to false 🔄\n")
-	
+
 	d.loading = false
 	d.initializing = false
 	d.statusLine.SetLoading(false)
-	
+
 	if msg.error != nil {
 		return d.handleDataLoadError(msg)
 	}
-	
+
 	return d.handleDataLoadSuccess(msg)
 }
 
 // handleDataLoadError handles errors when loading data
 func (d *DashboardView) handleDataLoadError(msg dashboardDataLoadedMsg) (tea.Model, tea.Cmd) {
 	debug.LogToFilef("  ERROR: %v, retryExhausted: %v\n", msg.error, msg.retryExhausted)
-	
+
 	if msg.retryExhausted {
 		debug.LogToFilef("  ❌ All retries exhausted, navigating to error view\n")
 		return d, func() tea.Msg {
@@ -609,7 +609,7 @@ func (d *DashboardView) handleDataLoadError(msg dashboardDataLoadedMsg) (tea.Mod
 			}
 		}
 	}
-	
+
 	d.error = msg.error
 	return d, nil
 }
@@ -643,7 +643,7 @@ func (d *DashboardView) handleDataLoadSuccess(msg dashboardDataLoadedMsg) (tea.M
 		}
 		return d, d.selectRepository(d.selectedRepo)
 	}
-	
+
 	return d, nil
 }
 
@@ -671,7 +671,7 @@ func (d *DashboardView) handleRepositorySelected(msg dashboardRepositorySelected
 
 	// Update the "All" count
 	// d.updateAllRunsCount() // TODO: implement if needed
-	
+
 	return d, nil
 }
 
@@ -787,13 +787,13 @@ func (d *DashboardView) handleURLSelectionKeys(msg tea.KeyMsg) (tea.Model, tea.C
 		d.pendingAPIRepoForURL = nil
 		// d.statusLine.ClearMessage() // TODO: check StatusLine API
 		return d, nil
-		
+
 	case msg.Type == tea.KeyRunes && string(msg.Runes) == "o":
 		return d.openRepoURL(false)
-		
+
 	case msg.Type == tea.KeyRunes && string(msg.Runes) == "g":
 		return d.openRepoURL(true)
-		
+
 	default:
 		// Ignore other keys during URL selection
 		return d, nil
@@ -823,7 +823,7 @@ func (d *DashboardView) openRepoURL(useGitHub bool) (tea.Model, tea.Cmd) {
 	} else {
 		d.statusLine.SetTemporaryMessageWithType(fmt.Sprintf("✗ Failed to open URL: %v", err), components.MessageError, 1*time.Second)
 	}
-	
+
 	return d, d.startMessageClearTimer(1 * time.Second)
 }
 
@@ -833,7 +833,7 @@ func (d *DashboardView) handleTripleColumnKeys(msg tea.KeyMsg) (tea.Model, tea.C
 	if d.inlineFZF != nil && d.inlineFZF.IsActive() {
 		newFzf, cmd := d.inlineFZF.Update(msg)
 		d.inlineFZF = newFzf
-		
+
 		// Check if FZF was deactivated (ESC pressed or Enter pressed)
 		if !d.inlineFZF.IsActive() {
 			// If Enter was pressed, handle selection
@@ -930,49 +930,49 @@ func (d *DashboardView) handleCommonKeys(msg tea.KeyMsg) tea.Cmd {
 	case key.Matches(msg, d.keys.LayoutSwitch):
 		d.cycleLayout()
 		return nil
-		
+
 	case key.Matches(msg, d.keys.LayoutTriple):
 		d.currentLayout = models.LayoutTripleColumn
 		return nil
-		
+
 	case key.Matches(msg, d.keys.LayoutAllRuns):
 		d.currentLayout = models.LayoutAllRuns
 		return nil
-		
+
 	case key.Matches(msg, d.keys.LayoutRepos):
 		d.currentLayout = models.LayoutRepositoriesOnly
 		return nil
-		
+
 	case key.Matches(msg, d.keys.Help):
 		d.helpView = components.NewHelpView() // TODO: check parameters
 		return nil
-		
+
 	case key.Matches(msg, d.keys.Quit):
 		_ = d.cache.SaveToDisk()
 		return tea.Quit
-		
+
 	case key.Matches(msg, d.keys.Refresh):
 		return d.triggerRefresh()
-		
+
 	case msg.Type == tea.KeyRunes && string(msg.Runes) == "f":
 		return d.startFZFMode()
-		
+
 	case msg.Type == tea.KeyRunes && string(msg.Runes) == "v":
 		return d.navigateToDetails()
-		
+
 	case msg.Type == tea.KeyRunes && string(msg.Runes) == "s":
 		return d.handleStatusCommand()
-		
+
 	case msg.Type == tea.KeyRunes && string(msg.Runes) == "n":
 		return d.navigateToCreateForm()
-		
+
 	case msg.Type == tea.KeyRunes && string(msg.Runes) == "G":
 		return d.jumpToBottom()
-		
+
 	case msg.Type == tea.KeyRunes && string(msg.Runes) == "g":
 		return d.handleGKey()
 	}
-	
+
 	return nil
 }
 
@@ -988,7 +988,7 @@ func (d *DashboardView) triggerRefresh() tea.Cmd {
 func (d *DashboardView) startFZFMode() tea.Cmd {
 	var items []string
 	var width int
-	
+
 	// Calculate column width based on focused column
 	totalWidth := d.width - 6
 	switch d.focusedColumn {
@@ -1006,7 +1006,7 @@ func (d *DashboardView) startFZFMode() tea.Cmd {
 		width = totalWidth - (totalWidth/3)*2
 		items = d.detailLines
 	}
-	
+
 	if len(items) > 0 {
 		d.fzfColumn = d.focusedColumn
 		d.inlineFZF = components.NewInlineFZF(items, "Type to filter...", width-4)
@@ -1029,7 +1029,7 @@ func (d *DashboardView) navigateToDetails() tea.Cmd {
 			"width":              d.width,
 			"height":             d.height,
 		})
-		
+
 		return func() tea.Msg {
 			return messages.NavigateToDetailsMsg{RunData: d.selectedRunData}
 		}
@@ -1048,7 +1048,7 @@ func (d *DashboardView) handleStatusCommand() tea.Cmd {
 		"selectedDetailLine": d.selectedDetailLine,
 		"focusedColumn":      d.focusedColumn,
 	})
-	
+
 	return func() tea.Msg {
 		return messages.NavigateToStatusMsg{}
 	}
@@ -1058,7 +1058,7 @@ func (d *DashboardView) handleStatusCommand() tea.Cmd {
 func (d *DashboardView) navigateToCreateForm() tea.Cmd {
 	if d.selectedRepo != nil {
 		repositoryName := d.selectedRepo.Name
-		
+
 		// Save dashboard state before navigating
 		debug.LogToFilef("💾 DASHBOARD: Saving state before CREATE navigation - repo=%d, run=%d, detail=%d, column=%d 💾\n",
 			d.selectedRepoIdx, d.selectedRunIdx, d.selectedDetailLine, d.focusedColumn)
@@ -1068,7 +1068,7 @@ func (d *DashboardView) navigateToCreateForm() tea.Cmd {
 			"selectedDetailLine": d.selectedDetailLine,
 			"focusedColumn":      d.focusedColumn,
 		})
-		
+
 		return func() tea.Msg {
 			return messages.NavigateToCreateMsg{
 				SelectedRepository: repositoryName,

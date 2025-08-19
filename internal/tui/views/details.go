@@ -808,13 +808,13 @@ func (v *RunDetailsView) renderRunDetails(content *strings.Builder, lines *[]str
 
 	// Render basic fields
 	lineCount = v.renderBasicFields(content, lines, lineCount, addField)
-	
+
 	// Render optional fields
 	lineCount = v.renderOptionalFields(content, lines, lineCount, addField)
-	
+
 	// Render status history
 	lineCount = v.renderStatusHistory(content, lines, lineCount, addSeparator)
-	
+
 	// Render multi-line fields
 	lineCount = v.renderMultilineFields(content, lines, lineCount, addSeparator)
 
@@ -827,16 +827,16 @@ func (v *RunDetailsView) renderBasicFields(content *strings.Builder, lines *[]st
 	if v.run.Title != "" {
 		lineCount = addField("Title", v.run.Title)
 	}
-	
+
 	// Display description if it exists
 	if v.run.Description != "" {
 		lineCount = v.renderDescription(content, lines, lineCount)
 	}
-	
+
 	lineCount = addField("Run ID", v.run.GetIDString())
 	lineCount = addField("Repository", v.run.Repository)
 	lineCount = addField("Source Branch", v.run.Source)
-	
+
 	return lineCount
 }
 
@@ -844,7 +844,7 @@ func (v *RunDetailsView) renderBasicFields(content *strings.Builder, lines *[]st
 func (v *RunDetailsView) renderDescription(content *strings.Builder, lines *[]string, lineCount int) int {
 	originalDescription := v.run.Description
 	displayDescription := originalDescription
-	
+
 	// Truncate to single line with ellipsis if too long (for display only)
 	if len(displayDescription) > 60 {
 		displayDescription = displayDescription[:57] + "..."
@@ -860,7 +860,7 @@ func (v *RunDetailsView) renderDescription(content *strings.Builder, lines *[]st
 	v.fieldValues = append(v.fieldValues, originalDescription) // Store original for copying
 	v.fieldIndices = append(v.fieldIndices, lineCount)
 	v.fieldRanges = append(v.fieldRanges, [2]int{lineCount, lineCount})
-	
+
 	return lineCount + 1
 }
 
@@ -884,21 +884,21 @@ func (v *RunDetailsView) renderOptionalFields(content *strings.Builder, lines *[
 		duration := v.run.UpdatedAt.Sub(v.run.CreatedAt)
 		lineCount = addField("Duration", formatDurationDetails(duration))
 	}
-	
+
 	return lineCount
 }
 
 // renderStatusHistory renders the status history section
 func (v *RunDetailsView) renderStatusHistory(content *strings.Builder, lines *[]string, lineCount int, addSeparator func(string) int) int {
 	lineCount = addSeparator("\n═══ Status History ═══")
-	
+
 	// Display status history in reverse order (most recent first)
 	for i := len(v.statusHistory) - 1; i >= 0; i-- {
 		content.WriteString(v.statusHistory[i] + "\n")
 		*lines = append(*lines, v.statusHistory[i])
 		lineCount++
 	}
-	
+
 	return lineCount
 }
 
@@ -943,14 +943,14 @@ func (v *RunDetailsView) renderMultilineFields(content *strings.Builder, lines *
 	if v.run.Error != "" {
 		lineCount = v.renderError(content, lines, lineCount, addSeparator)
 	}
-	
+
 	return lineCount
 }
 
 // renderError renders the error section with styling
 func (v *RunDetailsView) renderError(content *strings.Builder, lines *[]string, lineCount int, addSeparator func(string) int) int {
 	lineCount = addSeparator("\n═══ Error ═══")
-	
+
 	// Special handling for error to apply styling
 	v.fieldLines = append(v.fieldLines, "Error")
 	v.fieldValues = append(v.fieldValues, v.run.Error)
@@ -966,6 +966,6 @@ func (v *RunDetailsView) renderError(content *strings.Builder, lines *[]string, 
 	}
 	endLine := lineCount - 1
 	v.fieldRanges = append(v.fieldRanges, [2]int{startLine, endLine})
-	
+
 	return lineCount
 }

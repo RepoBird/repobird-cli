@@ -176,16 +176,16 @@ func (d *DashboardView) renderRepositoriesColumn(width, height int) string {
 	}
 	titleText := fmt.Sprintf("Repositories [%d]", len(d.repositories))
 	title := titleStyle.Render(titleText)
-	
+
 	// Calculate content height (subtract title height)
 	contentHeight := height - 2
-	
+
 	// If FZF is active for this column, add search bar
 	var searchBar string
 	if d.inlineFZF != nil && d.inlineFZF.IsActive() && d.fzfColumn == 0 {
 		searchBar = d.inlineFZF.RenderSearchBar()
 		if searchBar != "" {
-			contentHeight -= 1  // Only subtract when we actually have a search bar
+			contentHeight -= 1 // Only subtract when we actually have a search bar
 		}
 	}
 
@@ -253,14 +253,14 @@ func (d *DashboardView) renderRepositoriesColumn(width, height int) string {
 			Padding(0, 1)
 		parts = append(parts, searchStyle.Render(searchBar))
 	}
-	
+
 	// CRITICAL SAFETY CHECK: Validate viewport state before calling View() to prevent panic
 	viewportContent := ""
 	if d.repoViewport.Height > 0 && d.repoViewport.Width > 0 {
 		// Additional check: ensure YOffset is within bounds of total lines
 		totalLines := d.repoViewport.TotalLineCount()
 		if d.repoViewport.YOffset >= totalLines && totalLines > 0 {
-			debug.LogToFilef("🚨 RENDER SAFETY: Resetting repo viewport YOffset %d >= totalLines %d 🚨\n", 
+			debug.LogToFilef("🚨 RENDER SAFETY: Resetting repo viewport YOffset %d >= totalLines %d 🚨\n",
 				d.repoViewport.YOffset, totalLines)
 			d.repoViewport.YOffset = totalLines - 1
 			if d.repoViewport.YOffset < 0 {
@@ -273,7 +273,7 @@ func (d *DashboardView) renderRepositoriesColumn(width, height int) string {
 		viewportContent = "Loading..."
 	}
 	parts = append(parts, contentStyle.Render(viewportContent))
-	
+
 	return lipgloss.JoinVertical(lipgloss.Left, parts...)
 }
 
@@ -298,10 +298,10 @@ func (d *DashboardView) renderRunsColumn(width, height int) string {
 		titleText = fmt.Sprintf("Runs [%d]", len(d.filteredRuns))
 	}
 	title := titleStyle.Render(titleText)
-	
+
 	// Calculate content height (subtract title height)
 	contentHeight := height - 2
-	
+
 	// If FZF is active for this column, add search bar
 	var searchBar string
 	if d.inlineFZF != nil && d.inlineFZF.IsActive() && d.fzfColumn == 1 {
@@ -386,7 +386,7 @@ func (d *DashboardView) renderRunsColumn(width, height int) string {
 			Padding(0, 1)
 		parts = append(parts, searchStyle.Render(searchBar))
 	}
-	
+
 	// CRITICAL SAFETY CHECK: Validate viewport state before calling View() to prevent panic
 	viewportContent := ""
 	if d.runsViewport.Height > 0 && d.runsViewport.Width > 0 {
@@ -394,8 +394,8 @@ func (d *DashboardView) renderRunsColumn(width, height int) string {
 		totalLines := d.runsViewport.TotalLineCount()
 		if d.runsViewport.YOffset >= totalLines && totalLines > 0 {
 			// Only reset if the offset is WAY beyond content (emergency fix)
-			if d.runsViewport.YOffset >= totalLines + 10 {
-				debug.LogToFilef("🚨 RENDER EMERGENCY: Resetting runs viewport YOffset %d >> totalLines %d 🚨\n", 
+			if d.runsViewport.YOffset >= totalLines+10 {
+				debug.LogToFilef("🚨 RENDER EMERGENCY: Resetting runs viewport YOffset %d >> totalLines %d 🚨\n",
 					d.runsViewport.YOffset, totalLines)
 				if totalLines > 1 {
 					d.runsViewport.YOffset = totalLines - 1
@@ -410,7 +410,7 @@ func (d *DashboardView) renderRunsColumn(width, height int) string {
 		viewportContent = "Loading..."
 	}
 	parts = append(parts, contentStyle.Render(viewportContent))
-	
+
 	return lipgloss.JoinVertical(lipgloss.Left, parts...)
 }
 
@@ -431,10 +431,10 @@ func (d *DashboardView) renderDetailsColumn(width, height int) string {
 		titleStyle = titleStyle.Foreground(lipgloss.Color("240"))
 	}
 	title := titleStyle.Render("Run Details")
-	
+
 	// Calculate content height (subtract title height)
 	contentHeight := height - 2
-	
+
 	// If FZF is active for this column, add search bar
 	var searchBar string
 	if d.inlineFZF != nil && d.inlineFZF.IsActive() && d.fzfColumn == 2 {
@@ -544,7 +544,7 @@ func (d *DashboardView) renderDetailsColumn(width, height int) string {
 	// Update viewport content (will use filtered items if FZF is active)
 	d.updateDetailsViewportContent()
 
-	// Render viewport content with padding  
+	// Render viewport content with padding
 	contentStyle := lipgloss.NewStyle().
 		Width(width).
 		Height(contentHeight).
@@ -560,14 +560,14 @@ func (d *DashboardView) renderDetailsColumn(width, height int) string {
 			Padding(0, 1)
 		parts = append(parts, searchStyle.Render(searchBar))
 	}
-	
+
 	// CRITICAL SAFETY CHECK: Validate viewport state before calling View() to prevent panic
 	viewportContent := ""
 	if d.detailsViewport.Height > 0 && d.detailsViewport.Width > 0 {
 		// Additional check: ensure YOffset is within bounds of total lines
 		totalLines := d.detailsViewport.TotalLineCount()
 		if d.detailsViewport.YOffset >= totalLines && totalLines > 0 {
-			debug.LogToFilef("🚨 RENDER SAFETY: Resetting details viewport YOffset %d >= totalLines %d 🚨\n", 
+			debug.LogToFilef("🚨 RENDER SAFETY: Resetting details viewport YOffset %d >= totalLines %d 🚨\n",
 				d.detailsViewport.YOffset, totalLines)
 			d.detailsViewport.YOffset = totalLines - 1
 			if d.detailsViewport.YOffset < 0 {
@@ -580,7 +580,7 @@ func (d *DashboardView) renderDetailsColumn(width, height int) string {
 		viewportContent = "Loading..."
 	}
 	parts = append(parts, contentStyle.Render(viewportContent))
-	
+
 	return lipgloss.JoinVertical(lipgloss.Left, parts...)
 }
 
@@ -592,7 +592,7 @@ func (d *DashboardView) renderStatusLine(layoutName string) string {
 	} else {
 		layoutName = "[" + layoutName + "]"
 	}
-	
+
 	// Create formatter for consistent formatting
 	formatter := components.NewStatusFormatter(layoutName, d.width)
 

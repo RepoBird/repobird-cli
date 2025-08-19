@@ -16,32 +16,32 @@ import (
 // Helper function to create a test dashboard (reuse from other test files)
 func createTestDashboardForScrollBounds(t *testing.T) *DashboardView {
 	t.Helper()
-	
+
 	// Create a mock API client (reuse existing mock from create_form_test.go)
 	mockClient := &MockAPIClient{}
-	
+
 	// Create a simple cache for testing
 	testCache := cache.NewSimpleCache()
-	
+
 	// Create dashboard
 	dashboard := NewDashboardView(mockClient, testCache)
-	
+
 	// Set basic dimensions
 	dashboard.width = 100
 	dashboard.height = 30
-	
+
 	return dashboard
 }
 
 // TestScrollToSelectedAdvancedScenarios tests complex scrolling scenarios
 func TestScrollToSelectedAdvancedScenarios(t *testing.T) {
 	tests := []struct {
-		name                string
-		setupDashboard      func(*DashboardView)
-		column              int
-		expectedMaxYOffset  int
-		shouldPreventPanic  bool
-		description         string
+		name               string
+		setupDashboard     func(*DashboardView)
+		column             int
+		expectedMaxYOffset int
+		shouldPreventPanic bool
+		description        string
 	}{
 		{
 			name: "large run list with high selected index",
@@ -58,10 +58,10 @@ func TestScrollToSelectedAdvancedScenarios(t *testing.T) {
 				d.selectedRunIdx = 450 // High index like in the user's scenario
 				d.runsViewport = viewport.New(40, 20)
 			},
-			column:              1,
-			expectedMaxYOffset:  499, // Should not exceed total items - 1
-			shouldPreventPanic:  true,
-			description:         "Should handle scrolling to run 450 out of 500 without panic",
+			column:             1,
+			expectedMaxYOffset: 499, // Should not exceed total items - 1
+			shouldPreventPanic: true,
+			description:        "Should handle scrolling to run 450 out of 500 without panic",
 		},
 		{
 			name: "edge case - selected index equals total items",
@@ -70,10 +70,10 @@ func TestScrollToSelectedAdvancedScenarios(t *testing.T) {
 				d.selectedRunIdx = 100 // Equals total count (invalid)
 				d.runsViewport = viewport.New(40, 20)
 			},
-			column:              1,
-			expectedMaxYOffset:  99,
-			shouldPreventPanic:  true,
-			description:         "Should clamp index when it equals total count",
+			column:             1,
+			expectedMaxYOffset: 99,
+			shouldPreventPanic: true,
+			description:        "Should clamp index when it equals total count",
 		},
 		{
 			name: "repository column with realistic data",
@@ -84,10 +84,10 @@ func TestScrollToSelectedAdvancedScenarios(t *testing.T) {
 				d.selectedRepoIdx = 10 // Beyond bounds
 				d.repoViewport = viewport.New(40, 20)
 			},
-			column:              0,
-			expectedMaxYOffset:  2, // Should clamp to last valid index
-			shouldPreventPanic:  true,
-			description:         "Should handle repository selection beyond bounds",
+			column:             0,
+			expectedMaxYOffset: 2, // Should clamp to last valid index
+			shouldPreventPanic: true,
+			description:        "Should handle repository selection beyond bounds",
 		},
 		{
 			name: "details column with long content",
@@ -100,10 +100,10 @@ func TestScrollToSelectedAdvancedScenarios(t *testing.T) {
 				d.selectedDetailLine = 45
 				d.detailsViewport = viewport.New(40, 15)
 			},
-			column:              2,
-			expectedMaxYOffset:  49,
-			shouldPreventPanic:  true,
-			description:         "Should handle long details content properly",
+			column:             2,
+			expectedMaxYOffset: 49,
+			shouldPreventPanic: true,
+			description:        "Should handle long details content properly",
 		},
 		{
 			name: "zero content scenario",
@@ -112,10 +112,10 @@ func TestScrollToSelectedAdvancedScenarios(t *testing.T) {
 				d.selectedRunIdx = 50 // Any value
 				d.runsViewport = viewport.New(40, 20)
 			},
-			column:              1,
-			expectedMaxYOffset:  0,
-			shouldPreventPanic:  true,
-			description:         "Should handle empty content gracefully",
+			column:             1,
+			expectedMaxYOffset: 0,
+			shouldPreventPanic: true,
+			description:        "Should handle empty content gracefully",
 		},
 	}
 
@@ -155,7 +155,7 @@ func TestViewportContentUpdateRaceCondition(t *testing.T) {
 	dashboard := createTestDashboardForScrollBounds(t)
 
 	// Simulate the user's scenario: returning from details view with high index
-	dashboard.selectedRunIdx = 267 // From the debug logs
+	dashboard.selectedRunIdx = 267                            // From the debug logs
 	dashboard.filteredRuns = make([]*models.RunResponse, 276) // From debug logs
 	for i := 0; i < 276; i++ {
 		dashboard.filteredRuns[i] = &models.RunResponse{
@@ -186,8 +186,8 @@ func TestRepositorySwitchingBounds(t *testing.T) {
 
 	// Set up two repositories with different run counts
 	dashboard.repositories = []models.Repository{
-		{Name: "large-repo"},  // Will have many runs
-		{Name: "small-repo"},  // Will have few runs
+		{Name: "large-repo"}, // Will have many runs
+		{Name: "small-repo"}, // Will have few runs
 	}
 
 	// Start with large repo selected and high run index
@@ -298,13 +298,13 @@ func TestViewportBoundsWithRealWorldData(t *testing.T) {
 			}, "Should handle real-world index %d without panic", idx)
 
 			// Verify index is preserved (should be valid for 276 runs)
-			assert.Equal(t, idx, dashboard.selectedRunIdx, 
+			assert.Equal(t, idx, dashboard.selectedRunIdx,
 				"selectedRunIdx %d should be preserved as it's within bounds", idx)
 
 			// Verify viewport state is valid
-			assert.GreaterOrEqual(t, dashboard.runsViewport.YOffset, 0, 
+			assert.GreaterOrEqual(t, dashboard.runsViewport.YOffset, 0,
 				"YOffset should not be negative")
-			assert.LessOrEqual(t, dashboard.runsViewport.YOffset, 275, 
+			assert.LessOrEqual(t, dashboard.runsViewport.YOffset, 275,
 				"YOffset should not exceed max valid offset")
 		})
 	}

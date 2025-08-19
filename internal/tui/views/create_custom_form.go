@@ -184,7 +184,7 @@ func (f *CustomCreateForm) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (f *CustomCreateForm) handleInsertMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	keyString := msg.String()
 	debug.LogToFilef("📝 CUSTOM FORM: Processing key '%s' in INSERT mode", keyString)
-	
+
 	switch keyString {
 	case "esc":
 		return f.exitInsertMode()
@@ -243,7 +243,7 @@ func (f *CustomCreateForm) handleTabInInsertMode(reverse bool) (tea.Model, tea.C
 	} else {
 		f.nextField()
 	}
-	
+
 	// Re-enter insert mode if on text field
 	if f.fields[f.focusIndex].Type == "text" || f.fields[f.focusIndex].Type == "textarea" {
 		f.insertMode = true
@@ -268,7 +268,7 @@ func (f *CustomCreateForm) updateTextField(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	if currentField.Type != "text" && currentField.Type != "textarea" {
 		return f, nil
 	}
-	
+
 	var cmd tea.Cmd
 	switch currentField.Type {
 	case "text":
@@ -339,7 +339,7 @@ func (f *CustomCreateForm) moveToPreviousField() (tea.Model, tea.Cmd) {
 // handleEnterOrSpace handles enter or space key press
 func (f *CustomCreateForm) handleEnterOrSpace() (tea.Model, tea.Cmd) {
 	currentField := &f.fields[f.focusIndex]
-	
+
 	switch currentField.Type {
 	case "toggle":
 		return f.handleToggleField(currentField)

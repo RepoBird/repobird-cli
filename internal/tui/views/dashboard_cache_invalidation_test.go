@@ -194,7 +194,7 @@ func TestCacheInvalidateActiveRuns(t *testing.T) {
 
 	// Clear any existing runs first
 	testCache.Clear()
-	
+
 	testCache.SetRuns(runs)
 
 	// Verify all runs are cached

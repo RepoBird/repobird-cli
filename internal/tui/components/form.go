@@ -225,7 +225,7 @@ func (f *FormComponent) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						field.textArea, cmd = field.textArea.Update(msg)
 						field.Value = field.textArea.Value()
 						cmds = append(cmds, cmd)
-					
+
 					case Select:
 						// Select fields handle updates differently
 						// No-op for now

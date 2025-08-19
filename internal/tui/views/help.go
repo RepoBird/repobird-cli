@@ -181,6 +181,5 @@ func (h *HelpView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Model, 
 
 // Helper methods
 
-
 // helpClearMessageMsg is used to clear temporary messages in help view
 type helpClearMessageMsg struct{}

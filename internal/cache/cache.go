@@ -186,24 +186,24 @@ func SetCachedList(runs []models.RunResponse, details map[string]*models.RunResp
 	// Merge the existing details with new ones, separating terminal vs active
 	now := time.Now()
 	for k, v := range details {
-			if v != nil {
-				if isTerminalStatus(v.Status) {
-					// Store terminal runs permanently
-					globalCache.terminalDetails[k] = v
-					// Also persist to disk if available
-					if globalCache.persistentCache != nil {
-						go func(run *models.RunResponse) {
-							_ = globalCache.persistentCache.SaveRun(run)
-						}(v)
-					}
-				} else {
-					// Store active runs temporarily
-					globalCache.details[k] = v
-					globalCache.detailsAt[k] = now
+		if v != nil {
+			if isTerminalStatus(v.Status) {
+				// Store terminal runs permanently
+				globalCache.terminalDetails[k] = v
+				// Also persist to disk if available
+				if globalCache.persistentCache != nil {
+					go func(run *models.RunResponse) {
+						_ = globalCache.persistentCache.SaveRun(run)
+					}(v)
 				}
+			} else {
+				// Store active runs temporarily
+				globalCache.details[k] = v
+				globalCache.detailsAt[k] = now
 			}
 		}
 	}
+}
 
 // AddCachedDetail adds a single run detail to the cache
 func AddCachedDetail(runID string, run *models.RunResponse) {

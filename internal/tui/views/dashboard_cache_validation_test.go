@@ -369,4 +369,3 @@ func TestCacheValidationIntegration(t *testing.T) {
 	clearedRuns := testCache.GetRuns()
 	assert.Empty(t, clearedRuns, "Cache should be empty after clear")
 }
-

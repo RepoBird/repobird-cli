@@ -117,36 +117,36 @@ func TestUpdateRunsViewportContentBoundsValidation(t *testing.T) {
 		expectedFinalIdx    int
 	}{
 		{
-			name:              "normal case - index within bounds",
-			selectedRunIdx:    10,
-			filteredRunsCount: 100,
-			selectedRepo:      &models.Repository{Name: "test-repo"},
+			name:                "normal case - index within bounds",
+			selectedRunIdx:      10,
+			filteredRunsCount:   100,
+			selectedRepo:        &models.Repository{Name: "test-repo"},
 			expectIndexClamping: false,
-			expectedFinalIdx:  10,
+			expectedFinalIdx:    10,
 		},
 		{
-			name:              "index beyond bounds - should clamp",
-			selectedRunIdx:    150,
-			filteredRunsCount: 100,
-			selectedRepo:      &models.Repository{Name: "test-repo"},
+			name:                "index beyond bounds - should clamp",
+			selectedRunIdx:      150,
+			filteredRunsCount:   100,
+			selectedRepo:        &models.Repository{Name: "test-repo"},
 			expectIndexClamping: true,
-			expectedFinalIdx:  99,
+			expectedFinalIdx:    99,
 		},
 		{
-			name:              "no repository selected - should not clamp",
-			selectedRunIdx:    150,
-			filteredRunsCount: 0,
-			selectedRepo:      nil,
+			name:                "no repository selected - should not clamp",
+			selectedRunIdx:      150,
+			filteredRunsCount:   0,
+			selectedRepo:        nil,
 			expectIndexClamping: false,
-			expectedFinalIdx:  150, // Should remain unchanged when no repo selected
+			expectedFinalIdx:    150, // Should remain unchanged when no repo selected
 		},
 		{
-			name:              "empty runs - should not clamp if no repo",
-			selectedRunIdx:    50,
-			filteredRunsCount: 0,
-			selectedRepo:      nil,
+			name:                "empty runs - should not clamp if no repo",
+			selectedRunIdx:      50,
+			filteredRunsCount:   0,
+			selectedRepo:        nil,
 			expectIndexClamping: false,
-			expectedFinalIdx:  50,
+			expectedFinalIdx:    50,
 		},
 	}
 
@@ -155,7 +155,7 @@ func TestUpdateRunsViewportContentBoundsValidation(t *testing.T) {
 			dashboard := createTestDashboard(t)
 			dashboard.selectedRunIdx = tt.selectedRunIdx
 			dashboard.selectedRepo = tt.selectedRepo
-			
+
 			// Create mock filtered runs
 			dashboard.filteredRuns = make([]*models.RunResponse, tt.filteredRunsCount)
 			for i := 0; i < tt.filteredRunsCount; i++ {
@@ -175,7 +175,7 @@ func TestUpdateRunsViewportContentBoundsValidation(t *testing.T) {
 
 			// Verify index was clamped if expected
 			if tt.expectIndexClamping {
-				assert.Equal(t, tt.expectedFinalIdx, dashboard.selectedRunIdx, 
+				assert.Equal(t, tt.expectedFinalIdx, dashboard.selectedRunIdx,
 					"selectedRunIdx should be clamped to valid range")
 			} else {
 				assert.Equal(t, tt.expectedFinalIdx, dashboard.selectedRunIdx,
@@ -183,7 +183,7 @@ func TestUpdateRunsViewportContentBoundsValidation(t *testing.T) {
 			}
 
 			// Verify viewport YOffset is valid
-			assert.GreaterOrEqual(t, dashboard.runsViewport.YOffset, 0, 
+			assert.GreaterOrEqual(t, dashboard.runsViewport.YOffset, 0,
 				"Viewport YOffset should not be negative")
 		})
 	}
@@ -192,7 +192,7 @@ func TestUpdateRunsViewportContentBoundsValidation(t *testing.T) {
 // TestDashboardStatePreservation tests that dashboard state is properly preserved across navigation
 func TestDashboardStatePreservation(t *testing.T) {
 	dashboard := createTestDashboard(t)
-	
+
 	// Set up test state - will be used to verify restored dashboard
 	_ = map[string]interface{}{
 		"selectedRepoIdx":    5,
@@ -205,7 +205,7 @@ func TestDashboardStatePreservation(t *testing.T) {
 
 	// Create dashboard with restored state
 	restoredDashboard := NewDashboardViewWithState(
-		dashboard.client, 
+		dashboard.client,
 		dashboard.cache,
 		5,   // selectedRepoIdx
 		250, // selectedRunIdx
@@ -273,7 +273,7 @@ func TestRenderSafetyChecks(t *testing.T) {
 	// Set up viewport with problematic state
 	dashboard.runsViewport = viewport.New(50, 20)
 	dashboard.runsViewport.SetContent("Line 1\n") // Minimal content
-	dashboard.runsViewport.YOffset = 100         // Way beyond content
+	dashboard.runsViewport.YOffset = 100          // Way beyond content
 
 	// This should not panic and should return valid content
 	assert.NotPanics(t, func() {
@@ -292,19 +292,19 @@ func TestRenderSafetyChecks(t *testing.T) {
 // Helper function to create a test dashboard
 func createTestDashboard(t *testing.T) *DashboardView {
 	t.Helper()
-	
+
 	// Create a mock API client (reuse existing mock from create_form_test.go)
 	mockClient := &MockAPIClient{}
-	
+
 	// Create a simple cache for testing
 	testCache := cache.NewSimpleCache()
-	
+
 	// Create dashboard
 	dashboard := NewDashboardView(mockClient, testCache)
-	
+
 	// Set basic dimensions
 	dashboard.width = 100
 	dashboard.height = 30
-	
+
 	return dashboard
 }

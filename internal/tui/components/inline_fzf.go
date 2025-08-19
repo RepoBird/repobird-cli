@@ -16,13 +16,13 @@ import (
 type InlineFZF struct {
 	Active        bool
 	Input         textinput.Model
-	Items         []string       // Original items
-	FilteredItems []string       // Filtered items
-	SelectedIndex int            // Selected index in filtered items
-	Query         string         // Current search query
-	Placeholder   string         // Placeholder text
-	Width         int            // Width for rendering
-	
+	Items         []string // Original items
+	FilteredItems []string // Filtered items
+	SelectedIndex int      // Selected index in filtered items
+	Query         string   // Current search query
+	Placeholder   string   // Placeholder text
+	Width         int      // Width for rendering
+
 	// Store the last selection before deactivating
 	LastSelected      string
 	LastSelectedIndex int
@@ -34,7 +34,7 @@ func NewInlineFZF(items []string, placeholder string, width int) *InlineFZF {
 	input.Placeholder = placeholder
 	input.CharLimit = 100
 	input.Width = width - 4
-	
+
 	return &InlineFZF{
 		Active:        false,
 		Input:         input,
@@ -89,7 +89,7 @@ func (f *InlineFZF) Update(msg tea.Msg) (*InlineFZF, tea.Cmd) {
 		case "esc":
 			f.Deactivate()
 			return f, nil
-			
+
 		case "enter":
 			// Save selection before deactivating
 			if f.SelectedIndex >= 0 && f.SelectedIndex < len(f.FilteredItems) {
@@ -105,19 +105,19 @@ func (f *InlineFZF) Update(msg tea.Msg) (*InlineFZF, tea.Cmd) {
 			// Now deactivate
 			f.Deactivate()
 			return f, nil
-			
+
 		case "up", "ctrl+p", "ctrl+k":
 			if f.SelectedIndex > 0 {
 				f.SelectedIndex--
 			}
 			return f, nil
-			
+
 		case "down", "ctrl+n", "ctrl+j":
 			if f.SelectedIndex < len(f.FilteredItems)-1 {
 				f.SelectedIndex++
 			}
 			return f, nil
-			
+
 		default:
 			// Update the input field
 			var cmd tea.Cmd
@@ -127,7 +127,7 @@ func (f *InlineFZF) Update(msg tea.Msg) (*InlineFZF, tea.Cmd) {
 			return f, cmd
 		}
 	}
-	
+
 	return f, nil
 }
 
@@ -137,14 +137,14 @@ func (f *InlineFZF) filterItems() {
 		f.FilteredItems = f.Items
 		return
 	}
-	
+
 	// Use fuzzy matching
 	matches := fuzzy.Find(f.Query, f.Items)
 	f.FilteredItems = make([]string, len(matches))
 	for i, match := range matches {
 		f.FilteredItems[i] = f.Items[match.Index]
 	}
-	
+
 	// Reset selection if out of bounds
 	if f.SelectedIndex >= len(f.FilteredItems) {
 		f.SelectedIndex = 0
@@ -156,7 +156,7 @@ func (f *InlineFZF) GetSelected() (string, int) {
 	if f.SelectedIndex < 0 || f.SelectedIndex >= len(f.FilteredItems) {
 		return "", -1
 	}
-	
+
 	selected := f.FilteredItems[f.SelectedIndex]
 	// Find original index
 	for i, item := range f.Items {
@@ -177,11 +177,11 @@ func (f *InlineFZF) RenderSearchBar() string {
 	if !f.Active {
 		return ""
 	}
-	
+
 	searchStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("63")).
 		Bold(true)
-	
+
 	return searchStyle.Render("🔍 " + f.Input.View())
 }
 
@@ -200,22 +200,22 @@ func HighlightFZFMatch(text, query string) string {
 	if query == "" {
 		return text
 	}
-	
+
 	// Simple case-insensitive highlighting
 	lower := strings.ToLower(text)
 	queryLower := strings.ToLower(query)
-	
+
 	if idx := strings.Index(lower, queryLower); idx >= 0 {
 		before := text[:idx]
 		match := text[idx : idx+len(query)]
 		after := text[idx+len(query):]
-		
+
 		highlightStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("226")).
 			Bold(true)
-		
+
 		return before + highlightStyle.Render(match) + after
 	}
-	
+
 	return text
 }

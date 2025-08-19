@@ -216,7 +216,7 @@ func prepareBulkRequest(bulkConfig *bulk.BulkConfig) *dto.BulkRunRequest {
 func generateRunHashes(bulkConfig *bulk.BulkConfig) []string {
 	var runHashes []string
 	fileHashCache := cache.NewFileHashCache()
-	
+
 	for i, run := range bulkConfig.Runs {
 		// Create a hash based on the run content for tracking
 		hashContent := fmt.Sprintf("%s-%s-%s-%s",
@@ -231,7 +231,7 @@ func generateRunHashes(bulkConfig *bulk.BulkConfig) []string {
 		// Cache the hash for tracking
 		fileHashCache.Set(fmt.Sprintf("bulk-run-%d", i), hash)
 	}
-	
+
 	return runHashes
 }
 
