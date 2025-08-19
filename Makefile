@@ -331,6 +331,23 @@ release-github-draft:
 	@echo "Creating draft GitHub release"
 	@GITLAB_TOKEN="" ./scripts/local-github-release.sh --sign --draft
 
+## release-reset: Delete the last tag locally and from GitHub (use with caution!)
+release-reset:
+	@VERSION=$$(cat VERSION 2>/dev/null || echo "0.1.0"); \
+	if [ -z "$$VERSION" ]; then \
+		echo "Error: VERSION file not found"; \
+		exit 1; \
+	fi; \
+	[[ ! "$$VERSION" =~ ^v ]] && VERSION="v$$VERSION"; \
+	echo "Resetting release tag: $$VERSION"; \
+	echo "  - Deleting local tag..."; \
+	git tag -d $$VERSION 2>/dev/null || echo "    Local tag not found"; \
+	echo "  - Deleting remote tag from gh..."; \
+	git push gh --delete $$VERSION 2>/dev/null || echo "    Remote tag not found or already deleted"; \
+	echo "  - Cleaning dist directory..."; \
+	rm -rf dist/; \
+	echo "✓ Release reset complete. You can now run: make release-github"
+
 ## docker-build: Build Docker image
 docker-build:
 	docker build -t repobird-cli:$(VERSION) .

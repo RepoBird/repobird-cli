@@ -280,6 +280,7 @@ print_info "GoReleaser will generate completions and man pages automatically"
 # Build release with GoReleaser
 print_step "Building release with GoReleaser"
 
+# Always use --clean flag to ensure dist directory is cleaned
 GORELEASER_ARGS="release --clean"
 
 if [ "$LOCAL_ONLY" = true ] || [ "$SKIP_PUBLISH" = true ]; then
