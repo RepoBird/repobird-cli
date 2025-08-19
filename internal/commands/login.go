@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"syscall"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -25,7 +24,7 @@ func readMaskedInput() (string, error) {
 	fmt.Print("Enter your API key: ")
 
 	// Set terminal to raw mode to read char by char
-	oldState, err := term.MakeRaw(syscall.Stdin)
+	oldState, err := term.MakeRaw(getStdinFD())
 	if err != nil {
 		return "", err
 	}
@@ -36,7 +35,7 @@ func readMaskedInput() (string, error) {
 		if interrupted {
 			fmt.Print("\r\033[K")
 		}
-		_ = term.Restore(syscall.Stdin, oldState)
+		_ = term.Restore(getStdinFD(), oldState)
 		if !interrupted {
 			fmt.Println() // Only add newline if not interrupted
 		}
@@ -115,7 +114,7 @@ or in an encrypted file as a fallback.`,
 				}
 				// Fallback to regular password input if custom reader fails
 				fmt.Print("Enter your API key: ")
-				bytePassword, err := term.ReadPassword(syscall.Stdin)
+				bytePassword, err := term.ReadPassword(getStdinFD())
 				if err != nil {
 					// Final fallback to regular input
 					reader := bufio.NewReader(os.Stdin)
