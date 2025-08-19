@@ -252,30 +252,62 @@ curl -fsSL https://get.repobird.ai | sh
 
 ## Uninstallation
 
-### Package Managers
+### Using the Uninstall Script (Recommended)
+
+The easiest way to completely remove RepoBird CLI and all its data:
 
 ```bash
-# Homebrew
+# If you have the repository cloned
+./scripts/uninstall.sh
+
+# Or download and run directly
+curl -sSL https://raw.githubusercontent.com/RepoBird/repobird-cli/main/scripts/uninstall.sh | bash
+```
+
+The uninstall script will:
+- Detect and remove `repobird` binary from all common locations
+- Remove the `rb` alias/symlink
+- Delete configuration files (including API keys)
+- Clean up cache directories
+- Prompt for confirmation before each removal
+
+### Package Manager Uninstallation
+
+```bash
+# Homebrew (macOS)
 brew uninstall repobird
 
-# APT
+# APT (Ubuntu/Debian)
 sudo apt remove repobird
 
-# Chocolatey
+# YUM/DNF (Fedora/RHEL)
+sudo yum remove repobird
+# or
+sudo dnf remove repobird
+
+# Chocolatey (Windows)
 choco uninstall repobird
 
-# Snap
+# Scoop (Windows)
+scoop uninstall repobird
+
+# Snap (Linux)
 sudo snap remove repobird
 ```
 
-### Manual Uninstall
+### Manual Uninstallation
+
+If you prefer to uninstall manually:
 
 ```bash
-# Remove binaries
+# Remove binaries (check all possible locations)
+sudo rm -f /usr/local/bin/repobird /usr/local/bin/rb
 rm -f ~/.local/bin/repobird ~/.local/bin/rb
+rm -f ~/go/bin/repobird ~/go/bin/rb
 
-# Remove configuration (optional)
-rm -rf ~/.repobird/
+# Remove configuration and cache
+rm -rf ~/.config/repobird
+rm -rf ~/.repobird  # Legacy location
 ```
 
 ## Troubleshooting
@@ -289,7 +321,7 @@ rm -rf ~/.repobird/
 
 ### Get Help
 
-- GitHub Issues: https://github.com/repobird/repobird-cli/issues
+- GitHub Issues: https://github.com/RepoBird/repobird-cli/issues
 - Documentation: https://docs.repobird.ai
 - Community: https://discord.gg/repobird
 
@@ -306,7 +338,7 @@ All packages are cryptographically signed. Verify signatures:
 
 ```bash
 # Download signature and verify
-curl -L -o repobird.tar.gz.asc "https://github.com/repobird/repobird-cli/releases/latest/download/repobird_linux_amd64.tar.gz.asc"
+curl -L -o repobird.tar.gz.asc "https://github.com/RepoBird/repobird-cli/releases/latest/download/repobird_linux_amd64.tar.gz.asc"
 gpg --verify repobird.tar.gz.asc repobird.tar.gz
 ```
 

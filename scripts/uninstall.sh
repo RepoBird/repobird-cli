@@ -188,6 +188,77 @@ remove_cache() {
     fi
 }
 
+# Function to remove shell completions
+remove_shell_completions() {
+    local found=false
+    local shell_configs=(
+        "$HOME/.bashrc"
+        "$HOME/.bash_profile"
+        "$HOME/.zshrc"
+        "$HOME/.config/fish/config.fish"
+    )
+    
+    for config_file in "${shell_configs[@]}"; do
+        if [ -f "$config_file" ]; then
+            # Check for repobird completion entries
+            if grep -q "repobird completion\|rb completion\|_repobird\|__start_repobird" "$config_file" 2>/dev/null; then
+                found=true
+                echo -e "Found RepoBird completions in: ${GREEN}$config_file${NC}"
+                
+                # Show the lines that will be removed
+                echo -e "${YELLOW}Lines containing RepoBird completions:${NC}"
+                grep --color=never "repobird completion\|rb completion\|_repobird\|__start_repobird" "$config_file" | head -5
+                
+                if confirm "Remove RepoBird completions from $config_file?"; then
+                    # Create backup
+                    cp "$config_file" "$config_file.repobird-backup"
+                    echo "Created backup: $config_file.repobird-backup"
+                    
+                    # Remove completion lines
+                    if [[ "$OSTYPE" == "darwin"* ]]; then
+                        # macOS sed requires different syntax
+                        sed -i '' '/repobird completion/d; /rb completion/d; /_repobird/d; /__start_repobird/d' "$config_file"
+                    else
+                        # Linux sed
+                        sed -i '/repobird completion/d; /rb completion/d; /_repobird/d; /__start_repobird/d' "$config_file"
+                    fi
+                    
+                    echo -e "${GREEN}✓${NC} Removed completions from $config_file"
+                else
+                    echo "Skipping completion removal from $config_file"
+                fi
+            fi
+        fi
+    done
+    
+    # Check for Fish completion files
+    local fish_completions=(
+        "$HOME/.config/fish/completions/repobird.fish"
+        "$HOME/.config/fish/completions/rb.fish"
+    )
+    
+    for completion_file in "${fish_completions[@]}"; do
+        if [ -f "$completion_file" ]; then
+            found=true
+            echo -e "Found Fish completion file: ${GREEN}$completion_file${NC}"
+            
+            if confirm "Remove $completion_file?"; then
+                rm -f "$completion_file"
+                echo -e "${GREEN}✓${NC} Removed $completion_file"
+            else
+                echo "Skipping $completion_file"
+            fi
+        fi
+    done
+    
+    if [ "$found" = false ]; then
+        echo -e "${YELLOW}No shell completions found${NC}"
+    else
+        echo ""
+        echo -e "${YELLOW}Note: Restart your shell or run 'source ~/.bashrc' (or ~/.zshrc) to apply changes${NC}"
+    fi
+}
+
 # Main uninstall process
 echo "This script will uninstall RepoBird CLI and optionally remove its data."
 echo ""
@@ -213,8 +284,13 @@ echo "--------------------------"
 remove_cache
 
 echo ""
+echo "Step 4: Remove shell completions"
+echo "--------------------------------"
+remove_shell_completions
+
+echo ""
 echo "========================="
 echo -e "${GREEN}Uninstallation complete!${NC}"
 echo ""
 echo "Thank you for using RepoBird CLI."
-echo "To reinstall, visit: https://github.com/repobird/repobird-cli"
+echo "To reinstall, visit: https://github.com/RepoBird/repobird-cli"

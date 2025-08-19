@@ -6,7 +6,7 @@ set -e
 # Or: wget -qO- https://get.repobird.ai | sh
 
 # Constants
-GITHUB_REPO="repobird/repobird-cli"
+GITHUB_REPO="RepoBird/repobird-cli"
 BINARY_NAME="repobird"
 INSTALL_DIR="$HOME/.local/bin"
 ALIAS_NAME="rb"
