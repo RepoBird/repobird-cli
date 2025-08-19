@@ -25,12 +25,6 @@ RepoBird is an AI platform that automates code generation and software developme
 
 ### macOS
 
-#### Using Homebrew (Coming Soon)
-```bash
-brew tap repobird/tap
-brew install repobird
-```
-
 #### Direct Download
 ```bash
 # Download latest release for macOS (Apple Silicon)

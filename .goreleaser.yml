@@ -50,6 +50,9 @@ snapshot:
   name_template: "{{ incpatch .Version }}-next"
 
 release:
+  github:
+    owner: RepoBird
+    name: repobird-cli
   draft: false
   prerelease: auto
   name_template: "{{.ProjectName}} v{{.Version}}"
@@ -83,27 +86,28 @@ changelog:
       - "^chore:"
 
 # Package managers
-brews:
-  - name: repobird
-    repository:
-      owner: repobird
-      name: homebrew-tap
-      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-    homepage: "https://github.com/repobird/repobird-cli"
-    description: "Fast CLI for RepoBird AI agent platform"
-    license: "MIT"
-    install: |
-      bin.install "repobird"
-      
-      # Install shell completions
-      bash_completion.install "completions/repobird.bash" => "repobird"
-      zsh_completion.install "completions/_repobird"
-      fish_completion.install "completions/repobird.fish"
-      
-      # Install man pages
-      man1.install "man/repobird.1"
-    test: |
-      system "#{bin}/repobird version"
+# Homebrew support disabled for now - requires HOMEBREW_TAP_GITHUB_TOKEN
+# brews:
+#   - name: repobird
+#     repository:
+#       owner: repobird
+#       name: homebrew-tap
+#       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+#     homepage: "https://github.com/repobird/repobird-cli"
+#     description: "Fast CLI for RepoBird AI agent platform"
+#     license: "MIT"
+#     install: |
+#       bin.install "repobird"
+#       
+#       # Install shell completions
+#       bash_completion.install "completions/repobird.bash" => "repobird"
+#       zsh_completion.install "completions/_repobird"
+#       fish_completion.install "completions/repobird.fish"
+#       
+#       # Install man pages
+#       man1.install "man/repobird.1"
+#     test: |
+#       system "#{bin}/repobird version"
 
 nfpms:
   - file_name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Arch }}"
@@ -146,15 +150,16 @@ nfpms:
 #         command: repobird
 #         plugs: ["home", "network", "removable-media"]
 
-scoops:
-  - name: repobird
-    repository:
-      owner: repobird
-      name: scoop-bucket
-      token: "{{ .Env.SCOOP_GITHUB_TOKEN }}"
-    homepage: "https://github.com/repobird/repobird-cli"
-    description: "Fast CLI for RepoBird AI agent platform"
-    license: MIT
+# Scoop support disabled for now - requires SCOOP_GITHUB_TOKEN
+# scoops:
+#   - name: repobird
+#     repository:
+#       owner: repobird
+#       name: scoop-bucket
+#       token: "{{ .Env.SCOOP_GITHUB_TOKEN }}"
+#     homepage: "https://github.com/repobird/repobird-cli"
+#     description: "Fast CLI for RepoBird AI agent platform"
+#     license: MIT
 
 # Chocolatey support disabled for now - requires Windows/choco tools to build
 # chocolateys:
