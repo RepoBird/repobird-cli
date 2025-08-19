@@ -156,55 +156,57 @@ scoops:
     description: "Fast CLI for RepoBird AI agent platform"
     license: MIT
 
-chocolateys:
-  - name: repobird
-    title: RepoBird CLI
-    authors: RepoBird Team
-    project_url: "https://github.com/repobird/repobird-cli"
-    copyright: "2024 RepoBird Team"
-    license_url: "https://github.com/repobird/repobird-cli/blob/main/LICENSE"
-    require_license_acceptance: false
-    project_source_url: "https://github.com/repobird/repobird-cli"
-    docs_url: "https://github.com/repobird/repobird-cli/blob/main/README.md"
-    bug_tracker_url: "https://github.com/repobird/repobird-cli/issues"
-    tags: "cli ai code-generation"
-    summary: "Fast CLI for RepoBird AI agent platform"
-    description: |
-      RepoBird CLI enables users to submit AI-powered code generation tasks,
-      track their progress, and manage runs through a simple CLI interface.
-    release_notes: "https://github.com/repobird/repobird-cli/releases/tag/v{{ .Version }}"
-    api_key: "{{ .Env.CHOCOLATEY_API_KEY }}"
-    source_repo: "https://push.chocolatey.org/"
-    skip_publish: false
+# Chocolatey support disabled for now - requires Windows/choco tools to build
+# chocolateys:
+#   - name: repobird
+#     title: RepoBird CLI
+#     authors: RepoBird Team
+#     project_url: "https://github.com/repobird/repobird-cli"
+#     copyright: "2024 RepoBird Team"
+#     license_url: "https://github.com/repobird/repobird-cli/blob/main/LICENSE"
+#     require_license_acceptance: false
+#     project_source_url: "https://github.com/repobird/repobird-cli"
+#     docs_url: "https://github.com/repobird/repobird-cli/blob/main/README.md"
+#     bug_tracker_url: "https://github.com/repobird/repobird-cli/issues"
+#     tags: "cli ai code-generation"
+#     summary: "Fast CLI for RepoBird AI agent platform"
+#     description: |
+#       RepoBird CLI enables users to submit AI-powered code generation tasks,
+#       track their progress, and manage runs through a simple CLI interface.
+#     release_notes: "https://github.com/repobird/repobird-cli/releases/tag/v{{ .Version }}"
+#     api_key: "{{ .Env.CHOCOLATEY_API_KEY }}"
+#     source_repo: "https://push.chocolatey.org/"
+#     skip_publish: false
 
-aurs:
-  - name: repobird-bin
-    homepage: "https://github.com/repobird/repobird-cli"
-    description: "Fast CLI for RepoBird AI agent platform"
-    maintainers:
-      - "RepoBird Team <team@repobird.ai>"
-    license: MIT
-    private_key: "{{ .Env.AUR_KEY }}"
-    git_url: "ssh://aur@aur.archlinux.org/repobird-bin.git"
-    depends:
-      - glibc
-    package: |-
-      # bin
-      install -Dm755 "./repobird" "${pkgdir}/usr/bin/repobird"
-      
-      # license
-      install -Dm644 "./LICENSE" "${pkgdir}/usr/share/licenses/repobird/LICENSE"
-      
-      # completions
-      mkdir -p "${pkgdir}/usr/share/bash-completion/completions"
-      mkdir -p "${pkgdir}/usr/share/zsh/site-functions"
-      mkdir -p "${pkgdir}/usr/share/fish/completions"
-      install -Dm644 "./completions/repobird.bash" "${pkgdir}/usr/share/bash-completion/completions/repobird"
-      install -Dm644 "./completions/_repobird" "${pkgdir}/usr/share/zsh/site-functions/_repobird"
-      install -Dm644 "./completions/repobird.fish" "${pkgdir}/usr/share/fish/completions/repobird.fish"
-      
-      # man page
-      install -Dm644 "./man/repobird.1" "${pkgdir}/usr/share/man/man1/repobird.1"
+# AUR support disabled for now - requires AUR SSH key to publish
+# aurs:
+#   - name: repobird-bin
+#     homepage: "https://github.com/repobird/repobird-cli"
+#     description: "Fast CLI for RepoBird AI agent platform"
+#     maintainers:
+#       - "RepoBird Team <team@repobird.ai>"
+#     license: MIT
+#     private_key: "{{ .Env.AUR_KEY }}"
+#     git_url: "ssh://aur@aur.archlinux.org/repobird-bin.git"
+#     depends:
+#       - glibc
+#     package: |-
+#       # bin
+#       install -Dm755 "./repobird" "${pkgdir}/usr/bin/repobird"
+#       
+#       # license
+#       install -Dm644 "./LICENSE" "${pkgdir}/usr/share/licenses/repobird/LICENSE"
+#       
+#       # completions
+#       mkdir -p "${pkgdir}/usr/share/bash-completion/completions"
+#       mkdir -p "${pkgdir}/usr/share/zsh/site-functions"
+#       mkdir -p "${pkgdir}/usr/share/fish/completions"
+#       install -Dm644 "./completions/repobird.bash" "${pkgdir}/usr/share/bash-completion/completions/repobird"
+#       install -Dm644 "./completions/_repobird" "${pkgdir}/usr/share/zsh/site-functions/_repobird"
+#       install -Dm644 "./completions/repobird.fish" "${pkgdir}/usr/share/fish/completions/repobird.fish"
+#       
+#       # man page
+#       install -Dm644 "./man/repobird.1" "${pkgdir}/usr/share/man/man1/repobird.1"
 
 signs:
   - artifacts: checksum
