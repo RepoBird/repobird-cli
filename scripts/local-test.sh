@@ -127,9 +127,9 @@ run_tests() {
     if [ "$RUN_INTEGRATION" = true ]; then
         print_step "Running integration tests"
         if [ "$VERBOSE" = true ]; then
-            $GO_CMD test -v -tags=integration ./test/integration
+            $GO_CMD test -v -tags=integration ./tests/integration
         else
-            $GO_CMD test -tags=integration ./test/integration
+            $GO_CMD test -tags=integration ./tests/integration
         fi
         print_success "Integration tests passed"
     fi

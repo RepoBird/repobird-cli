@@ -315,7 +315,7 @@ make build-all
 
 #### Test Structure
 - Unit tests: Alongside source files (`*_test.go`)
-- Integration tests: In `test/integration/`
+- Integration tests: In `tests/integration/`
 - Mocks: Generated in `mocks/` directory
 
 #### Writing Tests

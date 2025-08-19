@@ -28,10 +28,10 @@ Integration tests ensure that the CLI works correctly from a user's perspective 
 make test-integration
 
 # Direct go test command
-go test -tags=integration -v ./test/integration/...
+go test -tags=integration -v ./tests/integration/...
 
 # Run specific test
-go test -tags=integration -v ./test/integration -run TestVersionCommand
+go test -tags=integration -v ./tests/integration -run TestVersionCommand
 ```
 
 ### Run All Tests (Unit + Integration)
@@ -42,7 +42,7 @@ make test-all
 ### Update Golden Files
 ```bash
 # Update golden files when output changes
-go test -tags=integration ./test/integration -update
+go test -tags=integration ./tests/integration -update
 ```
 
 ### Generate Coverage Report
@@ -53,7 +53,7 @@ make coverage-integration
 ## Test Structure
 
 ```
-test/integration/
+tests/integration/
 ├── cli_test.go          # Main integration test suite
 ├── mock_server.go       # Mock API server implementation
 ├── helpers.go           # Test helper functions

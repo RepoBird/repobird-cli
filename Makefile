@@ -215,7 +215,7 @@ test-unit:
 
 ## test-integration: Run integration tests only (development)
 test-integration:
-	@REPOBIRD_API_KEY= ./scripts/test-summary.sh go test -v -race -timeout 2m -tags=integration ./test/integration/...
+	@REPOBIRD_API_KEY= ./scripts/test-summary.sh go test -v -race -timeout 2m -tags=integration ./tests/integration/...
 
 ## test-commands: Run command tests only (development)
 test-commands:
@@ -246,7 +246,7 @@ coverage:
 
 ## coverage-integration: Generate coverage for integration tests (development)
 coverage-integration:
-	$(DEV_ENV) $(GOTEST) -v -race -coverprofile=coverage-integration.out -covermode=atomic -tags=integration ./test/integration/...
+	$(DEV_ENV) $(GOTEST) -v -race -coverprofile=coverage-integration.out -covermode=atomic -tags=integration ./tests/integration/...
 	$(GOCMD) tool cover -html=coverage-integration.out -o coverage-integration.html
 	@echo "Integration test coverage report: coverage-integration.html"
 	@$(GOCMD) tool cover -func=coverage-integration.out | grep total | awk '{print "Integration test coverage: " $$3}'

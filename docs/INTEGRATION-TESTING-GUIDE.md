@@ -30,7 +30,7 @@ The RepoBird CLI integration test suite ensures end-to-end functionality by exec
 ### Directory Structure
 
 ```
-test/integration/
+tests/integration/
 ├── cli_test.go          # Main test suite
 ├── mock_server.go       # Mock API server implementation
 ├── helpers.go           # Test utilities and assertions
@@ -129,36 +129,36 @@ make test-all
 make coverage-integration
 
 # Run with race detection
-go test -tags=integration -race ./test/integration
+go test -tags=integration -race ./tests/integration
 ```
 
 ### Direct Execution
 
 ```bash
 # Run all integration tests
-go test -tags=integration -v ./test/integration
+go test -tags=integration -v ./tests/integration
 
 # Run specific test
-go test -tags=integration -v ./test/integration -run TestVersionCommand
+go test -tags=integration -v ./tests/integration -run TestVersionCommand
 
 # Run with timeout
-go test -tags=integration -v -timeout 30s ./test/integration
+go test -tags=integration -v -timeout 30s ./tests/integration
 
 # Update golden files
-UPDATE_GOLDEN=1 go test -tags=integration ./test/integration -run TestGoldenFiles
+UPDATE_GOLDEN=1 go test -tags=integration ./tests/integration -run TestGoldenFiles
 ```
 
 ### Test Selection
 
 ```bash
 # Run tests matching pattern
-go test -tags=integration -v ./test/integration -run ".*Config.*"
+go test -tags=integration -v ./tests/integration -run ".*Config.*"
 
 # Skip slow tests
-go test -tags=integration -short ./test/integration
+go test -tags=integration -short ./tests/integration
 
 # Run tests in random order
-go test -tags=integration -shuffle=on ./test/integration
+go test -tags=integration -shuffle=on ./tests/integration
 ```
 
 ## Writing Tests
@@ -498,10 +498,10 @@ env := map[string]string{
 
 ```bash
 # Increase timeout
-go test -tags=integration -timeout 5m ./test/integration
+go test -tags=integration -timeout 5m ./tests/integration
 
 # Check for hanging commands
-go test -tags=integration -v ./test/integration 2>&1 | grep -i "running"
+go test -tags=integration -v ./tests/integration 2>&1 | grep -i "running"
 ```
 
 #### Binary Build Fails
@@ -528,20 +528,20 @@ lsof -i :8080-9000 | grep repobird
 
 ```bash
 # Update golden files
-UPDATE_GOLDEN=1 go test -tags=integration ./test/integration -run TestGoldenFiles
+UPDATE_GOLDEN=1 go test -tags=integration ./tests/integration -run TestGoldenFiles
 
 # View differences
-diff test/integration/testdata/golden/help.txt <(./build/repobird help)
+diff tests/integration/testdata/golden/help.txt <(./build/repobird help)
 ```
 
 #### Race Conditions
 
 ```bash
 # Run with race detector
-go test -tags=integration -race ./test/integration
+go test -tags=integration -race ./tests/integration
 
 # Check specific test
-go test -tags=integration -race -run TestConcurrent ./test/integration
+go test -tags=integration -race -run TestConcurrent ./tests/integration
 ```
 
 ### Debug Techniques
@@ -711,7 +711,7 @@ make test-all coverage-integration
 
 ```bash
 # Generate coverage report
-go test -tags=integration -coverprofile=coverage.out ./test/integration
+go test -tags=integration -coverprofile=coverage.out ./tests/integration
 
 # View coverage in browser
 go tool cover -html=coverage.out
@@ -759,16 +759,16 @@ When adding new integration tests:
 make test-integration
 
 # Run specific test
-go test -tags=integration -v ./test/integration -run TestName
+go test -tags=integration -v ./tests/integration -run TestName
 
 # Update golden files
-UPDATE_GOLDEN=1 go test -tags=integration ./test/integration
+UPDATE_GOLDEN=1 go test -tags=integration ./tests/integration
 
 # Debug failing test
-go test -tags=integration -v -run TestName ./test/integration
+go test -tags=integration -v -run TestName ./tests/integration
 
 # Check race conditions
-go test -tags=integration -race ./test/integration
+go test -tags=integration -race ./tests/integration
 ```
 
 ### Key Files
