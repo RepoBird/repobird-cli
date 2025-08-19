@@ -321,6 +321,16 @@ release:
 	@which goreleaser > /dev/null || (echo "goreleaser not installed. Run 'make init'"; exit 1)
 	goreleaser release --clean
 
+## release-github: Create and publish GitHub release with signing (uses local script)
+release-github:
+	@echo "Creating GitHub release (GitLab token disabled for GitHub-only release)"
+	@GITLAB_TOKEN="" ./scripts/local-github-release.sh --sign
+
+## release-github-draft: Create draft GitHub release for testing
+release-github-draft:
+	@echo "Creating draft GitHub release"
+	@GITLAB_TOKEN="" ./scripts/local-github-release.sh --sign --draft
+
 ## docker-build: Build Docker image
 docker-build:
 	docker build -t repobird-cli:$(VERSION) .
