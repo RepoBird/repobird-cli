@@ -273,9 +273,26 @@ if [ "$LOCAL_ONLY" = false ]; then
     print_success "Tag pushed to $GIT_REMOTE"
 fi
 
-# GoReleaser will handle generating completions and docs via hooks
-print_step "Preparing for release build"
-print_info "GoReleaser will generate completions and man pages automatically"
+# Generate completions and man pages BEFORE GoReleaser (best practice)
+print_step "Generating release artifacts"
+
+# Build binary first
+make build
+
+# Generate completions
+print_info "Generating shell completions..."
+mkdir -p completions
+./build/repobird completion bash > completions/repobird.bash
+./build/repobird completion zsh > completions/_repobird
+./build/repobird completion fish > completions/repobird.fish
+./build/repobird completion powershell > completions/repobird.ps1
+print_success "Completions generated"
+
+# Generate man pages
+print_info "Generating man pages..."
+mkdir -p man
+./build/repobird docs man man
+print_success "Man pages generated"
 
 # Build release with GoReleaser
 print_step "Building release with GoReleaser"
