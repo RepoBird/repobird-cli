@@ -32,12 +32,16 @@ go.work.sum
 # .idea/
 # .vscode/
 
-# Build output directory
+# Build output directories
 build/
+dist/
 
-# Generated documentation directories
+# Generated documentation and completions (created during release)
 man/
-yaml/
+completions/
+docs/cli/
+docs/yaml/
+docs/repobird.yaml/
 docs/generated/
 
 # Go linting config (environment-specific)

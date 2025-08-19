@@ -4,6 +4,23 @@
 
 set -e
 
+# Cleanup function
+cleanup() {
+    if [ -n "$TEMP_BUILD_DIR" ] && [ -d "$TEMP_BUILD_DIR" ]; then
+        echo "Cleaning up temporary build directory..."
+        rm -rf "$TEMP_BUILD_DIR"
+    fi
+    # Remove symlinks if they exist
+    [ -L completions ] && rm completions
+    [ -L man ] && rm man
+    # Also clean up any accidentally created real directories
+    [ -d completions ] && rm -rf completions/
+    [ -d man ] && rm -rf man/
+}
+
+# Set trap to cleanup on exit
+trap cleanup EXIT
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -72,6 +89,7 @@ LOCAL_ONLY=false
 SIGN_RELEASE=false
 NOTES_FILE=""
 OVERRIDE_VERSION=""
+GIT_REMOTE="gh"  # Default to 'gh' for GitHub
 
 show_help() {
     echo "Usage: $0 [options]"
@@ -85,6 +103,7 @@ show_help() {
     echo "  --sign              Sign release with GPG"
     echo "  --notes FILE        Release notes file (default: auto-generate)"
     echo "  --version VERSION   Override VERSION file (not recommended)"
+    echo "  --remote REMOTE     Git remote for GitHub (default: gh)"
     echo "  --help, -h          Show this help message"
     echo ""
     echo "Examples:"
@@ -140,6 +159,10 @@ while [[ $# -gt 0 ]]; do
             NOTES_FILE="$2"
             shift 2
             ;;
+        --remote)
+            GIT_REMOTE="$2"
+            shift 2
+            ;;
         --help|-h)
             show_help
             exit 0
@@ -175,7 +198,18 @@ echo "Version: $VERSION"
 echo "Draft: $DRAFT"
 echo "Prerelease: $PRERELEASE"
 echo "Local only: $LOCAL_ONLY"
+echo "Git remote: $GIT_REMOTE"
 echo ""
+
+# Verify git remote exists
+if ! git remote | grep -q "^${GIT_REMOTE}$"; then
+    print_error "Git remote '$GIT_REMOTE' not found"
+    echo "Available remotes:"
+    git remote -v
+    echo ""
+    echo "Use --remote to specify the correct GitHub remote"
+    exit 1
+fi
 
 # Check requirements
 check_requirements
@@ -239,25 +273,41 @@ print_step "Creating git tag"
 git tag -a "$VERSION" -m "Release $VERSION"
 
 if [ "$LOCAL_ONLY" = false ]; then
-    print_step "Pushing tag to origin"
-    git push origin "$VERSION"
-    print_success "Tag pushed"
+    print_step "Pushing tag to $GIT_REMOTE"
+    git push "$GIT_REMOTE" "$VERSION"
+    print_success "Tag pushed to $GIT_REMOTE"
 fi
 
-# Generate completions and documentation
-print_step "Generating completions and documentation"
+# Generate completions and documentation for release
+print_step "Generating completions and documentation for release"
 make build
-mkdir -p completions man docs/cli
 
-if [ -f ./scripts/generate-completions.sh ]; then
-    ./scripts/generate-completions.sh
-    print_success "Completions generated"
-fi
+# Create a temporary build directory for all artifacts
+TEMP_BUILD_DIR="/tmp/repobird-release-$$"
+export TEMP_BUILD_DIR
+mkdir -p "$TEMP_BUILD_DIR"
 
-if [ -f ./scripts/generate-docs.sh ]; then
-    ./scripts/generate-docs.sh
-    print_success "Documentation generated"
-fi
+# Generate completions in temp directory
+print_info "Generating completions..."
+./scripts/generate-completions.sh "$TEMP_BUILD_DIR/completions"
+print_success "Completions generated"
+
+# Generate man pages in temp directory
+print_info "Generating man pages..."
+./build/repobird docs man "$TEMP_BUILD_DIR/man"
+print_success "Man pages generated"
+
+# Generate docs if needed (but keep in temp)
+print_info "Generating documentation..."
+./scripts/generate-docs.sh "$TEMP_BUILD_DIR/docs"
+print_success "Documentation generated"
+
+# Create symlinks for GoReleaser (it expects them in project root)
+# Use symlinks instead of copying to avoid polluting the directory
+ln -sf "$TEMP_BUILD_DIR/completions" ./completions
+ln -sf "$TEMP_BUILD_DIR/man" ./man
+
+print_info "Artifacts linked for release build"
 
 # Build release with GoReleaser
 print_step "Building release with GoReleaser"
@@ -367,7 +417,9 @@ echo ""
 print_success "Release $VERSION completed successfully!"
 echo ""
 echo "Next steps:"
-echo "1. View release: https://github.com/$(git remote get-url origin | sed 's/.*github.com[:/]\(.*\)\.git/\1/')/releases/tag/$VERSION"
+# Extract GitHub repo from the correct remote
+GITHUB_REPO=$(git remote get-url "$GIT_REMOTE" | sed 's/.*github.com[^:]*[:\/]\(.*\)\.git/\1/')
+echo "1. View release: https://github.com/$GITHUB_REPO/releases/tag/$VERSION"
 echo "2. Update package managers (run ./scripts/local-package-publish.sh)"
 echo "3. Announce the release"
 

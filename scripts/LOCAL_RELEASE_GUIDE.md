@@ -4,6 +4,19 @@ This guide explains how to create and publish RepoBird CLI releases entirely fro
 
 ## Prerequisites
 
+### Git Remote Setup
+
+**IMPORTANT**: If your GitHub remote is not named `origin`, you need to specify it:
+```bash
+# Check your remotes
+git remote -v
+
+# If GitHub remote is named 'gh' instead of 'origin', use:
+./scripts/local-github-release.sh --remote gh
+```
+
+The script defaults to using `gh` as the remote name for GitHub.
+
 ### Required Tools
 
 1. **GitHub CLI (`gh`)**
