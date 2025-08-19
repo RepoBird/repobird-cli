@@ -263,16 +263,6 @@ if [ -f VERSION ]; then
     fi
 fi
 
-# Create and push tag
-print_step "Creating git tag"
-git tag -a "$VERSION" -m "Release $VERSION"
-
-if [ "$LOCAL_ONLY" = false ]; then
-    print_step "Pushing tag to $GIT_REMOTE"
-    git push "$GIT_REMOTE" "$VERSION"
-    print_success "Tag pushed to $GIT_REMOTE"
-fi
-
 # Generate completions and man pages BEFORE GoReleaser (best practice)
 print_step "Generating release artifacts"
 
@@ -328,10 +318,24 @@ if [ "$SIGN_RELEASE" = true ]; then
     print_info "Using GPG key: $GPG_FINGERPRINT"
 fi
 
-# Run GoReleaser
+# First run GoReleaser in snapshot mode to test the build
+print_step "Testing build with GoReleaser (snapshot mode)"
+goreleaser build --snapshot --clean
+print_success "Build test successful"
+
+# Now create and push the tag since build works
+if [ "$LOCAL_ONLY" = false ]; then
+    print_step "Creating and pushing git tag"
+    git tag -a "$VERSION" -m "Release $VERSION"
+    git push "$GIT_REMOTE" "$VERSION"
+    print_success "Tag pushed to $GIT_REMOTE"
+fi
+
+# Now run the actual release
+print_step "Creating GitHub release"
 goreleaser $GORELEASER_ARGS
 
-print_success "Release artifacts built"
+print_success "Release completed successfully"
 
 # If not publishing, show local artifacts
 if [ "$LOCAL_ONLY" = true ] || [ "$SKIP_PUBLISH" = true ]; then

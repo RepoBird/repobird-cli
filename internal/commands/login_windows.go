@@ -5,7 +5,6 @@ package commands
 
 import (
 	"os"
-	"syscall"
 )
 
 // getStdinFD returns the file descriptor for stdin on Windows systems
