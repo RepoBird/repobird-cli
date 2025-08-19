@@ -4,6 +4,15 @@ before:
   hooks:
     - go mod tidy
     - go mod download
+    # Generate completions and man pages in dist directory
+    - mkdir -p dist/completions dist/man
+    - go build -o dist/repobird-temp ./cmd/repobird
+    - dist/repobird-temp completion bash > dist/completions/repobird.bash
+    - dist/repobird-temp completion zsh > dist/completions/_repobird  
+    - dist/repobird-temp completion fish > dist/completions/repobird.fish
+    - dist/repobird-temp completion powershell > dist/completions/repobird.ps1
+    - dist/repobird-temp docs man dist/man
+    - rm dist/repobird-temp
 
 builds:
   - env:
@@ -40,9 +49,12 @@ archives:
       - LICENSE*
       - README*
       - CHANGELOG*
-      - docs/*
-      - completions/*
-      - man/*
+      - src: dist/completions/*
+        dst: completions
+        strip_parent: true
+      - src: dist/man/*
+        dst: man
+        strip_parent: true
 
 checksum:
   name_template: "checksums.txt"

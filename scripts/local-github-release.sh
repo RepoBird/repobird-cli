@@ -6,16 +6,11 @@ set -e
 
 # Cleanup function
 cleanup() {
-    if [ -n "$TEMP_BUILD_DIR" ] && [ -d "$TEMP_BUILD_DIR" ]; then
-        echo "Cleaning up temporary build directory..."
-        rm -rf "$TEMP_BUILD_DIR"
+    # GoReleaser handles its own cleanup, but remove any accidental artifacts
+    if [ -d completions ] || [ -d man ]; then
+        echo "Cleaning up any accidental artifacts..."
+        rm -rf completions/ man/ 2>/dev/null || true
     fi
-    # Remove symlinks if they exist
-    [ -L completions ] && rm completions
-    [ -L man ] && rm man
-    # Also clean up any accidentally created real directories
-    [ -d completions ] && rm -rf completions/
-    [ -d man ] && rm -rf man/
 }
 
 # Set trap to cleanup on exit
@@ -278,36 +273,9 @@ if [ "$LOCAL_ONLY" = false ]; then
     print_success "Tag pushed to $GIT_REMOTE"
 fi
 
-# Generate completions and documentation for release
-print_step "Generating completions and documentation for release"
-make build
-
-# Create a temporary build directory for all artifacts
-TEMP_BUILD_DIR="/tmp/repobird-release-$$"
-export TEMP_BUILD_DIR
-mkdir -p "$TEMP_BUILD_DIR"
-
-# Generate completions in temp directory
-print_info "Generating completions..."
-./scripts/generate-completions.sh "$TEMP_BUILD_DIR/completions"
-print_success "Completions generated"
-
-# Generate man pages in temp directory
-print_info "Generating man pages..."
-./build/repobird docs man "$TEMP_BUILD_DIR/man"
-print_success "Man pages generated"
-
-# Generate docs if needed (but keep in temp)
-print_info "Generating documentation..."
-./scripts/generate-docs.sh "$TEMP_BUILD_DIR/docs"
-print_success "Documentation generated"
-
-# Create symlinks for GoReleaser (it expects them in project root)
-# Use symlinks instead of copying to avoid polluting the directory
-ln -sf "$TEMP_BUILD_DIR/completions" ./completions
-ln -sf "$TEMP_BUILD_DIR/man" ./man
-
-print_info "Artifacts linked for release build"
+# GoReleaser will handle generating completions and docs via hooks
+print_step "Preparing for release build"
+print_info "GoReleaser will generate completions and man pages automatically"
 
 # Build release with GoReleaser
 print_step "Building release with GoReleaser"
