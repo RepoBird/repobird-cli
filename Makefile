@@ -339,13 +339,17 @@ release-reset:
 		exit 1; \
 	fi; \
 	[[ ! "$$VERSION" =~ ^v ]] && VERSION="v$$VERSION"; \
-	echo "Resetting release tag: $$VERSION"; \
+	echo "Resetting release: $$VERSION"; \
 	echo "  - Deleting local tag..."; \
 	git tag -d $$VERSION 2>/dev/null || echo "    Local tag not found"; \
 	echo "  - Deleting remote tag from gh..."; \
 	git push gh --delete $$VERSION 2>/dev/null || echo "    Remote tag not found or already deleted"; \
+	echo "  - Deleting GitHub release..."; \
+	gh release delete $$VERSION --yes 2>/dev/null || echo "    GitHub release not found"; \
 	echo "  - Cleaning dist directory..."; \
 	rm -rf dist/; \
+	echo "  - Cleaning generated artifacts..."; \
+	rm -rf completions/ man/ 2>/dev/null || true; \
 	echo "✓ Release reset complete. You can now run: make release-github"
 
 ## docker-build: Build Docker image

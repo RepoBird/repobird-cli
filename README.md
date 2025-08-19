@@ -28,11 +28,11 @@ RepoBird is an AI platform that automates code generation and software developme
 #### Direct Download
 ```bash
 # Download latest release for macOS (Apple Silicon)
-curl -L https://github.com/RepoBird/repobird-cli/releases/latest/download/repobird_darwin_arm64.tar.gz | tar xz
+curl -L https://github.com/RepoBird/repobird-cli/releases/latest/download/repobird-cli_darwin_arm64.tar.gz | tar xz
 sudo mv repobird /usr/local/bin/
 
 # For Intel Macs
-curl -L https://github.com/RepoBird/repobird-cli/releases/latest/download/repobird_darwin_amd64.tar.gz | tar xz
+curl -L https://github.com/RepoBird/repobird-cli/releases/latest/download/repobird-cli_darwin_amd64.tar.gz | tar xz
 sudo mv repobird /usr/local/bin/
 ```
 
@@ -67,7 +67,7 @@ curl -sSL https://raw.githubusercontent.com/RepoBird/repobird-cli/main/scripts/i
 #### Direct Download
 ```bash
 # Download latest release for Linux
-curl -L https://github.com/RepoBird/repobird-cli/releases/latest/download/repobird_linux_amd64.tar.gz | tar xz
+curl -L https://github.com/RepoBird/repobird-cli/releases/latest/download/repobird-cli_linux_amd64.tar.gz | tar xz
 sudo mv repobird /usr/local/bin/
 ```
 

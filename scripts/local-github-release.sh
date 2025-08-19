@@ -323,16 +323,35 @@ print_step "Testing build with GoReleaser (snapshot mode)"
 goreleaser build --snapshot --clean
 print_success "Build test successful"
 
-# Now create and push the tag since build works
+# Create and push the tag after successful test build
 if [ "$LOCAL_ONLY" = false ]; then
     print_step "Creating and pushing git tag"
-    git tag -a "$VERSION" -m "Release $VERSION"
+    # Check if tag already exists
+    if git rev-parse "$VERSION" >/dev/null 2>&1; then
+        print_warning "Tag $VERSION already exists locally"
+        read -p "Delete and recreate? (y/N) " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            git tag -d "$VERSION"
+            git push "$GIT_REMOTE" --delete "$VERSION" 2>/dev/null || true
+        else
+            print_info "Using existing tag"
+        fi
+    fi
+    
+    # Create the tag if it doesn't exist
+    if ! git rev-parse "$VERSION" >/dev/null 2>&1; then
+        git tag -a "$VERSION" -m "Release $VERSION"
+        print_success "Tag created: $VERSION"
+    fi
+    
+    # Push the tag
     git push "$GIT_REMOTE" "$VERSION"
     print_success "Tag pushed to $GIT_REMOTE"
 fi
 
-# Now run the actual release
-print_step "Creating GitHub release"
+# Now run the actual release with GoReleaser
+print_step "Creating GitHub release with GoReleaser"
 goreleaser $GORELEASER_ARGS
 
 print_success "Release completed successfully"
@@ -350,56 +369,16 @@ if [ "$LOCAL_ONLY" = true ] || [ "$SKIP_PUBLISH" = true ]; then
     exit 0
 fi
 
-# Create GitHub release if not done by GoReleaser
+# GoReleaser handles the release creation, so we don't need gh release create
+# Only upload additional assets if needed and release already exists
 if [ "$SKIP_PUBLISH" = false ] && [ "$LOCAL_ONLY" = false ]; then
-    print_step "Creating GitHub release"
-    
-    GH_ARGS=""
-    
-    if [ "$DRAFT" = true ]; then
-        GH_ARGS="$GH_ARGS --draft"
-    fi
-    
-    if [ "$PRERELEASE" = true ]; then
-        GH_ARGS="$GH_ARGS --prerelease"
-    fi
-    
-    if [ -n "$NOTES_FILE" ] && [ -f "$NOTES_FILE" ]; then
-        GH_ARGS="$GH_ARGS --notes-file $NOTES_FILE"
-    else
-        # Generate release notes from commits
-        print_step "Generating release notes"
-        PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
-        if [ -n "$PREV_TAG" ]; then
-            GH_ARGS="$GH_ARGS --generate-notes"
-        else
-            GH_ARGS="$GH_ARGS --notes 'Initial release'"
-        fi
-    fi
-    
-    # Check if release already exists
+    # Check if we need to upload any additional assets
     if gh release view "$VERSION" &>/dev/null; then
-        print_warning "Release $VERSION already exists"
-        read -p "Delete and recreate? (y/N) " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            gh release delete "$VERSION" --yes
-        else
-            print_info "Uploading assets to existing release"
-            gh release upload "$VERSION" dist/*.tar.gz dist/*.zip dist/checksums.txt --clobber
-            print_success "Assets uploaded"
-            exit 0
-        fi
+        print_info "Release $VERSION created by GoReleaser"
+        # GoReleaser should have already uploaded all assets
+    else
+        print_warning "Release $VERSION was not created (check GoReleaser output above)"
     fi
-    
-    # Create release with assets
-    gh release create "$VERSION" \
-        dist/*.tar.gz \
-        dist/*.zip \
-        dist/checksums.txt \
-        $GH_ARGS
-    
-    print_success "GitHub release created"
 fi
 
 # Summary
