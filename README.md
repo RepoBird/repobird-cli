@@ -22,9 +22,9 @@ Write your issue description once, and our autonomous agents handle everything -
 - ⚡ **Bulk Parallel Runs**: Clear 50+ issues simultaneously with one command
 - 🤖 **Autonomous Agents**: Full cycle from research to PR without human intervention
 - 📊 **Real-Time Monitoring**: Track progress of all parallel runs in the TUI dashboard
-- 🎯 **73% Auto-Merge Rate**: PRs so good they merge without changes
 - 🛡️ **Bulletproof Git Operations**: Impossible to mess up - predetermined workflows, not AI experiments
-- 🔐 **Enterprise Ready**: Secure API key management and team collaboration
+- 🔒 **Isolated VM Execution**: Each agent runs in its own secure Debian microVM with full development tools
+- 🌐 **Complete Dev Environment**: Multi-language support, package managers, databases - everything needed to build real software
 
 ## 🎯 Why RepoBird?
 
