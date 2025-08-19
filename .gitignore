@@ -16,6 +16,7 @@
 coverage.*
 *.coverprofile
 profile.cov
+test_*.md
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
@@ -66,3 +67,6 @@ ai_docs/
 # Personal development scripts
 scripts/kitty-dev.local.sh
 scripts/*.local.sh
+
+# Local development files
+local/
