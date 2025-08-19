@@ -186,33 +186,43 @@ repobird-cli/
 │   ├── api/              # API client and communication
 │   │   ├── client.go     # HTTP client implementation
 │   │   └── models.go     # API request/response types
+│   ├── bulk/             # Bulk operations handling
+│   ├── cache/            # Caching implementations
 │   ├── commands/         # Cobra command implementations
 │   │   ├── config.go     # Configuration management commands
 │   │   ├── run.go        # Task submission command
 │   │   ├── status.go     # Status checking command
 │   │   └── tui.go        # Terminal UI command
 │   ├── config/           # Configuration management
-│   │   └── config.go     # Viper-based config handling
+│   │   └── manager.go    # Configuration handling
+│   ├── container/        # Container-related utilities
+│   ├── domain/           # Domain models and logic
 │   ├── errors/           # Error handling
-│   │   └── errors.go     # Custom error types and formatting
+│   │   └── types.go      # Custom error types and formatting
 │   ├── models/           # Data models
-│   │   └── types.go      # Core data structures
+│   ├── prompts/          # Prompt generation
+│   ├── repository/       # Repository operations
 │   ├── retry/            # Retry logic
 │   │   └── retry.go      # Exponential backoff implementation
+│   ├── services/         # Business logic services
+│   ├── testutils/        # Testing utilities
 │   ├── tui/              # Terminal UI components
-│   │   ├── dashboard/    # Main dashboard view
+│   │   ├── views/        # TUI views
 │   │   ├── components/   # Reusable UI components
-│   │   └── models/       # TUI-specific models
+│   │   ├── cache/        # TUI caching layer
+│   │   └── keymap/       # Key binding management
 │   └── utils/            # Utility functions
-│       ├── git.go        # Git operations
-│       ├── polling.go    # Status polling
-│       └── security.go   # Security utilities
 ├── pkg/                   # Public library code
 │   ├── utils/            # Exported utilities
 │   └── version/          # Version information
 ├── docs/                  # Documentation
-├── tasks/                 # Example task files
-└── build/                 # Build artifacts
+├── examples/              # Example configurations
+│   └── single-runs/      # Single run examples
+├── scripts/               # Build and utility scripts
+├── tests/                 # Test files
+│   ├── integration/      # Integration tests
+│   └── testdata/         # Test data files
+└── testdata/              # Additional test fixtures
 ```
 
 ### Build System

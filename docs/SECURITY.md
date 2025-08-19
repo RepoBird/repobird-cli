@@ -77,7 +77,7 @@ Automatically used on headless servers, containers, or when keyring is unavailab
 
 If you discover a security vulnerability in RepoBird CLI, please report it responsibly:
 
-- **Email**: security@repobird.ai
+- **Contact**: https://repobird.ai/contact
 - **Response Time**: We aim to respond within 48 hours
 - **Please DO NOT**: Create public GitHub issues for security vulnerabilities
 
