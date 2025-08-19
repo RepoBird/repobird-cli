@@ -5,87 +5,72 @@
 [![CI Status](https://img.shields.io/github/actions/workflow/status/repobird/repobird-cli/ci.yml?branch=main)](https://github.com/repobird/repobird-cli/actions)
 [![Release](https://img.shields.io/github/v/release/repobird/repobird-cli)](https://github.com/repobird/repobird-cli/releases)
 
-RepoBird CLI is a powerful command-line interface and terminal UI for [RepoBird.ai](https://repobird.ai) - the AI-powered code generation platform. Submit coding tasks to AI agents, track progress in real-time, and manage your development workflows efficiently from your terminal.
+**One-Shot Issue to PR with Complete Git Automation**
+
+RepoBird CLI is the command-line interface for [RepoBird.ai](https://repobird.ai) - one-shot coding agents that handle everything from issue to PR. No chat, no iterations, no manual Git operations. Write your issue once, get a perfect PR back. Clear entire backlogs with bulk parallel runs.
 
 ## 🎯 What is RepoBird?
 
-RepoBird is an AI platform that automates code generation and software development tasks. Simply describe what you want to build or fix, and RepoBird's AI agents will create pull requests with the changes. The CLI tool gives you full control over this process directly from your terminal.
+RepoBird provides one-shot coding agents with complete Git automation. Unlike chat-based AI tools that require back-and-forth iterations and manual Git operations, RepoBird is simple: **issue in, PR out**. 
+
+Write your issue description once, and our autonomous agents handle everything - research, implementation, testing, commits, and PR creation. No chat interface, no copy-pasting code, no Git commands. The CLI enables massive scale with bulk parallel runs - clear your entire backlog in one command.
 
 ### Key Features
 
-- 🤖 **AI-Powered Development**: Submit tasks in natural language and get production-ready code
-- 📊 **Real-Time Monitoring**: Track AI agent progress with live updates
-- 🎨 **Interactive Dashboard**: Rich terminal UI with intuitive navigation
-- 🔄 **Batch Operations**: Submit and manage multiple tasks simultaneously
-- 🔍 **Smart Search**: Fuzzy search across repositories and runs
-- 🛡️ **Duplicate Prevention**: Automatic detection prevents accidental re-submissions
-- 🔐 **Secure Authentication**: Safe API key management with multiple auth methods
+- 🚀 **One-Shot Execution**: No chat, no iterations - write once, ship automatically
+- 🔧 **Complete Git Automation**: Never touch Git - perfect commits, branches, and PRs every time
+- ⚡ **Bulk Parallel Runs**: Clear 50+ issues simultaneously with one command
+- 🤖 **Autonomous Agents**: Full cycle from research to PR without human intervention
+- 📊 **Real-Time Monitoring**: Track progress of all parallel runs in the TUI dashboard
+- 🎯 **73% Auto-Merge Rate**: PRs so good they merge without changes
+- 🛡️ **Bulletproof Git Operations**: Impossible to mess up - predetermined workflows, not AI experiments
+- 🔐 **Enterprise Ready**: Secure API key management and team collaboration
+
+## 🎯 Why RepoBird?
+
+### The Problem with Other AI Tools
+- **Copilot/Cursor**: Requires constant interaction, you still handle all Git operations manually
+- **ChatGPT/Claude**: Copy-paste code snippets, manage Git yourself, lose context between sessions
+- **Other AI Agents**: Chat interfaces, multiple iterations, manual PR creation
+
+### The RepoBird Difference
+**One-Shot Simplicity**: Write your issue once, get a PR back. No chat, no iterations, no manual steps.
+
+**Complete Git Automation**: Our agents handle everything - branching, commits with proper messages, PR creation with descriptions. You never touch Git.
+
+**Massive Scale**: Submit 50+ tasks in parallel. While you're in a meeting, RepoBird clears your entire backlog.
+
+**Perfect Every Time**: Atomic commits, proper commit messages, clean Git history. Impossible to mess up because it's not AI making Git decisions - it's bulletproof predetermined workflows.
 
 ## 📦 Installation
 
-### macOS
+### Quick Install (Linux/macOS)
 
-#### Direct Download
-```bash
-# Download latest release for macOS (Apple Silicon)
-curl -L https://github.com/RepoBird/repobird-cli/releases/latest/download/repobird-cli_darwin_arm64.tar.gz | tar xz
-sudo mv repobird /usr/local/bin/
-
-# For Intel Macs
-curl -L https://github.com/RepoBird/repobird-cli/releases/latest/download/repobird-cli_darwin_amd64.tar.gz | tar xz
-sudo mv repobird /usr/local/bin/
-```
-
-### Linux
-
-#### Package Managers
-
-**Arch Linux (AUR)** - Coming Soon
-```bash
-yay -S repobird
-```
-
-**Debian/Ubuntu** - Available in Releases
-```bash
-# Download the .deb package from releases
-wget https://github.com/RepoBird/repobird-cli/releases/latest/download/repobird_VERSION_amd64.deb
-sudo dpkg -i repobird_*.deb
-```
-
-**Red Hat/Fedora** - Available in Releases  
-```bash
-# Download the .rpm package from releases
-wget https://github.com/RepoBird/repobird-cli/releases/latest/download/repobird_VERSION_x86_64.rpm
-sudo rpm -i repobird_*.rpm
-```
-
-#### Using Install Script
 ```bash
 curl -sSL https://raw.githubusercontent.com/RepoBird/repobird-cli/main/scripts/install.sh | bash
 ```
 
-#### Direct Download
+### Direct Download
+
+#### macOS
 ```bash
-# Download latest release for Linux
+# Apple Silicon
+curl -L https://github.com/RepoBird/repobird-cli/releases/latest/download/repobird-cli_darwin_arm64.tar.gz | tar xz
+sudo mv repobird /usr/local/bin/
+
+# Intel
+curl -L https://github.com/RepoBird/repobird-cli/releases/latest/download/repobird-cli_darwin_amd64.tar.gz | tar xz
+sudo mv repobird /usr/local/bin/
+```
+
+#### Linux
+```bash
 curl -L https://github.com/RepoBird/repobird-cli/releases/latest/download/repobird-cli_linux_amd64.tar.gz | tar xz
 sudo mv repobird /usr/local/bin/
 ```
 
-### Windows
-
-#### Using Scoop (Coming Soon)
-```powershell
-scoop bucket add repobird https://github.com/RepoBird/scoop-bucket
-scoop install repobird
-```
-
-#### Using Chocolatey (Coming Soon)
-```powershell
-choco install repobird
-```
-
-#### Direct Download
-Download the latest Windows ZIP from the [releases page](https://github.com/RepoBird/repobird-cli/releases) and extract `repobird.exe`.
+#### Windows
+Download the latest ZIP from the [releases page](https://github.com/RepoBird/repobird-cli/releases) and extract `repobird.exe`.
 
 ### Build from Source
 
@@ -94,8 +79,6 @@ Download the latest Windows ZIP from the [releases page](https://github.com/Repo
 git clone https://github.com/RepoBird/repobird-cli.git
 cd repobird-cli
 make build
-
-# Install globally (optional)
 sudo cp build/repobird /usr/local/bin/
 ```
 
@@ -136,17 +119,6 @@ rm -rf ~/.config/repobird
 rm -rf ~/.repobird  # Legacy location
 ```
 
-### Package Manager Uninstallation
-
-For package manager installations:
-
-```bash
-# Homebrew (macOS)
-brew uninstall repobird-cli
-
-# Scoop (Windows)
-scoop uninstall repobird
-```
 
 ## 🚀 Quick Start
 
@@ -157,35 +129,45 @@ Sign up for a free account at [RepoBird.ai](https://repobird.ai) to get your API
 ### 2. Authenticate
 
 ```bash
-# Interactive login (recommended)
+# One-time setup
 repobird login
 # Enter your API key when prompted
-
-# Verify authentication
-repobird verify
 ```
 
-### 3. Submit Your First Task
+### 3. Submit Your First Task (One-Shot)
 
 ```bash
-# Create a simple task file
+# Create a task - just describe what you want
 echo '{
   "repository": "your-org/your-repo",
-  "prompt": "Add a README file with project documentation"
-}' > task.json
+  "prompt": "Fix the login bug where users get stuck on loading screen"
+}' > fix.json
 
-# Submit the task
-repobird run task.json --follow
+# Submit and watch the magic happen
+repobird run fix.json --follow
+# That's it. PR will be created automatically. No further action needed.
 ```
 
-### 4. Monitor Progress
+### 4. Clear Your Entire Backlog (Bulk Mode)
 
 ```bash
-# Launch the interactive dashboard
-repobird tui
+# Submit multiple issues at once
+echo '{
+  "repository": "your-org/your-repo",
+  "runs": [
+    {"prompt": "Fix login bug"},
+    {"prompt": "Add dark mode"},
+    {"prompt": "Improve error handling"},
+    {"prompt": "Update dependencies"},
+    {"prompt": "Add unit tests for auth module"}
+  ]
+}' > backlog.json
 
-# Or check status via CLI
-repobird status
+# Fire and forget - all PRs created in parallel
+repobird bulk backlog.json
+
+# Monitor all runs in real-time
+repobird tui
 ```
 
 ## 📖 Usage Guide
