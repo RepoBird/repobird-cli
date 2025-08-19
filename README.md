@@ -25,50 +25,73 @@ RepoBird is an AI platform that automates code generation and software developme
 
 ### macOS
 
-#### Using Homebrew (Recommended)
+#### Using Homebrew (Coming Soon)
 ```bash
 brew tap repobird/tap
-brew install repobird-cli
+brew install repobird
 ```
 
 #### Direct Download
 ```bash
 # Download latest release for macOS (Apple Silicon)
-curl -L https://github.com/RepoBird/repobird-cli/releases/latest/download/repobird-darwin-arm64 -o repobird
-chmod +x repobird
+curl -L https://github.com/RepoBird/repobird-cli/releases/latest/download/repobird_darwin_arm64.tar.gz | tar xz
 sudo mv repobird /usr/local/bin/
 
 # For Intel Macs
-curl -L https://github.com/RepoBird/repobird-cli/releases/latest/download/repobird-darwin-amd64 -o repobird
-chmod +x repobird
+curl -L https://github.com/RepoBird/repobird-cli/releases/latest/download/repobird_darwin_amd64.tar.gz | tar xz
 sudo mv repobird /usr/local/bin/
 ```
 
 ### Linux
 
-#### Using Script
+#### Package Managers
+
+**Arch Linux (AUR)** - Coming Soon
 ```bash
-curl -sSL https://raw.githubusercontent.com/RepoBird/repobird-cli/main/install.sh | bash
+yay -S repobird
+```
+
+**Debian/Ubuntu** - Available in Releases
+```bash
+# Download the .deb package from releases
+wget https://github.com/RepoBird/repobird-cli/releases/latest/download/repobird_VERSION_amd64.deb
+sudo dpkg -i repobird_*.deb
+```
+
+**Red Hat/Fedora** - Available in Releases  
+```bash
+# Download the .rpm package from releases
+wget https://github.com/RepoBird/repobird-cli/releases/latest/download/repobird_VERSION_x86_64.rpm
+sudo rpm -i repobird_*.rpm
+```
+
+#### Using Install Script
+```bash
+curl -sSL https://raw.githubusercontent.com/RepoBird/repobird-cli/main/scripts/install.sh | bash
 ```
 
 #### Direct Download
 ```bash
 # Download latest release for Linux
-curl -L https://github.com/RepoBird/repobird-cli/releases/latest/download/repobird-linux-amd64 -o repobird
-chmod +x repobird
+curl -L https://github.com/RepoBird/repobird-cli/releases/latest/download/repobird_linux_amd64.tar.gz | tar xz
 sudo mv repobird /usr/local/bin/
 ```
 
 ### Windows
 
-#### Using Scoop
+#### Using Scoop (Coming Soon)
 ```powershell
 scoop bucket add repobird https://github.com/RepoBird/scoop-bucket
 scoop install repobird
 ```
 
+#### Using Chocolatey (Coming Soon)
+```powershell
+choco install repobird
+```
+
 #### Direct Download
-Download the latest Windows executable from the [releases page](https://github.com/RepoBird/repobird-cli/releases).
+Download the latest Windows ZIP from the [releases page](https://github.com/RepoBird/repobird-cli/releases) and extract `repobird.exe`.
 
 ### Build from Source
 

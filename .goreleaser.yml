@@ -129,21 +129,22 @@ nfpms:
       - src: "LICENSE"
         dst: "/usr/share/doc/repobird/LICENSE"
 
-snapcrafts:
-  - name: repobird
-    summary: "Fast CLI for RepoBird AI agent platform"
-    description: |
-      RepoBird CLI enables users to submit AI-powered code generation tasks,
-      track their progress, and manage runs through a simple CLI interface.
-    grade: stable
-    confinement: strict
-    publish: true
-    license: MIT
-    base: core22
-    apps:
-      repobird:
-        command: repobird
-        plugs: ["home", "network", "removable-media"]
+# Snapcraft support disabled for now - requires snapcraft to be installed
+# snapcrafts:
+#   - name: repobird
+#     summary: "Fast CLI for RepoBird AI agent platform"
+#     description: |
+#       RepoBird CLI enables users to submit AI-powered code generation tasks,
+#       track their progress, and manage runs through a simple CLI interface.
+#     grade: stable
+#     confinement: strict
+#     publish: true
+#     license: MIT
+#     base: core22
+#     apps:
+#       repobird:
+#         command: repobird
+#         plugs: ["home", "network", "removable-media"]
 
 scoops:
   - name: repobird
