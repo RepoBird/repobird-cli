@@ -1,7 +1,7 @@
 # RepoBird CLI
 
 [![Go Version](https://img.shields.io/badge/Go-1.20+-00ADD8?style=flat&logo=go)](https://go.dev)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
 [![CI Status](https://img.shields.io/github/actions/workflow/status/repobird/repobird-cli/ci.yml?branch=main)](https://github.com/repobird/repobird-cli/actions)
 [![Release](https://img.shields.io/github/v/release/repobird/repobird-cli)](https://github.com/repobird/repobird-cli/releases)
 
@@ -55,17 +55,17 @@ curl -sSL https://raw.githubusercontent.com/RepoBird/repobird-cli/main/scripts/i
 #### macOS
 ```bash
 # Apple Silicon
-curl -L https://github.com/RepoBird/repobird-cli/releases/latest/download/repobird-cli_darwin_arm64.tar.gz | tar xz
+curl -L https://github.com/RepoBird/repobird-cli/releases/latest/download/repobird-cli_darwin_arm64.tar.gz | tar xz && \
 sudo mv repobird /usr/local/bin/
 
 # Intel
-curl -L https://github.com/RepoBird/repobird-cli/releases/latest/download/repobird-cli_darwin_amd64.tar.gz | tar xz
+curl -L https://github.com/RepoBird/repobird-cli/releases/latest/download/repobird-cli_darwin_amd64.tar.gz | tar xz && \
 sudo mv repobird /usr/local/bin/
 ```
 
 #### Linux
 ```bash
-curl -L https://github.com/RepoBird/repobird-cli/releases/latest/download/repobird-cli_linux_amd64.tar.gz | tar xz
+curl -L https://github.com/RepoBird/repobird-cli/releases/latest/download/repobird-cli_linux_amd64.tar.gz | tar xz && \
 sudo mv repobird /usr/local/bin/
 ```
 
@@ -82,49 +82,11 @@ make build
 sudo cp build/repobird /usr/local/bin/
 ```
 
-## 🗑️ Uninstallation
-
-### Using the Uninstall Script
-
-The easiest way to completely remove RepoBird CLI and its data:
-
-```bash
-# If you have the repository cloned
-./scripts/uninstall.sh
-
-# Or download and run the script directly
-curl -sSL https://raw.githubusercontent.com/RepoBird/repobird-cli/main/scripts/uninstall.sh | bash
-```
-
-The uninstall script will:
-- Remove the `repobird` binary and `rb` alias from your system
-- Delete configuration files (including API keys)
-- Clean up cache directories
-- Prompt for confirmation before each removal
-
-### Manual Uninstallation
-
-If you prefer to uninstall manually:
-
-```bash
-# Remove the binary (location depends on installation method)
-sudo rm -f /usr/local/bin/repobird
-sudo rm -f /usr/local/bin/rb
-# Or if installed with go install
-rm -f ~/go/bin/repobird
-rm -f ~/go/bin/rb
-
-# Remove configuration and cache
-rm -rf ~/.config/repobird
-rm -rf ~/.repobird  # Legacy location
-```
-
-
 ## 🚀 Quick Start
 
 ### 1. Get Your API Key
 
-Sign up for a free account at [RepoBird.ai](https://repobird.ai) to get your API key.
+Sign up for a free account at [RepoBird.ai](https://repobird.ai) and get your API key from [Dashboard → API Keys](https://repobird.ai/dashboard/user-profile/api-keys).
 
 ### 2. Authenticate
 
@@ -285,13 +247,6 @@ For complete configuration options and examples, see the [Run Configuration Guid
 
 ## 🛡️ Advanced Features
 
-### Duplicate Prevention
-
-RepoBird automatically prevents accidental duplicate submissions:
-- File content hashing detects when you're re-running the same task
-- Visual indicators in the TUI show duplicate status
-- Easy override option when you intentionally want to re-run
-
 ### Smart Caching
 
 - Local caching reduces API calls and improves performance
@@ -329,17 +284,7 @@ RepoBird automatically prevents accidental duplicate submissions:
 
 ## 🤝 Contributing
 
-We welcome contributions! RepoBird CLI is open source and community-driven.
-
-### How to Contribute
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to your branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-Please read our [Contributing Guidelines](CONTRIBUTING.md) for details on our code of conduct and development process.
+We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ### Development Setup
 
@@ -360,11 +305,12 @@ make build
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the GNU Affero General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
 
 ## 🌟 Support
 
-- **Documentation**: [repobird.ai/docs](https://repobird.ai/docs)
+- **Application Documentation**: [repobird.ai/docs](https://repobird.ai/docs)
+- **Technical/Developer Docs**: [docs/](docs/) - Architecture, API reference, development guides
 - **Issues**: [GitHub Issues](https://github.com/repobird/repobird-cli/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/repobird/repobird-cli/discussions)
 
