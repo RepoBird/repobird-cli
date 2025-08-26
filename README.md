@@ -1,5 +1,8 @@
 # RepoBird CLI
 
+<img width="1254" height="726" alt="cli-logo-loading" src="https://github.com/user-attachments/assets/12e06a97-161f-4286-a241-6060fd8d9f2c" />
+
+
 [![Go Version](https://img.shields.io/badge/Go-1.20+-00ADD8?style=flat&logo=go)](https://go.dev)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
 [![CI Status](https://img.shields.io/github/actions/workflow/status/repobird/repobird-cli/ci.yml?branch=main)](https://github.com/repobird/repobird-cli/actions)
@@ -173,6 +176,7 @@ repobird tui                    # Launch terminal UI
 ```
 
 ### Terminal UI Navigation
+<img width="1251" height="723" alt="tui-example" src="https://github.com/user-attachments/assets/263d96bf-2b53-4152-943c-de5529ad40d6" />
 
 The interactive dashboard provides a rich interface for managing your runs:
 
