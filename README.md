@@ -178,7 +178,7 @@ repobird tui                    # Launch terminal UI
 ### Terminal UI Navigation
 <img width="1251" height="723" alt="tui-example" src="https://github.com/user-attachments/assets/263d96bf-2b53-4152-943c-de5529ad40d6" />
 
-The interactive dashboard provides a rich interface for managing your runs:
+The interactive dashboard features a **Miller column layout** inspired by the ranger file manager, providing hierarchical navigation through repositories → runs → details in a three-column view. This intuitive layout allows you to see context at every level while drilling down into specific run details.
 
 | Key | Action |
 |-----|--------|
