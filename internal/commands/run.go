@@ -31,20 +31,34 @@ import (
 var (
 	dryRun bool
 	follow bool
+	repo   string
+	prompt string
+	source string
+	target string
+	title  string
+	runType string
+	contextFlag string
 )
 
 var runCmd = &cobra.Command{
 	Use:   "run [file]",
-	Short: "Create runs from a JSON, YAML, Markdown, or bulk configuration file",
-	Long: `Create one or more runs from a configuration file.
+	Short: "Create runs from a JSON, YAML, Markdown, or bulk configuration file, or with flags",
+	Long: `Create one or more runs from a configuration file or using command-line flags.
 
 Supports single run or bulk run configurations in JSON, YAML, or Markdown format.
+Can also create a single run directly using command-line flags.
 
 Examples:
+  # Run from file
   repobird run task.json                    # Run from file (single or bulk)
   repobird run tasks.yaml --follow           # Run and follow status
   repobird run task.md --dry-run            # Validate without running
   cat task.json | repobird run              # Pipe JSON from stdin
+
+  # Run with flags
+  repobird run -r owner/repo -p "Fix the bug in auth"
+  repobird run --repo owner/repo --prompt "Add tests" --follow
+  repobird run -r owner/repo -p "Refactor" --source dev --target main
 
 For configuration examples and field descriptions:
   repobird examples                         # View all examples
@@ -60,6 +74,15 @@ For configuration examples and field descriptions:
 func init() {
 	runCmd.Flags().BoolVar(&dryRun, "dry-run", false, "validate input without creating a run")
 	runCmd.Flags().BoolVar(&follow, "follow", false, "follow the run status after creation")
+	
+	// Flags for direct run creation
+	runCmd.Flags().StringVarP(&repo, "repo", "r", "", "repository name (owner/repo or numeric ID)")
+	runCmd.Flags().StringVarP(&prompt, "prompt", "p", "", "prompt for the run")
+	runCmd.Flags().StringVar(&source, "source", "", "source branch (optional)")
+	runCmd.Flags().StringVar(&target, "target", "", "target branch (optional)")
+	runCmd.Flags().StringVar(&title, "title", "", "title for the run (optional)")
+	runCmd.Flags().StringVar(&runType, "run-type", "", "type of run: 'run' or 'plan' (optional, default: run)")
+	runCmd.Flags().StringVar(&contextFlag, "context", "", "additional context for the run (optional)")
 }
 
 func runCommand(cmd *cobra.Command, args []string) error {
@@ -68,6 +91,35 @@ func runCommand(cmd *cobra.Command, args []string) error {
 
 	if cfg.APIKey == "" {
 		return errors.NoAPIKeyError()
+	}
+
+	// Check if run is being created with flags
+	if repo != "" && prompt != "" {
+		// Create run from flags
+		runConfig := &models.RunConfig{
+			Repository: repo,
+			Prompt:     prompt,
+			Source:     source,
+			Target:     target,
+			Title:      title,
+			RunType:    runType,
+			Context:    contextFlag,
+		}
+		
+		// Set default run type if not specified
+		if runConfig.RunType == "" {
+			runConfig.RunType = "run"
+		}
+		
+		return processSingleRun(runConfig, "")
+	}
+	
+	// If flags are partially set, show more specific error
+	if repo != "" && prompt == "" {
+		return fmt.Errorf("missing required flag: --prompt (-p) is required when --repo is specified")
+	}
+	if prompt != "" && repo == "" {
+		return fmt.Errorf("missing required flag: --repo (-r) is required when --prompt is specified")
 	}
 
 	// Check if it's stdin input

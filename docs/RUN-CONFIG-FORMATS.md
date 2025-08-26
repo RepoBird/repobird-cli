@@ -4,6 +4,7 @@ The `repobird run` command supports multiple configuration file formats to defin
 
 ## Supported Formats
 
+- **Command-line flags** - Direct run creation using flags (single run only)
 - **JSON** (`.json`) - Standard JSON configuration (single or bulk)
 - **YAML** (`.yaml`, `.yml`) - Human-friendly YAML format (single or bulk)
 - **Markdown** (`.md`, `.markdown`) - Markdown with YAML frontmatter for documentation (single or bulk)
@@ -55,6 +56,38 @@ The `repobird run` command supports multiple configuration file formats to defin
 ## Format Examples
 
 ### Single Run Examples
+
+#### Command-Line Flags
+
+Create a run directly using command-line flags without any configuration file:
+
+```bash
+# Minimal example (required flags only)
+repobird run -r myorg/webapp -p "Fix the login bug"
+
+# With additional options
+repobird run --repo myorg/webapp \
+  --prompt "Fix the login bug where users cannot authenticate after 5 failed attempts" \
+  --source main \
+  --target fix/login-rate-limit \
+  --title "Fix authentication rate limiting issue" \
+  --context "Users report being permanently locked out. Should reset after 15 minutes." \
+  --follow
+
+# Short form flags
+repobird run -r myorg/webapp -p "Add unit tests for auth module" --follow
+```
+
+**Available flags:**
+- `-r, --repo` (required) - Repository name (owner/repo or numeric ID)
+- `-p, --prompt` (required) - The task description/instructions
+- `--source` - Source branch (optional, defaults to repository's default branch)
+- `--target` - Target branch (optional, auto-generated if not specified)
+- `--title` - Human-readable title (optional, auto-generated if not specified)
+- `--run-type` - Type of run: 'run' or 'plan' (optional, defaults to 'run')
+- `--context` - Additional context (optional)
+- `--follow` - Follow the run status after creation
+- `--dry-run` - Validate without creating the run
 
 #### JSON Format
 

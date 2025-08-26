@@ -101,13 +101,15 @@ repobird login
 ### 3. Submit Your First Task (One-Shot)
 
 ```bash
-# Create a task - just describe what you want
+# Quickest way - direct command with flags (no file needed)
+repobird run -r your-org/your-repo -p "Fix the login bug where users get stuck on loading screen"
+
+# Or use a JSON file for more options
 echo '{
   "repository": "your-org/your-repo",
   "prompt": "Fix the login bug where users get stuck on loading screen"
 }' > fix.json
 
-# Submit and watch the magic happen
 repobird run fix.json --follow
 # That's it. PR will be created automatically. No further action needed.
 ```
