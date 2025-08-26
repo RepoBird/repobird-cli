@@ -47,9 +47,10 @@ type DashboardView struct {
 	height int
 
 	// Loading and error state
-	loading      bool
-	error        error
-	initializing bool
+	loading       bool
+	error         error
+	initializing  bool
+	debugLoading  bool // Stay in loading state (for debugging)
 
 	// Real data
 	repositories    []models.Repository
@@ -213,6 +214,13 @@ func NewDashboardView(client APIClient, cache *cache.SimpleCache) *DashboardView
 	return dashboard
 }
 
+// NewDashboardViewDebugLoading creates a dashboard that stays in loading state
+func NewDashboardViewDebugLoading(client APIClient, cache *cache.SimpleCache) *DashboardView {
+	dashboard := NewDashboardView(client, cache)
+	dashboard.debugLoading = true
+	return dashboard
+}
+
 // IsKeyDisabled implements the CoreViewKeymap interface
 func (d *DashboardView) IsKeyDisabled(keyString string) bool {
 	disabled := d.disabledKeys[keyString]
@@ -269,6 +277,12 @@ func (d *DashboardView) Init() tea.Cmd {
 	if err != nil {
 		// Log error but don't fail - clipboard may not be available in some environments
 		debug.LogToFilef("DEBUG: Failed to initialize clipboard: %v\n", err)
+	}
+
+	// If in debug loading mode, only start the spinner
+	if d.debugLoading {
+		debug.LogToFile("🐛 DASHBOARD: Debug loading mode - staying in loading state 🐛\n")
+		return d.spinner.Tick
 	}
 
 	return tea.Batch(
@@ -584,9 +598,12 @@ func (d *DashboardView) handleDataLoaded(msg dashboardDataLoadedMsg) (tea.Model,
 	debug.LogToFilef("\n[DASHBOARD DATA LOADED MSG RECEIVED]\n")
 	debug.LogToFilef("🔄 REFRESH: Data loaded - setting loading state to false 🔄\n")
 
-	d.loading = false
-	d.initializing = false
-	d.statusLine.SetLoading(false)
+	// If in debug loading mode, stay in loading state
+	if !d.debugLoading {
+		d.loading = false
+		d.initializing = false
+		d.statusLine.SetLoading(false)
+	}
 
 	if msg.error != nil {
 		return d.handleDataLoadError(msg)

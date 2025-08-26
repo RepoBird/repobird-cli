@@ -28,6 +28,7 @@ type App struct {
 	width         int                     // Current window width
 	height        int                     // Current window height
 	authenticated bool                    // Whether initial auth is complete
+	debugLoading  bool                    // Debug mode to stay on loading screen
 }
 
 // authCompleteMsg is sent when authentication and cache initialization is complete
@@ -45,8 +46,26 @@ func NewApp(client APIClient) *App {
 	}
 }
 
+// NewAppWithDebugLoading creates a new App with debug loading mode enabled
+func NewAppWithDebugLoading(client APIClient) *App {
+	app := NewApp(client)
+	app.debugLoading = true
+	return app
+}
+
 // Init implements tea.Model interface - initializes with dashboard view
 func (a *App) Init() tea.Cmd {
+	// If in debug loading mode, skip authentication and go straight to dashboard loading view
+	if a.debugLoading {
+		debug.LogToFile("🐛 DEBUG LOADING: Skipping authentication, showing dashboard loading view 🐛\n")
+		a.authenticated = true
+		// Create minimal cache without authentication
+		a.cache = cache.NewSimpleCache()
+		// Create dashboard in loading state
+		a.current = views.NewDashboardViewDebugLoading(a.client, a.cache)
+		return a.current.Init()
+	}
+	
 	// Just authenticate, don't request window size yet
 	// The terminal will send the real window size automatically
 	return a.authenticateAndInitCache()
@@ -87,12 +106,18 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, tea.Batch(cmds...)
 	}
 
-	// Don't process other messages until authenticated
+	// Don't process other messages until authenticated (except quit)
 	if !a.authenticated {
 		// Still handle window size to store dimensions
 		if wsMsg, ok := msg.(tea.WindowSizeMsg); ok {
 			a.width = wsMsg.Width
 			a.height = wsMsg.Height
+		}
+		// Allow quitting even during loading
+		if keyMsg, ok := msg.(tea.KeyMsg); ok {
+			if keyMsg.String() == "q" || keyMsg.String() == "ctrl+c" {
+				return a, tea.Quit
+			}
 		}
 		return a, nil
 	}

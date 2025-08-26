@@ -18,6 +18,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var debugLoading bool
+
 var tuiCmd = &cobra.Command{
 	Use:   "tui",
 	Short: "Launch the interactive Terminal User Interface",
@@ -34,6 +36,7 @@ The TUI provides:
 //nolint:gochecknoinits // Required for CLI command registration
 func init() {
 	rootCmd.AddCommand(tuiCmd)
+	tuiCmd.Flags().BoolVar(&debugLoading, "debug-loading", false, "Stay on loading screen (for debugging only)")
 }
 
 func runTUI(cmd *cobra.Command, args []string) error {
@@ -62,7 +65,13 @@ func runTUI(cmd *cobra.Command, args []string) error {
 		// Log debug mode activation
 		tuiDebug.LogToFilef("🎮 DEBUG MODE: Activated with mock client and debug user ID=%d 🎮\n", debugUserInfo.ID)
 
-		app := tui.NewApp(mockClient)
+		var app *tui.App
+		if debugLoading {
+			tuiDebug.LogToFile("🐛 DEBUG LOADING MODE: Staying on loading screen 🐛\n")
+			app = tui.NewAppWithDebugLoading(mockClient)
+		} else {
+			app = tui.NewApp(mockClient)
+		}
 		return app.Run()
 	}
 
@@ -77,7 +86,14 @@ func runTUI(cmd *cobra.Command, args []string) error {
 
 	apiURL := utils.GetAPIURL(cfg.APIURL)
 	client := api.NewClient(cfg.APIKey, apiURL, cfg.Debug)
-	app := tui.NewApp(client)
+	
+	var app *tui.App
+	if debugLoading {
+		tuiDebug.LogToFile("🐛 DEBUG LOADING MODE: Staying on loading screen 🐛\n")
+		app = tui.NewAppWithDebugLoading(client)
+	} else {
+		app = tui.NewApp(client)
+	}
 
 	return app.Run()
 }
