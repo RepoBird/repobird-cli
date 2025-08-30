@@ -118,7 +118,7 @@ install_binary() {
     local extract_cmd=""
     
     if [[ $platform == *"windows"* ]]; then
-        filename="${BINARY_NAME}_${platform}.zip"
+        filename="${BINARY_NAME}-cli_${platform}.zip"
         extract_cmd="unzip -q"
         
         if ! command -v unzip >/dev/null 2>&1; then
@@ -126,7 +126,7 @@ install_binary() {
             exit 1
         fi
     else
-        filename="${BINARY_NAME}_${platform}.tar.gz"
+        filename="${BINARY_NAME}-cli_${platform}.tar.gz"
         extract_cmd="tar -xzf"
     fi
     
