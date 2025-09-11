@@ -247,34 +247,33 @@ func TestClient_GetBulkStatus(t *testing.T) {
 			name:    "successful status retrieval",
 			batchID: "batch-123",
 			mockResponse: dto.BulkStatusResponse{
-				BatchID: "batch-123",
-				Status:  "processing",
-				Runs: []dto.RunStatusItem{
-					{
-						ID:       1,
-						Title:    "Task 1",
-						Status:   "completed",
-						Progress: 100,
-						RunURL:   "https://repobird.ai/runs/1",
+				Data: dto.BulkStatusData{
+					BatchID: "batch-123",
+					Status:  "processing",
+					Runs: []dto.RunStatusItem{
+						{
+							ID:       1,
+							Title:    "Task 1",
+							Status:   "completed",
+							Progress: 100,
+							PRURL:    &[]string{"https://repobird.ai/runs/1"}[0],
+						},
+						{
+							ID:       2,
+							Title:    "Task 2",
+							Status:   "processing",
+							Progress: 50,
+						},
 					},
-					{
-						ID:       2,
-						Title:    "Task 2",
-						Status:   "processing",
-						Progress: 50,
-						Message:  "Analyzing code...",
+					Metadata: dto.BulkStatusMetadata{
+						TotalRuns:  2,
+						Queued:     0,
+						Processing: 1,
+						Completed:  1,
+						Failed:     0,
+						StartedAt:  time.Now().Add(-5 * time.Minute).Format(time.RFC3339),
 					},
 				},
-				Statistics: dto.BulkStatistics{
-					Total:      2,
-					Queued:     0,
-					Processing: 1,
-					Completed:  1,
-					Failed:     0,
-					Cancelled:  0,
-				},
-				CreatedAt: time.Now().Add(-5 * time.Minute),
-				UpdatedAt: time.Now(),
 			},
 			mockStatusCode: http.StatusOK,
 			expectedError:  false,
@@ -283,28 +282,30 @@ func TestClient_GetBulkStatus(t *testing.T) {
 			name:    "batch completed",
 			batchID: "batch-456",
 			mockResponse: dto.BulkStatusResponse{
-				BatchID: "batch-456",
-				Status:  "completed",
-				Runs: []dto.RunStatusItem{
-					{
-						ID:          1,
-						Title:       "Task 1",
-						Status:      "completed",
-						Progress:    100,
-						CompletedAt: &[]time.Time{time.Now()}[0],
+				Data: dto.BulkStatusData{
+					BatchID: "batch-456",
+					Status:  "completed",
+					Runs: []dto.RunStatusItem{
+						{
+							ID:          1,
+							Title:       "Task 1",
+							Status:      "completed",
+							Progress:    100,
+							CompletedAt: &[]string{time.Now().Format(time.RFC3339)}[0],
+						},
+						{
+							ID:          2,
+							Title:       "Task 2",
+							Status:      "failed",
+							CompletedAt: &[]string{time.Now().Format(time.RFC3339)}[0],
+						},
 					},
-					{
-						ID:          2,
-						Title:       "Task 2",
-						Status:      "failed",
-						Error:       "Build failed",
-						CompletedAt: &[]time.Time{time.Now()}[0],
+					Metadata: dto.BulkStatusMetadata{
+						TotalRuns: 2,
+						Completed: 1,
+						Failed:    1,
+						StartedAt: time.Now().Add(-10 * time.Minute).Format(time.RFC3339),
 					},
-				},
-				Statistics: dto.BulkStatistics{
-					Total:     2,
-					Completed: 1,
-					Failed:    1,
 				},
 			},
 			mockStatusCode: http.StatusOK,
@@ -354,9 +355,9 @@ func TestClient_GetBulkStatus(t *testing.T) {
 				require.NoError(t, err)
 				assert.NotNil(t, result)
 				if response, ok := tt.mockResponse.(dto.BulkStatusResponse); ok {
-					assert.Equal(t, response.BatchID, result.BatchID)
-					assert.Equal(t, response.Status, result.Status)
-					assert.Equal(t, len(response.Runs), len(result.Runs))
+					assert.Equal(t, response.Data.BatchID, result.Data.BatchID)
+					assert.Equal(t, response.Data.Status, result.Data.Status)
+					assert.Equal(t, len(response.Data.Runs), len(result.Data.Runs))
 				}
 			}
 		})
@@ -445,32 +446,41 @@ func TestClient_PollBulkStatus(t *testing.T) {
 			case 1:
 				// First call: processing
 				response = dto.BulkStatusResponse{
-					BatchID: batchID,
-					Status:  "processing",
-					Statistics: dto.BulkStatistics{
-						Total:      2,
-						Processing: 2,
+					Data: dto.BulkStatusData{
+						BatchID: batchID,
+						Status:  "processing",
+						Metadata: dto.BulkStatusMetadata{
+							TotalRuns:  2,
+							Processing: 2,
+							StartedAt:  "2024-01-01T10:00:00Z",
+						},
 					},
 				}
 			case 2:
 				// Second call: still processing
 				response = dto.BulkStatusResponse{
-					BatchID: batchID,
-					Status:  "processing",
-					Statistics: dto.BulkStatistics{
-						Total:      2,
-						Processing: 1,
-						Completed:  1,
+					Data: dto.BulkStatusData{
+						BatchID: batchID,
+						Status:  "processing",
+						Metadata: dto.BulkStatusMetadata{
+							TotalRuns:  2,
+							Processing: 1,
+							Completed:  1,
+							StartedAt:  "2024-01-01T10:00:00Z",
+						},
 					},
 				}
 			default:
 				// Final call: completed
 				response = dto.BulkStatusResponse{
-					BatchID: batchID,
-					Status:  "completed",
-					Statistics: dto.BulkStatistics{
-						Total:     2,
-						Completed: 2,
+					Data: dto.BulkStatusData{
+						BatchID: batchID,
+						Status:  "completed",
+						Metadata: dto.BulkStatusMetadata{
+							TotalRuns: 2,
+							Completed: 2,
+							StartedAt: "2024-01-01T10:00:00Z",
+						},
 					},
 				}
 			}
@@ -493,7 +503,7 @@ func TestClient_PollBulkStatus(t *testing.T) {
 		var updates []dto.BulkStatusResponse
 		for status := range statusChan {
 			updates = append(updates, status)
-			if status.Status == "completed" {
+			if status.Data.Status == "completed" {
 				break
 			}
 		}
@@ -501,8 +511,8 @@ func TestClient_PollBulkStatus(t *testing.T) {
 		// Verify we got updates
 		assert.Greater(t, len(updates), 0)
 		lastUpdate := updates[len(updates)-1]
-		assert.Equal(t, "completed", lastUpdate.Status)
-		assert.Equal(t, 2, lastUpdate.Statistics.Completed)
+		assert.Equal(t, "completed", lastUpdate.Data.Status)
+		assert.Equal(t, 2, lastUpdate.Data.Metadata.Completed)
 	})
 
 	t.Run("polling with context cancellation", func(t *testing.T) {
@@ -510,8 +520,15 @@ func TestClient_PollBulkStatus(t *testing.T) {
 
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			response := dto.BulkStatusResponse{
-				BatchID: batchID,
-				Status:  "processing",
+				Data: dto.BulkStatusData{
+					BatchID: batchID,
+					Status:  "processing",
+					Metadata: dto.BulkStatusMetadata{
+						TotalRuns:  2,
+						Processing: 2,
+						StartedAt:  "2024-01-01T10:00:00Z",
+					},
+				},
 			}
 			w.WriteHeader(http.StatusOK)
 			_ = json.NewEncoder(w).Encode(response)
@@ -528,7 +545,7 @@ func TestClient_PollBulkStatus(t *testing.T) {
 		// Get first update
 		select {
 		case status := <-statusChan:
-			assert.Equal(t, "processing", status.Status)
+			assert.Equal(t, "processing", status.Data.Status)
 		case <-time.After(1 * time.Second):
 			t.Fatal("timeout waiting for status")
 		}
@@ -550,11 +567,14 @@ func TestClient_PollBulkStatus(t *testing.T) {
 
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			response := dto.BulkStatusResponse{
-				BatchID: batchID,
-				Status:  "failed",
-				Statistics: dto.BulkStatistics{
-					Total:  2,
-					Failed: 2,
+				Data: dto.BulkStatusData{
+					BatchID: batchID,
+					Status:  "FAILED",
+					Metadata: dto.BulkStatusMetadata{
+						TotalRuns: 2,
+						Failed:    2,
+						StartedAt: "2024-01-01T10:00:00Z",
+					},
 				},
 			}
 			w.WriteHeader(http.StatusOK)
@@ -570,7 +590,7 @@ func TestClient_PollBulkStatus(t *testing.T) {
 
 		// Should get failed status and then channel closes
 		status := <-statusChan
-		assert.Equal(t, "failed", status.Status)
+		assert.Equal(t, "FAILED", status.Data.Status)
 
 		// Channel should be closed
 		_, ok := <-statusChan
@@ -598,8 +618,15 @@ func TestClient_PollBulkStatus(t *testing.T) {
 			} else {
 				// Subsequent calls succeed
 				response := dto.BulkStatusResponse{
-					BatchID: batchID,
-					Status:  "completed",
+					Data: dto.BulkStatusData{
+						BatchID: batchID,
+						Status:  "completed",
+						Metadata: dto.BulkStatusMetadata{
+							TotalRuns: 2,
+							Completed: 2,
+							StartedAt: "2024-01-01T10:00:00Z",
+						},
+					},
 				}
 				w.WriteHeader(http.StatusOK)
 				_ = json.NewEncoder(w).Encode(response)
@@ -618,7 +645,7 @@ func TestClient_PollBulkStatus(t *testing.T) {
 		// Should eventually get a successful response despite initial error
 		select {
 		case status := <-statusChan:
-			assert.Equal(t, "completed", status.Status)
+			assert.Equal(t, "completed", status.Data.Status)
 		case <-time.After(3 * time.Second):
 			t.Fatal("timeout waiting for successful status after error")
 		}
@@ -671,8 +698,15 @@ func TestClient_BulkRetryBehavior(t *testing.T) {
 			// Succeed on second attempt
 			w.WriteHeader(http.StatusOK)
 			_ = json.NewEncoder(w).Encode(dto.BulkStatusResponse{
-				BatchID: "batch-123",
-				Status:  "processing",
+				Data: dto.BulkStatusData{
+					BatchID: "batch-123",
+					Status:  "processing",
+					Metadata: dto.BulkStatusMetadata{
+						TotalRuns:  2,
+						Processing: 2,
+						StartedAt:  "2024-01-01T10:00:00Z",
+					},
+				},
 			})
 		}))
 		defer server.Close()
@@ -682,7 +716,7 @@ func TestClient_BulkRetryBehavior(t *testing.T) {
 		result, err := client.GetBulkStatus(context.Background(), "batch-123")
 
 		require.NoError(t, err)
-		assert.Equal(t, "batch-123", result.BatchID)
+		assert.Equal(t, "batch-123", result.Data.BatchID)
 		assert.Equal(t, 2, callCount)
 	})
 }

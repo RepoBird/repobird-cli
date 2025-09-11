@@ -26,34 +26,37 @@ func TestDisplayBulkResults_PRURLDisplay(t *testing.T) {
 		{
 			name: "Completed runs with PR URLs",
 			statusResponse: dto.BulkStatusResponse{
-				BatchID: "batch-123",
-				Status:  "COMPLETED",
-				Runs: []dto.RunStatusItem{
-					{
-						ID:     1,
-						Title:  "Fix bug #1",
-						Status: "DONE",
-						URL:    "https://github.com/test/repo/pull/101",
+				Data: dto.BulkStatusData{
+					BatchID: "batch-123",
+					Status:  "COMPLETED",
+					Runs: []dto.RunStatusItem{
+						{
+							ID:     1,
+							Title:  "Fix bug #1",
+							Status: "DONE",
+							PRURL:  &[]string{"https://github.com/test/repo/pull/101"}[0],
+						},
+						{
+							ID:     2,
+							Title:  "Add feature #2",
+							Status: "DONE",
+							PRURL:  &[]string{"https://github.com/test/repo/pull/102"}[0],
+						},
+						{
+							ID:     3,
+							Title:  "Refactor code",
+							Status: "DONE",
+							PRURL:  &[]string{"https://github.com/test/repo/pull/103"}[0],
+						},
 					},
-					{
-						ID:     2,
-						Title:  "Add feature #2",
-						Status: "DONE",
-						URL:    "https://github.com/test/repo/pull/102",
+					Metadata: dto.BulkStatusMetadata{
+						TotalRuns:  3,
+						Queued:     0,
+						Processing: 0,
+						Completed:  3,
+						Failed:     0,
+						StartedAt:  "2024-01-01T10:00:00Z",
 					},
-					{
-						ID:     3,
-						Title:  "Refactor code",
-						Status: "DONE",
-						URL:    "https://github.com/test/repo/pull/103",
-					},
-				},
-				Statistics: dto.BulkStatistics{
-					Total:      3,
-					Queued:     0,
-					Processing: 0,
-					Completed:  3,
-					Failed:     0,
 				},
 			},
 			expectedOutput: []string{
@@ -70,40 +73,40 @@ func TestDisplayBulkResults_PRURLDisplay(t *testing.T) {
 		{
 			name: "Mixed statuses - only completed runs show PR URLs",
 			statusResponse: dto.BulkStatusResponse{
-				BatchID: "batch-456",
-				Status:  "IN_PROGRESS",
-				Runs: []dto.RunStatusItem{
-					{
-						ID:     1,
-						Title:  "Completed task",
-						Status: "DONE",
-						URL:    "https://github.com/test/repo/pull/201",
+				Data: dto.BulkStatusData{
+					BatchID: "batch-456",
+					Status:  "IN_PROGRESS",
+					Runs: []dto.RunStatusItem{
+						{
+							ID:     1,
+							Title:  "Completed task",
+							Status: "DONE",
+							PRURL:  &[]string{"https://github.com/test/repo/pull/201"}[0],
+						},
+						{
+							ID:     2,
+							Title:  "Failed task",
+							Status: "FAILED",
+						},
+						{
+							ID:      3,
+							Title:   "Running task",
+							Status:  "PROCESSING",
+						},
 					},
-					{
-						ID:     2,
-						Title:  "Failed task",
-						Status: "FAILED",
-						Error:  "Build error",
+					Metadata: dto.BulkStatusMetadata{
+						TotalRuns:  3,
+						Queued:     0,
+						Processing: 1,
+						Completed:  1,
+						Failed:     1,
+						StartedAt:  "2024-01-01T10:00:00Z",
 					},
-					{
-						ID:      3,
-						Title:   "Running task",
-						Status:  "PROCESSING",
-						Message: "Analyzing code...",
-					},
-				},
-				Statistics: dto.BulkStatistics{
-					Total:      3,
-					Queued:     0,
-					Processing: 1,
-					Completed:  1,
-					Failed:     1,
 				},
 			},
 			expectedOutput: []string{
 				"✓ Completed task",
 				"✗ Failed task",
-				"Build error",
 				"● Running task", // ● is the processing icon
 				"Total: 3",
 				"Completed: 1",
@@ -117,22 +120,25 @@ func TestDisplayBulkResults_PRURLDisplay(t *testing.T) {
 		{
 			name: "Completed runs without PR URLs",
 			statusResponse: dto.BulkStatusResponse{
-				BatchID: "batch-789",
-				Status:  "COMPLETED",
-				Runs: []dto.RunStatusItem{
-					{
-						ID:     1,
-						Title:  "Task without PR",
-						Status: "DONE",
-						URL:    "", // No PR URL
+				Data: dto.BulkStatusData{
+					BatchID: "batch-789",
+					Status:  "COMPLETED",
+					Runs: []dto.RunStatusItem{
+						{
+							ID:     1,
+							Title:  "Task without PR",
+							Status: "DONE",
+							PRURL:  nil, // No PR URL
+						},
 					},
-				},
-				Statistics: dto.BulkStatistics{
-					Total:      1,
-					Queued:     0,
-					Processing: 0,
-					Completed:  1,
-					Failed:     0,
+					Metadata: dto.BulkStatusMetadata{
+						TotalRuns:  1,
+						Queued:     0,
+						Processing: 0,
+						Completed:  1,
+						Failed:     0,
+						StartedAt:  "2024-01-01T10:00:00Z",
+					},
 				},
 			},
 			expectedOutput: []string{
@@ -155,7 +161,7 @@ func TestDisplayBulkResults_PRURLDisplay(t *testing.T) {
 			os.Stdout = w
 
 			// Display bulk results
-			displayBulkResults(tt.statusResponse)
+			displayBulkResults(tt.statusResponse.Data)
 
 			// Restore stdout
 			w.Close()
@@ -186,36 +192,36 @@ func TestBulkRuns_PRURLInStatusDisplay(t *testing.T) {
 	now := time.Now()
 	completedTime := now.Add(5 * time.Minute)
 	
+	completedTimeStr := completedTime.Format(time.RFC3339)
 	statusWithPRs := dto.BulkStatusResponse{
-		BatchID: "batch-follow-123",
-		Status:  "COMPLETED",
-		Runs: []dto.RunStatusItem{
-			{
-				ID:          1,
-				Title:       "First bulk task",
-				Status:      "DONE",
-				URL:         "https://github.com/test/repo/pull/301",
-				StartedAt:   &now,
-				CompletedAt: &completedTime,
+		Data: dto.BulkStatusData{
+			BatchID: "batch-follow-123",
+			Status:  "COMPLETED",
+			Runs: []dto.RunStatusItem{
+				{
+					ID:          1,
+					Title:       "First bulk task",
+					Status:      "DONE",
+					PRURL:       &[]string{"https://github.com/test/repo/pull/301"}[0],
+					CompletedAt: &completedTimeStr,
+				},
+				{
+					ID:          2,
+					Title:       "Second bulk task",
+					Status:      "DONE",
+					PRURL:       &[]string{"https://github.com/test/repo/pull/302"}[0],
+					CompletedAt: &completedTimeStr,
+				},
 			},
-			{
-				ID:          2,
-				Title:       "Second bulk task",
-				Status:      "DONE",
-				URL:         "https://github.com/test/repo/pull/302",
-				StartedAt:   &now,
-				CompletedAt: &completedTime,
+			Metadata: dto.BulkStatusMetadata{
+				TotalRuns:  2,
+				Queued:     0,
+				Processing: 0,
+				Completed:  2,
+				Failed:     0,
+				StartedAt:  now.Format(time.RFC3339),
 			},
 		},
-		Statistics: dto.BulkStatistics{
-			Total:      2,
-			Queued:     0,
-			Processing: 0,
-			Completed:  2,
-			Failed:     0,
-		},
-		CreatedAt: now,
-		UpdatedAt: completedTime,
 	}
 
 	// Capture output
@@ -224,7 +230,7 @@ func TestBulkRuns_PRURLInStatusDisplay(t *testing.T) {
 	os.Stdout = w
 
 	// Display the status
-	displayBulkResults(statusWithPRs)
+	displayBulkResults(statusWithPRs.Data)
 
 	// Restore stdout
 	w.Close()
