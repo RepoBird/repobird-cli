@@ -511,8 +511,8 @@ func (v *RunDetailsView) updateContentOld() {
 		if v.run.RunType != "" {
 			addField("Run Type", v.run.RunType)
 		}
-		if v.run.PrURL != nil && *v.run.PrURL != "" {
-			addField("PR URL", *v.run.PrURL)
+		if v.run.PullRequestURL != nil && *v.run.PullRequestURL != "" {
+			addField("PR URL", *v.run.PullRequestURL)
 		}
 		if v.run.TriggerSource != nil && *v.run.TriggerSource != "" {
 			addField("Trigger Source", *v.run.TriggerSource)
@@ -872,8 +872,8 @@ func (v *RunDetailsView) renderOptionalFields(content *strings.Builder, lines *[
 	if v.run.RunType != "" {
 		lineCount = addField("Run Type", v.run.RunType)
 	}
-	if v.run.PrURL != nil && *v.run.PrURL != "" {
-		lineCount = addField("PR URL", *v.run.PrURL)
+	if v.run.PullRequestURL != nil && *v.run.PullRequestURL != "" {
+		lineCount = addField("PR URL", *v.run.PullRequestURL)
 	}
 	if v.run.TriggerSource != nil && *v.run.TriggerSource != "" {
 		lineCount = addField("Trigger Source", *v.run.TriggerSource)

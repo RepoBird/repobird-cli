@@ -28,6 +28,24 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+// Valid run statuses from API specification
+const (
+	RunStatusQueued       = "QUEUED"
+	RunStatusInitializing = "INITIALIZING"
+	RunStatusProcessing   = "PROCESSING"
+	RunStatusDone         = "DONE"
+	RunStatusFailed       = "FAILED"
+)
+
+// Valid batch statuses from API specification
+const (
+	BatchStatusQueued          = "QUEUED"
+	BatchStatusProcessing      = "PROCESSING"
+	BatchStatusCompleted       = "COMPLETED"
+	BatchStatusPartiallyFailed = "PARTIALLY_FAILED"
+	BatchStatusFailed          = "FAILED"
+)
+
 var (
 	bulkFollow      bool
 	bulkDryRun      bool
@@ -385,6 +403,7 @@ func followBulkProgress(ctx context.Context, client *api.Client, batchID string)
 	spinner := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 	spinnerIdx := 0
 	startTime := time.Now()
+	lastDisplayedRuns := 0
 
 	for {
 		select {
@@ -398,17 +417,23 @@ func followBulkProgress(ctx context.Context, client *api.Client, batchID string)
 				return nil
 			}
 
-			// Clear previous line
-			fmt.Print("\033[2K\r")
+			// Clear previous display (multiple lines if we displayed runs)
+			if lastDisplayedRuns > 0 {
+				for i := 0; i <= lastDisplayedRuns; i++ {
+					fmt.Print("\033[1A\033[2K") // Move up and clear line
+				}
+			} else {
+				fmt.Print("\033[2K\r") // Just clear current line
+			}
 
-			// Display progress
-			progressBar := makeProgressBar(status.Statistics)
-			fmt.Printf("%s %s", spinner[spinnerIdx], progressBar)
+			// Display individual run statuses
+			displayBulkProgressStatus(status, spinner[spinnerIdx])
+			lastDisplayedRuns = len(status.Runs)
 
 			spinnerIdx = (spinnerIdx + 1) % len(spinner)
 
-			// Check for completion
-			if status.Status == "completed" || status.Status == "failed" || status.Status == "cancelled" {
+			// Check for completion based on actual API status values
+			if status.Status == BatchStatusCompleted || status.Status == BatchStatusPartiallyFailed || status.Status == BatchStatusFailed {
 				fmt.Println("\n\nBatch completed!")
 				displayBulkResults(status)
 				return nil
@@ -438,26 +463,88 @@ func makeProgressBar(stats dto.BulkStatistics) string {
 		bar, completed, total, stats.Queued, stats.Processing, stats.Completed, stats.Failed)
 }
 
+func displayBulkProgressStatus(status dto.BulkStatusResponse, spinnerChar string) {
+	// Display overall progress
+	elapsed := time.Since(status.CreatedAt)
+	fmt.Printf("%s Following batch progress... (%s)\n", spinnerChar, formatDuration(elapsed))
+	
+	// Display individual run statuses
+	for _, run := range status.Runs {
+		statusIcon := "○"
+		statusColor := lipgloss.Color("7")
+		
+		// Check actual API status values
+		switch run.Status {
+		case RunStatusDone:
+			statusIcon = "✓"
+			statusColor = lipgloss.Color("10")
+		case RunStatusFailed:
+			statusIcon = "✗"
+			statusColor = lipgloss.Color("9")
+		case RunStatusProcessing, RunStatusInitializing:
+			statusIcon = "⚡"
+			statusColor = lipgloss.Color("11")
+		case RunStatusQueued:
+			statusIcon = "○"
+			statusColor = lipgloss.Color("8")
+		default:
+			// Unknown status
+			statusIcon = "?"
+			statusColor = lipgloss.Color("7")
+		}
+		
+		style := lipgloss.NewStyle().Foreground(statusColor)
+		fmt.Printf("  %s %s (ID: %d)", style.Render(statusIcon), run.Title, run.ID)
+		
+		// Show status message if processing
+		if run.Message != "" && (run.Status == RunStatusProcessing || run.Status == RunStatusInitializing) {
+			fmt.Printf(" - %s", run.Message)
+		}
+		
+		// Show PR URL if completed (URL field contains the PR URL in bulk status)
+		if run.URL != "" && run.Status == RunStatusDone {
+			fmt.Printf("\n    Pull Request: %s", run.URL)
+		}
+		
+		// Show error if failed
+		if run.Error != "" && run.Status == RunStatusFailed {
+			fmt.Printf("\n    Error: %s", run.Error)
+		}
+		
+		fmt.Println()
+	}
+}
+
 func displayBulkResults(status dto.BulkStatusResponse) {
 	fmt.Println("\nResults:")
+
+	// Create API client to fetch PR URLs for completed runs
+	cfg, _ := config.LoadConfig()
+	apiURL := utils.GetAPIURL(cfg.APIURL)
+	client := api.NewClient(cfg.APIKey, apiURL, debug)
 
 	for _, run := range status.Runs {
 		statusIcon := "○"
 		statusColor := lipgloss.Color("7")
 
+		// Check actual API status values
 		switch run.Status {
-		case "completed":
+		case RunStatusDone:
 			statusIcon = "✓"
 			statusColor = lipgloss.Color("10")
-		case "failed":
+		case RunStatusFailed:
 			statusIcon = "✗"
 			statusColor = lipgloss.Color("9")
-		case "processing":
+		case RunStatusProcessing, RunStatusInitializing:
 			statusIcon = "●"
 			statusColor = lipgloss.Color("11")
-		case "queued":
+		case RunStatusQueued:
 			statusIcon = "○"
 			statusColor = lipgloss.Color("8")
+		default:
+			// Unknown status - show as queued
+			statusIcon = "?"
+			statusColor = lipgloss.Color("7")
 		}
 
 		style := lipgloss.NewStyle().Foreground(statusColor)
@@ -472,6 +559,13 @@ func displayBulkResults(status dto.BulkStatusResponse) {
 		}
 		if run.RunURL != "" {
 			fmt.Printf("    URL: %s\n", run.RunURL)
+		}
+		
+		// Fetch and display PR URL for completed runs
+		if run.Status == RunStatusDone {
+			if runDetails, err := client.GetRun(fmt.Sprintf("%d", run.ID)); err == nil && runDetails.PullRequestURL != nil && *runDetails.PullRequestURL != "" {
+				fmt.Printf("    Pull Request: %s\n", *runDetails.PullRequestURL)
+			}
 		}
 	}
 

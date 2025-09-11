@@ -363,6 +363,9 @@ func followRunStatus(runService domain.RunService, runID string) error {
 	ctx := context.Background()
 	startTime := time.Now()
 	lastStatus := ""
+	
+	// Check if debug is enabled via environment variable or flag
+	isDebug := debug || os.Getenv("REPOBIRD_DEBUG_LOG") == "1"
 
 	callback := func(status string, message string) {
 		displayStatus := formatStatusForDisplay(status)
@@ -385,11 +388,50 @@ func followRunStatus(runService domain.RunService, runID string) error {
 		return fmt.Errorf("failed to follow run status: %s", errors.FormatUserError(err))
 	}
 
+	if isDebug {
+		fmt.Printf("DEBUG: WaitForCompletion returned - Status: %s, PullRequestURL: '%s'\n", finalRun.Status, finalRun.PullRequestURL)
+	}
+
+	// If run completed successfully, fetch full details to get PR URL
+	// Use a new context with its own timeout to avoid interference
+	if finalRun.Status == domain.StatusCompleted {
+		if isDebug {
+			fmt.Printf("DEBUG: Run completed, fetching full details for PR URL...\n")
+		}
+		
+		// Create a new context with a 10-second timeout for fetching full details
+		detailsCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		
+		// Wait a brief moment for API to update PR URL
+		time.Sleep(1 * time.Second)
+		
+		// Fetch full run details
+		if fullRun, err := runService.GetRun(detailsCtx, runID); err == nil {
+			if isDebug {
+				fmt.Printf("DEBUG: Fetched full details - Status: %s, PullRequestURL: '%s'\n", fullRun.Status, fullRun.PullRequestURL)
+			}
+			finalRun = fullRun
+		} else {
+			if isDebug {
+				fmt.Printf("DEBUG: Failed to fetch full details: %v\n", err)
+			}
+		}
+		// If fetch fails, we still have the basic run info from polling
+	}
+
 	fmt.Printf("\r\033[K") // Clear line
 	if finalRun.Status == domain.StatusFailed && finalRun.Error != "" {
 		fmt.Printf("Run failed: %s\n", finalRun.Error)
 	} else {
 		fmt.Printf("Run completed with status: %s\n", formatStatusForDisplay(finalRun.Status))
+		
+		// Display PR URL if run completed successfully and URL is available
+		if finalRun.Status == domain.StatusCompleted && finalRun.PullRequestURL != "" {
+			fmt.Printf("Pull Request: %s\n", finalRun.PullRequestURL)
+		} else if isDebug && finalRun.Status == domain.StatusCompleted {
+			fmt.Printf("DEBUG: Run completed but no PR URL available (PullRequestURL='%s')\n", finalRun.PullRequestURL)
+		}
 	}
 	return nil
 }

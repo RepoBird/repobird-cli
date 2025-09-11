@@ -640,8 +640,8 @@ func (d *DashboardView) handleRepoOpen() tea.Cmd {
 func (d *DashboardView) getRunURL() string {
 	if d.selectedRunIdx < len(d.filteredRuns) {
 		run := d.filteredRuns[d.selectedRunIdx]
-		if run.PrURL != nil && *run.PrURL != "" {
-			return *run.PrURL
+		if run.PullRequestURL != nil && *run.PullRequestURL != "" {
+			return *run.PullRequestURL
 		}
 	}
 	return ""

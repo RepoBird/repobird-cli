@@ -64,7 +64,7 @@ func (d *DashboardView) hasCurrentSelectionURL() bool {
 	case 1: // Runs column - check for PR URL
 		if d.selectedRunIdx < len(d.filteredRuns) {
 			run := d.filteredRuns[d.selectedRunIdx]
-			return run.PrURL != nil && *run.PrURL != ""
+			return run.PullRequestURL != nil && *run.PullRequestURL != ""
 		}
 	case 2: // Details column - check if selected line contains URL or can generate RepoBird URL
 		if d.selectedDetailLine < len(d.detailLinesOriginal) {

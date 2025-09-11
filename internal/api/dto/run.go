@@ -63,7 +63,7 @@ type RunResponse struct {
 	RepositoryName string     `json:"repositoryName"`
 	SourceBranch   string     `json:"sourceBranch"`
 	TargetBranch   string     `json:"targetBranch"`
-	PullRequestURL string     `json:"pullRequestUrl,omitempty"`
+	PullRequestURL string     `json:"prUrl,omitempty"`
 	RunType        string     `json:"runType"`
 	Title          string     `json:"title,omitempty"`
 	Context        string     `json:"context,omitempty"`

@@ -180,7 +180,7 @@ func GenerateMockRuns(numRepos, runsPerRepo int) []*models.RunResponse {
 			switch status {
 			case models.StatusDone:
 				prURL := fmt.Sprintf("https://github.com/%s/pull/%d", repo, rand.Intn(1000)+1)
-				run.PrURL = &prURL
+				run.PullRequestURL = &prURL
 				run.Description = fmt.Sprintf("Successfully completed: %s", titles[rand.Intn(len(titles))])
 
 			case models.StatusFailed:
@@ -193,7 +193,7 @@ func GenerateMockRuns(numRepos, runsPerRepo int) []*models.RunResponse {
 
 			case models.StatusPostProcess:
 				prURL := fmt.Sprintf("https://github.com/%s/pull/%d", repo, rand.Intn(1000)+1)
-				run.PrURL = &prURL
+				run.PullRequestURL = &prURL
 				run.Description = "Creating pull request and running tests..."
 
 			case models.StatusQueued:

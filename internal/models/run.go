@@ -98,7 +98,7 @@ type RunResponse struct {
 	Description    string    `json:"description,omitempty"`
 	Context        string    `json:"context,omitempty"`
 	Error          string    `json:"error,omitempty"`
-	PrURL          *string   `json:"prUrl,omitempty"`
+	PullRequestURL *string   `json:"prUrl,omitempty"`
 	TriggerSource  *string   `json:"triggerSource,omitempty"`
 	RunType        string    `json:"runType,omitempty"`
 	Plan           string    `json:"plan,omitempty"`

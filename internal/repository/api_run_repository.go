@@ -109,10 +109,19 @@ func (r *apiRunRepository) Get(ctx context.Context, id string) (*domain.Run, err
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
+	// Debug log raw response if debug is enabled
+	if r.debug {
+		fmt.Printf("DEBUG [api_run_repository.Get]: Raw API response for run %s:\n%s\n", id, string(body))
+	}
+
 	// Try to decode as SingleRunResponse first
 	var singleResp dto.SingleRunResponse
 	if err := json.Unmarshal(body, &singleResp); err == nil && singleResp.Data != nil {
-		return r.toDomainRun(singleResp.Data), nil
+		domainRun := r.toDomainRun(singleResp.Data)
+		if r.debug {
+			fmt.Printf("DEBUG [api_run_repository.Get]: Mapped to domain - Status: %s, PullRequestURL: '%s'\n", domainRun.Status, domainRun.PullRequestURL)
+		}
+		return domainRun, nil
 	}
 
 	// Fall back to direct decoding
@@ -121,7 +130,11 @@ func (r *apiRunRepository) Get(ctx context.Context, id string) (*domain.Run, err
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	return r.toDomainRun(&runResp), nil
+	domainRun := r.toDomainRun(&runResp)
+	if r.debug {
+		fmt.Printf("DEBUG [api_run_repository.Get]: Mapped to domain (fallback) - Status: %s, PullRequestURL: '%s'\n", domainRun.Status, domainRun.PullRequestURL)
+	}
+	return domainRun, nil
 }
 
 // List retrieves a list of runs

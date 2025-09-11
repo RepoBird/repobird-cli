@@ -79,8 +79,8 @@ func (d *DashboardView) updateDetailLines() {
 	addLine(fmt.Sprintf("Updated: %s", run.UpdatedAt.Format("Jan 2 15:04")))
 
 	// Show PR URL if available
-	if run.PrURL != nil && *run.PrURL != "" {
-		addLine(fmt.Sprintf("PR URL: %s", *run.PrURL))
+	if run.PullRequestURL != nil && *run.PullRequestURL != "" {
+		addLine(fmt.Sprintf("PR URL: %s", *run.PullRequestURL))
 	}
 
 	// Show trigger source if available
