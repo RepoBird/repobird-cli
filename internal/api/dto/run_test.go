@@ -2,6 +2,7 @@ package dto
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -229,14 +230,4 @@ func TestRunResponse_AllFields(t *testing.T) {
 	assert.Equal(t, []string{"file1.go", "file2.go"}, resp.FilesChanged)
 	assert.Equal(t, "Test summary", resp.Summary)
 	assert.Equal(t, "", resp.Error)
-}
-
-// Import fmt for Sprintf
-var fmt = struct {
-	Sprintf func(format string, a ...interface{}) string
-}{
-	Sprintf: func(format string, a ...interface{}) string {
-		// Simple sprintf implementation for test
-		return format
-	},
 }

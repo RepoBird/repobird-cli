@@ -129,6 +129,11 @@ func TestFollowRunStatus_WithPRURL(t *testing.T) {
 					Status: domain.StatusQueued,
 				}
 				mock.waitForCompletionFunc = func(ctx context.Context, id string, callback domain.ProgressCallback) (*domain.Run, error) {
+					// Update the run in the mock to completed status
+					if run, ok := mock.runs[id]; ok {
+						run.Status = domain.StatusCompleted
+						run.PullRequestURL = "" // No PR URL
+					}
 					return &domain.Run{
 						ID:             id,
 						Status:         domain.StatusCompleted,

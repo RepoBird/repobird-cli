@@ -709,7 +709,7 @@ func (c *Client) PollBulkStatus(ctx context.Context, batchID string, interval ti
 				}
 
 				// Check if batch is complete
-				if status.Status == "completed" || status.Status == "failed" || status.Status == "cancelled" {
+				if status.Data.Status == "COMPLETED" || status.Data.Status == "FAILED" || status.Data.Status == "PARTIALLY_FAILED" {
 					return
 				}
 			}

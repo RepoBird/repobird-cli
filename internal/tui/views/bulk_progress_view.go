@@ -64,9 +64,6 @@ func (v *BulkProgressView) View() string {
 		statusIcon := v.getStatusIcon(run.Status)
 		runDetails.WriteString(fmt.Sprintf("  %s %s (ID: %d)\n",
 			statusIcon, run.Title, run.ID))
-		if run.Message != "" {
-			runDetails.WriteString(fmt.Sprintf("    %s\n", run.Message))
-		}
 	}
 
 	return lipgloss.JoinVertical(

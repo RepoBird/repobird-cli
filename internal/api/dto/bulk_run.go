@@ -77,31 +77,42 @@ type BulkMetadata struct {
 	CreatedAt      time.Time `json:"createdAt"`
 }
 
-// BulkStatusResponse represents the status of a bulk run batch
+// BulkStatusResponse represents the API response for bulk status
 type BulkStatusResponse struct {
-	BatchID    string          `json:"batchId"`
-	Status     string          `json:"status"`
-	Runs       []RunStatusItem `json:"runs"`
-	Statistics BulkStatistics  `json:"statistics"`
-	CreatedAt  time.Time       `json:"createdAt"`
-	UpdatedAt  time.Time       `json:"updatedAt"`
+	Data BulkStatusData `json:"data"`
+}
+
+// BulkStatusData contains the actual bulk status data
+type BulkStatusData struct {
+	BatchID    string               `json:"batchId"`
+	BatchTitle *string              `json:"batchTitle,omitempty"`
+	Status     string               `json:"status"`
+	Runs       []RunStatusItem      `json:"runs"`
+	Metadata   BulkStatusMetadata   `json:"metadata"`
 }
 
 // RunStatusItem represents the status of a single run in a batch
 type RunStatusItem struct {
-	ID          int        `json:"id"`
-	Title       string     `json:"title"`
-	Status      string     `json:"status"`
-	Progress    int        `json:"progress,omitempty"`
-	Message     string     `json:"message,omitempty"`
-	Error       string     `json:"error,omitempty"`
-	StartedAt   *time.Time `json:"startedAt,omitempty"`
-	CompletedAt *time.Time `json:"completedAt,omitempty"`
-	URL         string     `json:"url,omitempty"`
-	RunURL      string     `json:"runUrl,omitempty"`
+	ID          int     `json:"id"`
+	Title       string  `json:"title"`
+	Status      string  `json:"status"`
+	Progress    int     `json:"progress,omitempty"`
+	CompletedAt *string `json:"completedAt,omitempty"`
+	PRURL       *string `json:"prUrl,omitempty"`
 }
 
-// BulkStatistics contains statistics about a bulk batch
+// BulkStatusMetadata contains metadata about the bulk batch status
+type BulkStatusMetadata struct {
+	TotalRuns               int     `json:"totalRuns"`
+	Completed               int     `json:"completed"`
+	Processing              int     `json:"processing"`
+	Queued                  int     `json:"queued"`
+	Failed                  int     `json:"failed"`
+	StartedAt               string  `json:"startedAt"`
+	EstimatedCompletionTime *string `json:"estimatedCompletionTime,omitempty"`
+}
+
+// BulkStatistics contains statistics about a bulk batch (deprecated, kept for compatibility)
 type BulkStatistics struct {
 	Total      int `json:"total"`
 	Queued     int `json:"queued"`

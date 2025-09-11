@@ -28,16 +28,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// Valid run statuses from API specification
-const (
-	RunStatusQueued       = "QUEUED"
-	RunStatusInitializing = "INITIALIZING"
-	RunStatusProcessing   = "PROCESSING"
-	RunStatusDone         = "DONE"
-	RunStatusFailed       = "FAILED"
-)
-
-// Valid batch statuses from API specification
+// Valid batch statuses from API specification (no duplicates exist for these)
 const (
 	BatchStatusQueued          = "QUEUED"
 	BatchStatusProcessing      = "PROCESSING"
@@ -394,8 +385,11 @@ func runBulkInteractive() error {
 }
 
 func followBulkProgress(ctx context.Context, client *api.Client, batchID string) error {
-	// Poll for status updates
-	statusChan, err := client.PollBulkStatus(ctx, batchID, 2*time.Second)
+	// Poll for status updates every 20 seconds
+	if debug {
+		fmt.Fprintf(os.Stderr, "[DEBUG] Starting to poll batch %s\n", batchID)
+	}
+	statusChan, err := client.PollBulkStatus(ctx, batchID, 20*time.Second)
 	if err != nil {
 		return err
 	}
@@ -403,7 +397,12 @@ func followBulkProgress(ctx context.Context, client *api.Client, batchID string)
 	spinner := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 	spinnerIdx := 0
 	startTime := time.Now()
-	lastDisplayedRuns := 0
+	var lastRunCount int
+	var lastStatus dto.BulkStatusData
+	
+	// Start with a loading indicator immediately
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
 
 	for {
 		select {
@@ -411,138 +410,154 @@ func followBulkProgress(ctx context.Context, client *api.Client, batchID string)
 			if !ok {
 				// Channel closed - check if it was due to timeout
 				if ctx.Err() == context.DeadlineExceeded {
-					fmt.Print("\033[2K\r") // Clear line
+					// Clear all lines
+					if lastRunCount > 0 {
+						// Clear including header line
+						for i := 0; i <= lastRunCount; i++ {
+							fmt.Print("\033[A\033[2K") // Move up and clear line
+						}
+					} else {
+						fmt.Print("\r\033[2K") // Clear loading line
+					}
 					return fmt.Errorf("polling timeout exceeded (maximum wait time: 1h 30m). The batch may still be processing on the server")
 				}
 				return nil
 			}
-
-			// Clear previous display (multiple lines if we displayed runs)
-			if lastDisplayedRuns > 0 {
-				for i := 0; i <= lastDisplayedRuns; i++ {
-					fmt.Print("\033[1A\033[2K") // Move up and clear line
+			
+			if debug {
+				fmt.Fprintf(os.Stderr, "[DEBUG] Batch status: %s, Runs: %d\n", status.Data.Status, len(status.Data.Runs))
+				for _, run := range status.Data.Runs {
+					fmt.Fprintf(os.Stderr, "[DEBUG]   Run %d: %s (status: %s)\n", run.ID, run.Title, run.Status)
 				}
-			} else {
-				fmt.Print("\033[2K\r") // Just clear current line
 			}
 
-			// Display individual run statuses
-			displayBulkProgressStatus(status, spinner[spinnerIdx])
-			lastDisplayedRuns = len(status.Runs)
-
-			spinnerIdx = (spinnerIdx + 1) % len(spinner)
+			// Clear previous display before updating
+			if lastRunCount > 0 {
+				// Clear the multi-line display
+				for i := 0; i <= lastRunCount; i++ {
+					fmt.Print("\033[A\033[2K") // Move up and clear line
+				}
+			} else {
+				// Clear the single loading line
+				fmt.Print("\r\033[2K")
+			}
+			
+			// Store the latest status and display it
+			lastStatus = status.Data
+			lastRunCount = len(status.Data.Runs)
+			displayMultiLineBulkStatus(lastStatus, spinner[spinnerIdx], startTime)
 
 			// Check for completion based on actual API status values
-			if status.Status == BatchStatusCompleted || status.Status == BatchStatusPartiallyFailed || status.Status == BatchStatusFailed {
-				fmt.Println("\n\nBatch completed!")
-				displayBulkResults(status)
+			if status.Data.Status == BatchStatusCompleted || status.Data.Status == BatchStatusPartiallyFailed || status.Data.Status == BatchStatusFailed {
+				// Clear the display before showing results (including header line)
+				if lastRunCount > 0 {
+					for i := 0; i <= lastRunCount; i++ {
+						fmt.Print("\033[A\033[2K") // Move up and clear line
+					}
+				}
+				fmt.Println("\nBatch completed!")
+				displayBulkResults(status.Data)
 				return nil
 			}
 
+		case <-ticker.C:
+			// Animate the spinner
+			spinnerIdx = (spinnerIdx + 1) % len(spinner)
+			
+			// Update display with animated spinner
+			if lastRunCount > 0 {
+				// Clear previous lines (including the header line)
+				for i := 0; i <= lastRunCount; i++ {
+					fmt.Print("\033[A\033[2K") // Move up and clear line
+				}
+				// Redraw with new spinner frame
+				displayMultiLineBulkStatus(lastStatus, spinner[spinnerIdx], startTime)
+			} else {
+				// Initial loading state
+				elapsed := time.Since(startTime)
+				fmt.Printf("\r%s Following batch progress... [%s]", spinner[spinnerIdx], formatDuration(elapsed))
+			}
+
 		case <-ctx.Done():
-			fmt.Print("\033[2K\r") // Clear line
+			// Clear all lines
+			if lastRunCount > 0 {
+				// Clear including header line
+				for i := 0; i <= lastRunCount; i++ {
+					fmt.Print("\033[A\033[2K") // Move up and clear line
+				}
+			} else {
+				fmt.Print("\r\033[2K") // Clear loading line
+			}
 			elapsed := time.Since(startTime)
 			return fmt.Errorf("polling timeout exceeded after %v (maximum wait time: 1h 30m). The batch may still be processing on the server", elapsed)
 		}
 	}
 }
 
-func makeProgressBar(stats dto.BulkStatistics) string {
-	width := 40
-	completed := stats.Completed + stats.Failed + stats.Cancelled
-	total := stats.Total
-
-	if total == 0 {
-		return ""
-	}
-
-	progress := int(float64(completed) / float64(total) * float64(width))
-	bar := strings.Repeat("█", progress) + strings.Repeat("░", width-progress)
-
-	return fmt.Sprintf("[%s] %d/%d (Queued: %d, Processing: %d, Completed: %d, Failed: %d)",
-		bar, completed, total, stats.Queued, stats.Processing, stats.Completed, stats.Failed)
-}
-
-func displayBulkProgressStatus(status dto.BulkStatusResponse, spinnerChar string) {
-	// Display overall progress
-	elapsed := time.Since(status.CreatedAt)
-	fmt.Printf("%s Following batch progress... (%s)\n", spinnerChar, formatDuration(elapsed))
+func displayMultiLineBulkStatus(status dto.BulkStatusData, spinnerChar string, startTime time.Time) {
+	// Display elapsed time on first line with spinner
+	elapsed := time.Since(startTime)
+	fmt.Printf("%s Following batch progress... [%s]\n", spinnerChar, formatDuration(elapsed))
 	
-	// Display individual run statuses
+	// Display each run on its own line with ID: STATUS format (no spinner)
 	for _, run := range status.Runs {
-		statusIcon := "○"
-		statusColor := lipgloss.Color("7")
+		statusText := "QUEUED"
+		statusColor := lipgloss.Color("8")
 		
-		// Check actual API status values
+		// Check actual API status values (server uses uppercase strings)
 		switch run.Status {
-		case RunStatusDone:
-			statusIcon = "✓"
+		case "DONE":
+			statusText = "DONE"
 			statusColor = lipgloss.Color("10")
-		case RunStatusFailed:
-			statusIcon = "✗"
+		case "FAILED":
+			statusText = "FAILED"
 			statusColor = lipgloss.Color("9")
-		case RunStatusProcessing, RunStatusInitializing:
-			statusIcon = "⚡"
+		case "PROCESSING", "RUNNING":
+			statusText = "PROCESSING"
 			statusColor = lipgloss.Color("11")
-		case RunStatusQueued:
-			statusIcon = "○"
+		case "INITIALIZING":
+			statusText = "INITIALIZING"
+			statusColor = lipgloss.Color("11")
+		case "QUEUED":
+			statusText = "QUEUED"
 			statusColor = lipgloss.Color("8")
 		default:
-			// Unknown status
-			statusIcon = "?"
+			// Use the raw status value if unknown
+			statusText = run.Status
 			statusColor = lipgloss.Color("7")
 		}
 		
 		style := lipgloss.NewStyle().Foreground(statusColor)
-		fmt.Printf("  %s %s (ID: %d)", style.Render(statusIcon), run.Title, run.ID)
-		
-		// Show status message if processing
-		if run.Message != "" && (run.Status == RunStatusProcessing || run.Status == RunStatusInitializing) {
-			fmt.Printf(" - %s", run.Message)
-		}
-		
-		// Show PR URL if completed (URL field contains the PR URL in bulk status)
-		if run.URL != "" && run.Status == RunStatusDone {
-			fmt.Printf("\n    Pull Request: %s", run.URL)
-		}
-		
-		// Show error if failed
-		if run.Error != "" && run.Status == RunStatusFailed {
-			fmt.Printf("\n    Error: %s", run.Error)
-		}
-		
-		fmt.Println()
+		fmt.Printf("  [%d]: %s\n", run.ID, style.Render(statusText))
 	}
 }
 
-func displayBulkResults(status dto.BulkStatusResponse) {
+func displayBulkResults(status dto.BulkStatusData) {
 	fmt.Println("\nResults:")
-
-	// Create API client to fetch PR URLs for completed runs
-	cfg, _ := config.LoadConfig()
-	apiURL := utils.GetAPIURL(cfg.APIURL)
-	client := api.NewClient(cfg.APIKey, apiURL, debug)
 
 	for _, run := range status.Runs {
 		statusIcon := "○"
 		statusColor := lipgloss.Color("7")
 
-		// Check actual API status values
+		// Check actual API status values (server uses uppercase strings)
 		switch run.Status {
-		case RunStatusDone:
+		case "DONE":
 			statusIcon = "✓"
 			statusColor = lipgloss.Color("10")
-		case RunStatusFailed:
+		case "FAILED":
 			statusIcon = "✗"
 			statusColor = lipgloss.Color("9")
-		case RunStatusProcessing, RunStatusInitializing:
+		case "PROCESSING", "RUNNING":
 			statusIcon = "●"
 			statusColor = lipgloss.Color("11")
-		case RunStatusQueued:
+		case "INITIALIZING":
+			statusIcon = "●"
+			statusColor = lipgloss.Color("11")
+		case "QUEUED":
 			statusIcon = "○"
 			statusColor = lipgloss.Color("8")
 		default:
-			// Unknown status - show as queued
+			// Unknown status - show with question mark
 			statusIcon = "?"
 			statusColor = lipgloss.Color("7")
 		}
@@ -554,25 +569,18 @@ func displayBulkResults(status dto.BulkStatusResponse) {
 			run.ID,
 		)
 
-		if run.Error != "" {
-			fmt.Printf("    Error: %s\n", run.Error)
-		}
-		if run.RunURL != "" {
-			fmt.Printf("    URL: %s\n", run.RunURL)
-		}
-		
-		// Fetch and display PR URL for completed runs
-		if run.Status == RunStatusDone {
-			if runDetails, err := client.GetRun(fmt.Sprintf("%d", run.ID)); err == nil && runDetails.PullRequestURL != nil && *runDetails.PullRequestURL != "" {
-				fmt.Printf("    Pull Request: %s\n", *runDetails.PullRequestURL)
-			}
+			
+		// Display PR URL if available
+		if run.PRURL != nil && *run.PRURL != "" {
+			fmt.Printf("    Pull Request: %s\n", *run.PRURL)
 		}
 	}
 
 	// Summary
 	fmt.Printf("\nSummary:\n")
-	fmt.Printf("  Total: %d\n", status.Statistics.Total)
-	fmt.Printf("  Completed: %d\n", status.Statistics.Completed)
-	fmt.Printf("  Failed: %d\n", status.Statistics.Failed)
-	fmt.Printf("  Cancelled: %d\n", status.Statistics.Cancelled)
+	fmt.Printf("  Total: %d\n", status.Metadata.TotalRuns)
+	fmt.Printf("  Completed: %d\n", status.Metadata.Completed)
+	fmt.Printf("  Failed: %d\n", status.Metadata.Failed)
+	fmt.Printf("  Processing: %d\n", status.Metadata.Processing)
+	fmt.Printf("  Queued: %d\n", status.Metadata.Queued)
 }
