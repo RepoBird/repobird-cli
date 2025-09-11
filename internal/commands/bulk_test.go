@@ -89,9 +89,9 @@ func TestDisplayBulkResults_PRURLDisplay(t *testing.T) {
 							Status: "FAILED",
 						},
 						{
-							ID:      3,
-							Title:   "Running task",
-							Status:  "PROCESSING",
+							ID:     3,
+							Title:  "Running task",
+							Status: "PROCESSING",
 						},
 					},
 					Metadata: dto.BulkStatusMetadata{
@@ -191,7 +191,7 @@ func TestBulkRuns_PRURLInStatusDisplay(t *testing.T) {
 	// Test that the batch status display properly shows PR URLs
 	now := time.Now()
 	completedTime := now.Add(5 * time.Minute)
-	
+
 	completedTimeStr := completedTime.Format(time.RFC3339)
 	statusWithPRs := dto.BulkStatusResponse{
 		Data: dto.BulkStatusData{

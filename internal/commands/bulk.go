@@ -399,7 +399,7 @@ func followBulkProgress(ctx context.Context, client *api.Client, batchID string)
 	startTime := time.Now()
 	var lastRunCount int
 	var lastStatus dto.BulkStatusData
-	
+
 	// Start with a loading indicator immediately
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
@@ -423,7 +423,7 @@ func followBulkProgress(ctx context.Context, client *api.Client, batchID string)
 				}
 				return nil
 			}
-			
+
 			if debug {
 				fmt.Fprintf(os.Stderr, "[DEBUG] Batch status: %s, Runs: %d\n", status.Data.Status, len(status.Data.Runs))
 				for _, run := range status.Data.Runs {
@@ -441,7 +441,7 @@ func followBulkProgress(ctx context.Context, client *api.Client, batchID string)
 				// Clear the single loading line
 				fmt.Print("\r\033[2K")
 			}
-			
+
 			// Store the latest status and display it
 			lastStatus = status.Data
 			lastRunCount = len(status.Data.Runs)
@@ -463,7 +463,7 @@ func followBulkProgress(ctx context.Context, client *api.Client, batchID string)
 		case <-ticker.C:
 			// Animate the spinner
 			spinnerIdx = (spinnerIdx + 1) % len(spinner)
-			
+
 			// Update display with animated spinner
 			if lastRunCount > 0 {
 				// Clear previous lines (including the header line)
@@ -498,12 +498,12 @@ func displayMultiLineBulkStatus(status dto.BulkStatusData, spinnerChar string, s
 	// Display elapsed time on first line with spinner
 	elapsed := time.Since(startTime)
 	fmt.Printf("%s Following batch progress... [%s]\n", spinnerChar, formatDuration(elapsed))
-	
+
 	// Display each run on its own line with ID: STATUS format (no spinner)
 	for _, run := range status.Runs {
 		statusText := "QUEUED"
 		statusColor := lipgloss.Color("8")
-		
+
 		// Check actual API status values (server uses uppercase strings)
 		switch run.Status {
 		case "DONE":
@@ -526,7 +526,7 @@ func displayMultiLineBulkStatus(status dto.BulkStatusData, spinnerChar string, s
 			statusText = run.Status
 			statusColor = lipgloss.Color("7")
 		}
-		
+
 		style := lipgloss.NewStyle().Foreground(statusColor)
 		fmt.Printf("  [%d]: %s\n", run.ID, style.Render(statusText))
 	}
@@ -569,7 +569,6 @@ func displayBulkResults(status dto.BulkStatusData) {
 			run.ID,
 		)
 
-			
 		// Display PR URL if available
 		if run.PRURL != nil && *run.PRURL != "" {
 			fmt.Printf("    Pull Request: %s\n", *run.PRURL)

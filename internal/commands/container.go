@@ -5,7 +5,7 @@ package commands
 
 import (
 	"os"
-	
+
 	"github.com/repobird/repobird-cli/internal/config"
 	"github.com/repobird/repobird-cli/internal/container"
 	"github.com/repobird/repobird-cli/internal/utils"

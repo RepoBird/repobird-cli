@@ -21,7 +21,7 @@ import (
 
 // mockRunService implements domain.RunService for testing
 type mockRunService struct {
-	runs map[string]*domain.Run
+	runs                  map[string]*domain.Run
 	waitForCompletionFunc func(ctx context.Context, id string, callback domain.ProgressCallback) (*domain.Run, error)
 }
 
@@ -200,7 +200,7 @@ func TestFollowRunStatus_WithPRURL(t *testing.T) {
 
 			// Verify expected output
 			for _, expected := range tt.expectedOutput {
-				assert.Contains(t, output, expected, 
+				assert.Contains(t, output, expected,
 					"Output should contain expected message: %s", expected)
 			}
 

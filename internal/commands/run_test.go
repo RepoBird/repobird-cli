@@ -17,12 +17,12 @@ import (
 
 func TestRunCommand_WithFlags(t *testing.T) {
 	tests := []struct {
-		name           string
-		args           []string
-		setupConfig    func()
-		expectError    bool
-		errorContains  string
-		expectDryRun   bool
+		name          string
+		args          []string
+		setupConfig   func()
+		expectError   bool
+		errorContains string
+		expectDryRun  bool
 	}{
 		{
 			name: "Valid minimal flags",
@@ -132,14 +132,14 @@ func TestRunCommand_WithFlags(t *testing.T) {
 			old := os.Stdout
 			r, w, _ := os.Pipe()
 			os.Stdout = w
-			
+
 			// Execute the command function
 			cmdErr := runCommand(runCmd, []string{})
-			
+
 			// Restore stdout
 			w.Close()
 			os.Stdout = old
-			
+
 			// Read captured output
 			var buf bytes.Buffer
 			buf.ReadFrom(r)
@@ -165,9 +165,9 @@ func TestRunCommand_WithFlags(t *testing.T) {
 
 func TestRunCommand_ValidationWithFlags(t *testing.T) {
 	tests := []struct {
-		name          string
-		args          []string
-		expectInJSON  map[string]string
+		name         string
+		args         []string
+		expectInJSON map[string]string
 	}{
 		{
 			name: "Default run type when not specified",
@@ -234,14 +234,14 @@ func TestRunCommand_ValidationWithFlags(t *testing.T) {
 			old := os.Stdout
 			r, w, _ := os.Pipe()
 			os.Stdout = w
-			
+
 			// Execute command
 			cmdErr := runCommand(runCmd, []string{})
-			
+
 			// Restore stdout
 			w.Close()
 			os.Stdout = old
-			
+
 			// Read output
 			var buf bytes.Buffer
 			buf.ReadFrom(r)
@@ -249,12 +249,12 @@ func TestRunCommand_ValidationWithFlags(t *testing.T) {
 
 			require.NoError(t, cmdErr)
 			assert.Contains(t, output, "Validation successful")
-			
+
 			// Extract JSON from output
 			jsonStart := strings.Index(output, "{")
 			jsonEnd := strings.LastIndex(output, "}") + 1
 			require.True(t, jsonStart >= 0 && jsonEnd > jsonStart, "JSON output not found")
-			
+
 			jsonStr := output[jsonStart:jsonEnd]
 			var result map[string]interface{}
 			err = json.Unmarshal([]byte(jsonStr), &result)
@@ -264,13 +264,12 @@ func TestRunCommand_ValidationWithFlags(t *testing.T) {
 			for key, expectedVal := range tt.expectInJSON {
 				actualVal, exists := result[key]
 				assert.True(t, exists, fmt.Sprintf("Field %s not found in output", key))
-				assert.Equal(t, expectedVal, fmt.Sprintf("%v", actualVal), 
+				assert.Equal(t, expectedVal, fmt.Sprintf("%v", actualVal),
 					fmt.Sprintf("Field %s has unexpected value", key))
 			}
 		})
 	}
 }
-
 
 func TestRunCommand_ErrorMessages(t *testing.T) {
 	// Test specific error message scenarios
@@ -313,7 +312,7 @@ func TestRunCommand_ErrorMessages(t *testing.T) {
 			expectedMessage: "missing required flag: --repo (-r) is required when --prompt is specified",
 		},
 		{
-			name: "Empty string for prompt",  
+			name: "Empty string for prompt",
 			setupFunc: func() {
 				cfg.APIKey = "test"
 			},

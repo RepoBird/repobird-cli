@@ -65,7 +65,7 @@ func (a *App) Init() tea.Cmd {
 		a.current = views.NewDashboardViewDebugLoading(a.client, a.cache)
 		return a.current.Init()
 	}
-	
+
 	// Just authenticate, don't request window size yet
 	// The terminal will send the real window size automatically
 	return a.authenticateAndInitCache()

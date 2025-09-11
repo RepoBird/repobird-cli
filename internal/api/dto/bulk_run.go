@@ -84,11 +84,11 @@ type BulkStatusResponse struct {
 
 // BulkStatusData contains the actual bulk status data
 type BulkStatusData struct {
-	BatchID    string               `json:"batchId"`
-	BatchTitle *string              `json:"batchTitle,omitempty"`
-	Status     string               `json:"status"`
-	Runs       []RunStatusItem      `json:"runs"`
-	Metadata   BulkStatusMetadata   `json:"metadata"`
+	BatchID    string             `json:"batchId"`
+	BatchTitle *string            `json:"batchTitle,omitempty"`
+	Status     string             `json:"status"`
+	Runs       []RunStatusItem    `json:"runs"`
+	Metadata   BulkStatusMetadata `json:"metadata"`
 }
 
 // RunStatusItem represents the status of a single run in a batch

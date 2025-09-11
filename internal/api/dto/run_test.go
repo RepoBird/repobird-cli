@@ -165,7 +165,7 @@ func TestCreateRunRequest_JSONFields(t *testing.T) {
 	assert.Equal(t, "run", result["runType"])
 	assert.Equal(t, "Bug Fix", result["title"])
 	assert.Equal(t, "Users report issues", result["context"])
-	
+
 	files, ok := result["files"].([]interface{})
 	assert.True(t, ok)
 	assert.Len(t, files, 2)
@@ -174,7 +174,7 @@ func TestCreateRunRequest_JSONFields(t *testing.T) {
 func TestRunResponse_AllFields(t *testing.T) {
 	now := time.Now()
 	completedAt := now.Add(1 * time.Hour)
-	
+
 	// Test full response with all fields
 	jsonInput := fmt.Sprintf(`{
 		"id": "run-123",

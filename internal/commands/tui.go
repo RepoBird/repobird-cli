@@ -86,7 +86,7 @@ func runTUI(cmd *cobra.Command, args []string) error {
 
 	apiURL := utils.GetAPIURL(cfg.APIURL)
 	client := api.NewClient(cfg.APIKey, apiURL, cfg.Debug)
-	
+
 	var app *tui.App
 	if debugLoading {
 		tuiDebug.LogToFile("🐛 DEBUG LOADING MODE: Staying on loading screen 🐛\n")

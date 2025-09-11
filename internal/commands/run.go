@@ -29,14 +29,14 @@ import (
 )
 
 var (
-	dryRun bool
-	follow bool
-	repo   string
-	prompt string
-	source string
-	target string
-	title  string
-	runType string
+	dryRun      bool
+	follow      bool
+	repo        string
+	prompt      string
+	source      string
+	target      string
+	title       string
+	runType     string
 	contextFlag string
 )
 
@@ -74,7 +74,7 @@ For configuration examples and field descriptions:
 func init() {
 	runCmd.Flags().BoolVar(&dryRun, "dry-run", false, "validate input without creating a run")
 	runCmd.Flags().BoolVar(&follow, "follow", false, "follow the run status after creation")
-	
+
 	// Flags for direct run creation
 	runCmd.Flags().StringVarP(&repo, "repo", "r", "", "repository name (owner/repo or numeric ID)")
 	runCmd.Flags().StringVarP(&prompt, "prompt", "p", "", "prompt for the run")
@@ -105,15 +105,15 @@ func runCommand(cmd *cobra.Command, args []string) error {
 			RunType:    runType,
 			Context:    contextFlag,
 		}
-		
+
 		// Set default run type if not specified
 		if runConfig.RunType == "" {
 			runConfig.RunType = "run"
 		}
-		
+
 		return processSingleRun(runConfig, "")
 	}
-	
+
 	// If flags are partially set, show more specific error
 	if repo != "" && prompt == "" {
 		return fmt.Errorf("missing required flag: --prompt (-p) is required when --repo is specified")
@@ -363,7 +363,7 @@ func followRunStatus(runService domain.RunService, runID string) error {
 	ctx := context.Background()
 	startTime := time.Now()
 	lastStatus := ""
-	
+
 	// Check if debug is enabled via environment variable or flag
 	isDebug := debug || os.Getenv("REPOBIRD_DEBUG_LOG") == "1"
 
@@ -398,14 +398,14 @@ func followRunStatus(runService domain.RunService, runID string) error {
 		if isDebug {
 			fmt.Printf("DEBUG: Run completed, fetching full details for PR URL...\n")
 		}
-		
+
 		// Create a new context with a 10-second timeout for fetching full details
 		detailsCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		
+
 		// Wait a brief moment for API to update PR URL
 		time.Sleep(1 * time.Second)
-		
+
 		// Fetch full run details
 		if fullRun, err := runService.GetRun(detailsCtx, runID); err == nil {
 			if isDebug {
@@ -425,7 +425,7 @@ func followRunStatus(runService domain.RunService, runID string) error {
 		fmt.Printf("Run failed: %s\n", finalRun.Error)
 	} else {
 		fmt.Printf("Run completed with status: %s\n", formatStatusForDisplay(finalRun.Status))
-		
+
 		// Display PR URL if run completed successfully and URL is available
 		if finalRun.Status == domain.StatusCompleted && finalRun.PullRequestURL != "" {
 			fmt.Printf("Pull Request: %s\n", finalRun.PullRequestURL)

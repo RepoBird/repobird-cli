@@ -47,10 +47,10 @@ type DashboardView struct {
 	height int
 
 	// Loading and error state
-	loading       bool
-	error         error
-	initializing  bool
-	debugLoading  bool // Stay in loading state (for debugging)
+	loading      bool
+	error        error
+	initializing bool
+	debugLoading bool // Stay in loading state (for debugging)
 
 	// Real data
 	repositories    []models.Repository
