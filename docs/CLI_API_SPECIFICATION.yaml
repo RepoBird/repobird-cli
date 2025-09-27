@@ -16,7 +16,7 @@ info:
     - Disabled repositories (isEnabled=false)
     - Repositories without GitHub App installation (installationId is null or empty)
     - Deleted repositories (deletedAt is not null)
-    
+
     This ensures that only active, properly configured repositories are accessible via the API.
 
     ## File Hash Tracking
@@ -305,6 +305,10 @@ components:
           type: string
           description: Optional title for the run
           example: Add authentication system
+        context:
+          type: string
+          description: Additional context for the run (separate from the main prompt)
+          example: This should work with the existing authentication module
         sourceBranch:
           type: string
           description: |
@@ -756,6 +760,13 @@ paths:
                   repositoryName: acme/webapp
                   prompt: Fix the login bug in auth.js
                   title: Fix authentication issue
+              withContext:
+                summary: Run with additional context
+                value:
+                  repositoryName: acme/webapp
+                  prompt: Refactor the authentication module
+                  context: Use the new JWT library we installed last week
+                  title: Refactor auth module
               withBranches:
                 summary: Run with specific branches
                 value:
