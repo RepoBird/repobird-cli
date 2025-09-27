@@ -222,12 +222,12 @@ func TestOpenURL(t *testing.T) {
 	defer func() { cmdExecutor = originalExecutor }()
 
 	tests := []struct {
-		name          string
-		input         string
-		wantCalled    bool
-		wantURL       string
-		returnError   error
-		wantErr       bool
+		name        string
+		input       string
+		wantCalled  bool
+		wantURL     string
+		returnError error
+		wantErr     bool
 	}{
 		{
 			name:       "Empty URL",
