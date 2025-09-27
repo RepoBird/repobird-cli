@@ -60,6 +60,16 @@ Examples:
   repobird run --repo owner/repo --prompt "Add tests" --follow
   repobird run -r owner/repo -p "Refactor" --source dev --target main
 
+  # Using prompt from file
+  repobird run -r owner/repo -p @prompt.txt         # Read prompt from file
+  repobird run -r owner/repo -p @prompt.md          # Markdown file as prompt
+  echo "Fix auth bug" | repobird run -r owner/repo -p -  # Prompt from stdin
+  repobird run -r owner/repo -p "@@starts with @"   # Use @@ to escape @
+
+  # Using context from file
+  repobird run -r owner/repo -p "Refactor" --context @context.md
+  repobird run -r owner/repo -p @task.txt --context @requirements.md
+
 For configuration examples and field descriptions:
   repobird examples                         # View all examples
   repobird examples generate run -o task.json
@@ -77,12 +87,12 @@ func init() {
 
 	// Flags for direct run creation
 	runCmd.Flags().StringVarP(&repo, "repo", "r", "", "repository name (owner/repo or numeric ID)")
-	runCmd.Flags().StringVarP(&prompt, "prompt", "p", "", "prompt for the run")
+	runCmd.Flags().StringVarP(&prompt, "prompt", "p", "", "prompt for the run (use @file to read from file, - for stdin)")
 	runCmd.Flags().StringVar(&source, "source", "", "source branch (optional)")
 	runCmd.Flags().StringVar(&target, "target", "", "target branch (optional)")
 	runCmd.Flags().StringVar(&title, "title", "", "title for the run (optional)")
 	runCmd.Flags().StringVar(&runType, "run-type", "", "type of run: 'run' or 'plan' (optional, default: run)")
-	runCmd.Flags().StringVar(&contextFlag, "context", "", "additional context for the run (optional)")
+	runCmd.Flags().StringVar(&contextFlag, "context", "", "additional context (use @file to read from file, - for stdin)")
 }
 
 func runCommand(cmd *cobra.Command, args []string) error {
@@ -95,15 +105,30 @@ func runCommand(cmd *cobra.Command, args []string) error {
 
 	// Check if run is being created with flags
 	if repo != "" && prompt != "" {
+		// Process prompt input (handles @file, -, or literal string)
+		processedPrompt, err := utils.ReadPromptInput(prompt)
+		if err != nil {
+			return fmt.Errorf("failed to process prompt: %w", err)
+		}
+
+		// Process context if provided (also supports @file syntax)
+		processedContext := contextFlag
+		if contextFlag != "" {
+			processedContext, err = utils.ReadPromptInput(contextFlag)
+			if err != nil {
+				return fmt.Errorf("failed to process context: %w", err)
+			}
+		}
+
 		// Create run from flags
 		runConfig := &models.RunConfig{
 			Repository: repo,
-			Prompt:     prompt,
+			Prompt:     processedPrompt,
 			Source:     source,
 			Target:     target,
 			Title:      title,
 			RunType:    runType,
-			Context:    contextFlag,
+			Context:    processedContext,
 		}
 
 		// Set default run type if not specified

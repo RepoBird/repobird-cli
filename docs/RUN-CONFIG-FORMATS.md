@@ -65,6 +65,12 @@ Create a run directly using command-line flags without any configuration file:
 # Minimal example (required flags only)
 repobird run -r myorg/webapp -p "Fix the login bug"
 
+# Read prompt from a file using @ prefix
+repobird run -r myorg/webapp -p @task.txt
+
+# Read prompt from stdin
+echo "Fix the login bug" | repobird run -r myorg/webapp -p -
+
 # With additional options
 repobird run --repo myorg/webapp \
   --prompt "Fix the login bug where users cannot authenticate after 5 failed attempts" \
@@ -74,6 +80,12 @@ repobird run --repo myorg/webapp \
   --context "Users report being permanently locked out. Should reset after 15 minutes." \
   --follow
 
+# Using files for complex prompts and context
+repobird run -r myorg/webapp -p @detailed-task.md --context @requirements.txt
+
+# Escape @ at the beginning with @@
+repobird run -r myorg/webapp -p "@@mentions are preserved"
+
 # Short form flags
 repobird run -r myorg/webapp -p "Add unit tests for auth module" --follow
 ```
@@ -81,11 +93,14 @@ repobird run -r myorg/webapp -p "Add unit tests for auth module" --follow
 **Available flags:**
 - `-r, --repo` (required) - Repository name (owner/repo or numeric ID)
 - `-p, --prompt` (required) - The task description/instructions
+  - Use `@filename` to read from a file
+  - Use `-` to read from stdin
+  - Use `@@` to escape a literal `@` at the beginning
 - `--source` - Source branch (optional, defaults to repository's default branch)
 - `--target` - Target branch (optional, auto-generated if not specified)
 - `--title` - Human-readable title (optional, auto-generated if not specified)
 - `--run-type` - Type of run: 'run' or 'plan' (optional, defaults to 'run')
-- `--context` - Additional context (optional)
+- `--context` - Additional context (optional, also supports `@filename` and `-`)
 - `--follow` - Follow the run status after creation
 - `--dry-run` - Validate without creating the run
 

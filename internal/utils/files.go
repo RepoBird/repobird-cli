@@ -5,8 +5,10 @@ package utils
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // ReadFileWithError reads a file and returns standardized error messages
@@ -91,4 +93,64 @@ func RemoveFileIfExists(path string) error {
 		return fmt.Errorf("failed to remove file %s: %w", path, err)
 	}
 	return nil
+}
+
+// ReadPromptInput reads prompt content from either a literal string or a file.
+// If the input starts with '@', it reads from the file specified after the @.
+// If the input is '-', it reads from stdin.
+// Otherwise, it returns the input as-is.
+//
+// Examples:
+//   - "Fix the bug" returns "Fix the bug"
+//   - "@prompt.txt" reads content from prompt.txt
+//   - "@/path/to/prompt.md" reads content from /path/to/prompt.md
+//   - "-" reads from stdin
+//   - "@@literal" returns "@literal" (double @ escapes the @)
+func ReadPromptInput(input string) (string, error) {
+	if input == "" {
+		return "", fmt.Errorf("prompt cannot be empty")
+	}
+
+	// Handle stdin input
+	if input == "-" {
+		data, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			return "", fmt.Errorf("failed to read from stdin: %w", err)
+		}
+		content := strings.TrimSpace(string(data))
+		if content == "" {
+			return "", fmt.Errorf("stdin is empty - no prompt data received")
+		}
+		return content, nil
+	}
+
+	// Handle file input with @ prefix
+	if strings.HasPrefix(input, "@") {
+		// Handle escaped @ (@@)
+		if strings.HasPrefix(input, "@@") {
+			return input[1:], nil // Remove one @ and return the rest
+		}
+
+		// Extract filename (everything after @)
+		filename := input[1:]
+		if filename == "" {
+			return "", fmt.Errorf("filename cannot be empty after @")
+		}
+
+		// Read the file
+		data, err := ReadFileWithError(filename)
+		if err != nil {
+			return "", fmt.Errorf("failed to read prompt file: %w", err)
+		}
+
+		content := strings.TrimSpace(string(data))
+		if content == "" {
+			return "", fmt.Errorf("prompt file %s is empty", filename)
+		}
+
+		return content, nil
+	}
+
+	// Return literal string
+	return input, nil
 }

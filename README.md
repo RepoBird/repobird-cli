@@ -31,18 +31,21 @@ Write your issue description once, and our autonomous agents handle everything -
 ## 🎯 Why RepoBird?
 
 ### The Problem with Other AI Tools
-- **Copilot/Cursor**: Requires constant interaction, you still handle all Git operations manually
-- **ChatGPT/Claude**: Copy-paste code snippets, manage Git yourself, lose context between sessions
-- **Other AI Agents**: Chat interfaces, multiple iterations, manual PR creation
+- **IDE-based tools**: Run locally with resource constraints, handle one task at a time, require IDE context switching and manual Git operations
+- **Other AI Agents**: Chat interfaces requiring multiple iterations, manual PR creation, no parallel execution capabilities, lack native GitHub integration
 
 ### The RepoBird Difference
-**One-Shot Simplicity**: Write your issue once, get a PR back. No chat, no iterations, no manual steps.
+**GitHub-Native Integration**: Lives entirely within your GitHub workflow as a GitHub App. Complete automation from issue to PR - no external tools, no context switching.
 
-**Complete Git Automation**: Our agents handle everything - branching, commits with proper messages, PR creation with descriptions. You never touch Git.
+**Cloud-Based Parallel Execution**: The ONLY cloud-based solution with true parallel processing. Launch 50 agents simultaneously - each with full resources, no local constraints.
 
-**Massive Scale**: Submit 50+ tasks in parallel. While you're in a meeting, RepoBird clears your entire backlog.
+**One-Shot Simplicity**: Write your issue once, get a production-ready PR back. No chat, no iterations, no manual steps. 73% of PRs merge without changes.
 
-**Perfect Every Time**: Atomic commits, proper commit messages, clean Git history. Impossible to mess up because it's not AI making Git decisions - it's bulletproof predetermined workflows.
+**Complete Git Automation**: Our agents handle everything - branching, atomic commits with proper messages, comprehensive PR descriptions. You never touch Git.
+
+**Unlimited Scale**: Submit 100+ tasks in parallel with RepoBird CLI. While you're in a meeting, cloud agents clear your entire backlog. No resource constraints, no queuing.
+
+**Enterprise-Grade Environment**: Each agent runs in an isolated cloud VM with full development tools, package managers, and internet access. Powered by Claude Code - the industry's most advanced AI coding agent.
 
 ## 📦 Installation
 
@@ -103,6 +106,10 @@ repobird login
 ```bash
 # Quickest way - direct command with flags (no file needed)
 repobird run -r your-org/your-repo -p "Fix the login bug where users get stuck on loading screen"
+
+# Or read prompt from a file using @ prefix
+echo "Fix the login bug where users get stuck on loading screen" > task.txt
+repobird run -r your-org/your-repo -p @task.txt
 
 # Or use a JSON file for more options
 echo '{

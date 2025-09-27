@@ -61,7 +61,8 @@ Get API Key: %s`, config.GetAPIKeysURL()),
 		}
 
 		fmt.Printf("✓ Man pages generated in %s directory\n", outputDir)
-		fmt.Println("Tip: The 'run' command supports both single and bulk configurations. Use 'repobird examples' for format details.")
+		fmt.Println("Tip: The 'run' command supports both single and bulk configurations.")
+		fmt.Println("     You can also use @filename to read prompts from files. Use 'repobird examples' for format details.")
 		return nil
 	},
 }
@@ -96,7 +97,8 @@ Get API Key: %s`, config.GetAPIKeysURL()),
 		}
 
 		fmt.Printf("✓ Markdown documentation generated in %s directory\n", outputDir)
-		fmt.Println("Tip: The 'run' command supports both single and bulk configurations. Use 'repobird examples' for format details.")
+		fmt.Println("Tip: The 'run' command supports both single and bulk configurations.")
+		fmt.Println("     You can also use @filename to read prompts from files. Use 'repobird examples' for format details.")
 		return nil
 	},
 }
@@ -131,7 +133,8 @@ Get API Key: %s`, config.GetAPIKeysURL()),
 		}
 
 		fmt.Printf("✓ YAML documentation generated in %s directory\n", outputDir)
-		fmt.Println("Tip: The 'run' command supports both single and bulk configurations. Use 'repobird examples' for format details.")
+		fmt.Println("Tip: The 'run' command supports both single and bulk configurations.")
+		fmt.Println("     You can also use @filename to read prompts from files. Use 'repobird examples' for format details.")
 		return nil
 	},
 }
