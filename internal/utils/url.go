@@ -18,6 +18,24 @@ import (
 // URL pattern matching - covers HTTP/HTTPS URLs
 var urlPattern = regexp.MustCompile(`https?://[^\s]+`)
 
+// commandExecutor interface for running commands (allows mocking in tests)
+type commandExecutor interface {
+	Run(ctx context.Context, name string, args ...string) error
+}
+
+// defaultCommandExecutor runs commands using exec.CommandContext
+type defaultCommandExecutor struct{}
+
+func (d defaultCommandExecutor) Run(ctx context.Context, name string, args ...string) error {
+	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.Stderr = nil
+	cmd.Stdout = nil
+	return cmd.Run()
+}
+
+// cmdExecutor is the command executor used by this package (can be overridden in tests)
+var cmdExecutor commandExecutor = defaultCommandExecutor{}
+
 // IsURL checks if a string contains a valid URL
 func IsURL(text string) bool {
 	if text == "" {
@@ -77,23 +95,14 @@ func OpenURLWithTimeout(urlStr string) error {
 
 // openURLSilent opens a URL while suppressing stderr to prevent GTK theme warnings
 func openURLSilent(ctx context.Context, url string) error {
-	var cmd *exec.Cmd
-
 	switch runtime.GOOS {
 	case "darwin":
-		cmd = exec.CommandContext(ctx, "open", url)
+		return cmdExecutor.Run(ctx, "open", url)
 	case "windows":
-		cmd = exec.CommandContext(ctx, "rundll32", "url.dll,FileProtocolHandler", url)
+		return cmdExecutor.Run(ctx, "rundll32", "url.dll,FileProtocolHandler", url)
 	default: // linux, freebsd, openbsd, netbsd, etc.
-		cmd = exec.CommandContext(ctx, "xdg-open", url)
+		return cmdExecutor.Run(ctx, "xdg-open", url)
 	}
-
-	// Suppress stderr to prevent GTK theme warnings from cluttering the terminal
-	cmd.Stderr = nil
-	// Also suppress stdout to keep it clean
-	cmd.Stdout = nil
-
-	return cmd.Run()
 }
 
 // ContainsURL checks if a field label typically contains URLs

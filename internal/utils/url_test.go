@@ -5,7 +5,9 @@ package utils
 
 import (
 	"context"
+	"errors"
 	"os"
+	"runtime"
 	"testing"
 	"time"
 )
@@ -87,60 +89,210 @@ func TestContainsURL(t *testing.T) {
 	}
 }
 
-func TestOpenURLSilent(t *testing.T) {
-	// Skip this test to prevent opening browser during test runs
-	t.Skip("Skipping openURLSilent test to prevent browser opening")
+// mockCommandExecutor captures command execution details for testing
+type mockCommandExecutor struct {
+	commands []struct {
+		name string
+		args []string
+	}
+	returnError error
+}
 
-	// Original test code commented out:
-	// Test that the function properly constructs commands based on OS
-	// We won't actually run the commands in tests, just verify the logic
+func (m *mockCommandExecutor) Run(ctx context.Context, name string, args ...string) error {
+	m.commands = append(m.commands, struct {
+		name string
+		args []string
+	}{name: name, args: args})
+	return m.returnError
+}
+
+func TestOpenURLSilent(t *testing.T) {
+	// Save original executor and restore after test
+	originalExecutor := cmdExecutor
+	defer func() { cmdExecutor = originalExecutor }()
 
 	testURL := "https://github.com/example/repo"
 
-	// This should not panic or error on valid URL
-	// In actual usage, we'd mock exec.Command, but for this simple test
-	// we'll just verify the function exists and can be called
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	err := openURLSilent(ctx, testURL)
-
-	// The command might fail in CI/test environments, but it shouldn't panic
-	// and should return some kind of result (either nil or an error)
-	if err != nil {
-		t.Logf("openURLSilent returned error (expected in test environment): %v", err)
-	}
-
-	// Test with empty URL
-	ctx2, cancel2 := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel2()
-	err = openURLSilent(ctx2, "")
-	if err != nil {
-		t.Logf("openURLSilent with empty URL returned error: %v", err)
-	}
-}
-
-func TestOpenURL(t *testing.T) {
-	// Skip this test to prevent opening browser during test runs
-	t.Skip("Skipping OpenURL test to prevent browser opening")
-
-	// Original test code commented out:
 	tests := []struct {
-		name    string
-		input   string
-		wantErr bool
+		name        string
+		url         string
+		os          string
+		wantCmd     string
+		wantArgs    []string
+		returnError error
+		wantError   bool
 	}{
-		{"Empty URL", "", false},
-		{"Valid URL", "https://github.com", false}, // May fail in test env, that's ok
-		{"URL with text", "Check out https://github.com for code", false},
-		{"No URL in text", "This has no URL", false}, // Should return nil
+		{
+			name:     "macOS",
+			url:      testURL,
+			os:       "darwin",
+			wantCmd:  "open",
+			wantArgs: []string{testURL},
+		},
+		{
+			name:     "Windows",
+			url:      testURL,
+			os:       "windows",
+			wantCmd:  "rundll32",
+			wantArgs: []string{"url.dll,FileProtocolHandler", testURL},
+		},
+		{
+			name:     "Linux",
+			url:      testURL,
+			os:       "linux",
+			wantCmd:  "xdg-open",
+			wantArgs: []string{testURL},
+		},
+		{
+			name:        "Command fails",
+			url:         testURL,
+			os:          runtime.GOOS,
+			returnError: errors.New("command failed"),
+			wantError:   true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Create mock executor
+			mock := &mockCommandExecutor{returnError: tt.returnError}
+			cmdExecutor = mock
+
+			// Temporarily override runtime.GOOS if needed
+			if tt.os != "" && tt.os != runtime.GOOS {
+				// For this test, we'll simulate the behavior by checking
+				// what command would be used on different platforms
+				// Note: We can't actually change runtime.GOOS, so we test
+				// with the current OS and verify the mock captures the right command
+				if runtime.GOOS != tt.os {
+					t.Skipf("Skipping %s test on %s", tt.os, runtime.GOOS)
+				}
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			err := openURLSilent(ctx, tt.url)
+			if (err != nil) != tt.wantError {
+				t.Errorf("openURLSilent() error = %v, wantError %v", err, tt.wantError)
+			}
+
+			// Verify the correct command was called (only if we're on the right OS)
+			if tt.wantCmd != "" && !tt.wantError && runtime.GOOS == tt.os {
+				if len(mock.commands) != 1 {
+					t.Fatalf("Expected 1 command call, got %d", len(mock.commands))
+				}
+				if mock.commands[0].name != tt.wantCmd {
+					t.Errorf("Expected command %q, got %q", tt.wantCmd, mock.commands[0].name)
+				}
+				if len(mock.commands[0].args) != len(tt.wantArgs) {
+					t.Errorf("Expected %d args, got %d", len(tt.wantArgs), len(mock.commands[0].args))
+				} else {
+					for i, arg := range tt.wantArgs {
+						if mock.commands[0].args[i] != arg {
+							t.Errorf("Expected arg[%d] = %q, got %q", i, arg, mock.commands[0].args[i])
+						}
+					}
+				}
+			}
+		})
+	}
+
+	// Test with empty URL should not call any command
+	t.Run("Empty URL", func(t *testing.T) {
+		mock := &mockCommandExecutor{}
+		cmdExecutor = mock
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		err := openURLSilent(ctx, "")
+		if err == nil {
+			// The function should still be called but with empty URL
+			if len(mock.commands) != 1 {
+				t.Fatalf("Expected 1 command call with empty URL, got %d", len(mock.commands))
+			}
+		}
+	})
+}
+
+func TestOpenURL(t *testing.T) {
+	// Save original executor and restore after test
+	originalExecutor := cmdExecutor
+	defer func() { cmdExecutor = originalExecutor }()
+
+	tests := []struct {
+		name          string
+		input         string
+		wantCalled    bool
+		wantURL       string
+		returnError   error
+		wantErr       bool
+	}{
+		{
+			name:       "Empty URL",
+			input:      "",
+			wantCalled: false,
+			wantErr:    false,
+		},
+		{
+			name:       "Valid URL",
+			input:      "https://github.com",
+			wantCalled: true,
+			wantURL:    "https://github.com",
+			wantErr:    false,
+		},
+		{
+			name:       "URL with text",
+			input:      "Check out https://github.com for code",
+			wantCalled: true,
+			wantURL:    "https://github.com",
+			wantErr:    false,
+		},
+		{
+			name:       "No URL in text",
+			input:      "This has no URL",
+			wantCalled: false,
+			wantErr:    false,
+		},
+		{
+			name:        "Command execution error",
+			input:       "https://example.com",
+			wantCalled:  true,
+			wantURL:     "https://example.com",
+			returnError: errors.New("failed to open"),
+			wantErr:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create mock executor
+			mock := &mockCommandExecutor{returnError: tt.returnError}
+			cmdExecutor = mock
+
 			err := OpenURLWithTimeout(tt.input)
 			if (err != nil) != tt.wantErr {
-				// In test environments, commands might fail - that's expected
-				t.Logf("OpenURL(%q) error = %v (may be expected in test environment)", tt.input, err)
+				t.Errorf("OpenURL(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
+			}
+
+			// Check if the command was called as expected
+			if tt.wantCalled {
+				if len(mock.commands) != 1 {
+					t.Fatalf("Expected command to be called once, got %d calls", len(mock.commands))
+				}
+				// Verify the URL passed to the command
+				if len(mock.commands[0].args) > 0 {
+					// The URL is typically the last argument
+					actualURL := mock.commands[0].args[len(mock.commands[0].args)-1]
+					if actualURL != tt.wantURL {
+						t.Errorf("Expected URL %q, got %q", tt.wantURL, actualURL)
+					}
+				}
+			} else {
+				if len(mock.commands) != 0 {
+					t.Errorf("Expected no command calls, got %d", len(mock.commands))
+				}
 			}
 		})
 	}
