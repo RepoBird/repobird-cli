@@ -303,6 +303,12 @@ func processSingleRun(runConfig *models.RunConfig, additionalContext string) err
 	fmt.Printf("Repository: %s\n", run.RepositoryName)
 	fmt.Printf("Source: %s → Target: %s\n", run.SourceBranch, run.TargetBranch)
 
+	// Print the RepoBird URL for the run
+	runURL := utils.GenerateRepoBirdURL(run.ID)
+	if runURL != "" {
+		fmt.Printf("URL: %s\n", runURL)
+	}
+
 	if follow {
 		fmt.Println("\nFollowing run status...")
 		return followRunStatus(runService, run.ID)
