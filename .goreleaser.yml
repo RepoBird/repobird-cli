@@ -79,11 +79,33 @@ release:
 
 changelog:
   sort: asc
+  use: github
   filters:
     exclude:
-      - "^docs:"
-      - "^test:"
-      - "^chore:"
+      # Internal-only commit types (not user-facing)
+      # Based on Conventional Commits / OpenCommit standards
+      - "^chore"
+      - "^docs"
+      - "^test"
+      - "^style"
+      - "^refactor"
+      - "^perf"
+      - "^build"
+      - "^ci"
+      # Also exclude Merge commits
+      - "^Merge "
+  # Only include user-facing changes: feat, fix, and BREAKING CHANGE
+  # Group commits by type for better readability
+  groups:
+    - title: "Features"
+      regexp: "^feat"
+      order: 0
+    - title: "Bug Fixes"
+      regexp: "^fix"
+      order: 1
+    - title: "Breaking Changes"
+      regexp: "BREAKING CHANGE"
+      order: 2
 
 # Package managers
 # Homebrew support disabled for now - requires HOMEBREW_TAP_GITHUB_TOKEN

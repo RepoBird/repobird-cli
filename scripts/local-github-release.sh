@@ -11,6 +11,9 @@ cleanup() {
         echo "Cleaning up any accidental artifacts..."
         rm -rf completions/ man/ 2>/dev/null || true
     fi
+
+    # Clean up temporary changelog file
+    rm -f /tmp/repobird-changelog-*.md 2>/dev/null || true
 }
 
 # Set trap to cleanup on exit
@@ -294,8 +297,13 @@ if [ "$LOCAL_ONLY" = true ] || [ "$SKIP_PUBLISH" = true ]; then
     GORELEASER_ARGS="$GORELEASER_ARGS --skip=publish"
 fi
 
-if [ "$VERSION" != "$(git describe --tags --abbrev=0)" ]; then
+if [ "$VERSION" != "$(git describe --tags --abbrev=0 2>/dev/null)" ]; then
     GORELEASER_ARGS="$GORELEASER_ARGS --skip=validate"
+fi
+
+# Add custom notes file if provided
+if [ -n "$NOTES_FILE" ] && [ -f "$NOTES_FILE" ]; then
+    GORELEASER_ARGS="$GORELEASER_ARGS --release-notes=$NOTES_FILE"
 fi
 
 # Set up environment for GoReleaser
@@ -322,6 +330,126 @@ fi
 print_step "Testing build with GoReleaser (snapshot mode)"
 goreleaser build --snapshot --clean
 print_success "Build test successful"
+
+# Generate changelog preview
+print_step "Generating changelog preview"
+CHANGELOG_FILE="/tmp/repobird-changelog-$VERSION.md"
+
+# Get the previous tag to generate changelog from
+PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+if [ -z "$PREV_TAG" ]; then
+    print_warning "No previous tag found, showing all commits"
+    GIT_RANGE="HEAD"
+else
+    GIT_RANGE="$PREV_TAG..HEAD"
+    print_info "Generating changelog from $PREV_TAG to HEAD"
+fi
+
+# Generate changelog with filtering
+cat > "$CHANGELOG_FILE" << 'CHANGELOG_HEADER'
+# Release Notes
+
+## Features
+CHANGELOG_HEADER
+
+# Add features - clean up verbose commit messages
+git log $GIT_RANGE --pretty=format:"%s" --no-merges | grep "^feat" | while IFS= read -r line; do
+    # Extract just the commit title (remove verbose explanations after first sentence/clause)
+    # Look for patterns like "The addition of", "This change", etc. and remove them
+    clean_line=$(echo "$line" | sed 's/ The .*//' | sed 's/ This .*//' | sed 's/ It .*//' | sed 's/\. .*//')
+    echo "- $clean_line"
+done >> "$CHANGELOG_FILE"
+
+# Check if any features were added
+if ! grep -q "^- feat" "$CHANGELOG_FILE"; then
+    echo "(none)" >> "$CHANGELOG_FILE"
+fi
+
+cat >> "$CHANGELOG_FILE" << 'CHANGELOG_FIXES'
+
+## Bug Fixes
+CHANGELOG_FIXES
+
+# Add fixes - clean up verbose commit messages
+git log $GIT_RANGE --pretty=format:"%s" --no-merges | grep "^fix" | while IFS= read -r line; do
+    # Extract just the commit title
+    clean_line=$(echo "$line" | sed 's/ The .*//' | sed 's/ This .*//' | sed 's/ It .*//' | sed 's/\. .*//')
+    echo "- $clean_line"
+done >> "$CHANGELOG_FILE"
+
+# Check if any fixes were added
+if ! grep -q "^- fix" "$CHANGELOG_FILE"; then
+    echo "(none)" >> "$CHANGELOG_FILE"
+fi
+
+cat >> "$CHANGELOG_FILE" << 'CHANGELOG_BREAKING'
+
+## Breaking Changes
+CHANGELOG_BREAKING
+
+# Add breaking changes
+git log $GIT_RANGE --pretty=format:"%s" --no-merges | grep -i "BREAKING CHANGE" | while IFS= read -r line; do
+    clean_line=$(echo "$line" | sed 's/ The .*//' | sed 's/ This .*//' | sed 's/ It .*//' | sed 's/\. .*//')
+    echo "- $clean_line"
+done >> "$CHANGELOG_FILE"
+
+# Check if any breaking changes were added
+if ! grep -q "BREAKING CHANGE" "$CHANGELOG_FILE"; then
+    echo "(none)" >> "$CHANGELOG_FILE"
+fi
+
+cat >> "$CHANGELOG_FILE" << 'CHANGELOG_FOOTER'
+
+---
+**Note:** Internal changes (chore, docs, test, style, refactor, perf, build, ci) are excluded from this changelog.
+CHANGELOG_FOOTER
+
+# Show the changelog to user
+echo ""
+print_info "Generated changelog preview:"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+cat "$CHANGELOG_FILE"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+# Ask user for confirmation
+if [ "$LOCAL_ONLY" = false ] && [ "$SKIP_PUBLISH" = false ]; then
+    echo "Options:"
+    echo "  [Y] Accept and continue with release"
+    echo "  [e] Edit changelog in \$EDITOR (${EDITOR:-nano})"
+    echo "  [N] Cancel release"
+    echo ""
+    read -p "Proceed with this changelog? (Y/e/N) " -n 1 -r
+    echo
+
+    if [[ $REPLY =~ ^[Ee]$ ]]; then
+        # Open changelog in editor
+        ${EDITOR:-nano} "$CHANGELOG_FILE"
+
+        echo ""
+        print_info "Edited changelog:"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        cat "$CHANGELOG_FILE"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo ""
+
+        read -p "Proceed with release? (y/N) " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            print_warning "Release cancelled by user"
+            rm -f "$CHANGELOG_FILE"
+            exit 0
+        fi
+    elif [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        print_warning "Release cancelled by user"
+        rm -f "$CHANGELOG_FILE"
+        exit 0
+    fi
+
+    # Use the custom changelog file for the release
+    NOTES_FILE="$CHANGELOG_FILE"
+    print_success "Changelog approved"
+fi
 
 # Create and push the tag after successful test build
 if [ "$LOCAL_ONLY" = false ]; then

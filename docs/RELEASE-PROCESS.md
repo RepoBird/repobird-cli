@@ -20,9 +20,78 @@ This will:
 1. Run validation checks (tests, formatting)
 2. Build the binary and generate completions/man pages
 3. Test build with GoReleaser in snapshot mode
-4. Create and push git tag after successful test
-5. Run GoReleaser to create GitHub release with all artifacts
-6. Sign release artifacts with GPG
+4. **Generate changelog preview and prompt for approval**
+5. Create and push git tag after successful test
+6. Run GoReleaser to create GitHub release with all artifacts
+7. Sign release artifacts with GPG
+
+### Changelog Preview
+
+The release script now generates an **interactive changelog preview** before publishing:
+
+- Automatically filters out internal commits (chore, docs, test, style, refactor, perf, build, ci)
+- Shows only user-facing changes (feat, fix, BREAKING CHANGE)
+- Groups commits by type (Features, Bug Fixes, Breaking Changes)
+- Allows you to:
+  - **[Y]** Accept and continue
+  - **[e]** Edit changelog in your `$EDITOR` (defaults to nano)
+  - **[N]** Cancel release
+
+Example workflow:
+```bash
+make release-github
+
+# ... validation and build steps ...
+
+# Generated changelog preview:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Release Notes
+
+## Features
+- feat(run.go): add printing of RepoBird URL for each run
+- feat(tui): add debug loading mode for debugging
+
+## Bug Fixes
+- fix(install.sh): update binary filename format
+
+## Breaking Changes
+(none)
+
+---
+**Note:** Internal changes are excluded from this changelog.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Options:
+  [Y] Accept and continue with release
+  [e] Edit changelog in $EDITOR (nano)
+  [N] Cancel release
+
+Proceed with this changelog? (Y/e/N)
+```
+
+You can:
+- Press **Y** to accept and continue
+- Press **e** to edit in your editor (set with `export EDITOR=vim`)
+- Press **N** to cancel and make changes
+
+### Changelog Filtering
+
+The changelog automatically excludes commits based on **Conventional Commits / OpenCommit standards**:
+
+**Excluded (internal-only):**
+- `chore:` - Routine maintenance
+- `docs:` - Documentation changes
+- `test:` - Test-only changes
+- `style:` - Code formatting
+- `refactor:` - Code restructuring
+- `perf:` - Performance improvements (internal)
+- `build:` - Build system changes
+- `ci:` - CI/CD changes
+
+**Included (user-facing):**
+- `feat:` - New features
+- `fix:` - Bug fixes
+- `BREAKING CHANGE:` - Breaking changes (any type)
 
 ### 2. Draft Release
 
