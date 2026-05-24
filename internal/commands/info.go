@@ -5,7 +5,6 @@ package commands
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -76,36 +75,9 @@ var infoCmd = &cobra.Command{
 				fmt.Printf("  Email: %s\n", userInfo.Email)
 				fmt.Printf("  Tier: %s\n", userInfo.Tier)
 
-				// Always show both for Free tier, or if either has values
-				if strings.Contains(strings.ToLower(userInfo.Tier), "free") ||
-					userInfo.ProTotalRuns > 0 || userInfo.RemainingProRuns > 0 {
-					// Use hardcoded defaults if totals are 0 (API didn't return them)
-					proTotal := userInfo.ProTotalRuns
-					if proTotal == 0 && strings.Contains(strings.ToLower(userInfo.Tier), "free") {
-						proTotal = 3 // Free tier default
-					} else if proTotal == 0 {
-						proTotal = 30 // Pro tier default
-					}
-					// Handle admin credits that exceed defaults
-					if userInfo.RemainingProRuns > proTotal {
-						proTotal = userInfo.RemainingProRuns
-					}
-					fmt.Printf("  Runs: %d/%d\n", userInfo.RemainingProRuns, proTotal)
-				}
-				if strings.Contains(strings.ToLower(userInfo.Tier), "free") ||
-					userInfo.PlanTotalRuns > 0 || userInfo.RemainingPlanRuns > 0 {
-					// Use hardcoded defaults if totals are 0 (API didn't return them)
-					planTotal := userInfo.PlanTotalRuns
-					if planTotal == 0 && strings.Contains(strings.ToLower(userInfo.Tier), "free") {
-						planTotal = 5 // Free tier default
-					} else if planTotal == 0 {
-						planTotal = 35 // Pro tier default
-					}
-					// Handle admin credits that exceed defaults
-					if userInfo.RemainingPlanRuns > planTotal {
-						planTotal = userInfo.RemainingPlanRuns
-					}
-					fmt.Printf("  Plan Runs: %d/%d\n", userInfo.RemainingPlanRuns, planTotal)
+				fmt.Printf("  Runs: %d/%d\n", userInfo.RemainingProRuns, userInfo.ProTotalRuns)
+				if userInfo.PlanTotalRuns > 0 || userInfo.RemainingPlanRuns > 0 {
+					fmt.Printf("  Plan Runs: %d/%d\n", userInfo.RemainingPlanRuns, userInfo.PlanTotalRuns)
 				}
 
 				// Calculate reset date

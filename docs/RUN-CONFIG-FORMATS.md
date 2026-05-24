@@ -1,14 +1,13 @@
 # RepoBird Run Configuration Formats
 
-The `repobird run` command supports multiple configuration file formats to define AI coding tasks. This guide covers all supported formats with complete examples. The command automatically detects whether a configuration file contains a single run or multiple bulk runs.
+The `repobird run` command supports multiple configuration file formats to define AI coding tasks. This guide covers all supported single-run formats with complete examples.
 
 ## Supported Formats
 
 - **Command-line flags** - Direct run creation using flags (single run only)
-- **JSON** (`.json`) - Standard JSON configuration (single or bulk)
-- **YAML** (`.yaml`, `.yml`) - Human-friendly YAML format (single or bulk)
-- **Markdown** (`.md`, `.markdown`) - Markdown with YAML frontmatter for documentation (single or bulk)
-- **JSONL** (`.jsonl`) - JSON Lines format for bulk runs
+- **JSON** (`.json`) - Standard JSON configuration
+- **YAML** (`.yaml`, `.yml`) - Human-friendly YAML format
+- **Markdown** (`.md`, `.markdown`) - Markdown with YAML frontmatter for documentation
 - **Stdin** - Pipe JSON directly without a file
 
 ## Configuration Fields
@@ -32,26 +31,6 @@ The `repobird run` command supports multiple configuration file formats to defin
 | `runType` | string | `run` | Type of run: `run` or `plan` |
 | `context` | string | - | Additional context or instructions for the AI |
 | `files` | array | - | List of specific files to include in the context |
-
-### Bulk Run Configuration
-
-#### Top-Level Fields
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `repository` | string | Repository for all runs (required) |
-| `source` | string | Source branch for all runs (defaults to repository's default branch if not specified) |
-| `runType` | string | Type for all runs: `run` or `plan` (defaults to `run`) |
-| `runs` | array | Array of run configurations (required) |
-
-#### Run Item Fields
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `prompt` | string | Task description for this run (required) |
-| `title` | string | Human-readable title for this run |
-| `target` | string | Target branch for this run |
-| `context` | string | Additional context for this run |
 
 ## Format Examples
 
@@ -224,85 +203,6 @@ jq -n '{
 }' | repobird run
 ```
 
-### Bulk Run Examples
-
-#### Bulk JSON Format
-
-Create a file `tasks.json`:
-
-```json
-{
-  "repository": "myorg/webapp",
-  "source": "main",
-  "runType": "run",
-  "runs": [
-    {
-      "prompt": "Fix the login bug where users cannot authenticate",
-      "title": "Fix authentication issue",
-      "target": "fix/auth-bug",
-      "context": "Users report being locked out after 5 failed attempts"
-    },
-    {
-      "prompt": "Add comprehensive logging to all API endpoints",
-      "title": "Add API logging",
-      "target": "feature/api-logging",
-      "context": "Need request/response logging with timestamps"
-    },
-    {
-      "prompt": "Optimize database queries in the user service",
-      "title": "Optimize user queries",
-      "target": "perf/user-queries"
-    }
-  ]
-}
-```
-
-Run with:
-```bash
-repobird run tasks.json          # Process all runs
-repobird run tasks.json --follow  # Follow batch progress
-repobird run tasks.json --dry-run # Validate without running
-```
-
-#### Bulk YAML Format
-
-Create a file `tasks.yaml`:
-
-```yaml
-repository: myorg/webapp
-source: main
-runType: run
-runs:
-  - prompt: Fix the login bug where users cannot authenticate
-    title: Fix authentication issue
-    target: fix/auth-bug
-    context: Users report being locked out after 5 failed attempts
-  
-  - prompt: Add comprehensive logging to all API endpoints
-    title: Add API logging
-    target: feature/api-logging
-    context: Need request/response logging with timestamps
-  
-  - prompt: Optimize database queries in the user service
-    title: Optimize user queries
-    target: perf/user-queries
-```
-
-#### JSONL Format (Bulk)
-
-Create a file `tasks.jsonl`:
-
-```jsonl
-{"prompt": "Fix login bug", "title": "Fix auth", "target": "fix/auth", "repository": "myorg/webapp"}
-{"prompt": "Add logging", "title": "Add logs", "target": "feature/logs", "repository": "myorg/webapp"}
-{"prompt": "Optimize queries", "title": "DB optimization", "target": "perf/db", "repository": "myorg/webapp"}
-```
-
-Run with:
-```bash
-repobird run tasks.jsonl
-```
-
 ## Minimal Examples
 
 ### Minimal JSON
@@ -432,6 +332,5 @@ repobird run feature-impl.yaml --follow
 
 ## See Also
 
-- [Bulk Runs Guide](BULK-RUNS.md) - Running multiple tasks in batch
 - [Configuration Guide](CONFIGURATION-GUIDE.md) - Setting up RepoBird CLI
 - [API Reference](API-REFERENCE.md) - Complete API documentation

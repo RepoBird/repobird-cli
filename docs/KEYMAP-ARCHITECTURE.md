@@ -40,7 +40,6 @@ Key Press → App.processKeyWithFiltering() → View Check → Action
 
 ### Navigation Keys
 - `b` - Back navigation
-- `B` - Bulk operations
 - `n` - New item
 - `r` - Refresh
 - `q` - Quit/back
@@ -126,18 +125,7 @@ func (d *DetailsView) HandleKey(msg tea.KeyMsg) (handled bool, model tea.Model, 
 }
 ```
 
-### Bulk View (Mode-Specific Keys)
-```go
-func (b *BulkView) IsKeyDisabled(key string) bool {
-    switch b.mode {
-    case FileSelectMode:
-        return key == "enter" && b.selectedFile == ""
-    case ProgressMode:
-        return key == "q" // Can't quit during progress
-    }
-    return false
-}
-```
+Bulk-run keybindings are legacy and hidden in current public builds.
 
 ## Benefits
 

@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-The RepoBird CLI will be a fast, cross-platform command-line tool built in **Go** that enables users to trigger AI agent runs in the cloud directly from their terminal. The tool will support multiple input formats (JSON, JSONL, YAML, TOML, Markdown) and provide both CLI and TUI modes with vim keybindings for efficient navigation.
+The RepoBird CLI will be a fast, cross-platform command-line tool built in **Go** that enables users to trigger AI agent runs in the cloud directly from their terminal. The tool will support multiple input formats (JSON, YAML, TOML, Markdown) and provide both CLI and TUI modes with vim keybindings for efficient navigation.
 
 ## Language Choice: Go
 
@@ -34,7 +34,6 @@ After thorough analysis, **Go** is the optimal choice for this CLI tool based on
 
 1. **Input Format Support**
    - JSON task files with configuration
-   - JSONL batch files for bulk operations
    - YAML/TOML for better readability with markdown-formatted prompts
    - Plain Markdown/TXT files for simple prompts (configuration via flags)
 
@@ -198,13 +197,6 @@ config:
     slack: false
 ```
 
-#### JSONL Batch File
-```jsonl
-{"prompt": "Fix login bug", "repository": "acme/webapp", "priority": "high"}
-{"prompt": "Add password reset", "repository": "acme/webapp", "priority": "medium"}
-{"prompt": "Implement 2FA", "repository": "acme/webapp", "priority": "low"}
-```
-
 ## API Integration
 
 ### Authentication Flow
@@ -311,7 +303,6 @@ Command mode:
 
 ### Phase 2: Multi-Format Support (Week 3)
 - [ ] YAML/TOML parsing with Viper
-- [ ] JSONL batch processing
 - [ ] Markdown/text file support
 - [ ] Configuration management
 

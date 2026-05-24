@@ -2,46 +2,62 @@
 
 All notable changes to RepoBird CLI will be documented in this file.
 
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
 ## [Unreleased]
 
-### Improved
+## [0.2.0] - 2026-05-23
+
+### Changed
+
+- Single-run creation now sends the current OpenCode agent contract to the API
 - Git operations now respond faster with automatic timeouts
 - Better error handling when cache directories can't be created
 - Cleaner interface with reduced visual clutter
+- Bulk run workflows are hidden and disabled while the API keeps them behind a legacy gate
+- README now points users to the live RepoBird docs and CLI quick start, with OpenCode and credit-based positioning
+- Public docs and examples no longer advertise bulk runs while they remain legacy-gated
 
 ### Fixed
+
 - Repository statistics now display correctly in the dashboard
 - Branch detection errors are handled more gracefully
 
-## [0.1.2]
+## [0.1.2] - 2024-01-01
 
 ### Added
+
 - Bug report template for easier issue reporting
 - Feature request and pull request templates
 - Command aliases in documentation for easier command discovery
 - GitHub Actions CI for automated quality checks
 
-### Improved
+### Changed
+
 - Dashboard now displays repository statistics more accurately
 - Better sorting of repositories in the interface
 - Clearer documentation for configuration and setup
 - Enhanced error messages when branches aren't found
-
-### Fixed
-- Git backup directories are now properly ignored
-- Environment variable handling in tests
-- Resource cleanup in various operations
-
-### Changed
 - Auto-detection of git information temporarily disabled while improvements are made
 - Default branch handling now respects repository settings
 - Development environment now uses localhost:3000 by default
 
-## [0.1.1] and earlier
+### Fixed
 
-Initial releases establishing core functionality:
-- Terminal UI for managing AI-powered code generation
+- Git backup directories are now properly ignored
+- Environment variable handling in tests
+- Resource cleanup in various operations
+
+## [0.1.1] - 2024-01-01
+
+### Added
+
+- Initial terminal UI for managing AI-powered code generation
 - Command-line interface for submitting tasks
 - Bulk operations support
 - Configuration management
 - API integration with RepoBird platform
+
+[Unreleased]: https://github.com/RepoBird/repobird-cli/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/RepoBird/repobird-cli/compare/v0.1.2...v0.2.0
+[0.1.2]: https://github.com/RepoBird/repobird-cli/compare/v0.1.1...v0.1.2

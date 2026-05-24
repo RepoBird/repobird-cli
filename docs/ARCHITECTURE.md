@@ -34,7 +34,6 @@ Cobra-based CLI commands for user interaction:
 - **config**: Manage API keys and settings  
 - **auth**: Authentication workflows
 - **tui**: Launch interactive terminal interface
-- **bulk**: Batch run submission
 
 ### 2. TUI Layer (`/internal/tui/`)
 Bubble Tea-based terminal UI with message-driven navigation:
@@ -42,7 +41,7 @@ Bubble Tea-based terminal UI with message-driven navigation:
 **Architecture:**
 - **App Router** (`app.go`): Central navigation with view history stack
 - **Navigation Messages**: Type-safe view transitions via messages  
-- **Views**: Dashboard, Create, Details, List, Bulk, Error
+- **Views**: Dashboard, Create, Details, List, Error
 - **Components**: ScrollableList, Form, WindowLayout, FZF selector
 - **Pattern**: `NewView(client, cache, id)` minimal constructors
 

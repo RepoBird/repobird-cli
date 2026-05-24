@@ -62,6 +62,7 @@ type APIRunRequest struct {
 	SourceBranch   string   `json:"sourceBranch"`
 	TargetBranch   string   `json:"targetBranch"`
 	RunType        RunType  `json:"runType"`
+	Agent          string   `json:"agent,omitempty"`
 	Title          string   `json:"title,omitempty"`
 	Context        string   `json:"context,omitempty"`
 	Files          []string `json:"files,omitempty"`
@@ -77,6 +78,7 @@ func (r *RunRequest) ToAPIRequest() *APIRunRequest {
 		SourceBranch:   r.Source,
 		TargetBranch:   r.Target,
 		RunType:        r.RunType,
+		Agent:          "opencode",
 		Title:          r.Title,
 		Context:        r.Context,
 		Files:          r.Files,

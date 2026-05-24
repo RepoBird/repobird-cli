@@ -1146,11 +1146,10 @@ paths:
 
   /api/v1/runs/bulk:
     post:
-      summary: Create bulk runs
+      summary: Create bulk runs (legacy-gated)
       description: |
-        Creates multiple AI agent runs in a single batch for the specified repository.
-        Maximum of 40 runs per batch. Supports partial success with 207 Multi-Status.
-        Each run can have its own configuration while sharing common settings.
+        Legacy/development endpoint. Bulk runs are unavailable in current public CLI builds.
+        Use POST /api/v1/runs for individual runs.
       tags:
         - Runs
       requestBody:
@@ -1324,10 +1323,9 @@ paths:
 
   /api/v1/runs/bulk/{batchId}:
     get:
-      summary: Get bulk run status
+      summary: Get bulk run status (legacy-gated)
       description: |
-        Retrieves the status and details of all runs in a batch.
-        Provides aggregate status and individual run progress.
+        Legacy/development endpoint. Bulk runs are unavailable in current public CLI builds.
       tags:
         - Runs
       parameters:
@@ -1378,11 +1376,9 @@ paths:
                 $ref: '#/components/schemas/Error'
 
     delete:
-      summary: Cancel bulk runs
+      summary: Cancel bulk runs (legacy-gated)
       description: |
-        Cancels all QUEUED runs in a batch.
-        Only QUEUED runs can be cancelled. PROCESSING/RUNNING runs will continue.
-        Returns information about which runs were cancelled, completed, or unable to cancel.
+        Legacy/development endpoint. Bulk runs are unavailable in current public CLI builds.
       tags:
         - Runs
       parameters:
@@ -1562,7 +1558,7 @@ tags:
     description: |
       AI agent run management including creation, listing, and monitoring.
       Supports file hash tracking for audit purposes (duplicates are allowed).
-      Bulk operations allow creating up to 40 runs in a single request.
+      Bulk operations are legacy-gated and unavailable in current public CLI builds.
   - name: Repositories
     description: |
       Repository management and configuration.

@@ -45,7 +45,6 @@ docs/repobird.yaml/
 docs/generated/
 
 # Go linting config (environment-specific)
-.golangci.yml
 
 # Ignore repobird binary in any folder
 **/repobird
@@ -74,6 +73,7 @@ scripts/*.local.sh
 
 # Local development files
 local/
+.worktrees/
 
 # Claude Flow and Swarm directories
 .claude-flow/

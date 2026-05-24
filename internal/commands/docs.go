@@ -18,7 +18,7 @@ import (
 var docsCmd = &cobra.Command{
 	Use:   "docs",
 	Short: "Generate documentation",
-	Long: fmt.Sprintf(`Generate documentation for the RepoBird CLI and TUI - trigger AI coding agents, submit batch runs, and monitor your AI agent runs through an interactive dashboard.
+	Long: fmt.Sprintf(`Generate documentation for the RepoBird CLI and TUI - trigger AI coding agents and monitor your AI agent runs through an interactive dashboard.
 
 Base URL: %s
 Get API Key: %s`, config.GetURLs().BaseURL, config.GetAPIKeysURL()),
@@ -29,7 +29,7 @@ var manCmd = &cobra.Command{
 	Short: "Generate man pages",
 	Long: fmt.Sprintf(`Generate man pages for RepoBird CLI commands.
 
-The 'run' command supports both single and bulk configurations in JSON, YAML, and Markdown formats.
+The 'run' command supports single run configurations in JSON, YAML, and Markdown formats.
 Use 'repobird examples' to see configuration formats and generate example files.
 
 Get API Key: %s`, config.GetAPIKeysURL()),
@@ -61,7 +61,7 @@ Get API Key: %s`, config.GetAPIKeysURL()),
 		}
 
 		fmt.Printf("✓ Man pages generated in %s directory\n", outputDir)
-		fmt.Println("Tip: The 'run' command supports both single and bulk configurations.")
+		fmt.Println("Tip: The 'run' command supports single run configurations.")
 		fmt.Println("     You can also use @filename to read prompts from files. Use 'repobird examples' for format details.")
 		return nil
 	},
@@ -72,7 +72,7 @@ var markdownCmd = &cobra.Command{
 	Short: "Generate markdown documentation",
 	Long: fmt.Sprintf(`Generate markdown documentation for RepoBird CLI commands.
 
-The 'run' command supports both single and bulk configurations in JSON, YAML, and Markdown formats.
+The 'run' command supports single run configurations in JSON, YAML, and Markdown formats.
 Use 'repobird examples' to see configuration formats and generate example files.
 
 Get API Key: %s`, config.GetAPIKeysURL()),
@@ -97,7 +97,7 @@ Get API Key: %s`, config.GetAPIKeysURL()),
 		}
 
 		fmt.Printf("✓ Markdown documentation generated in %s directory\n", outputDir)
-		fmt.Println("Tip: The 'run' command supports both single and bulk configurations.")
+		fmt.Println("Tip: The 'run' command supports single run configurations.")
 		fmt.Println("     You can also use @filename to read prompts from files. Use 'repobird examples' for format details.")
 		return nil
 	},
@@ -108,7 +108,7 @@ var yamlCmd = &cobra.Command{
 	Short: "Generate YAML documentation",
 	Long: fmt.Sprintf(`Generate YAML documentation for RepoBird CLI commands.
 
-The 'run' command supports both single and bulk configurations in JSON, YAML, and Markdown formats.
+The 'run' command supports single run configurations in JSON, YAML, and Markdown formats.
 Use 'repobird examples' to see configuration formats and generate example files.
 
 Get API Key: %s`, config.GetAPIKeysURL()),
@@ -133,7 +133,7 @@ Get API Key: %s`, config.GetAPIKeysURL()),
 		}
 
 		fmt.Printf("✓ YAML documentation generated in %s directory\n", outputDir)
-		fmt.Println("Tip: The 'run' command supports both single and bulk configurations.")
+		fmt.Println("Tip: The 'run' command supports single run configurations.")
 		fmt.Println("     You can also use @filename to read prompts from files. Use 'repobird examples' for format details.")
 		return nil
 	},

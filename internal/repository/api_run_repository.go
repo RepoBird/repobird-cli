@@ -48,6 +48,7 @@ func (r *apiRunRepository) Create(ctx context.Context, req domain.CreateRunReque
 		SourceBranch:   req.SourceBranch,
 		TargetBranch:   req.TargetBranch,
 		RunType:        req.RunType,
+		Agent:          agentOrDefault(req.Agent),
 		Title:          req.Title,
 		Context:        req.Context,
 		Files:          req.Files,
@@ -88,6 +89,13 @@ func (r *apiRunRepository) Create(ctx context.Context, req domain.CreateRunReque
 	}
 
 	return r.toDomainRun(&runResp), nil
+}
+
+func agentOrDefault(agent string) string {
+	if agent != "" {
+		return agent
+	}
+	return "opencode"
 }
 
 // Get retrieves a run by ID

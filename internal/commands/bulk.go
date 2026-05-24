@@ -48,31 +48,13 @@ var (
 func NewBulkCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "bulk [files...]",
-		Short: "Submit multiple runs from configuration files",
-		Long: `Submit multiple runs from configuration files.
-		
-Supports multiple formats:
-- Bulk JSON/YAML files with multiple runs
-- Multiple single-run configuration files
-- JSONL format for streaming large batches
-- Markdown format with front matter
+		Short: "Submit multiple runs from configuration files (legacy)",
+		Long: `Legacy bulk run command.
 
-Examples:
-  # Single bulk config file
-  repobird bulk tasks.json
-  
-  # Multiple files merged into batch
-  repobird bulk auth.yaml payment.yaml user.json
-  
-  # JSONL format
-  repobird bulk runs.jsonl
-  
-  # Interactive mode
-  repobird bulk --interactive
-  
-  # Follow batch progress
-  repobird bulk tasks.json --follow`,
-		RunE: runBulk,
+Bulk runs are currently unavailable in the public CLI while RepoBird's run
+creation API is being migrated. Create single runs with 'repobird run' instead.`,
+		Hidden: true,
+		RunE:   runBulk,
 	}
 
 	cmd.Flags().BoolVarP(&bulkFollow, "follow", "f", false, "Follow batch progress")
@@ -87,6 +69,14 @@ Examples:
 }
 
 func runBulk(cmd *cobra.Command, args []string) error {
+	return bulkRunsUnavailableError()
+}
+
+func bulkRunsUnavailableError() error {
+	return fmt.Errorf("bulk runs are currently unavailable in the CLI; create individual runs with 'repobird run'")
+}
+
+func runBulkLegacy(cmd *cobra.Command, args []string) error {
 	// Interactive mode
 	if bulkInteractive || len(args) == 0 {
 		return runBulkInteractive()

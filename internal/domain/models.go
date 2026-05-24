@@ -42,6 +42,7 @@ type CreateRunRequest struct {
 	SourceBranch   string
 	TargetBranch   string
 	RunType        string
+	Agent          string
 	Title          string
 	Context        string
 	Files          []string

@@ -35,7 +35,7 @@ DIST_DIR=dist
 # Platforms for cross-compilation
 PLATFORMS=darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64
 
-.PHONY: all build clean test coverage fmt lint vet deps run install uninstall help
+.PHONY: all build clean test coverage fmt lint vet deps run install uninstall help worktree worktree-clean
 
 # Default target
 all: test build
@@ -60,6 +60,20 @@ init:
 deps:
 	$(GOMOD) download
 	$(GOMOD) verify
+
+## worktree: Create/reuse a task worktree under .worktrees/ (BRANCH=agent/name BASE=current)
+worktree:
+	@BRANCH="$${BRANCH:-agent/$$(date +%Y%m%d-%H%M%S)}"; \
+	BASE="$${BASE:-$$(git branch --show-current)}"; \
+	./scripts/worktree-setup.sh "$$BRANCH" "$$BASE"
+
+## worktree-clean: Remove a task worktree (BRANCH=agent/name)
+worktree-clean:
+	@if [ -z "$${BRANCH:-}" ]; then \
+		echo "Usage: make worktree-clean BRANCH=agent/name"; \
+		exit 1; \
+	fi
+	git worktree remove ".worktrees/$(BRANCH)"
 
 ## build: Build the binary for current platform (development, without CGO for portability)
 build:
