@@ -41,7 +41,7 @@ Bubble Tea-based terminal UI with message-driven navigation:
 **Architecture:**
 - **App Router** (`app.go`): Central navigation with view history stack
 - **Navigation Messages**: Type-safe view transitions via messages  
-- **Views**: Dashboard, Create, Details, List, Bulk, Error
+- **Views**: Dashboard, Create, Details, List, Error
 - **Components**: ScrollableList, Form, WindowLayout, FZF selector
 - **Pattern**: `NewView(client, cache, id)` minimal constructors
 

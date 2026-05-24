@@ -224,13 +224,12 @@ interface ListResponse<T> {
    - Context provided as text string
 
 3. **Run Types**:
-   - Pro runs: Full implementation with claude-code (`runType: 'pro'`)
-   - Plan runs: Generate implementation plans only (`runType: 'pro-plan'`)
+   - Run execution uses the current OpenCode-backed agent contract.
+   - Plan mode is temporarily unavailable during the OpenCode migration.
 
 4. **Batch Operations**:
-   - JSONL batch file support (multiple runs)
-   - Each line creates separate run
-   - Sequential processing
+   - Bulk/batch run creation is legacy-gated and unavailable in current public CLI builds.
+   - Public CLI docs should direct users to `repobird run` for individual runs.
 
 5. **Usage Metrics**:
    - Remaining pro runs (remainingProRuns from userSchema)

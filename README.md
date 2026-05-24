@@ -38,13 +38,11 @@ Write your issue description once, and autonomous OpenCode-based agents handle t
 ### The RepoBird Difference
 **GitHub-Native Integration**: Lives entirely within your GitHub workflow as a GitHub App. Complete automation from issue to PR - no external tools, no context switching.
 
-**Cloud-Based Parallel Execution**: The ONLY cloud-based solution with true parallel processing. Launch 50 agents simultaneously - each with full resources, no local constraints.
+**Cloud-Based Execution**: Launch coding agents in managed cloud environments with full resources and no local constraints.
 
 **One-Shot Simplicity**: Write your issue once, get a production-ready PR back. No chat, no iterations, no manual steps. 73% of PRs merge without changes.
 
 **Complete Git Automation**: Our agents handle everything - branching, atomic commits with proper messages, comprehensive PR descriptions. You never touch Git.
-
-**Unlimited Scale**: Submit 100+ tasks in parallel with RepoBird CLI. While you're in a meeting, cloud agents clear your entire backlog. No resource constraints, no queuing.
 
 **Enterprise-Grade Environment**: Each agent runs in an isolated cloud VM with full development tools, package managers, and internet access. RepoBird's forward-looking agent workflow is OpenCode-based.
 
@@ -240,6 +238,7 @@ For the live product documentation, start at [repobird.ai/docs](https://repobird
 ### Getting Started
 - [RepoBird Docs](https://repobird.ai/docs) - Product guides, GitHub setup, workflow docs, and feature documentation
 - [Getting Started Guide](https://repobird.ai/docs/getting-started) - Connect GitHub and trigger your first RepoBird run
+- [CLI Quick Start](https://repobird.ai/docs/cli-quickstart) - Install the CLI, authenticate, and submit your first terminal run
 - [Installation Guide](docs/INSTALLATION.md) - Platform-specific CLI setup instructions
 - [Configuration Guide](docs/CONFIGURATION-GUIDE.md) - Authentication and settings
 

@@ -13,6 +13,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Better error handling when cache directories can't be created
 - Cleaner interface with reduced visual clutter
 - Bulk run workflows are hidden and disabled while the API keeps them behind a legacy gate
+- README now points users to the live RepoBird docs and CLI quick start, with OpenCode and credit-based positioning
+- Public docs and examples no longer advertise bulk runs while they remain legacy-gated
 
 ### Fixed
 
