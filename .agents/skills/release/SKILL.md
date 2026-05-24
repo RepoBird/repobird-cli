@@ -11,8 +11,8 @@ User instructions for the current release take precedence over this workflow. Pr
 
 ## Repo Shape
 
-- Primary remote: `origin` (`git@gitlab.com:ariel-frischer/repobird-cli.git`)
-- GitHub remote: optional; when present, prefer the existing `gh` remote name, but confirm with `git remote -v`
+- GitLab remote: `glab` (`git@gitlab.com:ariel-frischer/repobird-cli.git`)
+- GitHub remote: `gh` (`https://github.com/RepoBird/repobird-cli.git`), but confirm with `git remote -v`
 - Main development branch: `dev`
 - Release branch: `main`
 - GitHub release target in GoReleaser: `RepoBird/repobird-cli`
@@ -23,8 +23,8 @@ User instructions for the current release take precedence over this workflow. Pr
 
 Remote policy:
 
-- Push both `dev` and `main` to `origin` (GitLab).
-- Push only `main` and release tags to GitHub. Never push `dev` to GitHub.
+- Push both `dev` and `main` to `glab` (GitLab).
+- Push only `main` and release tags to `gh` (GitHub). Never push `dev` to GitHub.
 - If no GitHub remote is configured, do not invent one during release work; report that GitHub publishing is pending remote setup.
 
 Branch content policy:
@@ -46,7 +46,7 @@ Run these before release work. Stop and fix release blockers before tagging.
 ```bash
 git status --short --branch
 git remote -v
-git fetch origin --prune --tags
+git fetch glab --prune --tags
 gh auth status
 glab auth status
 make fmt-check
@@ -111,9 +111,9 @@ Release from `main` unless the user explicitly asks for another branch.
 
 ```bash
 git switch dev
-git pull --ff-only origin dev
+git pull --ff-only glab dev
 git switch main
-git pull --ff-only origin main
+git pull --ff-only glab main
 git merge --no-ff --no-commit dev
 if git diff --cached --name-only -- .agents | grep -q .; then
   git rm -r --cached .agents
@@ -128,7 +128,7 @@ make test
 make build
 chlog check
 git ls-tree -r --name-only HEAD -- .agents
-git push origin main
+git push glab main
 ```
 
 Do not proceed if `.agents/` appears in the staged merge diff or in `HEAD` on `main` after the guard commands. Fix the merge before pushing.
@@ -141,19 +141,19 @@ Create an annotated tag from `main`:
 
 ```bash
 git switch main
-git pull --ff-only origin main
+git pull --ff-only glab main
 git tag -a vX.Y.Z -m "Release vX.Y.Z"
-git push origin vX.Y.Z
+git push glab vX.Y.Z
 ```
 
-If a GitHub remote is configured, push only the same `main` commit and tag there so GitHub Actions can publish:
+Push only the same `main` commit and tag to GitHub so GitHub Actions can publish:
 
 ```bash
-git push <github-remote> main
-git push <github-remote> vX.Y.Z
+git push gh main
+git push gh vX.Y.Z
 ```
 
-Use the actual GitHub remote name from `git remote -v`; if it is not `gh`, substitute that name. Do not push `dev` to GitHub.
+Use the actual GitHub remote name from `git remote -v`; the expected name is `gh`. Do not push `dev` to GitHub.
 
 Watch GitHub Actions when available:
 
@@ -185,7 +185,7 @@ make build
 gh release view vX.Y.Z
 git switch dev
 git merge main
-git push origin dev
+git push glab dev
 ```
 
 Final handoff should include the release version, main SHA, CI/release URL if available, release URL if available, and any follow-up Beads.

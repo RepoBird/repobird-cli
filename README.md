@@ -8,24 +8,25 @@
 [![CI Status](https://img.shields.io/github/actions/workflow/status/repobird/repobird-cli/ci.yml?branch=main)](https://github.com/repobird/repobird-cli/actions)
 [![Release](https://img.shields.io/github/v/release/repobird/repobird-cli)](https://github.com/repobird/repobird-cli/releases)
 
-**One-Shot Issue to PR with Complete Git Automation**
+**One-shot issue to PR with OpenCode-powered cloud agents**
 
-RepoBird CLI is the command-line interface for [RepoBird.ai](https://repobird.ai) - one-shot coding agents that handle everything from issue to PR. No chat, no iterations, no manual Git operations. Write your issue once, get a perfect PR back.
+RepoBird CLI is the command-line interface for [RepoBird.ai](https://repobird.ai) - OpenCode-powered cloud coding agents that handle everything from issue to PR. No chat loop, no local workstation babysitting, no manual Git operations. Write the task once, track the run, and review the PR when it is ready.
 
 ## 🎯 What is RepoBird?
 
-RepoBird provides one-shot coding agents with complete Git automation. Unlike chat-based AI tools that require back-and-forth iterations and manual Git operations, RepoBird is simple: **issue in, PR out**. 
+RepoBird provides one-shot coding agents with complete Git automation. Unlike chat-based AI tools that require back-and-forth iterations and manual Git operations, RepoBird is simple: **issue in, PR out**.
 
-Write your issue description once, and our autonomous agents handle everything - research, implementation, testing, commits, and PR creation. No chat interface, no copy-pasting code, no Git commands.
+Write your issue description once, and autonomous OpenCode-based agents handle the workflow: repository setup, implementation, testing, commits, and PR creation. Credits are the customer-facing unit for cloud agent work, so RepoBird no longer models availability around fixed Basic/Pro monthly run counts.
 
 ### Key Features
 
 - 🚀 **One-Shot Execution**: No chat, no iterations - write once, ship automatically
 - 🔧 **Complete Git Automation**: Never touch Git - perfect commits, branches, and PRs every time
-- ⚡ **Cloud Execution**: Launch coding agents without tying up your local machine
-- 🤖 **Autonomous Agents**: Full cycle from research to PR without human intervention
+- ⚡ **OpenCode Cloud Execution**: Launch OpenCode-backed coding agents without tying up your local machine
+- 🤖 **Autonomous Agents**: Full cycle from repository setup to PR without human intervention
 - 📊 **Real-Time Monitoring**: Track progress of all parallel runs in the TUI dashboard
 - 🔒 **Isolated VM Execution**: Each agent runs in its own secure Debian microVM with full development tools
+- 💳 **Credit-Based Usage**: Runs consume credits based on cloud agent work instead of fixed Basic/Pro run limits
 - 🌐 **Complete Dev Environment**: Multi-language support, package managers, databases - everything needed to build real software
 
 ## 🎯 Why RepoBird?
@@ -45,7 +46,9 @@ Write your issue description once, and our autonomous agents handle everything -
 
 **Unlimited Scale**: Submit 100+ tasks in parallel with RepoBird CLI. While you're in a meeting, cloud agents clear your entire backlog. No resource constraints, no queuing.
 
-**Enterprise-Grade Environment**: Each agent runs in an isolated cloud VM with full development tools, package managers, and internet access. RepoBird is migrating its agent workflow toward OpenCode.
+**Enterprise-Grade Environment**: Each agent runs in an isolated cloud VM with full development tools, package managers, and internet access. RepoBird's forward-looking agent workflow is OpenCode-based.
+
+**Credit-Based Runs**: Credits cover cloud agent work across model usage, orchestration, runtime, logs, and storage. Basic and Pro language may still appear as capability or model-selection presets in some API responses, but it should not be interpreted as fixed monthly run-count availability.
 
 ## 📦 Installation
 
@@ -232,15 +235,20 @@ For complete configuration options and examples, see the [Run Configuration Guid
 
 ## 📚 Documentation
 
+For the live product documentation, start at [repobird.ai/docs](https://repobird.ai/docs).
+
 ### Getting Started
-- [Installation Guide](https://repobird.ai/docs/cli/installation) - Platform-specific setup instructions
-- [Quick Start Tutorial](https://repobird.ai/docs/cli/quickstart) - Your first RepoBird task
+- [RepoBird Docs](https://repobird.ai/docs) - Product guides, GitHub setup, workflow docs, and feature documentation
+- [Getting Started Guide](https://repobird.ai/docs/getting-started) - Connect GitHub and trigger your first RepoBird run
+- [Installation Guide](docs/INSTALLATION.md) - Platform-specific CLI setup instructions
 - [Configuration Guide](docs/CONFIGURATION-GUIDE.md) - Authentication and settings
 
 ### User Guides
 - [Terminal UI Guide](docs/TUI-GUIDE.md) - Master the interactive dashboard
 - [Run Configuration Formats](docs/RUN-CONFIG-FORMATS.md) - Task file examples
-- [Troubleshooting Guide](docs/TROUBLESHOOTING.md) - Common issues and solutions
+- [Branch Workflow](https://repobird.ai/docs/branch-workflow) - How RepoBird creates branches and pull requests
+- [Troubleshooting Guide](docs/TROUBLESHOOTING.md) - CLI troubleshooting
+- [Error Messages Guide](https://repobird.ai/docs/error-messages-guide) - Product error codes and recovery steps
 
 ### Reference
 - [CLI Command Reference](docs/cli-reference.md) - Complete command documentation
