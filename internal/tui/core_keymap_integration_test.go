@@ -77,23 +77,18 @@ func TestCoreKeymapSystemIntegration(t *testing.T) {
 		assert.Nil(t, cmd)
 	})
 
-	t.Run("app allows enabled navigation keys", func(t *testing.T) {
+	t.Run("app leaves hidden bulk key to views", func(t *testing.T) {
 		mockClient := &MockAPIClient{}
 		app := NewApp(mockClient)
 
-		// Create a view with 'B' key enabled (not disabled)
 		mockView := NewMockViewWithCoreKeymap()
 		app.current = mockView
 
-		// Send 'B' key press (bulk navigation)
 		keyMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("B")}
 		handled, model, cmd := app.processKeyWithFiltering(keyMsg)
 
-		// Should be handled by navigation system
-		assert.True(t, handled)
+		assert.False(t, handled)
 		assert.Equal(t, app, model)
-		// Note: cmd will be nil because MockAPIClient can't be cast to *api.Client
-		// which is required for BulkView. This is a limitation of the current implementation.
 		assert.Nil(t, cmd)
 	})
 
@@ -210,7 +205,7 @@ func TestAppKeyRegistryIntegration(t *testing.T) {
 		assert.Equal(t, keymap.ActionNavigateToDashboard, app.keyRegistry.GetAction("H")) // H goes to dashboard
 		assert.Equal(t, keymap.ActionNavigateToDashboard, app.keyRegistry.GetAction("q")) // q goes to dashboard
 		assert.Equal(t, keymap.ActionViewSpecific, app.keyRegistry.GetAction("b"))        // b is view-specific
-		assert.Equal(t, keymap.ActionNavigateBulk, app.keyRegistry.GetAction("B"))
+		assert.Equal(t, keymap.ActionViewSpecific, app.keyRegistry.GetAction("B"))
 		assert.Equal(t, keymap.ActionGlobalQuit, app.keyRegistry.GetAction("Q"))
 		assert.Equal(t, keymap.ActionViewSpecific, app.keyRegistry.GetAction("s"))
 	})

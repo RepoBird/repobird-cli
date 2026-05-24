@@ -131,19 +131,9 @@ func listRuns(client *api.Client) error {
 		// Set the current user for cache initialization and show user info
 		services.SetCurrentUser(userInfo)
 
-		// Use hardcoded fallback totals when API returns 0 (like auth info does)
-		if userInfo.Tier == "Free Plan v1" {
-			// Hardcoded limits for Free Plan v1 - always show tier total, not extra credits
-			proTotal := 3
-			planTotal := 5
-			fmt.Printf("Runs: %d/%d (%s tier)\n", userInfo.RemainingProRuns, proTotal, userInfo.Tier)
-			fmt.Printf("Plan Runs: %d/%d\n", userInfo.RemainingPlanRuns, planTotal)
-		} else {
-			// Other tiers - show actual values from API
-			fmt.Printf("Runs: %d/%d (%s tier)\n", userInfo.RemainingProRuns, userInfo.ProTotalRuns, userInfo.Tier)
-			if userInfo.PlanTotalRuns > 0 || userInfo.RemainingPlanRuns > 0 {
-				fmt.Printf("Plan Runs: %d/%d\n", userInfo.RemainingPlanRuns, userInfo.PlanTotalRuns)
-			}
+		fmt.Printf("Runs: %d/%d (%s tier)\n", userInfo.RemainingProRuns, userInfo.ProTotalRuns, userInfo.Tier)
+		if userInfo.PlanTotalRuns > 0 || userInfo.RemainingPlanRuns > 0 {
+			fmt.Printf("Plan Runs: %d/%d\n", userInfo.RemainingPlanRuns, userInfo.PlanTotalRuns)
 		}
 		fmt.Println()
 	}
@@ -197,7 +187,7 @@ func listRuns(client *api.Client) error {
 		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
 			idStr,
 			run.Status,
-			run.Repository,
+			run.GetRepositoryName(),
 			created,
 			title,
 		)

@@ -163,28 +163,9 @@ or in an encrypted file as a fallback.`,
 		fmt.Printf("  Email: %s\n", userInfo.Email)
 		fmt.Printf("  Tier: %s\n", userInfo.Tier)
 
-		// Show runs - always show Runs first, then Plan Runs
-		// For Free tier, always show both lines
-		if strings.Contains(strings.ToLower(userInfo.Tier), "free") {
-			// Free tier - show both, Runs then Plan Runs
-			// Use hardcoded defaults if totals are 0 (API didn't return them)
-			proTotal := userInfo.ProTotalRuns
-			planTotal := userInfo.PlanTotalRuns
-			if proTotal == 0 {
-				proTotal = 3 // Free tier default
-			}
-			if planTotal == 0 {
-				planTotal = 5 // Free tier default
-			}
-			// Always show tier total, not extra credits
-			fmt.Printf("  Runs: %d/%d\n", userInfo.RemainingProRuns, proTotal)
-			fmt.Printf("  Plan Runs: %d/%d\n", userInfo.RemainingPlanRuns, planTotal)
-		} else {
-			// Other tiers - show Runs, and Plan Runs if available
-			fmt.Printf("  Runs: %d/%d\n", userInfo.RemainingProRuns, userInfo.ProTotalRuns)
-			if userInfo.PlanTotalRuns > 0 || userInfo.RemainingPlanRuns > 0 {
-				fmt.Printf("  Plan Runs: %d/%d\n", userInfo.RemainingPlanRuns, userInfo.PlanTotalRuns)
-			}
+		fmt.Printf("  Runs: %d/%d\n", userInfo.RemainingProRuns, userInfo.ProTotalRuns)
+		if userInfo.PlanTotalRuns > 0 || userInfo.RemainingPlanRuns > 0 {
+			fmt.Printf("  Plan Runs: %d/%d\n", userInfo.RemainingPlanRuns, userInfo.PlanTotalRuns)
 		}
 
 		// Display storage method

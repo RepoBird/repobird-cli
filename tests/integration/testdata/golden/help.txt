@@ -1,5 +1,5 @@
 CLI and TUI (Terminal User Interface) for RepoBird.ai - trigger AI coding agents,
-submit batch runs, and monitor your AI agent runs through an interactive dashboard.
+and monitor your AI agent runs through an interactive dashboard.
 
 Base URL: https://repobird.ai
 Get API Key: https://repobird.ai/dashboard/user-profile/api-keys
@@ -8,7 +8,6 @@ Usage:
   repobird [command]
 
 Available Commands:
-  bulk        Submit multiple runs from configuration files
   completion  Generate shell completion scripts
   config      Manage RepoBird configuration
   docs        Generate documentation
@@ -17,7 +16,7 @@ Available Commands:
   info        Display authentication information
   login       Configure your API key securely
   logout      Remove stored API key
-  run         Create runs from a JSON, YAML, Markdown, or bulk configuration file
+  run         Create a run from a JSON, YAML, or Markdown configuration file, or with flags
   status      Check the status of runs
   tui         Launch the interactive Terminal User Interface
   verify      Verify current API key

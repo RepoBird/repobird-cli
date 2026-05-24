@@ -80,14 +80,14 @@ func TestRootCommand_CommandDescriptions(t *testing.T) {
 	// Map of command names to their expected short descriptions
 	expectedDescriptions := map[string]string{
 		"version":    "Print version information",
-		"run":        "Create runs from a JSON, YAML, Markdown, or bulk configuration file, or with flags",
+		"run":        "Create a run from a JSON, YAML, or Markdown configuration file, or with flags",
 		"status":     "Check the status of runs",
 		"config":     "Manage RepoBird configuration",
 		"login":      "Configure your API key securely",
 		"logout":     "Remove stored API key",
 		"verify":     "Verify current API key",
 		"info":       "Display authentication information",
-		"bulk":       "Submit multiple runs from configuration files",
+		"bulk":       "Submit multiple runs from configuration files (legacy)",
 		"tui":        "Launch the interactive Terminal User Interface",
 		"completion": "Generate shell completion scripts",
 		"docs":       "Generate documentation",

@@ -49,6 +49,7 @@ type CreateRunRequest struct {
 	SourceBranch   string   `json:"sourceBranch"`
 	TargetBranch   string   `json:"targetBranch"`
 	RunType        string   `json:"runType"`
+	Agent          string   `json:"agent,omitempty"`
 	Title          string   `json:"title,omitempty"`
 	Context        string   `json:"context,omitempty"`
 	Files          []string `json:"files,omitempty"`

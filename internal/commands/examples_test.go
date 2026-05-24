@@ -142,43 +142,6 @@ func TestGenerateRunExample(t *testing.T) {
 	}
 }
 
-func TestGenerateBulkExample(t *testing.T) {
-	result, err := generateBulkExample()
-	require.NoError(t, err)
-	require.NotEmpty(t, result)
-
-	// Check that bulk example contains proper structure
-	assert.Contains(t, result, `"runs":`)
-	assert.Contains(t, result, `"repository":`)
-	assert.Contains(t, result, `"prompt":`)
-
-	// Check field ordering in bulk runs - repository should come before prompt
-	lines := strings.Split(result, "\n")
-
-	// Find first run's repository and prompt
-	var firstRepoIndex, firstPromptIndex int
-	inFirstRun := false
-	for i, line := range lines {
-		if strings.Contains(line, `"runs":`) {
-			inFirstRun = true
-		}
-		if inFirstRun {
-			if strings.Contains(line, `"repository":`) && firstRepoIndex == 0 {
-				firstRepoIndex = i
-			}
-			if strings.Contains(line, `"prompt":`) && firstPromptIndex == 0 {
-				firstPromptIndex = i
-			}
-			if firstRepoIndex > 0 && firstPromptIndex > 0 {
-				break
-			}
-		}
-	}
-
-	assert.Less(t, firstRepoIndex, firstPromptIndex,
-		"repository field should appear before prompt field in bulk example")
-}
-
 func TestFieldOrderConsistency(t *testing.T) {
 	// Test that all formats maintain consistent field ordering
 	formats := []string{"json", "yaml", "md"}

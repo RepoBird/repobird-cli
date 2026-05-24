@@ -116,7 +116,6 @@ repobird examples schema
 # Generate example files
 repobird examples generate minimal -o task.json
 repobird examples generate run -f yaml -o task.yaml
-repobird examples generate bulk -o bulk.json
 ```
 
 ### Supported Formats

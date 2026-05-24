@@ -1,39 +1,17 @@
 # Bulk Runs Guide
 
+Bulk runs are currently unavailable in the public CLI while RepoBird keeps the
+bulk API behind a legacy/development gate. This page is retained as historical
+reference for the legacy implementation.
+
 ## Overview
 
 Execute multiple AI-powered tasks simultaneously for efficient batch processing.
 
-## Related Documentation
-- **[TUI Guide](TUI-GUIDE.md)** - Bulk view in TUI
-- **[API Reference](API-REFERENCE.md)** - Bulk API endpoints
-- **[Configuration Guide](CONFIGURATION-GUIDE.md)** - Bulk configuration
-
 ## Quick Start
 
-### Generate Example Configuration
-```bash
-# Generate bulk configuration example
-repobird examples generate bulk -o bulk-tasks.json
-```
-
-### CLI Usage
-```bash
-# Submit bulk runs
-repobird bulk config.json
-
-# With progress tracking
-repobird bulk config.json --follow
-
-# Dry run (validate only)
-repobird bulk config.json --dry-run
-```
-
-### TUI Usage
-Press `B` in dashboard to open bulk view:
-1. Select configuration file
-2. Review and toggle runs
-3. Submit and track progress
+Bulk commands and TUI entry points are hidden in current public builds. Use
+`repobird run` for individual runs.
 
 ## Configuration Format
 

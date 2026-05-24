@@ -27,7 +27,7 @@ var rootCmd = &cobra.Command{
 	Short:   "CLI and TUI for RepoBird.ai - trigger AI coding agents and manage runs",
 	Version: version.GetBuildInfo(),
 	Long: fmt.Sprintf(`CLI and TUI (Terminal User Interface) for RepoBird.ai - trigger AI coding agents,
-submit batch runs, and monitor your AI agent runs through an interactive dashboard.
+and monitor your AI agent runs through an interactive dashboard.
 
 Base URL: %s
 Get API Key: %s`, config.GetURLs().BaseURL, config.GetAPIKeysURL()),

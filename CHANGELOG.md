@@ -5,9 +5,13 @@ All notable changes to RepoBird CLI will be documented in this file.
 ## [Unreleased]
 
 ### Improved
+- Single-run creation now sends the current OpenCode agent contract to the API
 - Git operations now respond faster with automatic timeouts
 - Better error handling when cache directories can't be created
 - Cleaner interface with reduced visual clutter
+
+### Changed
+- Bulk run workflows are hidden and disabled while the API keeps them behind a legacy gate
 
 ### Fixed
 - Repository statistics now display correctly in the dashboard

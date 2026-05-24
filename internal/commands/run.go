@@ -42,15 +42,15 @@ var (
 
 var runCmd = &cobra.Command{
 	Use:   "run [file]",
-	Short: "Create runs from a JSON, YAML, Markdown, or bulk configuration file, or with flags",
+	Short: "Create a run from a JSON, YAML, or Markdown configuration file, or with flags",
 	Long: `Create one or more runs from a configuration file or using command-line flags.
 
-Supports single run or bulk run configurations in JSON, YAML, or Markdown format.
+Supports single run configurations in JSON, YAML, or Markdown format.
 Can also create a single run directly using command-line flags.
 
 Examples:
   # Run from file
-  repobird run task.json                    # Run from file (single or bulk)
+  repobird run task.json                    # Run from file
   repobird run tasks.yaml --follow           # Run and follow status
   repobird run task.md --dry-run            # Validate without running
   cat task.json | repobird run              # Pipe JSON from stdin
@@ -72,8 +72,7 @@ Examples:
 
 For configuration examples and field descriptions:
   repobird examples                         # View all examples
-  repobird examples generate run -o task.json
-  repobird examples generate bulk -o tasks.json`,
+  repobird examples generate run -o task.json`,
 	Args:          cobra.MaximumNArgs(1),
 	RunE:          runCommand,
 	SilenceErrors: true,
@@ -194,8 +193,7 @@ func runCommand(cmd *cobra.Command, args []string) error {
 	}
 
 	if isBulk {
-		// Process as bulk configuration - no need for validation prompts
-		return processBulkRuns(filename)
+		return bulkRunsUnavailableError()
 	}
 
 	// Process as single run configuration
@@ -240,6 +238,7 @@ func processSingleRun(runConfig *models.RunConfig, additionalContext string) err
 		SourceBranch:   runConfig.Source,
 		TargetBranch:   runConfig.Target,
 		RunType:        runConfig.RunType,
+		Agent:          "opencode",
 		Title:          runConfig.Title,
 		Context:        runConfig.Context,
 		Files:          runConfig.Files,
