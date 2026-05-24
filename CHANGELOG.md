@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-05-23
+
 ### Changed
 
 - Single-run creation now sends the current OpenCode agent contract to the API
@@ -56,5 +58,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Configuration management
 - API integration with RepoBird platform
 
-[Unreleased]: https://github.com/RepoBird/repobird-cli/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/RepoBird/repobird-cli/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/RepoBird/repobird-cli/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/RepoBird/repobird-cli/compare/v0.1.1...v0.1.2
