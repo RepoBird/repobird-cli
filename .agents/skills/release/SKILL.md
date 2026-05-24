@@ -1,6 +1,6 @@
 ---
 name: release
-description: Prepare and execute a RepoBird CLI release: pre-flight checks, chlog stamping, git tagging, GitHub Actions/Goreleaser publishing, and post-release verification.
+description: "Prepare and execute a RepoBird CLI release: pre-flight checks, chlog stamping, git tagging, GitHub Actions/Goreleaser publishing, and post-release verification."
 ---
 
 # RepoBird CLI Release Workflow
@@ -12,6 +12,7 @@ User instructions for the current release take precedence over this workflow. Pr
 ## Repo Shape
 
 - Primary remote: `origin` (`git@gitlab.com:ariel-frischer/repobird-cli.git`)
+- GitHub remote: optional; when present, prefer the existing `gh` remote name, but confirm with `git remote -v`
 - Main development branch: `dev`
 - Release branch: `main`
 - GitHub release target in GoReleaser: `RepoBird/repobird-cli`
@@ -20,7 +21,23 @@ User instructions for the current release take precedence over this workflow. Pr
 - Changelog source: `CHANGELOG.yaml`, rendered to `CHANGELOG.md` with `chlog`
 - Release publishing: GitHub Actions release workflow and/or local GoReleaser scripts
 
-If a GitHub remote is configured locally, use its existing name. Do not assume one exists; check `git remote -v`.
+Remote policy:
+
+- Push both `dev` and `main` to `origin` (GitLab).
+- Push only `main` and release tags to GitHub. Never push `dev` to GitHub.
+- If no GitHub remote is configured, do not invent one during release work; report that GitHub publishing is pending remote setup.
+
+Branch content policy:
+
+- `.agents/` and similar local agent workflow folders are allowed to be tracked on `dev`.
+- `.agents/` must not be present, staged, or tracked on `main`.
+- Do not add `.agents/` to a global repo ignore as the fix; this folder may be intentionally versioned on `dev`.
+- Before committing or pushing `main`, verify:
+  ```bash
+  git status --short -- .agents
+  git ls-tree -r --name-only HEAD -- .agents
+  ```
+  Both commands must produce no `.agents` paths on `main`.
 
 ## Preflight
 
@@ -42,6 +59,8 @@ make build
 ```
 
 If the working tree has unrelated local changes, do not overwrite them. Work around them or ask before proceeding.
+
+`gh auth status` may fail when the GitHub remote has not been configured yet. Treat that as a GitHub publishing blocker, not a GitLab release blocker, unless the user explicitly requires GitHub publishing for the release.
 
 ## Determine Version
 
@@ -95,15 +114,24 @@ git switch dev
 git pull --ff-only origin dev
 git switch main
 git pull --ff-only origin main
-git merge --no-ff dev
+git merge --no-ff --no-commit dev
+if git diff --cached --name-only -- .agents | grep -q .; then
+  git rm -r --cached .agents
+  rm -rf .agents
+fi
+git diff --cached --name-only -- .agents
+git commit -m "merge dev into main for vX.Y.Z"
 make fmt-check
 make vet
 make lint
 make test
 make build
 chlog check
+git ls-tree -r --name-only HEAD -- .agents
 git push origin main
 ```
+
+Do not proceed if `.agents/` appears in the staged merge diff or in `HEAD` on `main` after the guard commands. Fix the merge before pushing.
 
 If CI fails after pushing `main`, inspect logs and fix on `dev`, then merge forward again. Avoid direct `main` hotfixes unless explicitly requested.
 
@@ -118,12 +146,14 @@ git tag -a vX.Y.Z -m "Release vX.Y.Z"
 git push origin vX.Y.Z
 ```
 
-If a GitHub remote is configured, push the same `main` commit and tag there so GitHub Actions can publish:
+If a GitHub remote is configured, push only the same `main` commit and tag there so GitHub Actions can publish:
 
 ```bash
 git push <github-remote> main
 git push <github-remote> vX.Y.Z
 ```
+
+Use the actual GitHub remote name from `git remote -v`; if it is not `gh`, substitute that name. Do not push `dev` to GitHub.
 
 Watch GitHub Actions when available:
 
