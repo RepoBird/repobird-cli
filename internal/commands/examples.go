@@ -23,35 +23,33 @@ var examplesCmd = &cobra.Command{
 	Short: "Show configuration schemas and generate example files",
 	Long: `Show configuration schemas and generate example files for RepoBird runs.
 
-This command helps you understand the configuration format for single runs and bulk runs,
+This command helps you understand the configuration format for single runs,
 showing all required and optional fields with their types and descriptions.`,
 	RunE: showExamples,
 }
 
 var schemaCmd = &cobra.Command{
-	Use:   "schema [run|bulk]",
-	Short: "Display configuration schema for run or bulk configurations",
+	Use:   "schema [run]",
+	Short: "Display configuration schema for run configurations",
 	Long: `Display the complete configuration schema showing all fields, types, and descriptions.
 
 Examples:
   repobird examples schema        # Show single run schema (default)
-  repobird examples schema run    # Show single run schema  
-  repobird examples schema bulk   # Show bulk run schema`,
+  repobird examples schema run    # Show single run schema`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: showSchema,
 }
 
 var generateCmd = &cobra.Command{
-	Use:   "generate [run|bulk|minimal]",
+	Use:   "generate [run|minimal]",
 	Short: "Generate example configuration files",
-	Long: `Generate example configuration files for single or bulk runs.
+	Long: `Generate example configuration files for single runs.
 
 Examples:
   repobird examples generate                     # Generate full single run example (JSON)
   repobird examples generate minimal             # Generate minimal config (only required fields)
   repobird examples generate run --format yaml   # Generate YAML example
   repobird examples generate run --format md     # Generate Markdown example
-  repobird examples generate bulk                # Generate bulk run example
   repobird examples generate minimal -o task.json # Save minimal config to file`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: generateExample,
@@ -103,9 +101,9 @@ func showSchema(cmd *cobra.Command, args []string) error {
 	case "run":
 		showRunSchema()
 	case "bulk":
-		showBulkSchema()
+		return bulkRunsUnavailableError()
 	default:
-		return fmt.Errorf("unknown schema type: %s (use 'run' or 'bulk')", schemaType)
+		return fmt.Errorf("unknown schema type: %s (use 'run')", schemaType)
 	}
 	return nil
 }
@@ -136,32 +134,6 @@ func showRunSchema() {
 	fmt.Println("  repobird examples generate -f md    # Generate Markdown example")
 }
 
-func showBulkSchema() {
-	fmt.Println("BULK RUN CONFIGURATION SCHEMA")
-	fmt.Println("==============================")
-	fmt.Println()
-	fmt.Println("TOP-LEVEL STRUCTURE:")
-	fmt.Println("  {")
-	fmt.Println("    \"runs\": [              // Array of run configurations")
-	fmt.Println("      { /* run config */ },")
-	fmt.Println("      { /* run config */ }")
-	fmt.Println("    ]")
-	fmt.Println("  }")
-	fmt.Println()
-	fmt.Println("EACH RUN CONFIGURATION:")
-	fmt.Println("  Same as single run schema (see 'repobird examples schema run')")
-	fmt.Println()
-	fmt.Println("BULK-SPECIFIC BEHAVIOR:")
-	fmt.Println("  • Processes runs sequentially by default")
-	fmt.Println("  • Continues on individual run failures")
-	fmt.Println("  • Provides summary of all runs at completion")
-	fmt.Println("  • Supports --dry-run for validation")
-	fmt.Println()
-	fmt.Println("EXAMPLE:")
-	fmt.Println("  repobird examples generate bulk     # Generate bulk example")
-	fmt.Println("  repobird bulk config.json --dry-run # Validate bulk config")
-}
-
 func generateExample(cmd *cobra.Command, args []string) error {
 	// If no arguments provided and no output file, show help
 	if len(args) == 0 && outputFile == "" {
@@ -182,9 +154,9 @@ func generateExample(cmd *cobra.Command, args []string) error {
 	case "minimal":
 		content, err = generateRunExample(formatType, true)
 	case "bulk":
-		content, err = generateBulkExample()
+		return bulkRunsUnavailableError()
 	default:
-		return fmt.Errorf("unknown example type: %s (use 'run', 'minimal', or 'bulk')", exampleType)
+		return fmt.Errorf("unknown example type: %s (use 'run' or 'minimal')", exampleType)
 	}
 
 	if err != nil {
@@ -351,33 +323,4 @@ runType: %s`,
 	default:
 		return "", fmt.Errorf("unsupported format: %s (use json, yaml, or md)", format)
 	}
-}
-
-func generateBulkExample() (string, error) {
-	// Manually build JSON to maintain field order
-	bulkJSON := `{
-  "runs": [
-    {
-      "repository": "myorg/webapp",
-      "prompt": "Add comprehensive error handling to the authentication module",
-      "context": "Add try-catch blocks and user-friendly error messages"
-    },
-    {
-      "repository": "myorg/webapp",
-      "prompt": "Create unit tests for the user profile component with at least 80% code coverage"
-    },
-    {
-      "repository": "myorg/backend",
-      "prompt": "Plan refactoring of the database layer to use connection pooling",
-      "runType": "plan",
-      "context": "Current implementation creates new connections for each request"
-    }
-  ]
-}`
-
-	header := "// Bulk run configuration example\n"
-	header += "// This will create 3 separate runs sequentially\n"
-	header += "// Save this file and run: repobird bulk bulk-tasks.json\n\n"
-
-	return header + bulkJSON, nil
 }

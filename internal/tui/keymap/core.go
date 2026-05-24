@@ -59,7 +59,6 @@ func NewCoreKeyRegistry() *CoreKeyRegistry {
 	// Primary navigation: h/H for dashboard (vim/ranger style), q for dashboard/quit
 	registry.Register("h", ActionNavigateToDashboard, "dashboard")
 	registry.Register("H", ActionNavigateToDashboard, "dashboard") // Same as h
-	registry.Register("B", ActionNavigateBulk, "bulk operations")
 	registry.Register("n", ActionNavigateNew, "new run")
 	registry.Register("r", ActionNavigateRefresh, "refresh")
 	registry.Register("q", ActionNavigateToDashboard, "dashboard") // Goes to dashboard from child views
@@ -77,7 +76,7 @@ func NewCoreKeyRegistry() *CoreKeyRegistry {
 	registry.Register("tab", ActionViewSpecific, "next field")
 	registry.Register("shift+tab", ActionViewSpecific, "previous field")
 	registry.Register("backspace", ActionViewSpecific, "typing")
-	registry.Register("b", ActionViewSpecific, "view specific") // Let views handle 'b' (dashboard uses for bulk)
+	registry.Register("b", ActionViewSpecific, "view specific")
 
 	// Navigation keys (for column/list navigation within views)
 	// Note: 'h' is registered above as back navigation

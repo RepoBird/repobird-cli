@@ -228,6 +228,7 @@ func (v *CreateRunView) handleFormSubmit(msg components.FormSubmitMsg) (tea.Mode
 		Prompt:         msg.Values["prompt"],
 		Context:        msg.Values["context"],
 		RunType:        models.RunType("run"), // Default to run type
+		Agent:          "opencode",
 	}
 
 	// Submit asynchronously
@@ -260,6 +261,7 @@ func (v *CreateRunView) handleCustomFormSubmit(msg CustomFormSubmitMsg) (tea.Mod
 		Prompt:         msg.Values["prompt"],
 		Context:        msg.Values["context"],
 		RunType:        models.RunType(runType), // Use the selected run type
+		Agent:          "opencode",
 	}
 
 	// Submit asynchronously

@@ -94,7 +94,7 @@ For more detailed information about RepoBird's features, architecture, and imple
 ## Product Roadmap Highlights
 
 ### Recently Completed ✅
-- **Claude Code Integration**: Superior AI agent for code generation
+- **OpenCode-oriented Agent Workflow**: Forward-looking agent execution for code generation
 - **UI-Triggered Runs**: Launch agents directly from dashboard
 - **Internal Notifications**: Customizable email preferences for run updates
 - **State-of-the-Art AI Environment**: Enterprise-grade sandboxed VM with full dev ecosystem

@@ -105,13 +105,6 @@ func (v *View) Init() tea.Cmd {
 - PR URL and status
 - Copy to clipboard support
 
-### Bulk View
-**Modes:**
-1. File selection - Choose config file
-2. Run list - Review and toggle runs
-3. Progress - Real-time submission tracking
-4. Results - Summary with success/failure
-
 ## Caching
 
 **Hybrid Cache Architecture:**

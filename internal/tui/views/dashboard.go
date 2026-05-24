@@ -230,21 +230,6 @@ func (d *DashboardView) IsKeyDisabled(keyString string) bool {
 // HandleKey implements the CoreViewKeymap interface
 func (d *DashboardView) HandleKey(keyMsg tea.KeyMsg) (handled bool, model tea.Model, cmd tea.Cmd) {
 	switch keyMsg.String() {
-	case "b":
-		// Dashboard handles 'b' specially for bulk view navigation (overrides back navigation)
-		// Save dashboard state before navigating
-		debug.LogToFilef("💾 DASHBOARD: Saving state before BULK navigation - repo=%d, run=%d, detail=%d, column=%d 💾\n",
-			d.selectedRepoIdx, d.selectedRunIdx, d.selectedDetailLine, d.focusedColumn)
-		d.cache.SetNavigationContext("dashboardState", map[string]interface{}{
-			"selectedRepoIdx":    d.selectedRepoIdx,
-			"selectedRunIdx":     d.selectedRunIdx,
-			"selectedDetailLine": d.selectedDetailLine,
-			"focusedColumn":      d.focusedColumn,
-		})
-		// Navigate to bulk view
-		return true, d, func() tea.Msg {
-			return messages.NavigateToBulkMsg{}
-		}
 	case "h", "H":
 		// Handle 'h' and 'H' for column navigation (move left)
 		// Override centralized system behavior for dashboard-specific column navigation

@@ -1,5 +1,9 @@
 # Bulk Workflows Comparison: TUI vs CLI
 
+Bulk runs are currently unavailable in the public CLI while RepoBird keeps the
+bulk API behind a legacy/development gate. This document is retained as
+historical reference for the legacy implementation.
+
 This document details the technical differences between running bulk operations through the TUI (Terminal User Interface) and the CLI `run` command, particularly focusing on how they process YAML configuration files and handle API requests.
 
 ## Overview

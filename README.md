@@ -10,19 +10,19 @@
 
 **One-Shot Issue to PR with Complete Git Automation**
 
-RepoBird CLI is the command-line interface for [RepoBird.ai](https://repobird.ai) - one-shot coding agents that handle everything from issue to PR. No chat, no iterations, no manual Git operations. Write your issue once, get a perfect PR back. Clear entire backlogs with bulk parallel runs.
+RepoBird CLI is the command-line interface for [RepoBird.ai](https://repobird.ai) - one-shot coding agents that handle everything from issue to PR. No chat, no iterations, no manual Git operations. Write your issue once, get a perfect PR back.
 
 ## 🎯 What is RepoBird?
 
 RepoBird provides one-shot coding agents with complete Git automation. Unlike chat-based AI tools that require back-and-forth iterations and manual Git operations, RepoBird is simple: **issue in, PR out**. 
 
-Write your issue description once, and our autonomous agents handle everything - research, implementation, testing, commits, and PR creation. No chat interface, no copy-pasting code, no Git commands. The CLI enables massive scale with bulk parallel runs - clear your entire backlog in one command.
+Write your issue description once, and our autonomous agents handle everything - research, implementation, testing, commits, and PR creation. No chat interface, no copy-pasting code, no Git commands.
 
 ### Key Features
 
 - 🚀 **One-Shot Execution**: No chat, no iterations - write once, ship automatically
 - 🔧 **Complete Git Automation**: Never touch Git - perfect commits, branches, and PRs every time
-- ⚡ **Bulk Parallel Runs**: Clear 50+ issues simultaneously with one command
+- ⚡ **Cloud Execution**: Launch coding agents without tying up your local machine
 - 🤖 **Autonomous Agents**: Full cycle from research to PR without human intervention
 - 📊 **Real-Time Monitoring**: Track progress of all parallel runs in the TUI dashboard
 - 🔒 **Isolated VM Execution**: Each agent runs in its own secure Debian microVM with full development tools
@@ -45,7 +45,7 @@ Write your issue description once, and our autonomous agents handle everything -
 
 **Unlimited Scale**: Submit 100+ tasks in parallel with RepoBird CLI. While you're in a meeting, cloud agents clear your entire backlog. No resource constraints, no queuing.
 
-**Enterprise-Grade Environment**: Each agent runs in an isolated cloud VM with full development tools, package managers, and internet access. Powered by Claude Code - the industry's most advanced AI coding agent.
+**Enterprise-Grade Environment**: Each agent runs in an isolated cloud VM with full development tools, package managers, and internet access. RepoBird is migrating its agent workflow toward OpenCode.
 
 ## 📦 Installation
 
@@ -121,28 +121,6 @@ repobird run fix.json --follow
 # That's it. PR will be created automatically. No further action needed.
 ```
 
-### 4. Clear Your Entire Backlog (Bulk Mode)
-
-```bash
-# Submit multiple issues at once
-echo '{
-  "repository": "your-org/your-repo",
-  "runs": [
-    {"prompt": "Fix login bug"},
-    {"prompt": "Add dark mode"},
-    {"prompt": "Improve error handling"},
-    {"prompt": "Update dependencies"},
-    {"prompt": "Add unit tests for auth module"}
-  ]
-}' > backlog.json
-
-# Fire and forget - all PRs created in parallel
-repobird bulk backlog.json
-
-# Monitor all runs in real-time
-repobird tui
-```
-
 ## 📖 Usage Guide
 
 ### Authentication Management
@@ -167,9 +145,6 @@ repobird run task.json --follow
 repobird run task.yaml          # YAML format
 repobird run task.md            # Markdown with frontmatter
 cat task.json | repobird run -  # From stdin
-
-# Bulk operations
-repobird bulk tasks.json        # Submit multiple tasks
 ```
 
 ### Monitoring & Management
@@ -206,7 +181,6 @@ The interactive dashboard features a **Miller column layout** inspired by the ra
 ```bash
 # Generate example configurations
 repobird examples generate minimal -o task.json
-repobird examples generate bulk -o bulk.json
 repobird examples schema  # View full schema documentation
 ```
 
@@ -240,21 +214,6 @@ Tasks are defined in JSON, YAML, or Markdown files with two required fields:
 }
 ```
 
-### Bulk Operations
-
-Submit multiple tasks in a single file:
-
-```json
-{
-  "repository": "myorg/webapp",
-  "runs": [
-    {"prompt": "Fix login bug", "target": "fix/login"},
-    {"prompt": "Add password reset", "target": "feature/reset"},
-    {"prompt": "Improve error handling", "target": "fix/errors"}
-  ]
-}
-```
-
 For complete configuration options and examples, see the [Run Configuration Guide](docs/RUN-CONFIG-FORMATS.md).
 
 ## 🛡️ Advanced Features
@@ -281,7 +240,6 @@ For complete configuration options and examples, see the [Run Configuration Guid
 ### User Guides
 - [Terminal UI Guide](docs/TUI-GUIDE.md) - Master the interactive dashboard
 - [Run Configuration Formats](docs/RUN-CONFIG-FORMATS.md) - Task file examples
-- [Bulk Operations Guide](docs/BULK-RUNS.md) - Managing multiple tasks
 - [Troubleshooting Guide](docs/TROUBLESHOOTING.md) - Common issues and solutions
 
 ### Reference

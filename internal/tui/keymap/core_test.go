@@ -18,13 +18,13 @@ func TestCoreKeyRegistry(t *testing.T) {
 		assert.Equal(t, ActionNavigateToDashboard, registry.GetAction("h")) // h goes to dashboard
 		assert.Equal(t, ActionNavigateToDashboard, registry.GetAction("H")) // H goes to dashboard (same as h)
 		assert.Equal(t, ActionNavigateToDashboard, registry.GetAction("q")) // q goes to dashboard
-		assert.Equal(t, ActionNavigateBulk, registry.GetAction("B"))
 		assert.Equal(t, ActionNavigateNew, registry.GetAction("n"))
 		assert.Equal(t, ActionNavigateRefresh, registry.GetAction("r"))
 		assert.Equal(t, ActionNavigateHelp, registry.GetAction("?"))
 
 		// Test that old back keys are now view-specific
 		assert.Equal(t, ActionViewSpecific, registry.GetAction("b"))         // b is now view-specific
+		assert.Equal(t, ActionViewSpecific, registry.GetAction("B"))         // bulk navigation is hidden
 		assert.Equal(t, ActionViewSpecific, registry.GetAction("backspace")) // backspace is typing
 		assert.Equal(t, ActionViewSpecific, registry.GetAction("esc"))       // esc is for modals
 

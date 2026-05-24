@@ -55,6 +55,7 @@ func (f FormFields) ToAPIRunRequest() models.APIRunRequest {
 		Prompt:         runReq.Prompt,
 		Context:        runReq.Context,
 		RunType:        runReq.RunType,
+		Agent:          "opencode",
 	}
 }
 

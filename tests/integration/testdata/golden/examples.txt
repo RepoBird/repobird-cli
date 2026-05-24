@@ -10,6 +10,12 @@ SINGLE RUN FORMATS:
   • YAML (.yaml, .yml)   - Human-friendly YAML format
   • Markdown (.md)       - Documentation with YAML frontmatter
 
+COMMAND-LINE PROMPT OPTIONS:
+  • -p "text"            - Direct prompt text
+  • -p @file.txt         - Read prompt from file
+  • -p -                 - Read prompt from stdin
+  • --context @file.md   - Read context from file
+
 COMMANDS:
   schema [type]     Show configuration schema
   generate [type]   Generate example configuration files

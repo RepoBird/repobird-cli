@@ -34,7 +34,6 @@ Cobra-based CLI commands for user interaction:
 - **config**: Manage API keys and settings  
 - **auth**: Authentication workflows
 - **tui**: Launch interactive terminal interface
-- **bulk**: Batch run submission
 
 ### 2. TUI Layer (`/internal/tui/`)
 Bubble Tea-based terminal UI with message-driven navigation:

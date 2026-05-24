@@ -143,6 +143,7 @@ func TestCreateRunRequest_JSONFields(t *testing.T) {
 		SourceBranch:   "main",
 		TargetBranch:   "fix/bug",
 		RunType:        "run",
+		Agent:          "opencode",
 		Title:          "Bug Fix",
 		Context:        "Users report issues",
 		Files:          []string{"file1.go", "file2.go"},
@@ -163,6 +164,7 @@ func TestCreateRunRequest_JSONFields(t *testing.T) {
 	assert.Equal(t, "main", result["sourceBranch"])
 	assert.Equal(t, "fix/bug", result["targetBranch"])
 	assert.Equal(t, "run", result["runType"])
+	assert.Equal(t, "opencode", result["agent"])
 	assert.Equal(t, "Bug Fix", result["title"])
 	assert.Equal(t, "Users report issues", result["context"])
 

@@ -255,7 +255,7 @@ func TestStatusCommand(t *testing.T) {
 	})
 }
 
-// TestBulkCommands tests bulk operations with --dry-run
+// TestBulkCommands tests that legacy bulk operations are disabled.
 func TestBulkCommands(t *testing.T) {
 	env, mockServer := SetupTestEnv(t)
 	defer mockServer.Close()
@@ -283,15 +283,15 @@ func TestBulkCommands(t *testing.T) {
 
 	t.Run("bulk run with --dry-run", func(t *testing.T) {
 		result := RunCommandWithEnv(t, env, "bulk", bulkFile, "--dry-run")
-		AssertSuccess(t, result)
-		AssertContains(t, result.Stdout, "Configuration valid")
+		AssertFailure(t, result)
+		AssertContains(t, result.Stderr, "bulk runs are currently unavailable")
 	})
 
 	t.Run("bulk with invalid file", func(t *testing.T) {
 		// Try to run bulk with non-existent file
 		result := RunCommandWithEnv(t, env, "bulk", "/nonexistent/bulk.json", "--dry-run")
 		AssertFailure(t, result)
-		AssertContains(t, result.Stderr, "failed to read file")
+		AssertContains(t, result.Stderr, "bulk runs are currently unavailable")
 	})
 }
 
@@ -465,13 +465,10 @@ func TestGoldenFiles(t *testing.T) {
 		CompareGolden(t, result.Stdout, goldenPath, update)
 	})
 
-	t.Run("examples schema bulk", func(t *testing.T) {
+	t.Run("examples schema bulk disabled", func(t *testing.T) {
 		result := RunCommand(t, "examples", "schema", "bulk")
-		AssertSuccess(t, result)
-
-		// Schema output should be stable
-		goldenPath := filepath.Join("testdata", "golden", "examples-schema-bulk.txt")
-		CompareGolden(t, result.Stdout, goldenPath, update)
+		AssertFailure(t, result)
+		AssertContains(t, result.Stderr, "bulk runs are currently unavailable")
 	})
 }
 
@@ -587,49 +584,8 @@ func TestExamplesGenerate(t *testing.T) {
 
 	t.Run("generate bulk example", func(t *testing.T) {
 		result := RunCommand(t, "examples", "generate", "bulk")
-		AssertSuccess(t, result)
-
-		// Find where JSON starts (after comment lines)
-		lines := strings.Split(result.Stdout, "\n")
-		var jsonStart int
-		for i, line := range lines {
-			trimmed := strings.TrimSpace(line)
-			if trimmed == "{" {
-				jsonStart = i
-				break
-			}
-		}
-
-		if jsonStart == 0 {
-			t.Fatal("Could not find JSON in bulk output")
-		}
-
-		// Extract just the JSON part
-		var jsonLines []string
-		for i := jsonStart; i < len(lines); i++ {
-			line := lines[i]
-			// Stop if we encounter non-JSON content after the JSON
-			if strings.TrimSpace(line) != "" || i == jsonStart || strings.Contains(line, "}") || strings.Contains(line, "]") || strings.Contains(line, "{") || strings.Contains(line, "[") || strings.Contains(line, "\"") || strings.Contains(line, ",") {
-				jsonLines = append(jsonLines, line)
-			}
-		}
-		jsonContent := strings.Join(jsonLines, "\n")
-
-		// Output should be valid JSON with runs array
-		var data map[string]interface{}
-		if err := json.Unmarshal([]byte(jsonContent), &data); err != nil {
-			t.Errorf("Generated bulk JSON is not valid: %v\nContent: %s", err, jsonContent)
-		}
-
-		// Check for runs array
-		runs, ok := data["runs"].([]interface{})
-		if !ok {
-			t.Error("Generated bulk config missing 'runs' array")
-			return
-		}
-		if len(runs) == 0 {
-			t.Error("Generated bulk config has empty 'runs' array")
-		}
+		AssertFailure(t, result)
+		AssertContains(t, result.Stderr, "bulk runs are currently unavailable")
 	})
 
 	t.Run("generate with output file", func(t *testing.T) {
