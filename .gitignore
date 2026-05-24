@@ -78,3 +78,7 @@ local/
 # Claude Flow and Swarm directories
 .claude-flow/
 .swarm/
+
+# Dolt database files (added by bd init)
+.dolt/
+*.db

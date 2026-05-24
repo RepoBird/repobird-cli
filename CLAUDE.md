@@ -3,6 +3,10 @@
 ## Project Overview
 RepoBird CLI is a Go-based command-line tool for interacting with the RepoBird AI platform. It enables users to submit AI-powered code generation tasks, track their progress, and manage runs through both CLI commands and a rich Terminal User Interface.
 
+## Current Migration Context
+- RepoBird is in a large `repobird-next` migration from Claude-oriented workflows to OpenCode-oriented workflows.
+- Product behavior should reflect credits-based runs. Do not model usage, quotas, pricing, or run availability around Basic/Pro run-count amounts unless the current product/API contract explicitly requires it for compatibility.
+
 ## Documentation
 Core documentation is in the `docs/` directory:
 - **[Architecture Overview](docs/ARCHITECTURE.md)** - System design and components
