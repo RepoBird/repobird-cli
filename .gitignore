@@ -74,6 +74,7 @@ scripts/*.local.sh
 
 # Local development files
 local/
+.worktrees/
 
 # Claude Flow and Swarm directories
 .claude-flow/
