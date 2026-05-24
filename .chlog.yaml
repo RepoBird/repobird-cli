@@ -1,0 +1,12 @@
+repo_url: https://github.com/RepoBird/repobird-cli
+changelog_file: CHANGELOG.yaml
+public_file: CHANGELOG.md
+include_internal: false
+strict_categories: false
+categories:
+  - added
+  - changed
+  - deprecated
+  - removed
+  - fixed
+  - security
