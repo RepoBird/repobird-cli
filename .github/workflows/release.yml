@@ -40,8 +40,8 @@ jobs:
         run: |
           make build
           mkdir -p completions man docs/cli
-          ./scripts/generate-completions.sh
-          ./scripts/generate-docs.sh
+          ./scripts/generate-completions.sh completions
+          ./scripts/generate-docs.sh .
 
       - name: Import GPG key
         id: import_gpg
@@ -80,7 +80,7 @@ jobs:
   update-homebrew-core:
     needs: goreleaser
     runs-on: ubuntu-latest
-    if: "!contains(github.ref, '-')" # Only for stable releases
+    if: ${{ false }} # Re-enable after Homebrew publishing credentials are configured.
     steps:
       - name: Update Homebrew Core
         uses: dawidd6/action-homebrew-bump-formula@v3
@@ -93,6 +93,7 @@ jobs:
   build-packages:
     needs: goreleaser
     runs-on: ubuntu-latest
+    if: ${{ false }} # GoReleaser already publishes archives and nfpm packages.
     strategy:
       matrix:
         arch: [amd64, arm64]
@@ -214,7 +215,7 @@ jobs:
   deploy-packages:
     needs: build-packages
     runs-on: ubuntu-latest
-    if: github.repository == 'repobird/repobird-cli'
+    if: ${{ false }} # Re-enable after package repository deployment is refreshed.
     steps:
       - name: Download all packages
         uses: actions/download-artifact@v4
@@ -270,15 +271,7 @@ jobs:
         if: needs.goreleaser.result == 'success'
         run: |
           echo "🎉 Release ${{ github.ref_name }} published successfully!"
-          echo "📦 Packages available on:"
-          echo "  - GitHub Releases"
-          echo "  - Homebrew"
-          echo "  - Chocolatey"
-          echo "  - Scoop"
-          echo "  - Snap Store"
-          echo "  - AUR"
-          echo "  - APT Repository"
-          echo "  - YUM Repository"
+          echo "📦 Packages available on GitHub Releases"
 
       - name: Notify failure
         if: needs.goreleaser.result == 'failure'
