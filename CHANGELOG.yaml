@@ -1,11 +1,14 @@
 project: RepoBird CLI
 versions:
-    unreleased:
+    unreleased: {}
+    0.3.0:
+        date: 2026-05-25
+        changed:
+            - Synced run pagination and account usage display with current RepoBird API behavior
+            - Legacy bulk run workflows are now gated behind development-only environment flags
         internal:
             changed:
                 - Added repo-local repobird-next sync skill for API/schema integration work
-                - Synced CLI run pagination and account usage display with current repobird-next API behavior
-                - Gated legacy bulk run workflows behind development-only environment flags
     0.2.0:
         date: 2026-05-23
         changed:
