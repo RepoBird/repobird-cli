@@ -55,9 +55,9 @@ jobs:
       - name: Set GoReleaser args
         run: |
           if [ "$HAS_GPG_PRIVATE_KEY" = "true" ]; then
-            echo "GORELEASER_ARGS=release --clean" >> "$GITHUB_ENV"
+            echo "GORELEASER_ARGS=release --clean --skip=sbom" >> "$GITHUB_ENV"
           else
-            echo "GORELEASER_ARGS=release --clean --skip=sign" >> "$GITHUB_ENV"
+            echo "GORELEASER_ARGS=release --clean --skip=sign,sbom" >> "$GITHUB_ENV"
           fi
 
       - name: Run GoReleaser
