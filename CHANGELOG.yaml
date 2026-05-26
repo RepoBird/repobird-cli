@@ -1,6 +1,9 @@
 project: RepoBird CLI
 versions:
-    unreleased: {}
+    unreleased:
+        internal:
+            changed:
+                - Added repo-local repobird-next sync skill for API/schema integration work
     0.2.0:
         date: 2026-05-23
         changed:
