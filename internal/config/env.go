@@ -16,4 +16,7 @@ const (
 
 	// EnvEnvironment is the environment variable for setting the environment (prod/dev)
 	EnvEnvironment = "REPOBIRD_ENV"
+
+	// EnvEnableBulkRuns enables legacy bulk run workflows in development only
+	EnvEnableBulkRuns = "REPOBIRD_DEV_ENABLE_BULK_RUNS"
 )

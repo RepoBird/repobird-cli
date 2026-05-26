@@ -23,11 +23,13 @@ type AuthVerifyData struct {
 	GithubUsername string `json:"githubUsername,omitempty"`
 
 	// Tier info
-	TierName          string // Will be populated from either format
-	RemainingProRuns  int    `json:"remainingProRuns"`
-	RemainingPlanRuns int    `json:"remainingPlanRuns"`
-	ProTotalRuns      int    `json:"proTotalRuns"`
-	PlanTotalRuns     int    `json:"planTotalRuns"`
+	TierName            string         // Will be populated from either format
+	RemainingProRuns    int            `json:"remainingProRuns"`
+	RemainingPlanRuns   int            `json:"remainingPlanRuns"`
+	ProTotalRuns        int            `json:"proTotalRuns"`
+	PlanTotalRuns       int            `json:"planTotalRuns"`
+	CreditBalance       *CreditBalance `json:"creditBalance,omitempty"`
+	LastPeriodResetDate *time.Time     `json:"lastPeriodResetDate,omitempty"`
 
 	// Nested structures (legacy API format)
 	User    *User `json:"user,omitempty"`
@@ -146,19 +148,21 @@ func (a *AuthVerifyResponse) ToUserInfo() *UserInfo {
 	}
 
 	return &UserInfo{
-		ID:                userID,
-		StringID:          id,
-		Email:             email,
-		Name:              name,
-		GithubUsername:    githubUsername,
-		RemainingRuns:     remainingRuns, // Deprecated
-		TotalRuns:         totalRuns,     // Deprecated
-		RemainingProRuns:  remainingProRuns,
-		RemainingPlanRuns: remainingPlanRuns,
-		ProTotalRuns:      proTotalRuns,
-		PlanTotalRuns:     planTotalRuns,
-		Tier:              tierName,
-		TierDetails:       tierDetails,
+		ID:                  userID,
+		StringID:            id,
+		Email:               email,
+		Name:                name,
+		GithubUsername:      githubUsername,
+		RemainingRuns:       remainingRuns, // Deprecated
+		TotalRuns:           totalRuns,     // Deprecated
+		RemainingProRuns:    remainingProRuns,
+		RemainingPlanRuns:   remainingPlanRuns,
+		ProTotalRuns:        proTotalRuns,
+		PlanTotalRuns:       planTotalRuns,
+		Tier:                tierName,
+		TierDetails:         tierDetails,
+		CreditBalance:       a.Data.CreditBalance,
+		LastPeriodResetDate: a.Data.LastPeriodResetDate,
 	}
 }
 

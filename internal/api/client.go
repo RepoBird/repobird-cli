@@ -345,13 +345,7 @@ func (c *Client) VerifyAuth() (*models.UserInfo, error) {
 
 // ListRuns with context and page-based pagination (for dashboard compatibility)
 func (c *Client) ListRuns(ctx context.Context, page, limit int) (*models.ListRunsResponse, error) {
-	// Convert page to offset for existing endpoint
-	offset := (page - 1) * limit
-	if offset < 0 {
-		offset = 0
-	}
-
-	path := RunsListURL(limit, offset)
+	path := RunsPageURL(page, limit)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+path, nil)
 	if err != nil {

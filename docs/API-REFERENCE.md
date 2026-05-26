@@ -72,7 +72,7 @@ func (c *Client) ListRuns(ctx context.Context, opts ListOptions) (*RunList, erro
 ### Additional Endpoints
 - `DELETE /api/v1/runs/{id}` - Cancel active run
 - `GET /api/v1/runs/{id}/logs` - Stream run logs
-- `GET /api/v1/user` - Get user info and quotas
+- `GET /api/v1/user` - Get user info and credit balance
 - `GET /api/v1/repositories` - List accessible repositories
 
 ## Error Handling
@@ -81,7 +81,7 @@ func (c *Client) ListRuns(ctx context.Context, opts ListOptions) (*RunList, erro
 | Code | HTTP Status | Description | Retryable |
 |------|-------------|-------------|-----------|
 | `AUTH_FAILED` | 401 | Invalid API key | No |
-| `QUOTA_EXCEEDED` | 429 | Usage limit reached | No |
+| `NO_RUNS_REMAINING` | 403 | No credits available | No |
 | `RATE_LIMITED` | 429 | Too many requests | Yes |
 | `SERVER_ERROR` | 500 | Internal error | Yes |
 | `SERVICE_UNAVAILABLE` | 503 | Service down | Yes |

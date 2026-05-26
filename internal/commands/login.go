@@ -162,11 +162,7 @@ or in an encrypted file as a fallback.`,
 		fmt.Println("✓ API key validated and stored successfully!")
 		fmt.Printf("  Email: %s\n", userInfo.Email)
 		fmt.Printf("  Tier: %s\n", userInfo.Tier)
-
-		fmt.Printf("  Runs: %d/%d\n", userInfo.RemainingProRuns, userInfo.ProTotalRuns)
-		if userInfo.PlanTotalRuns > 0 || userInfo.RemainingPlanRuns > 0 {
-			fmt.Printf("  Plan Runs: %d/%d\n", userInfo.RemainingPlanRuns, userInfo.PlanTotalRuns)
-		}
+		printAccountUsage(userInfo)
 
 		// Display storage method
 		fmt.Println()

@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/repobird/repobird-cli/internal/api"
+	"github.com/repobird/repobird-cli/internal/config"
 	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/repobird/repobird-cli/internal/services"
 	"github.com/repobird/repobird-cli/internal/tui/cache"
@@ -333,6 +334,15 @@ func (a *App) navigateToStatus() (tea.Model, tea.Cmd) {
 // navigateToBulk handles navigation to the bulk view
 func (a *App) navigateToBulk() (tea.Model, tea.Cmd) {
 	debug.LogToFilef("🏗️ BULK NAV: Attempting to navigate to bulk view 🏗️\n")
+	if !config.IsBulkRunsEnabled() {
+		return a, func() tea.Msg {
+			return messages.NavigateToErrorMsg{
+				Message:     "Bulk runs are currently unavailable. Create individual runs instead.",
+				Recoverable: true,
+			}
+		}
+	}
+
 	debug.LogToFilef("🔍 BULK NAV: Client type: %T 🔍\n", a.client)
 	a.pushToStack()
 

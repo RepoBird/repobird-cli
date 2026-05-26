@@ -95,6 +95,24 @@ components:
           type: integer
           example: 20
           description: Total plan runs available per period for this tier
+        creditBalance:
+          $ref: '#/components/schemas/CreditBalance'
+
+    CreditBalance:
+      type: object
+      properties:
+        availableCredits:
+          type: integer
+          example: 42
+        monthlyIncludedCredits:
+          type: integer
+          example: 30
+        purchasedCredits:
+          type: integer
+          example: 12
+        reservedCredits:
+          type: integer
+          example: 3
 
     Tier:
       type: object
@@ -623,6 +641,8 @@ paths:
                         type: integer
                         example: 20
                         description: Total plan runs available per period for this tier
+                      creditBalance:
+                        $ref: '#/components/schemas/CreditBalance'
                       lastPeriodResetDate:
                         type: string
                         format: date-time
@@ -714,6 +734,8 @@ paths:
                         type: integer
                         example: 20
                         description: Total plan runs available per period for this tier
+                      creditBalance:
+                        $ref: '#/components/schemas/CreditBalance'
                       lastPeriodResetDate:
                         type: string
                         format: date-time
@@ -839,7 +861,7 @@ paths:
                     error: INVALID_INPUT
                     message: Either repoId or repositoryName is required
         '403':
-          description: Forbidden (no runs remaining, repo disabled, or repo lacks GitHub App installation)
+          description: Forbidden (no credits available, repo disabled, or repo lacks GitHub App installation)
           content:
             application/json:
               schema:
@@ -1146,9 +1168,9 @@ paths:
 
   /api/v1/runs/bulk:
     post:
-      summary: Create bulk runs (legacy-gated)
+      summary: Create bulk runs (development-gated)
       description: |
-        Legacy/development endpoint. Bulk runs are unavailable in current public CLI builds.
+        Development-gated endpoint. Bulk runs are unavailable in current public CLI builds.
         Use POST /api/v1/runs for individual runs.
       tags:
         - Runs
@@ -1323,9 +1345,9 @@ paths:
 
   /api/v1/runs/bulk/{batchId}:
     get:
-      summary: Get bulk run status (legacy-gated)
+      summary: Get bulk run status (development-gated)
       description: |
-        Legacy/development endpoint. Bulk runs are unavailable in current public CLI builds.
+        Development-gated endpoint. Bulk runs are unavailable in current public CLI builds.
       tags:
         - Runs
       parameters:
@@ -1376,9 +1398,9 @@ paths:
                 $ref: '#/components/schemas/Error'
 
     delete:
-      summary: Cancel bulk runs (legacy-gated)
+      summary: Cancel bulk runs (development-gated)
       description: |
-        Legacy/development endpoint. Bulk runs are unavailable in current public CLI builds.
+        Development-gated endpoint. Bulk runs are unavailable in current public CLI builds.
       tags:
         - Runs
       parameters:
@@ -1558,7 +1580,7 @@ tags:
     description: |
       AI agent run management including creation, listing, and monitoring.
       Supports file hash tracking for audit purposes (duplicates are allowed).
-      Bulk operations are legacy-gated and unavailable in current public CLI builds.
+      Bulk operations are development-gated and unavailable in current public CLI builds.
   - name: Repositories
     description: |
       Repository management and configuration.

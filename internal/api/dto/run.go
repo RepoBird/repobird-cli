@@ -99,9 +99,10 @@ type SingleRunResponse struct {
 
 // ListRunsResponse represents the paginated API response for list operations
 type ListRunsResponse struct {
-	Data    []*RunResponse `json:"data"`
-	Total   int            `json:"total"`
-	Limit   int            `json:"limit"`
-	Offset  int            `json:"offset"`
-	HasMore bool           `json:"hasMore"`
+	Data     []*RunResponse `json:"data"`
+	Metadata struct {
+		CurrentPage int `json:"currentPage"`
+		Total       int `json:"total"`
+		TotalPages  int `json:"totalPages"`
+	} `json:"metadata"`
 }

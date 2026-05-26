@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-05-25
+
+### Changed
+
+- Synced run pagination and account usage display with current RepoBird API behavior
+- Legacy bulk run workflows are now gated behind development-only environment flags
+
 ## [0.2.0] - 2026-05-23
 
 ### Changed
@@ -58,6 +65,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Configuration management
 - API integration with RepoBird platform
 
-[Unreleased]: https://github.com/RepoBird/repobird-cli/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/RepoBird/repobird-cli/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/RepoBird/repobird-cli/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/RepoBird/repobird-cli/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/RepoBird/repobird-cli/compare/v0.1.1...v0.1.2

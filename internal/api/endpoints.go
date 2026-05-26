@@ -14,7 +14,7 @@ const (
 	EndpointRunDetailsTemplate = "/api/v1/runs/%s"
 
 	// EndpointRunsList is the endpoint template for listing runs with pagination
-	EndpointRunsListTemplate = "/api/v1/runs?limit=%d&offset=%d"
+	EndpointRunsListTemplate = "/api/v1/runs?page=%d&limit=%d"
 
 	// EndpointAuthVerify is the endpoint for verifying authentication
 	EndpointAuthVerify = "/api/v1/auth/verify"
@@ -37,7 +37,20 @@ func RunDetailsURL(id string) string {
 	return fmt.Sprintf(EndpointRunDetailsTemplate, id)
 }
 
-// RunsListURL builds the URL for listing runs with pagination
+// RunsListURL builds the URL for listing runs with pagination.
+// The legacy offset argument is converted to the page-based API contract.
 func RunsListURL(limit, offset int) string {
-	return fmt.Sprintf(EndpointRunsListTemplate, limit, offset)
+	page := 1
+	if limit > 0 && offset > 0 {
+		page = (offset / limit) + 1
+	}
+	return RunsPageURL(page, limit)
+}
+
+// RunsPageURL builds the URL for the current page-based API contract.
+func RunsPageURL(page, limit int) string {
+	if page < 1 {
+		page = 1
+	}
+	return fmt.Sprintf(EndpointRunsListTemplate, page, limit)
 }

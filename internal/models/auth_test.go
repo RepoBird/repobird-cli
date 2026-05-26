@@ -81,6 +81,47 @@ func TestAuthVerifyResponseParsing(t *testing.T) {
 				Tier:              "free",
 			},
 		},
+		{
+			name: "Current CLI auth format with credit balance",
+			jsonData: `{
+				"data": {
+					"id": "789",
+					"email": "credits@example.com",
+					"name": "Credit User",
+					"githubUsername": "credituser",
+					"tier": "pro",
+					"remainingProRuns": 0,
+					"remainingPlanRuns": 0,
+					"proTotalRuns": 100,
+					"planTotalRuns": 20,
+					"creditBalance": {
+						"availableCredits": 42,
+						"monthlyIncludedCredits": 30,
+						"purchasedCredits": 12,
+						"reservedCredits": 3
+					}
+				}
+			}`,
+			expected: &UserInfo{
+				ID:                HashStringToInt("789"),
+				Email:             "credits@example.com",
+				Name:              "Credit User",
+				GithubUsername:    "credituser",
+				RemainingRuns:     0,
+				TotalRuns:         120,
+				RemainingProRuns:  0,
+				RemainingPlanRuns: 0,
+				ProTotalRuns:      100,
+				PlanTotalRuns:     20,
+				Tier:              "pro",
+				CreditBalance: &CreditBalance{
+					AvailableCredits:       42,
+					MonthlyIncludedCredits: 30,
+					PurchasedCredits:       12,
+					ReservedCredits:        3,
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -103,6 +144,7 @@ func TestAuthVerifyResponseParsing(t *testing.T) {
 			assert.Equal(t, tt.expected.RemainingRuns, userInfo.RemainingRuns)
 			assert.Equal(t, tt.expected.Tier, userInfo.Tier)
 			assert.NotNil(t, userInfo.TierDetails)
+			assert.Equal(t, tt.expected.CreditBalance, userInfo.CreditBalance)
 		})
 	}
 }

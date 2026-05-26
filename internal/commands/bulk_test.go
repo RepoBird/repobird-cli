@@ -13,7 +13,27 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/repobird/repobird-cli/internal/api/dto"
+	"github.com/repobird/repobird-cli/internal/config"
 )
+
+func TestNewBulkCommandDevelopmentGate(t *testing.T) {
+	t.Run("hidden and unavailable by default", func(t *testing.T) {
+		t.Setenv(config.EnvEnvironment, "")
+		t.Setenv(config.EnvEnableBulkRuns, "")
+
+		cmd := NewBulkCommand()
+		assert.True(t, cmd.Hidden)
+		assert.ErrorContains(t, cmd.RunE(cmd, nil), "bulk runs are currently unavailable")
+	})
+
+	t.Run("visible in development when enabled", func(t *testing.T) {
+		t.Setenv(config.EnvEnvironment, "development")
+		t.Setenv(config.EnvEnableBulkRuns, "1")
+
+		cmd := NewBulkCommand()
+		assert.False(t, cmd.Hidden)
+	})
+}
 
 // TestDisplayBulkResults_PRURLDisplay tests that PR URLs are displayed for completed bulk runs
 func TestDisplayBulkResults_PRURLDisplay(t *testing.T) {

@@ -324,6 +324,7 @@ func TestClient_ListRuns_Pagination(t *testing.T) {
 		name      string
 		limit     int
 		offset    int
+		page      int
 		expectErr bool
 		validate  func(t *testing.T, runs []*models.RunResponse)
 	}{
@@ -331,6 +332,7 @@ func TestClient_ListRuns_Pagination(t *testing.T) {
 			name:   "Default pagination",
 			limit:  10,
 			offset: 0,
+			page:   1,
 			validate: func(t *testing.T, runs []*models.RunResponse) {
 				assert.Len(t, runs, 3) // Based on server response
 			},
@@ -339,6 +341,7 @@ func TestClient_ListRuns_Pagination(t *testing.T) {
 			name:   "Large limit",
 			limit:  100,
 			offset: 0,
+			page:   1,
 			validate: func(t *testing.T, runs []*models.RunResponse) {
 				assert.Len(t, runs, 3)
 			},
@@ -347,6 +350,7 @@ func TestClient_ListRuns_Pagination(t *testing.T) {
 			name:   "With offset",
 			limit:  10,
 			offset: 1,
+			page:   1,
 			validate: func(t *testing.T, runs []*models.RunResponse) {
 				// Should still get results, server handles pagination
 				assert.NotEmpty(t, runs)
@@ -359,10 +363,11 @@ func TestClient_ListRuns_Pagination(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				// Validate query parameters
 				limit := r.URL.Query().Get("limit")
-				offset := r.URL.Query().Get("offset")
+				page := r.URL.Query().Get("page")
 
 				assert.Equal(t, fmt.Sprintf("%d", tt.limit), limit)
-				assert.Equal(t, fmt.Sprintf("%d", tt.offset), offset)
+				assert.Equal(t, fmt.Sprintf("%d", tt.page), page)
+				assert.Empty(t, r.URL.Query().Get("offset"))
 
 				runs := []*models.RunResponse{
 					{ID: "run-1", Status: models.StatusDone, CreatedAt: time.Now()},
