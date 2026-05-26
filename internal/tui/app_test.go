@@ -9,6 +9,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/repobird/repobird-cli/internal/api"
+	"github.com/repobird/repobird-cli/internal/config"
 	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/repobird/repobird-cli/internal/tui/cache"
 	"github.com/repobird/repobird-cli/internal/tui/messages"
@@ -260,7 +261,27 @@ func TestAppNavigationContext(t *testing.T) {
 }
 
 func TestAppBulkViewNavigation(t *testing.T) {
+	t.Run("Gate disabled", func(t *testing.T) {
+		t.Setenv(config.EnvEnvironment, "")
+		t.Setenv(config.EnvEnableBulkRuns, "")
+
+		apiClient := &api.Client{}
+		app := NewApp(apiClient)
+		_ = app.Init()
+		completeAuthentication(app)
+
+		initialView := app.current
+		model, cmd := app.handleNavigation(messages.NavigateToBulkMsg{})
+		appModel := model.(*App)
+
+		assert.Equal(t, initialView, appModel.current)
+		assert.NotNil(t, cmd)
+	})
+
 	t.Run("With api.Client", func(t *testing.T) {
+		t.Setenv(config.EnvEnvironment, "development")
+		t.Setenv(config.EnvEnableBulkRuns, "1")
+
 		// Use real api.Client for this test
 		apiClient := &api.Client{}
 		app := NewApp(apiClient)
@@ -276,6 +297,9 @@ func TestAppBulkViewNavigation(t *testing.T) {
 	})
 
 	t.Run("With MockAPIClient", func(t *testing.T) {
+		t.Setenv(config.EnvEnvironment, "development")
+		t.Setenv(config.EnvEnableBulkRuns, "1")
+
 		// Mock client shouldn't create bulk view
 		mockClient := &MockAPIClient{}
 		app := NewApp(mockClient)

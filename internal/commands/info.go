@@ -5,7 +5,6 @@ package commands
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -74,17 +73,8 @@ var infoCmd = &cobra.Command{
 				fmt.Println("Account Information:")
 				fmt.Printf("  Email: %s\n", userInfo.Email)
 				fmt.Printf("  Tier: %s\n", userInfo.Tier)
-
-				fmt.Printf("  Runs: %d/%d\n", userInfo.RemainingProRuns, userInfo.ProTotalRuns)
-				if userInfo.PlanTotalRuns > 0 || userInfo.RemainingPlanRuns > 0 {
-					fmt.Printf("  Plan Runs: %d/%d\n", userInfo.RemainingPlanRuns, userInfo.PlanTotalRuns)
-				}
-
-				// Calculate reset date
-				now := time.Now()
-				nextMonth := now.AddDate(0, 1, 0)
-				resetDate := time.Date(nextMonth.Year(), nextMonth.Month(), 1, 0, 0, 0, 0, time.UTC)
-				fmt.Printf("  Resets: %s\n", resetDate.Format("2006-01-02"))
+				printAccountUsage(userInfo)
+				printAccountReset(userInfo)
 			} else {
 				fmt.Println()
 				fmt.Println("  ⚠️  Could not fetch account information")

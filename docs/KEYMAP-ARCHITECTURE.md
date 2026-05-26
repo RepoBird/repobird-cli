@@ -125,7 +125,7 @@ func (d *DetailsView) HandleKey(msg tea.KeyMsg) (handled bool, model tea.Model, 
 }
 ```
 
-Bulk-run keybindings are legacy and hidden in current public builds.
+Bulk-run keybindings are development-gated and hidden in current public builds.
 
 ## Benefits
 

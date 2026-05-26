@@ -48,12 +48,15 @@ var (
 func NewBulkCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "bulk [files...]",
-		Short: "Submit multiple runs from configuration files (legacy)",
-		Long: `Legacy bulk run command.
+		Short: "Submit multiple runs from configuration files (development only)",
+		Long: `Development-only bulk run command.
 
 Bulk runs are currently unavailable in the public CLI while RepoBird's run
-creation API is being migrated. Create single runs with 'repobird run' instead.`,
-		Hidden: true,
+creation API is being migrated. Create single runs with 'repobird run' instead.
+
+Set REPOBIRD_ENV=development and REPOBIRD_DEV_ENABLE_BULK_RUNS=1 to use this
+legacy workflow against a development server.`,
+		Hidden: !config.IsBulkRunsEnabled(),
 		RunE:   runBulk,
 	}
 
@@ -69,7 +72,10 @@ creation API is being migrated. Create single runs with 'repobird run' instead.`
 }
 
 func runBulk(cmd *cobra.Command, args []string) error {
-	return bulkRunsUnavailableError()
+	if !config.IsBulkRunsEnabled() {
+		return bulkRunsUnavailableError()
+	}
+	return runBulkLegacy(cmd, args)
 }
 
 func bulkRunsUnavailableError() error {

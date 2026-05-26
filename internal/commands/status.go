@@ -131,9 +131,13 @@ func listRuns(client *api.Client) error {
 		// Set the current user for cache initialization and show user info
 		services.SetCurrentUser(userInfo)
 
-		fmt.Printf("Runs: %d/%d (%s tier)\n", userInfo.RemainingProRuns, userInfo.ProTotalRuns, userInfo.Tier)
-		if userInfo.PlanTotalRuns > 0 || userInfo.RemainingPlanRuns > 0 {
-			fmt.Printf("Plan Runs: %d/%d\n", userInfo.RemainingPlanRuns, userInfo.PlanTotalRuns)
+		if userInfo.CreditBalance != nil {
+			fmt.Printf("Credits: %d available (%s tier)\n", userInfo.CreditBalance.AvailableCredits, userInfo.Tier)
+		} else {
+			fmt.Printf("Runs: %d/%d (%s tier)\n", userInfo.RemainingProRuns, userInfo.ProTotalRuns, userInfo.Tier)
+			if userInfo.PlanTotalRuns > 0 || userInfo.RemainingPlanRuns > 0 {
+				fmt.Printf("Plan Runs: %d/%d\n", userInfo.RemainingPlanRuns, userInfo.PlanTotalRuns)
+			}
 		}
 		fmt.Println()
 	}

@@ -499,17 +499,19 @@ func (s *StatusView) initializeStatusFields() {
 		s.fieldLines = append(s.fieldLines, lineNum)
 		lineNum++
 
-		// Usage information - show pro runs as "Runs" and plan runs as "Plan Runs"
-		// Pro runs (displayed as "Runs")
-		if s.userInfo.ProTotalRuns > 0 {
+		if s.userInfo.CreditBalance != nil {
+			s.statusKeys = append(s.statusKeys, "Credits:")
+			s.statusFields = append(s.statusFields, fmt.Sprintf("%d available", s.userInfo.CreditBalance.AvailableCredits))
+			s.fieldLines = append(s.fieldLines, lineNum)
+			lineNum++
+		} else if s.userInfo.ProTotalRuns > 0 {
 			s.statusKeys = append(s.statusKeys, "Runs:")
 			s.statusFields = append(s.statusFields, fmt.Sprintf("%d/%d", s.userInfo.RemainingProRuns, s.userInfo.ProTotalRuns))
 			s.fieldLines = append(s.fieldLines, lineNum)
 			lineNum++
 		}
 
-		// Plan runs (displayed as "Plan Runs")
-		if s.userInfo.PlanTotalRuns > 0 {
+		if s.userInfo.CreditBalance == nil && s.userInfo.PlanTotalRuns > 0 {
 			s.statusKeys = append(s.statusKeys, "Plan Runs:")
 			s.statusFields = append(s.statusFields, fmt.Sprintf("%d/%d", s.userInfo.RemainingPlanRuns, s.userInfo.PlanTotalRuns))
 			s.fieldLines = append(s.fieldLines, lineNum)

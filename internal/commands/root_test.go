@@ -87,7 +87,7 @@ func TestRootCommand_CommandDescriptions(t *testing.T) {
 		"logout":     "Remove stored API key",
 		"verify":     "Verify current API key",
 		"info":       "Display authentication information",
-		"bulk":       "Submit multiple runs from configuration files (legacy)",
+		"bulk":       "Submit multiple runs from configuration files (development only)",
 		"tui":        "Launch the interactive Terminal User Interface",
 		"completion": "Generate shell completion scripts",
 		"docs":       "Generate documentation",

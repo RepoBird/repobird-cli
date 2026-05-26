@@ -193,7 +193,10 @@ func runCommand(cmd *cobra.Command, args []string) error {
 	}
 
 	if isBulk {
-		return bulkRunsUnavailableError()
+		if !config.IsBulkRunsEnabled() {
+			return bulkRunsUnavailableError()
+		}
+		return processBulkRuns(filename)
 	}
 
 	// Process as single run configuration
@@ -317,6 +320,10 @@ func processSingleRun(runConfig *models.RunConfig, additionalContext string) err
 }
 
 func processBulkRuns(filename string) error {
+	if !config.IsBulkRunsEnabled() {
+		return bulkRunsUnavailableError()
+	}
+
 	// Load bulk configuration
 	bulkConfig, err := bulk.ParseBulkConfig(filename)
 	if err != nil {
@@ -484,6 +491,10 @@ func formatDuration(d time.Duration) string {
 }
 
 func executeBulkRuns(bulkConfig *bulk.BulkConfig) error {
+	if !config.IsBulkRunsEnabled() {
+		return bulkRunsUnavailableError()
+	}
+
 	// Create API client
 	apiURL := utils.GetAPIURL(cfg.APIURL)
 	client := api.NewClient(cfg.APIKey, apiURL, debug)

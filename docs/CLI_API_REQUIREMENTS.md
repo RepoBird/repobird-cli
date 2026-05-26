@@ -228,12 +228,13 @@ interface ListResponse<T> {
    - Plan mode is temporarily unavailable during the OpenCode migration.
 
 4. **Batch Operations**:
-   - Bulk/batch run creation is legacy-gated and unavailable in current public CLI builds.
+   - Bulk/batch run creation is development-gated and unavailable in current public CLI builds.
+   - CLI support requires `REPOBIRD_ENV=development` and `REPOBIRD_DEV_ENABLE_BULK_RUNS=1`.
    - Public CLI docs should direct users to `repobird run` for individual runs.
 
 5. **Usage Metrics**:
-   - Remaining pro runs (remainingProRuns from userSchema)
-   - Remaining plan runs (remainingPlanRuns from userSchema)
+   - Credit balance (creditBalance from the credit wallet)
+   - Remaining pro/plan runs are legacy compatibility fields only
    - Period reset date (lastPeriodResetDate from userSchema)
    - Note: Basic runs (remainingBasicRuns) not available currently
 
