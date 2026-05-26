@@ -26,6 +26,12 @@ Remote policy:
 - Push both `dev` and `main` to `glab` (GitLab).
 - Push only `main` and release tags to `gh` (GitHub). Never push `dev` to GitHub.
 - If no GitHub remote is configured, do not invent one during release work; report that GitHub publishing is pending remote setup.
+- If the configured GitHub remote is HTTPS and `git push gh main` fails with an OAuth workflow-scope error after editing `.github/workflows/*`, retry the GitHub push over SSH:
+  ```bash
+  git push git@github.com:RepoBird/repobird-cli.git main
+  git push git@github.com:RepoBird/repobird-cli.git vX.Y.Z
+  ```
+  Do not run interactive `gh auth refresh` unless the user is available to complete browser device auth.
 
 Branch content policy:
 
@@ -61,6 +67,19 @@ make build
 If the working tree has unrelated local changes, do not overwrite them. Work around them or ask before proceeding.
 
 `gh auth status` may fail when the GitHub remote has not been configured yet. Treat that as a GitHub publishing blocker, not a GitLab release blocker, unless the user explicitly requires GitHub publishing for the release.
+
+Also check repository Actions settings before assuming tag pushes will trigger release workflows:
+
+```bash
+gh api repos/RepoBird/repobird-cli/actions/permissions
+gh api repos/RepoBird/repobird-cli/actions/workflows --jq '.workflows[] | [.name,.state,.path,.id] | @tsv'
+```
+
+If permissions show `allowed_actions: local_only` but release workflows use external actions, enable the policy before retagging:
+
+```bash
+gh api -X PUT repos/RepoBird/repobird-cli/actions/permissions -F enabled=true -f allowed_actions=all
+```
 
 ## Determine Version
 
@@ -159,9 +178,41 @@ Watch GitHub Actions when available:
 
 ```bash
 gh run list --branch main --limit 10
+gh run list --limit 10
 gh run watch
 gh release view vX.Y.Z --json tagName,url,body,assets
 ```
+
+If `gh run list --branch main` is empty after pushing a tag, run `gh run list --limit 10`; release workflows triggered by tag pushes appear on the tag ref, not the `main` branch.
+
+If release CI fails before a release is published, fix the workflow on `dev`, merge it forward to `main`, then move the unpublished tag to the fixed `main` commit:
+
+```bash
+git switch dev
+# fix workflow, commit, push dev
+git switch main
+git merge --no-ff --no-commit dev
+git status --short -- .agents
+git diff --cached --name-only -- .agents
+git ls-tree -r --name-only HEAD -- .agents
+git commit -m "merge dev into main for vX.Y.Z release workflow fix"
+git push glab main
+git push git@github.com:RepoBird/repobird-cli.git main
+git tag -f -a vX.Y.Z -m "Release vX.Y.Z"
+git push --force glab vX.Y.Z
+git push --force git@github.com:RepoBird/repobird-cli.git vX.Y.Z
+```
+
+Only force-update a release tag when the prior tag has not produced a usable release. Once artifacts are live or users may have consumed the tag, prefer a follow-up release instead.
+
+Known release workflow checks from v0.3.0:
+
+- `.github/workflows/release.yml` uses GoReleaser config `version: 2`; `goreleaser/goreleaser-action` must install GoReleaser v2, for example `version: "~> v2"`.
+- If `GPG_PRIVATE_KEY` is not configured, the workflow must skip checksum signing or conditionally import the key. GitHub expressions cannot use `secrets.*` directly in a step `if`; expose a job-level env such as `HAS_GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY != '' }}` and test `env.HAS_GPG_PRIVATE_KEY`.
+- `scripts/generate-completions.sh` defaults to a temp directory. Call it with `completions` so GoReleaser can archive `completions/*`.
+- `scripts/generate-docs.sh` generates `man`, `markdown`, and `yaml`. To keep GoReleaser's git state clean while still packaging man pages, generate into `/tmp` and copy only `/tmp/repobird-docs/man/.` into `man/`.
+- If Syft/GoReleaser compatibility breaks SBOM generation, temporarily use `--skip=sbom` and create a follow-up Bead to restore SBOM publishing.
+- Disable or skip stale downstream package-manager/deployment jobs if GoReleaser already publishes the desired archives and packages and those jobs no longer match artifact names.
 
 If GitHub Actions is unavailable, use the local release path only after confirming the required credentials:
 
@@ -185,6 +236,15 @@ make build
 gh release view vX.Y.Z
 git switch dev
 git merge main
+git push glab dev
+```
+
+After merging `main` back into `dev`, verify `.agents/` still exists on `dev`. Since `.agents/` is intentionally absent from `main`, a fast-forward merge can delete the dev-only skill files. If that happens, restore them from the pre-merge `dev` commit and commit the restoration before pushing `dev`:
+
+```bash
+git restore --source=<pre-merge-dev-sha> -- .agents
+git add .agents/skills/release/SKILL.md .agents/skills/repobird-next-sync/SKILL.md .agents/skills/repobird-next-sync/agents/openai.yaml
+git commit -m "chore: restore dev agent skills"
 git push glab dev
 ```
 
