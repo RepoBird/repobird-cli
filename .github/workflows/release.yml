@@ -41,7 +41,8 @@ jobs:
           make build
           mkdir -p completions man docs/cli
           ./scripts/generate-completions.sh completions
-          ./scripts/generate-docs.sh .
+          ./scripts/generate-docs.sh /tmp/repobird-docs
+          cp -R /tmp/repobird-docs/man/. man/
 
       - name: Import GPG key
         id: import_gpg
