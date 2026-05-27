@@ -43,15 +43,17 @@ func NewAPIRunRepository(httpClient HTTPClient, baseURL, apiKey string, debug bo
 func (r *apiRunRepository) Create(ctx context.Context, req domain.CreateRunRequest) (*domain.Run, error) {
 	// Convert domain request to API DTO
 	apiReq := &dto.CreateRunRequest{
-		Prompt:         req.Prompt,
-		RepositoryName: req.RepositoryName,
-		SourceBranch:   req.SourceBranch,
-		TargetBranch:   req.TargetBranch,
-		RunType:        req.RunType,
-		Agent:          agentOrDefault(req.Agent),
-		Title:          req.Title,
-		Context:        req.Context,
-		Files:          req.Files,
+		Prompt:           req.Prompt,
+		RepositoryName:   req.RepositoryName,
+		SourceBranch:     req.SourceBranch,
+		TargetBranch:     req.TargetBranch,
+		RunType:          req.RunType,
+		Agent:            agentOrDefault(req.Agent),
+		OpenCodeModel:    req.OpenCodeModel,
+		OpenCodeProvider: req.OpenCodeProvider,
+		Title:            req.Title,
+		Context:          req.Context,
+		Files:            req.Files,
 	}
 
 	// Make API request

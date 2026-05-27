@@ -82,6 +82,8 @@ func init() {
 
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(runCmd)
+	rootCmd.AddCommand(newRunPresetCommand("basic"))
+	rootCmd.AddCommand(newRunPresetCommand("pro"))
 	rootCmd.AddCommand(statusCmd)
 	InitConfigSubcommands() // Initialize config subcommands
 	rootCmd.AddCommand(configCmd)

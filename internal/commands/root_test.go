@@ -52,6 +52,8 @@ func TestRootCommand_HasExpectedCommands(t *testing.T) {
 	expectedCommands := []string{
 		"version",
 		"run",
+		"basic",
+		"pro",
 		"status",
 		"config",
 		"login",
@@ -81,6 +83,8 @@ func TestRootCommand_CommandDescriptions(t *testing.T) {
 	expectedDescriptions := map[string]string{
 		"version":    "Print version information",
 		"run":        "Create a run from a JSON, YAML, or Markdown configuration file, or with flags",
+		"basic":      "Create a Basic cloud agent run",
+		"pro":        "Create a Pro cloud agent run",
 		"status":     "Check the status of runs",
 		"config":     "Manage RepoBird configuration",
 		"login":      "Configure your API key securely",

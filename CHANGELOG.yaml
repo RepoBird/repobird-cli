@@ -1,6 +1,10 @@
 project: RepoBird CLI
 versions:
     unreleased: {}
+    0.4.0:
+        date: 2026-05-27
+        added:
+            - Added Basic/Pro CLI run presets with model selection output and prompt shortcut commands
     0.3.0:
         date: 2026-05-25
         changed:

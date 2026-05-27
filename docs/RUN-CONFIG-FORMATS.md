@@ -44,6 +44,15 @@ Create a run directly using command-line flags without any configuration file:
 # Minimal example (required flags only)
 repobird run -r myorg/webapp -p "Fix the login bug"
 
+# Basic and Pro cloud-agent presets
+repobird run --basic -r myorg/webapp -p "Fix a small bug"     # DeepSeek V4 Flash
+repobird run --pro -r myorg/webapp -p "Implement OAuth"       # Kimi K2.6
+repobird basic -r myorg/webapp "Fix a small bug"
+repobird pro -r myorg/webapp "Implement OAuth"
+
+# Inside a git repo with an origin remote, Basic/Pro commands can auto-detect the repository
+repobird pro "Fix the login bug"
+
 # Read prompt from a file using @ prefix
 repobird run -r myorg/webapp -p @task.txt
 
@@ -70,7 +79,7 @@ repobird run -r myorg/webapp -p "Add unit tests for auth module" --follow
 ```
 
 **Available flags:**
-- `-r, --repo` (required) - Repository name (owner/repo or numeric ID)
+- `-r, --repo` - Repository name (owner/repo or numeric ID); required unless a Basic/Pro preset can auto-detect it from git
 - `-p, --prompt` (required) - The task description/instructions
   - Use `@filename` to read from a file
   - Use `-` to read from stdin
@@ -79,6 +88,8 @@ repobird run -r myorg/webapp -p "Add unit tests for auth module" --follow
 - `--target` - Target branch (optional, auto-generated if not specified)
 - `--title` - Human-readable title (optional, auto-generated if not specified)
 - `--run-type` - Type of run: 'run' or 'plan' (optional, defaults to 'run')
+- `--basic` - Use the Basic cloud-agent preset (DeepSeek V4 Flash)
+- `--pro` - Use the Pro cloud-agent preset (Kimi K2.6)
 - `--context` - Additional context (optional, also supports `@filename` and `-`)
 - `--follow` - Follow the run status after creation
 - `--dry-run` - Validate without creating the run

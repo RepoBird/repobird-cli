@@ -44,15 +44,17 @@ func (r RunID) String() string {
 
 // CreateRunRequest represents the API request to create a run
 type CreateRunRequest struct {
-	Prompt         string   `json:"prompt"`
-	RepositoryName string   `json:"repositoryName"`
-	SourceBranch   string   `json:"sourceBranch"`
-	TargetBranch   string   `json:"targetBranch"`
-	RunType        string   `json:"runType"`
-	Agent          string   `json:"agent,omitempty"`
-	Title          string   `json:"title,omitempty"`
-	Context        string   `json:"context,omitempty"`
-	Files          []string `json:"files,omitempty"`
+	Prompt           string   `json:"prompt"`
+	RepositoryName   string   `json:"repositoryName"`
+	SourceBranch     string   `json:"sourceBranch"`
+	TargetBranch     string   `json:"targetBranch"`
+	RunType          string   `json:"runType"`
+	Agent            string   `json:"agent,omitempty"`
+	OpenCodeModel    string   `json:"opencodeModel,omitempty"`
+	OpenCodeProvider string   `json:"opencodeProvider,omitempty"`
+	Title            string   `json:"title,omitempty"`
+	Context          string   `json:"context,omitempty"`
+	Files            []string `json:"files,omitempty"`
 }
 
 // RunResponse represents the API response for a run

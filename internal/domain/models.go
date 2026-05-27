@@ -37,15 +37,17 @@ type Run struct {
 
 // CreateRunRequest represents a request to create a new run
 type CreateRunRequest struct {
-	Prompt         string
-	RepositoryName string
-	SourceBranch   string
-	TargetBranch   string
-	RunType        string
-	Agent          string
-	Title          string
-	Context        string
-	Files          []string
+	Prompt           string
+	RepositoryName   string
+	SourceBranch     string
+	TargetBranch     string
+	RunType          string
+	Agent            string
+	OpenCodeModel    string
+	OpenCodeProvider string
+	Title            string
+	Context          string
+	Files            []string
 }
 
 // ListOptions represents options for listing runs
@@ -67,8 +69,10 @@ const (
 
 // RunType constants
 const (
-	RunTypeRun  = "run"
-	RunTypePlan = "plan"
+	RunTypeRun   = "run"
+	RunTypePlan  = "plan"
+	RunTypeBasic = "basic"
+	RunTypePro   = "pro"
 )
 
 // IsTerminal returns true if the run status is terminal

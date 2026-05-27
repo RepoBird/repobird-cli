@@ -108,6 +108,13 @@ repobird login
 # Quickest way - direct command with flags (no file needed)
 repobird run -r your-org/your-repo -p "Fix the login bug where users get stuck on loading screen"
 
+# Simple cloud-agent presets
+repobird basic -r your-org/your-repo "Fix a small bug"  # DeepSeek V4 Flash
+repobird pro -r your-org/your-repo "Implement OAuth"    # Kimi K2.6
+
+# Inside a git repo with an origin remote, the repo can be auto-detected
+repobird pro "Fix the login bug where users get stuck on loading screen"
+
 # Or read prompt from a file using @ prefix
 echo "Fix the login bug where users get stuck on loading screen" > task.txt
 repobird run -r your-org/your-repo -p @task.txt
@@ -141,12 +148,25 @@ export REPOBIRD_API_KEY=your-api-key
 ```bash
 # Single task
 repobird run task.json --follow
+repobird basic "Fix a small bug"
+repobird pro "Implement OAuth"
+repobird run --basic -r myorg/webapp -p "Fix a small bug"
+repobird run --pro -r myorg/webapp -p "Implement OAuth"
 
 # From different formats
 repobird run task.yaml          # YAML format
 repobird run task.md            # Markdown with frontmatter
 cat task.json | repobird run -  # From stdin
 ```
+
+| Command | Use When | Default Model |
+|---|---|---|
+| `repobird basic "prompt"` | Quick Basic preset from inside a git repo | DeepSeek V4 Flash |
+| `repobird pro "prompt"` | Quick Pro preset from inside a git repo | Kimi K2.6 |
+| `repobird run --basic -r owner/repo -p "prompt"` | Basic preset with explicit repository | DeepSeek V4 Flash |
+| `repobird run --pro -r owner/repo -p "prompt"` | Pro preset with explicit repository | Kimi K2.6 |
+
+The `basic` and `pro` commands auto-detect the repository from the current git remote when `-r/--repo` is omitted. After submission, the CLI prints the selected run type and model before showing the run ID/status.
 
 ### Monitoring & Management
 
