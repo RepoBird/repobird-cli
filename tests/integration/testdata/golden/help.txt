@@ -8,6 +8,7 @@ Usage:
   repobird [command]
 
 Available Commands:
+  basic       Create a Basic cloud agent run
   completion  Generate shell completion scripts
   config      Manage RepoBird configuration
   docs        Generate documentation
@@ -16,6 +17,7 @@ Available Commands:
   info        Display authentication information
   login       Configure your API key securely
   logout      Remove stored API key
+  pro         Create a Pro cloud agent run
   run         Create a run from a JSON, YAML, or Markdown configuration file, or with flags
   status      Check the status of runs
   tui         Launch the interactive Terminal User Interface

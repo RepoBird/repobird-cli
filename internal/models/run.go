@@ -17,8 +17,10 @@ import (
 type RunType string
 
 const (
-	RunTypeRun  RunType = "run"
-	RunTypePlan RunType = "plan"
+	RunTypeRun   RunType = "run"
+	RunTypePlan  RunType = "plan"
+	RunTypeBasic RunType = "basic"
+	RunTypePro   RunType = "pro"
 )
 
 type RunStatus string
@@ -57,17 +59,19 @@ type RunConfig struct {
 
 // APIRunRequest is the structure that matches the actual API expectations
 type APIRunRequest struct {
-	Prompt         string   `json:"prompt"`
-	RepositoryName string   `json:"repositoryName"`
-	SourceBranch   string   `json:"sourceBranch"`
-	TargetBranch   string   `json:"targetBranch"`
-	RunType        RunType  `json:"runType"`
-	Agent          string   `json:"agent,omitempty"`
-	Title          string   `json:"title,omitempty"`
-	Context        string   `json:"context,omitempty"`
-	Files          []string `json:"files,omitempty"`
-	FileHash       string   `json:"fileHash,omitempty"`
-	Force          bool     `json:"force,omitempty"`
+	Prompt           string   `json:"prompt"`
+	RepositoryName   string   `json:"repositoryName"`
+	SourceBranch     string   `json:"sourceBranch"`
+	TargetBranch     string   `json:"targetBranch"`
+	RunType          RunType  `json:"runType"`
+	Agent            string   `json:"agent,omitempty"`
+	OpenCodeModel    string   `json:"opencodeModel,omitempty"`
+	OpenCodeProvider string   `json:"opencodeProvider,omitempty"`
+	Title            string   `json:"title,omitempty"`
+	Context          string   `json:"context,omitempty"`
+	Files            []string `json:"files,omitempty"`
+	FileHash         string   `json:"fileHash,omitempty"`
+	Force            bool     `json:"force,omitempty"`
 }
 
 // ToAPIRequest converts user-facing RunRequest to API-compatible structure

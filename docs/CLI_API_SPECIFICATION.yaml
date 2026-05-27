@@ -311,10 +311,24 @@ components:
           example: acme/webapp
         runType:
           type: string
-          enum: [run, plan]
+          enum: [run, plan, basic, pro]
           default: run
-          description: Type of run (run for execution, plan for planning)
+          description: Type of run. Legacy run/plan values remain supported; CLI Basic/Pro shortcuts send basic/pro with the matching OpenCode model.
           example: run
+        agent:
+          type: string
+          enum: [opencode]
+          description: Cloud agent used by current CLI run creation.
+          example: opencode
+        opencodeModel:
+          type: string
+          description: Optional OpenCode model override. CLI Basic uses openrouter/deepseek/deepseek-v4-flash; CLI Pro uses openrouter/moonshotai/kimi-k2.6.
+          example: openrouter/moonshotai/kimi-k2.6
+        opencodeProvider:
+          type: string
+          enum: [openrouter]
+          description: Provider for the selected OpenCode model.
+          example: openrouter
         prompt:
           type: string
           description: The task description or prompt

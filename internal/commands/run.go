@@ -38,7 +38,31 @@ var (
 	title       string
 	runType     string
 	contextFlag string
+	basicRun    bool
+	proRun      bool
 )
+
+type runPreset struct {
+	RunType  string
+	Label    string
+	Model    string
+	Provider string
+}
+
+var runPresets = map[string]runPreset{
+	"basic": {
+		RunType:  "basic",
+		Label:    "Basic",
+		Model:    "openrouter/deepseek/deepseek-v4-flash",
+		Provider: "openrouter",
+	},
+	"pro": {
+		RunType:  "pro",
+		Label:    "Pro",
+		Model:    "openrouter/moonshotai/kimi-k2.6",
+		Provider: "openrouter",
+	},
+}
 
 var runCmd = &cobra.Command{
 	Use:   "run [file]",
@@ -57,6 +81,8 @@ Examples:
 
   # Run with flags
   repobird run -r owner/repo -p "Fix the bug in auth"
+  repobird run --basic -r owner/repo -p "Fix a small bug"
+  repobird run --pro -r owner/repo -p "Implement OAuth"
   repobird run --repo owner/repo --prompt "Add tests" --follow
   repobird run -r owner/repo -p "Refactor" --source dev --target main
 
@@ -91,10 +117,16 @@ func init() {
 	runCmd.Flags().StringVar(&target, "target", "", "target branch (optional)")
 	runCmd.Flags().StringVar(&title, "title", "", "title for the run (optional)")
 	runCmd.Flags().StringVar(&runType, "run-type", "", "type of run: 'run' or 'plan' (optional, default: run)")
+	runCmd.Flags().BoolVar(&basicRun, "basic", false, "use the Basic cloud agent preset")
+	runCmd.Flags().BoolVar(&proRun, "pro", false, "use the Pro cloud agent preset")
 	runCmd.Flags().StringVar(&contextFlag, "context", "", "additional context (use @file to read from file, - for stdin)")
 }
 
 func runCommand(cmd *cobra.Command, args []string) error {
+	return runCommandWithPreset(cmd, args, "")
+}
+
+func runCommandWithPreset(cmd *cobra.Command, args []string, presetName string) error {
 	// For execution errors (not arg/flag errors), suppress usage
 	cmd.SilenceUsage = true
 
@@ -102,8 +134,22 @@ func runCommand(cmd *cobra.Command, args []string) error {
 		return errors.NoAPIKeyError()
 	}
 
+	selectedPreset, err := resolveRunPreset(presetName)
+	if err != nil {
+		return err
+	}
+
+	if selectedPreset != nil && runType != "" {
+		return fmt.Errorf("--run-type cannot be used with --%s", selectedPreset.RunType)
+	}
+
+	if prompt == "" && len(args) == 1 && (repo != "" || presetName != "") {
+		prompt = args[0]
+		args = nil
+	}
+
 	// Check if run is being created with flags
-	if repo != "" && prompt != "" {
+	if prompt != "" && (repo != "" || selectedPreset != nil) {
 		// Process prompt input (handles @file, -, or literal string)
 		processedPrompt, err := utils.ReadPromptInput(prompt)
 		if err != nil {
@@ -126,7 +172,7 @@ func runCommand(cmd *cobra.Command, args []string) error {
 			Source:     source,
 			Target:     target,
 			Title:      title,
-			RunType:    runType,
+			RunType:    selectedRunType(selectedPreset),
 			Context:    processedContext,
 		}
 
@@ -142,7 +188,7 @@ func runCommand(cmd *cobra.Command, args []string) error {
 	if repo != "" && prompt == "" {
 		return fmt.Errorf("missing required flag: --prompt (-p) is required when --repo is specified")
 	}
-	if prompt != "" && repo == "" {
+	if prompt != "" && repo == "" && selectedPreset == nil {
 		return fmt.Errorf("missing required flag: --repo (-r) is required when --prompt is specified")
 	}
 
@@ -179,6 +225,7 @@ func runCommand(cmd *cobra.Command, args []string) error {
 			}
 		}
 
+		applyRunPreset(runConfig, selectedPreset)
 		return processSingleRun(runConfig, "")
 	}
 
@@ -225,10 +272,25 @@ func runCommand(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	applyRunPreset(runConfig, selectedPreset)
 	return processSingleRun(runConfig, additionalContext)
 }
 
 func processSingleRun(runConfig *models.RunConfig, additionalContext string) error {
+	if runConfig.Repository == "" {
+		container := getContainer()
+		gitService := container.GitService()
+		if gitService.IsGitRepository() {
+			repoName, err := gitService.GetRepositoryName()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: Could not auto-detect repository: %v\n", err)
+			} else {
+				runConfig.Repository = repoName
+				fmt.Printf("Auto-detected repository: %s\n", repoName)
+			}
+		}
+	}
+
 	// Validate the configuration
 	if err := utils.ValidateRunConfig(runConfig); err != nil {
 		return fmt.Errorf("validation failed: %w", err)
@@ -236,15 +298,17 @@ func processSingleRun(runConfig *models.RunConfig, additionalContext string) err
 
 	// Convert to domain request
 	createReq := domain.CreateRunRequest{
-		Prompt:         runConfig.Prompt,
-		RepositoryName: runConfig.Repository,
-		SourceBranch:   runConfig.Source,
-		TargetBranch:   runConfig.Target,
-		RunType:        runConfig.RunType,
-		Agent:          "opencode",
-		Title:          runConfig.Title,
-		Context:        runConfig.Context,
-		Files:          runConfig.Files,
+		Prompt:           runConfig.Prompt,
+		RepositoryName:   runConfig.Repository,
+		SourceBranch:     runConfig.Source,
+		TargetBranch:     runConfig.Target,
+		RunType:          runConfig.RunType,
+		Agent:            "opencode",
+		OpenCodeModel:    modelForRunType(runConfig.RunType),
+		OpenCodeProvider: providerForRunType(runConfig.RunType),
+		Title:            runConfig.Title,
+		Context:          runConfig.Context,
+		Files:            runConfig.Files,
 	}
 
 	// Append additional markdown context if present
@@ -256,33 +320,9 @@ func processSingleRun(runConfig *models.RunConfig, additionalContext string) err
 		}
 	}
 
-	// Auto-detection disabled for now
-	// TODO: Enable when feature is ready
-	// container := getContainer()
-	// gitService := container.GitService()
-	//
-	// if createReq.RepositoryName == "" && gitService.IsGitRepository() {
-	// 	repo, err := gitService.GetRepositoryName()
-	// 	if err != nil {
-	// 		fmt.Fprintf(os.Stderr, "Warning: Could not auto-detect repository: %v\n", err)
-	// 	} else {
-	// 		createReq.RepositoryName = repo
-	// 		fmt.Printf("Auto-detected repository: %s\n", repo)
-	// 	}
-	// }
-	//
-	// if createReq.SourceBranch == "" && gitService.IsGitRepository() {
-	// 	branch, err := gitService.GetCurrentBranch()
-	// 	if err != nil {
-	// 		fmt.Fprintf(os.Stderr, "Warning: Could not auto-detect branch: %v\n", err)
-	// 	} else {
-	// 		createReq.SourceBranch = branch
-	// 		fmt.Printf("Auto-detected source branch: %s\n", branch)
-	// 	}
-	// }
-
 	if dryRun {
 		fmt.Println("Validation successful. Run would be created with:")
+		printRunSelection(createReq)
 		b, _ := json.MarshalIndent(createReq, "", "  ")
 		fmt.Println(string(b))
 		return nil
@@ -293,6 +333,7 @@ func processSingleRun(runConfig *models.RunConfig, additionalContext string) err
 	runService := container.RunService()
 	ctx := context.Background()
 
+	printRunSelection(createReq)
 	fmt.Println("Creating run...")
 	run, err := runService.CreateRun(ctx, createReq)
 	if err != nil {
@@ -317,6 +358,100 @@ func processSingleRun(runConfig *models.RunConfig, additionalContext string) err
 	}
 
 	return nil
+}
+
+func newRunPresetCommand(presetName string) *cobra.Command {
+	preset := runPresets[presetName]
+	cmd := &cobra.Command{
+		Use:   fmt.Sprintf("%s [prompt]", presetName),
+		Short: fmt.Sprintf("Create a %s cloud agent run", preset.Label),
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runCommandWithPreset(cmd, args, presetName)
+		},
+		SilenceErrors: true,
+		SilenceUsage:  false,
+	}
+
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "validate input without creating a run")
+	cmd.Flags().BoolVar(&follow, "follow", false, "follow the run status after creation")
+	cmd.Flags().StringVarP(&repo, "repo", "r", "", "repository name (owner/repo or numeric ID)")
+	cmd.Flags().StringVar(&source, "source", "", "source branch (optional)")
+	cmd.Flags().StringVar(&target, "target", "", "target branch (optional)")
+	cmd.Flags().StringVar(&title, "title", "", "title for the run (optional)")
+	cmd.Flags().StringVar(&contextFlag, "context", "", "additional context (use @file to read from file, - for stdin)")
+	return cmd
+}
+
+func resolveRunPreset(presetName string) (*runPreset, error) {
+	if basicRun && proRun {
+		return nil, fmt.Errorf("--basic and --pro cannot be used together")
+	}
+	if presetName != "" {
+		preset, ok := runPresets[presetName]
+		if !ok {
+			return nil, fmt.Errorf("unknown run preset: %s", presetName)
+		}
+		return &preset, nil
+	}
+	if basicRun {
+		preset := runPresets["basic"]
+		return &preset, nil
+	}
+	if proRun {
+		preset := runPresets["pro"]
+		return &preset, nil
+	}
+	return nil, nil
+}
+
+func selectedRunType(preset *runPreset) string {
+	if preset != nil {
+		return preset.RunType
+	}
+	return runType
+}
+
+func applyRunPreset(runConfig *models.RunConfig, preset *runPreset) {
+	if preset != nil {
+		runConfig.RunType = preset.RunType
+	}
+}
+
+func modelForRunType(runType string) string {
+	preset, ok := runPresets[runType]
+	if !ok {
+		return ""
+	}
+	return preset.Model
+}
+
+func providerForRunType(runType string) string {
+	preset, ok := runPresets[runType]
+	if !ok {
+		return ""
+	}
+	return preset.Provider
+}
+
+func printRunSelection(req domain.CreateRunRequest) {
+	preset, ok := runPresets[req.RunType]
+	if !ok {
+		return
+	}
+	fmt.Printf("Run type: %s\n", preset.Label)
+	fmt.Printf("Model: %s (%s)\n", modelDisplayName(preset.Model), preset.Model)
+}
+
+func modelDisplayName(model string) string {
+	switch model {
+	case "openrouter/deepseek/deepseek-v4-flash":
+		return "DeepSeek V4 Flash"
+	case "openrouter/moonshotai/kimi-k2.6":
+		return "Kimi K2.6"
+	default:
+		return model
+	}
 }
 
 func processBulkRuns(filename string) error {

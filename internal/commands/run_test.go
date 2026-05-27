@@ -8,12 +8,23 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/repobird/repobird-cli/internal/config"
 )
+
+func ensureRunTestConfig() {
+	if cfg == nil {
+		cfg = &config.SecureConfig{
+			Config: &config.Config{},
+		}
+	}
+}
 
 func TestRunCommand_WithFlags(t *testing.T) {
 	tests := []struct {
@@ -100,6 +111,7 @@ func TestRunCommand_WithFlags(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ensureRunTestConfig()
 			// Save original config and flags
 			originalAPIKey := cfg.APIKey
 			defer func() {
@@ -188,6 +200,26 @@ func TestRunCommand_ValidationWithFlags(t *testing.T) {
 			},
 		},
 		{
+			name: "Basic preset selects DeepSeek model",
+			args: []string{"-r", "test/repo", "-p", "Fix bug", "--basic", "--dry-run"},
+			expectInJSON: map[string]string{
+				"RunType":        "basic",
+				"RepositoryName": "test/repo",
+				"Prompt":         "Fix bug",
+				"OpenCodeModel":  "openrouter/deepseek/deepseek-v4-flash",
+			},
+		},
+		{
+			name: "Pro preset selects Kimi model",
+			args: []string{"-r", "test/repo", "-p", "Fix bug", "--pro", "--dry-run"},
+			expectInJSON: map[string]string{
+				"RunType":        "pro",
+				"RepositoryName": "test/repo",
+				"Prompt":         "Fix bug",
+				"OpenCodeModel":  "openrouter/moonshotai/kimi-k2.6",
+			},
+		},
+		{
 			name: "All optional fields populated",
 			args: []string{
 				"-r", "owner/repo", "-p", "Task prompt",
@@ -210,6 +242,7 @@ func TestRunCommand_ValidationWithFlags(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ensureRunTestConfig()
 			// Setup config with API key
 			originalAPIKey := cfg.APIKey
 			cfg.APIKey = "test-key"
@@ -223,6 +256,8 @@ func TestRunCommand_ValidationWithFlags(t *testing.T) {
 				title = ""
 				runType = ""
 				contextFlag = ""
+				basicRun = false
+				proRun = false
 				dryRun = false
 			}()
 
@@ -269,6 +304,124 @@ func TestRunCommand_ValidationWithFlags(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRunCommand_RejectsConflictingPresetFlags(t *testing.T) {
+	ensureRunTestConfig()
+	originalAPIKey := cfg.APIKey
+	cfg.APIKey = "test-key"
+	defer func() {
+		cfg.APIKey = originalAPIKey
+		repo = ""
+		prompt = ""
+		source = ""
+		target = ""
+		title = ""
+		runType = ""
+		contextFlag = ""
+		basicRun = false
+		proRun = false
+		dryRun = false
+	}()
+
+	err := runCmd.ParseFlags([]string{"-r", "test/repo", "-p", "Fix bug", "--basic", "--pro", "--dry-run"})
+	require.NoError(t, err)
+
+	cmdErr := runCommand(runCmd, []string{})
+	require.Error(t, cmdErr)
+	assert.Contains(t, cmdErr.Error(), "--basic and --pro cannot be used together")
+}
+
+func TestRunPresetCommand_UsesPromptArgument(t *testing.T) {
+	ensureRunTestConfig()
+	originalAPIKey := cfg.APIKey
+	cfg.APIKey = "test-key"
+	defer func() {
+		cfg.APIKey = originalAPIKey
+		repo = ""
+		prompt = ""
+		source = ""
+		target = ""
+		title = ""
+		runType = ""
+		contextFlag = ""
+		basicRun = false
+		proRun = false
+		dryRun = false
+	}()
+
+	cmd := newRunPresetCommand("pro")
+	err := cmd.ParseFlags([]string{"-r", "test/repo", "--dry-run"})
+	require.NoError(t, err)
+
+	old := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+	cmdErr := cmd.RunE(cmd, []string{"Fix the bug"})
+	w.Close()
+	os.Stdout = old
+
+	var buf bytes.Buffer
+	buf.ReadFrom(r)
+	output := buf.String()
+
+	require.NoError(t, cmdErr)
+	assert.Contains(t, output, "Validation successful")
+	assert.Contains(t, output, `"RunType": "pro"`)
+	assert.Contains(t, output, `"OpenCodeModel": "openrouter/moonshotai/kimi-k2.6"`)
+	assert.Contains(t, output, "Model: Kimi K2.6")
+}
+
+func TestRunPresetCommand_AutoDetectsRepository(t *testing.T) {
+	ensureRunTestConfig()
+	originalAPIKey := cfg.APIKey
+	cfg.APIKey = "test-key"
+	defer func() {
+		cfg.APIKey = originalAPIKey
+		repo = ""
+		prompt = ""
+		source = ""
+		target = ""
+		title = ""
+		runType = ""
+		contextFlag = ""
+		basicRun = false
+		proRun = false
+		dryRun = false
+		resetContainer()
+	}()
+
+	tempDir := t.TempDir()
+	originalWd, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.Chdir(originalWd) })
+	require.NoError(t, os.Chdir(tempDir))
+
+	if err := exec.Command("git", "init").Run(); err != nil {
+		t.Skipf("git unavailable: %v", err)
+	}
+	require.NoError(t, exec.Command("git", "remote", "add", "origin", "https://github.com/acme/webapp.git").Run())
+
+	cmd := newRunPresetCommand("basic")
+	err = cmd.ParseFlags([]string{"--dry-run"})
+	require.NoError(t, err)
+
+	old := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+	cmdErr := cmd.RunE(cmd, []string{"Fix the bug"})
+	w.Close()
+	os.Stdout = old
+
+	var buf bytes.Buffer
+	buf.ReadFrom(r)
+	output := buf.String()
+
+	require.NoError(t, cmdErr)
+	assert.Contains(t, output, "Auto-detected repository: acme/webapp")
+	assert.Contains(t, output, `"RepositoryName": "acme/webapp"`)
+	assert.Contains(t, output, `"RunType": "basic"`)
+	assert.Contains(t, output, "Model: DeepSeek V4 Flash")
 }
 
 func TestRunCommand_ErrorMessages(t *testing.T) {
@@ -323,6 +476,7 @@ func TestRunCommand_ErrorMessages(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ensureRunTestConfig()
 			// Save original config
 			originalAPIKey := cfg.APIKey
 			defer func() {

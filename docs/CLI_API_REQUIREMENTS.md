@@ -40,7 +40,10 @@ interface CreateRunRequest {
   pullRequestNumber?: number;  // Existing PR to modify
   
   // Agent configuration
-  runType?: 'run' | 'plan';   // CLI sends 'run' or 'plan', API maps to 'pro' or 'pro-plan'
+  runType?: 'run' | 'plan' | 'basic' | 'pro'; // CLI presets use 'basic'/'pro'; legacy run/plan remain supported
+  agent?: 'opencode';          // CLI sends OpenCode for cloud-agent runs
+  opencodeModel?: string;      // Basic default: openrouter/deepseek/deepseek-v4-flash; Pro default: openrouter/moonshotai/kimi-k2.6
+  opencodeProvider?: 'openrouter';
   context?: string;            // Additional context for the agent
   
   // Execution options
@@ -68,8 +71,8 @@ interface RunResponse {
   repository: string;         // Full repo name (owner/repo)
   source: string;             // Branch started from
   target: string;             // PR target branch
-  agent: 'claude-code';       // Agent type (only claude-code)
-  runType?: 'pro' | 'pro-plan';  // Run type (pro or pro-plan)
+  agent: 'opencode';          // Default cloud agent
+  runType?: 'basic' | 'pro' | 'pro-plan';  // Run type returned by issue-run APIs
   
   // GitHub integration
   issueNumber?: number;
@@ -321,7 +324,8 @@ curl -X GET https://repobird.ai/api/v1/runs?page=1&limit=10 \
    - Support .env file for development API URL override
    - Repository resolution: name → repoId via API
    - Auto-detect repo from git config if not specified
-   - Map CLI commands to API runType ('run' → 'pro', 'plan' → 'pro-plan')
+   - Preserve legacy CLI runType values ('run' → 'pro', 'plan' → 'pro-plan') while exposing Basic/Pro presets
+   - Basic preset uses DeepSeek V4 Flash; Pro preset uses Kimi K2.6
    - Handle status enum values correctly
 
 2. **Core Features**:

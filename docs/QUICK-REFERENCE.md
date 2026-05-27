@@ -5,6 +5,8 @@
 ```bash
 repobird tui                        # Launch interactive dashboard
 repobird run task.json              # Submit task
+repobird basic "Fix a bug"          # Basic run, repo auto-detected from git
+repobird pro "Implement OAuth"      # Pro run, repo auto-detected from git
 repobird status                     # View all runs
 repobird status RUN_ID --follow     # Follow specific run
 repobird config set api-key KEY     # Set API key
