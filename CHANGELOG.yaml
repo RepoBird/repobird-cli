@@ -3,6 +3,7 @@ versions:
     unreleased:
         added:
             - Branch-only run submission is now available from the CLI with --branch-only/--no-pr and branchOnly config files.
+            - Added feature-gated repo commands to inspect and update repository branch defaults.
         changed:
             - Run creation now supports baseBranch/outputMode/outputBranch/prTargetBranch/outputBranchPolicy while preserving source/target/branchOnly compatibility.
         internal:

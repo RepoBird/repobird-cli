@@ -9,6 +9,7 @@ repobird basic "Fix a bug"          # Basic run, repo auto-detected from git
 repobird pro "Implement OAuth"      # Pro run, repo auto-detected from git
 repobird status                     # View all runs
 repobird status RUN_ID --follow     # Follow specific run
+repobird repo show repo_123         # Inspect repository defaults
 repobird config set api-key KEY     # Set API key
 ```
 

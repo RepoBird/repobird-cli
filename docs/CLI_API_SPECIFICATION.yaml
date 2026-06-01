@@ -282,6 +282,21 @@ components:
         defaultBranch:
           type: string
           example: main
+        defaultBaseBranch:
+          type: string
+          nullable: true
+          description: Persisted default base branch for new runs when repository branch defaults are enabled.
+          example: develop
+        defaultPrTargetBranch:
+          type: string
+          nullable: true
+          description: Persisted default pull request target branch for new PR-mode runs when enabled.
+          example: release
+        defaultOutputBranch:
+          type: string
+          nullable: true
+          description: Persisted branch-only output branch default when enabled. Null means generated branch.
+          example: automation/repobird
         isEnabled:
           type: boolean
           example: true
@@ -1621,6 +1636,72 @@ paths:
                     $ref: '#/components/schemas/Repository'
         '404':
           description: Repository not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/repos/{id}:
+    get:
+      summary: Get repository details
+      tags:
+        - Repositories
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Repository details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Repository'
+        '404':
+          description: Repository not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      summary: Update repository branch defaults
+      description: Feature-gated endpoint for setting or clearing persisted repository branch defaults.
+      tags:
+        - Repositories
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                defaultBaseBranch:
+                  type: string
+                  nullable: true
+                defaultPrTargetBranch:
+                  type: string
+                  nullable: true
+                defaultOutputBranch:
+                  type: string
+                  nullable: true
+                  description: Null clears the persisted output branch so branch-only runs generate one.
+      responses:
+        '200':
+          description: Updated repository details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Repository'
+        '404':
+          description: Repository not found, unauthorized, or branch-default updates are not enabled.
           content:
             application/json:
               schema:

@@ -85,6 +85,7 @@ func init() {
 	rootCmd.AddCommand(newRunPresetCommand("basic"))
 	rootCmd.AddCommand(newRunPresetCommand("pro"))
 	rootCmd.AddCommand(statusCmd)
+	rootCmd.AddCommand(repoCmd)
 	InitConfigSubcommands() // Initialize config subcommands
 	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(loginCmd)

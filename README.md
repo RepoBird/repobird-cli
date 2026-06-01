@@ -183,6 +183,18 @@ repobird status --follow RUN_ID # Live updates
 repobird tui                    # Launch terminal UI
 ```
 
+### Repository Defaults
+
+When repository branch defaults are enabled on the API, the CLI can inspect and update persisted defaults. Per-run flags such as `--base-branch`, `--pr-target-branch`, `--output-branch`, and `--branch-only` still override repository defaults.
+
+```bash
+repobird repo list
+repobird repo show repo_123
+repobird repo defaults repo_123 --base develop --pr-target release
+repobird repo defaults repo_123 --clear-base --clear-pr-target
+repobird repo defaults repo_123 --clear-output  # branch-only runs generate an output branch
+```
+
 ### Terminal UI Navigation
 <img width="1251" height="723" alt="tui-example" src="https://github.com/user-attachments/assets/263d96bf-2b53-4152-943c-de5529ad40d6" />
 

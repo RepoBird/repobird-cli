@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - Branch-only run submission is now available from the CLI with --branch-only/--no-pr and branchOnly config files.
+- Added feature-gated repo commands to inspect and update repository branch defaults.
 
 ### Changed
 
