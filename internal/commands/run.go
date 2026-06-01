@@ -40,6 +40,7 @@ var (
 	contextFlag string
 	basicRun    bool
 	proRun      bool
+	branchOnly  bool
 )
 
 type runPreset struct {
@@ -85,6 +86,7 @@ Examples:
   repobird run --pro -r owner/repo -p "Implement OAuth"
   repobird run --repo owner/repo --prompt "Add tests" --follow
   repobird run -r owner/repo -p "Refactor" --source dev --target main
+  repobird run -r owner/repo -p "Update generated docs" --branch-only
 
   # Using prompt from file
   repobird run -r owner/repo -p @prompt.txt         # Read prompt from file
@@ -119,6 +121,8 @@ func init() {
 	runCmd.Flags().StringVar(&runType, "run-type", "", "type of run: 'run' or 'plan' (optional, default: run)")
 	runCmd.Flags().BoolVar(&basicRun, "basic", false, "use the Basic cloud agent preset")
 	runCmd.Flags().BoolVar(&proRun, "pro", false, "use the Pro cloud agent preset")
+	runCmd.Flags().BoolVar(&branchOnly, "branch-only", false, "push commits to a branch without creating a pull request")
+	runCmd.Flags().BoolVar(&branchOnly, "no-pr", false, "alias for --branch-only")
 	runCmd.Flags().StringVar(&contextFlag, "context", "", "additional context (use @file to read from file, - for stdin)")
 }
 
@@ -174,6 +178,7 @@ func runCommandWithPreset(cmd *cobra.Command, args []string, presetName string) 
 			Title:      title,
 			RunType:    selectedRunType(selectedPreset),
 			Context:    processedContext,
+			BranchOnly: branchOnly,
 		}
 
 		// Set default run type if not specified
@@ -309,6 +314,7 @@ func processSingleRun(runConfig *models.RunConfig, additionalContext string) err
 		Title:            runConfig.Title,
 		Context:          runConfig.Context,
 		Files:            runConfig.Files,
+		BranchOnly:       runConfig.BranchOnly,
 	}
 
 	// Append additional markdown context if present
@@ -379,6 +385,8 @@ func newRunPresetCommand(presetName string) *cobra.Command {
 	cmd.Flags().StringVar(&source, "source", "", "source branch (optional)")
 	cmd.Flags().StringVar(&target, "target", "", "target branch (optional)")
 	cmd.Flags().StringVar(&title, "title", "", "title for the run (optional)")
+	cmd.Flags().BoolVar(&branchOnly, "branch-only", false, "push commits to a branch without creating a pull request")
+	cmd.Flags().BoolVar(&branchOnly, "no-pr", false, "alias for --branch-only")
 	cmd.Flags().StringVar(&contextFlag, "context", "", "additional context (use @file to read from file, - for stdin)")
 	return cmd
 }

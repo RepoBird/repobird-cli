@@ -1,6 +1,11 @@
 project: RepoBird CLI
 versions:
-    unreleased: {}
+    unreleased:
+        added:
+            - Branch-only run submission is now available from the CLI with --branch-only/--no-pr and branchOnly config files.
+        internal:
+            fixed:
+                - Made cache last-repository test ordering deterministic under race-enabled full-suite runs.
     0.4.0:
         date: 2026-05-27
         added:

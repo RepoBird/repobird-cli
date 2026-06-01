@@ -48,6 +48,7 @@ type CreateRunRequest struct {
 	Title            string
 	Context          string
 	Files            []string
+	BranchOnly       bool
 }
 
 // ListOptions represents options for listing runs

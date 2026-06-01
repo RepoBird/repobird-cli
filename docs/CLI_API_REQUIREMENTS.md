@@ -38,6 +38,7 @@ interface CreateRunRequest {
   target?: string;             // Target branch for PR (default: repo's defaultBranch)
   issueNumber?: number;        // GitHub issue number to work on
   pullRequestNumber?: number;  // Existing PR to modify
+  branchOnly?: boolean;        // Push commits to a branch without creating a PR
   
   // Agent configuration
   runType?: 'run' | 'plan' | 'basic' | 'pro'; // CLI presets use 'basic'/'pro'; legacy run/plan remain supported

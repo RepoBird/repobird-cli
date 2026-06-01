@@ -112,6 +112,9 @@ repobird run -r your-org/your-repo -p "Fix the login bug where users get stuck o
 repobird basic -r your-org/your-repo "Fix a small bug"  # DeepSeek V4 Flash
 repobird pro -r your-org/your-repo "Implement OAuth"    # Kimi K2.6
 
+# Push commits to a branch without opening a PR
+repobird run -r your-org/your-repo -p "Update generated docs" --branch-only
+
 # Inside a git repo with an origin remote, the repo can be auto-detected
 repobird pro "Fix the login bug where users get stuck on loading screen"
 

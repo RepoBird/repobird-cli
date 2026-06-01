@@ -20,6 +20,7 @@ type MarkdownConfig struct {
 	Title       string                 `yaml:"title" json:"title"`
 	Context     string                 `yaml:"context" json:"context"`
 	Files       []string               `yaml:"files" json:"files"`
+	BranchOnly  bool                   `yaml:"branchOnly" json:"branchOnly"`
 	PullRequest *PullRequestConfig     `yaml:"pullRequest,omitempty" json:"pullRequest,omitempty"`
 	Metadata    map[string]interface{} `yaml:"metadata,omitempty" json:"metadata,omitempty"`
 }
@@ -64,6 +65,7 @@ func ParseMarkdownConfigFromReader(r io.Reader) (*models.RunConfig, string, erro
 		Title:      config.Title,
 		Context:    config.Context,
 		Files:      config.Files,
+		BranchOnly: config.BranchOnly,
 	}
 
 	// Extract markdown content (rest) as additional context if present
@@ -84,6 +86,7 @@ func validateMarkdownConfig(config *MarkdownConfig) error {
 		Title:      config.Title,
 		Context:    config.Context,
 		Files:      config.Files,
+		BranchOnly: config.BranchOnly,
 	}
 
 	// Use shared validation

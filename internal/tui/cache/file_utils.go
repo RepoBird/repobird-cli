@@ -26,6 +26,7 @@ func CalculateConfigHash(config *models.RunConfig) (string, error) {
 		Target     string `json:"target"`
 		Context    string `json:"context,omitempty"`
 		Title      string `json:"title,omitempty"`
+		BranchOnly bool   `json:"branchOnly,omitempty"`
 	}{
 		Prompt:     config.Prompt,
 		Repository: config.Repository,
@@ -33,6 +34,7 @@ func CalculateConfigHash(config *models.RunConfig) (string, error) {
 		Target:     config.Target,
 		Context:    config.Context,
 		Title:      config.Title,
+		BranchOnly: config.BranchOnly,
 	}
 
 	jsonData, err := json.Marshal(normalized)

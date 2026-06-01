@@ -141,6 +141,8 @@ repobird run [flags] <input-file>
   -w, --watch            Watch for status updates
   --repo string          Target repository (owner/name)
   --branch string        Target branch
+  --branch-only          Push commits without creating a pull request
+  --no-pr                Alias for --branch-only
   --dry-run              Validate without executing
 
 # Check status of runs

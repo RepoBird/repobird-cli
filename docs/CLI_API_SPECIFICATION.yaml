@@ -360,6 +360,11 @@ components:
             If provided, the branch must exist in the repository or the request will be rejected with a BRANCH_NOT_FOUND error.
             Note: Empty string is treated as undefined and will default to source branch.
           example: main
+        branchOnly:
+          type: boolean
+          default: false
+          description: Push commits to the target branch without creating a pull request. Successful runs return a branch URL instead of a pull request URL.
+          example: true
         fileHash:
           type: string
           description: SHA-256 hash of the task file for tracking purposes (duplicates allowed)
@@ -812,12 +817,20 @@ paths:
                   sourceBranch: develop
                   targetBranch: main
               withSourceOnly:
-                summary: Run with source branch only (PR merges back to same branch)
+                summary: Run from a specific source branch
                 value:
                   repositoryName: acme/webapp
                   prompt: Refactor authentication module
                   title: Clean up auth code
                   sourceBranch: feature/auth-refactor
+              branchOnly:
+                summary: Run without creating a pull request
+                value:
+                  repositoryName: acme/webapp
+                  prompt: Update generated docs
+                  title: Refresh generated docs
+                  targetBranch: automation/generated-docs
+                  branchOnly: true
               withHash:
                 summary: Run with file hash for tracking
                 value:

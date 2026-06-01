@@ -31,6 +31,7 @@ The `repobird run` command supports multiple configuration file formats to defin
 | `runType` | string | `run` | Type of run: `run` or `plan` |
 | `context` | string | - | Additional context or instructions for the AI |
 | `files` | array | - | List of specific files to include in the context |
+| `branchOnly` | boolean | `false` | Push commits to the target branch without creating a PR |
 
 ## Format Examples
 
@@ -58,6 +59,9 @@ repobird run -r myorg/webapp -p @task.txt
 
 # Read prompt from stdin
 echo "Fix the login bug" | repobird run -r myorg/webapp -p -
+
+# Push commits without opening a PR
+repobird run -r myorg/webapp -p "Update generated docs" --branch-only
 
 # With additional options
 repobird run --repo myorg/webapp \
@@ -90,6 +94,7 @@ repobird run -r myorg/webapp -p "Add unit tests for auth module" --follow
 - `--run-type` - Type of run: 'run' or 'plan' (optional, defaults to 'run')
 - `--basic` - Use the Basic cloud-agent preset (DeepSeek V4 Flash)
 - `--pro` - Use the Pro cloud-agent preset (Kimi K2.6)
+- `--branch-only`, `--no-pr` - Push commits to the target branch without creating a PR
 - `--context` - Additional context (optional, also supports `@filename` and `-`)
 - `--follow` - Follow the run status after creation
 - `--dry-run` - Validate without creating the run
@@ -106,6 +111,7 @@ Create a file `task.json`:
   "target": "fix/login-rate-limit",
   "title": "Fix authentication rate limiting issue",
   "runType": "run",
+  "branchOnly": true,
   "context": "Users report being permanently locked out after 5 failed login attempts. The rate limiting should reset after 15 minutes.",
   "files": [
     "src/auth/login.js",
@@ -133,6 +139,7 @@ source: main
 target: fix/login-rate-limit
 title: Fix authentication rate limiting issue
 runType: run
+branchOnly: true
 context: |
   Users report being permanently locked out after 5 failed login attempts.
   The rate limiting should reset after 15 minutes.
@@ -159,6 +166,7 @@ source: main
 target: fix/login-rate-limit
 title: Fix authentication rate limiting issue
 runType: run
+branchOnly: true
 files:
   - src/auth/login.js
   - src/auth/rateLimit.js

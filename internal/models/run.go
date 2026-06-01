@@ -43,6 +43,7 @@ type RunRequest struct {
 	Title      string   `json:"title,omitempty"`
 	Context    string   `json:"context,omitempty"`
 	Files      []string `json:"files,omitempty"`
+	BranchOnly bool     `json:"branchOnly,omitempty"`
 }
 
 // RunConfig is a unified configuration structure for both JSON and Markdown configs
@@ -55,6 +56,7 @@ type RunConfig struct {
 	Title      string   `json:"title,omitempty" yaml:"title,omitempty"`
 	Context    string   `json:"context,omitempty" yaml:"context,omitempty"`
 	Files      []string `json:"files,omitempty" yaml:"files,omitempty"`
+	BranchOnly bool     `json:"branchOnly,omitempty" yaml:"branchOnly,omitempty"`
 }
 
 // APIRunRequest is the structure that matches the actual API expectations
@@ -72,6 +74,7 @@ type APIRunRequest struct {
 	Files            []string `json:"files,omitempty"`
 	FileHash         string   `json:"fileHash,omitempty"`
 	Force            bool     `json:"force,omitempty"`
+	BranchOnly       bool     `json:"branchOnly,omitempty"`
 }
 
 // ToAPIRequest converts user-facing RunRequest to API-compatible structure
@@ -86,6 +89,7 @@ func (r *RunRequest) ToAPIRequest() *APIRunRequest {
 		Title:          r.Title,
 		Context:        r.Context,
 		Files:          r.Files,
+		BranchOnly:     r.BranchOnly,
 	}
 }
 
@@ -283,6 +287,7 @@ func parseJSONWithUnknownFieldsAndPrompts(file *os.File) (*RunConfig, *prompts.V
 		Title:      runReq.Title,
 		Context:    runReq.Context,
 		Files:      runReq.Files,
+		BranchOnly: runReq.BranchOnly,
 	}
 
 	return runConfig, promptHandler, nil

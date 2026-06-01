@@ -55,6 +55,7 @@ type CreateRunRequest struct {
 	Title            string   `json:"title,omitempty"`
 	Context          string   `json:"context,omitempty"`
 	Files            []string `json:"files,omitempty"`
+	BranchOnly       bool     `json:"branchOnly,omitempty"`
 }
 
 // RunResponse represents the API response for a run

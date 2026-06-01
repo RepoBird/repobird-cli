@@ -54,6 +54,7 @@ func (r *apiRunRepository) Create(ctx context.Context, req domain.CreateRunReque
 		Title:            req.Title,
 		Context:          req.Context,
 		Files:            req.Files,
+		BranchOnly:       req.BranchOnly,
 	}
 
 	// Make API request

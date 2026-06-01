@@ -292,6 +292,7 @@ func CalculateConfigHash(config *models.RunConfig) (string, error) {
 		"title":      config.Title,
 		"context":    config.Context,
 		"files":      config.Files,
+		"branchOnly": config.BranchOnly,
 	}
 
 	// Marshal to get normalized JSON

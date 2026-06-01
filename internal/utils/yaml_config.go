@@ -23,6 +23,7 @@ type YAMLConfig struct {
 	Title       string                 `yaml:"title" json:"title"`
 	Context     string                 `yaml:"context" json:"context"`
 	Files       []string               `yaml:"files" json:"files"`
+	BranchOnly  bool                   `yaml:"branchOnly" json:"branchOnly"`
 	PullRequest *PullRequestConfig     `yaml:"pullRequest,omitempty" json:"pullRequest,omitempty"`
 	Metadata    map[string]interface{} `yaml:"metadata,omitempty" json:"metadata,omitempty"`
 }
@@ -101,6 +102,9 @@ func parseYAMLWithUnknownFieldsAndPrompts(data []byte) (*models.RunConfig, *prom
 	if context, ok := genericMap["context"].(string); ok {
 		config.Context = context
 	}
+	if branchOnly, ok := genericMap["branchOnly"].(bool); ok {
+		config.BranchOnly = branchOnly
+	}
 	if filesInterface, ok := genericMap["files"]; ok {
 		if filesArray, ok := filesInterface.([]interface{}); ok {
 			config.Files = make([]string, 0, len(filesArray))
@@ -153,6 +157,7 @@ func parseYAMLWithUnknownFieldsAndPrompts(data []byte) (*models.RunConfig, *prom
 		Title:      config.Title,
 		Context:    config.Context,
 		Files:      config.Files,
+		BranchOnly: config.BranchOnly,
 	}
 
 	// Return the config and prompts (but no validation error prompts)
@@ -177,13 +182,14 @@ func findUnsupportedYAMLFieldsWithSuggestions(data map[string]interface{}) ([]st
 		"title":       true,
 		"context":     true,
 		"files":       true,
+		"branchOnly":  true,
 		"pullRequest": true,
 		"metadata":    true,
 	}
 
 	supportedFieldsList := []string{
 		"prompt", "repository", "source", "target", "runType",
-		"title", "context", "files", "pullRequest", "metadata",
+		"title", "context", "files", "branchOnly", "pullRequest", "metadata",
 	}
 
 	var unsupported []string
@@ -215,6 +221,7 @@ func validateYAMLConfigForPrompts(config *YAMLConfig) error {
 		Title:      config.Title,
 		Context:    config.Context,
 		Files:      config.Files,
+		BranchOnly: config.BranchOnly,
 	}
 
 	// Apply defaults first
@@ -411,6 +418,7 @@ func ParseJSONFromStdinWithPrompts() (*models.RunConfig, *prompts.ValidationProm
 		Title:      runReq.Title,
 		Context:    runReq.Context,
 		Files:      runReq.Files,
+		BranchOnly: runReq.BranchOnly,
 	}
 
 	return runConfig, promptHandler, nil
