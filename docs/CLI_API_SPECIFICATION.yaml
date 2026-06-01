@@ -343,8 +343,9 @@ components:
           example: This should work with the existing authentication module
         sourceBranch:
           type: string
+          deprecated: true
           description: |
-            Source branch to start from. If not provided, the system will:
+            Legacy alias for baseBranch. Source branch to start from. If not provided, the system will:
             1. Fetch the repository's current default branch from GitHub
             2. Update the repository record with the latest default branch
             3. Use that branch as the source
@@ -353,17 +354,42 @@ components:
           example: feature/auth
         targetBranch:
           type: string
+          deprecated: true
           description: |
-            Target branch where the PR will merge to. If not provided, defaults to the source branch
-            (creating a PR that merges back to the same branch).
+            Legacy target branch alias. For branch-only runs, maps to outputBranch. For PR runs, maps to prTargetBranch.
 
             If provided, the branch must exist in the repository or the request will be rejected with a BRANCH_NOT_FOUND error.
             Note: Empty string is treated as undefined and will default to source branch.
           example: main
+        baseBranch:
+          type: string
+          description: Branch to start work from. Defaults to the repository default branch when omitted.
+          example: main
+        outputMode:
+          type: string
+          enum: [pr, branch]
+          default: pr
+          description: Use pr to create a pull request, or branch to push commits without creating a pull request.
+          example: pr
+        outputBranch:
+          type: string
+          description: Branch to push generated commits to. If omitted, the API may generate one.
+          example: repobird/auth-refresh
+        prTargetBranch:
+          type: string
+          description: Branch the pull request targets. Defaults to baseBranch when omitted.
+          example: main
+        outputBranchPolicy:
+          type: string
+          enum: [create, reuse]
+          default: create
+          description: Whether to create a fresh output branch or reuse an existing output branch.
+          example: create
         branchOnly:
           type: boolean
           default: false
-          description: Push commits to the target branch without creating a pull request. Successful runs return a branch URL instead of a pull request URL.
+          deprecated: true
+          description: Legacy alias for outputMode=branch. Successful runs return a branch URL instead of a pull request URL.
           example: true
         fileHash:
           type: string
@@ -381,6 +407,9 @@ components:
         repositoryName: acme/webapp
         runType: run
         prompt: Implement JWT authentication with refresh tokens
+        baseBranch: main
+        outputMode: pr
+        prTargetBranch: main
         title: Add authentication system
         fileHash: a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3
 
@@ -814,23 +843,26 @@ paths:
                   repositoryName: acme/webapp
                   prompt: Implement new feature
                   title: Add user dashboard
-                  sourceBranch: develop
-                  targetBranch: main
+                  baseBranch: develop
+                  outputBranch: repobird/user-dashboard
+                  prTargetBranch: main
               withSourceOnly:
                 summary: Run from a specific source branch
                 value:
                   repositoryName: acme/webapp
                   prompt: Refactor authentication module
                   title: Clean up auth code
-                  sourceBranch: feature/auth-refactor
+                  baseBranch: feature/auth-refactor
               branchOnly:
                 summary: Run without creating a pull request
                 value:
                   repositoryName: acme/webapp
                   prompt: Update generated docs
                   title: Refresh generated docs
-                  targetBranch: automation/generated-docs
-                  branchOnly: true
+                  baseBranch: main
+                  outputMode: branch
+                  outputBranch: automation/generated-docs
+                  outputBranchPolicy: reuse
               withHash:
                 summary: Run with file hash for tracking
                 value:

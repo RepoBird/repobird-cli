@@ -34,11 +34,16 @@ interface CreateRunRequest {
   
   // Optional fields
   title?: string;              // Title for the run (auto-generated if not provided, defaults to "No Title")
-  source?: string;             // Source branch to start from (default: repo's defaultBranch)
-  target?: string;             // Target branch for PR (default: repo's defaultBranch)
+  baseBranch?: string;         // Branch to start work from (default: repo's defaultBranch)
+  outputMode?: 'pr' | 'branch'; // 'pr' creates a pull request; 'branch' pushes commits without a PR
+  outputBranch?: string;       // Branch to push generated commits to
+  prTargetBranch?: string;     // PR target branch (defaults to baseBranch)
+  outputBranchPolicy?: 'create' | 'reuse'; // Whether to create or reuse outputBranch
+  source?: string;             // Legacy alias for baseBranch
+  target?: string;             // Legacy target alias; branch-only maps it to outputBranch
   issueNumber?: number;        // GitHub issue number to work on
   pullRequestNumber?: number;  // Existing PR to modify
-  branchOnly?: boolean;        // Push commits to a branch without creating a PR
+  branchOnly?: boolean;        // Legacy alias for outputMode='branch'
   
   // Agent configuration
   runType?: 'run' | 'plan' | 'basic' | 'pro'; // CLI presets use 'basic'/'pro'; legacy run/plan remain supported
@@ -70,8 +75,12 @@ interface RunResponse {
   // Execution details
   repoId: number;
   repository: string;         // Full repo name (owner/repo)
-  source: string;             // Branch started from
-  target: string;             // PR target branch
+  baseBranch?: string;        // Branch started from
+  outputMode?: 'pr' | 'branch';
+  outputBranch?: string;      // Branch generated commits were pushed to
+  prTargetBranch?: string;    // PR target branch
+  source?: string;            // Legacy branch started from
+  target?: string;            // Legacy target branch
   agent: 'opencode';          // Default cloud agent
   runType?: 'basic' | 'pro' | 'pro-plan';  // Run type returned by issue-run APIs
   

@@ -44,46 +44,56 @@ func (r RunID) String() string {
 
 // CreateRunRequest represents the API request to create a run
 type CreateRunRequest struct {
-	Prompt           string   `json:"prompt"`
-	RepositoryName   string   `json:"repositoryName"`
-	SourceBranch     string   `json:"sourceBranch"`
-	TargetBranch     string   `json:"targetBranch"`
-	RunType          string   `json:"runType"`
-	Agent            string   `json:"agent,omitempty"`
-	OpenCodeModel    string   `json:"opencodeModel,omitempty"`
-	OpenCodeProvider string   `json:"opencodeProvider,omitempty"`
-	Title            string   `json:"title,omitempty"`
-	Context          string   `json:"context,omitempty"`
-	Files            []string `json:"files,omitempty"`
-	BranchOnly       bool     `json:"branchOnly,omitempty"`
+	Prompt             string   `json:"prompt"`
+	RepositoryName     string   `json:"repositoryName"`
+	SourceBranch       string   `json:"sourceBranch,omitempty"`
+	TargetBranch       string   `json:"targetBranch,omitempty"`
+	BaseBranch         string   `json:"baseBranch,omitempty"`
+	OutputMode         string   `json:"outputMode,omitempty"`
+	OutputBranch       string   `json:"outputBranch,omitempty"`
+	PRTargetBranch     string   `json:"prTargetBranch,omitempty"`
+	OutputBranchPolicy string   `json:"outputBranchPolicy,omitempty"`
+	RunType            string   `json:"runType"`
+	Agent              string   `json:"agent,omitempty"`
+	OpenCodeModel      string   `json:"opencodeModel,omitempty"`
+	OpenCodeProvider   string   `json:"opencodeProvider,omitempty"`
+	Title              string   `json:"title,omitempty"`
+	Context            string   `json:"context,omitempty"`
+	Files              []string `json:"files,omitempty"`
+	BranchOnly         bool     `json:"branchOnly,omitempty"`
 }
 
 // RunResponse represents the API response for a run
 type RunResponse struct {
-	ID             RunID      `json:"id"`
-	Status         string     `json:"status"`
-	StatusMessage  string     `json:"statusMessage,omitempty"`
-	Prompt         string     `json:"prompt"`
-	RepositoryName string     `json:"repositoryName"`
-	SourceBranch   string     `json:"sourceBranch"`
-	TargetBranch   string     `json:"targetBranch"`
-	PullRequestURL string     `json:"prUrl,omitempty"`
-	RunType        string     `json:"runType"`
-	Title          string     `json:"title,omitempty"`
-	Context        string     `json:"context,omitempty"`
-	Files          []string   `json:"files,omitempty"`
-	UserID         int        `json:"userId"`
-	RepositoryID   int        `json:"repositoryId"`
-	CreatedAt      time.Time  `json:"createdAt"`
-	UpdatedAt      time.Time  `json:"updatedAt"`
-	CompletedAt    *time.Time `json:"completedAt,omitempty"`
-	Cost           float64    `json:"cost,omitempty"`
-	InputTokens    int        `json:"inputTokens,omitempty"`
-	OutputTokens   int        `json:"outputTokens,omitempty"`
-	FileCount      int        `json:"fileCount,omitempty"`
-	FilesChanged   []string   `json:"filesChanged,omitempty"`
-	Summary        string     `json:"summary,omitempty"`
-	Error          string     `json:"error,omitempty"`
+	ID                 RunID      `json:"id"`
+	Status             string     `json:"status"`
+	StatusMessage      string     `json:"statusMessage,omitempty"`
+	Prompt             string     `json:"prompt"`
+	RepositoryName     string     `json:"repositoryName"`
+	SourceBranch       string     `json:"sourceBranch"`
+	TargetBranch       string     `json:"targetBranch"`
+	BaseBranch         string     `json:"baseBranch,omitempty"`
+	OutputMode         string     `json:"outputMode,omitempty"`
+	OutputBranch       string     `json:"outputBranch,omitempty"`
+	PRTargetBranch     string     `json:"prTargetBranch,omitempty"`
+	OutputBranchPolicy string     `json:"outputBranchPolicy,omitempty"`
+	PullRequestURL     string     `json:"prUrl,omitempty"`
+	RunType            string     `json:"runType"`
+	Title              string     `json:"title,omitempty"`
+	Context            string     `json:"context,omitempty"`
+	Files              []string   `json:"files,omitempty"`
+	UserID             int        `json:"userId"`
+	RepositoryID       int        `json:"repositoryId"`
+	CreatedAt          time.Time  `json:"createdAt"`
+	UpdatedAt          time.Time  `json:"updatedAt"`
+	CompletedAt        *time.Time `json:"completedAt,omitempty"`
+	Cost               float64    `json:"cost,omitempty"`
+	InputTokens        int        `json:"inputTokens,omitempty"`
+	OutputTokens       int        `json:"outputTokens,omitempty"`
+	FileCount          int        `json:"fileCount,omitempty"`
+	FilesChanged       []string   `json:"filesChanged,omitempty"`
+	Summary            string     `json:"summary,omitempty"`
+	Error              string     `json:"error,omitempty"`
 }
 
 // CreateRunResponse represents the wrapped API response for create operations

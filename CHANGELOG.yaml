@@ -3,6 +3,8 @@ versions:
     unreleased:
         added:
             - Branch-only run submission is now available from the CLI with --branch-only/--no-pr and branchOnly config files.
+        changed:
+            - Run creation now supports baseBranch/outputMode/outputBranch/prTargetBranch/outputBranchPolicy while preserving source/target/branchOnly compatibility.
         internal:
             fixed:
                 - Made cache last-repository test ordering deterministic under race-enabled full-suite runs.

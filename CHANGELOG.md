@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Branch-only run submission is now available from the CLI with --branch-only/--no-pr and branchOnly config files.
 
+### Changed
+
+- Run creation now supports baseBranch/outputMode/outputBranch/prTargetBranch/outputBranchPolicy while preserving source/target/branchOnly compatibility.
+
 ## [0.4.0] - 2026-05-27
 
 ### Added

@@ -15,17 +15,22 @@ import (
 
 // YAMLConfig represents the structure of a YAML configuration file
 type YAMLConfig struct {
-	Prompt      string                 `yaml:"prompt" json:"prompt"`
-	Repository  string                 `yaml:"repository" json:"repository"`
-	Source      string                 `yaml:"source" json:"source"`
-	Target      string                 `yaml:"target" json:"target"`
-	RunType     string                 `yaml:"runType" json:"runType"`
-	Title       string                 `yaml:"title" json:"title"`
-	Context     string                 `yaml:"context" json:"context"`
-	Files       []string               `yaml:"files" json:"files"`
-	BranchOnly  bool                   `yaml:"branchOnly" json:"branchOnly"`
-	PullRequest *PullRequestConfig     `yaml:"pullRequest,omitempty" json:"pullRequest,omitempty"`
-	Metadata    map[string]interface{} `yaml:"metadata,omitempty" json:"metadata,omitempty"`
+	Prompt             string                 `yaml:"prompt" json:"prompt"`
+	Repository         string                 `yaml:"repository" json:"repository"`
+	Source             string                 `yaml:"source" json:"source"`
+	Target             string                 `yaml:"target" json:"target"`
+	BaseBranch         string                 `yaml:"baseBranch" json:"baseBranch"`
+	OutputMode         string                 `yaml:"outputMode" json:"outputMode"`
+	OutputBranch       string                 `yaml:"outputBranch" json:"outputBranch"`
+	PRTargetBranch     string                 `yaml:"prTargetBranch" json:"prTargetBranch"`
+	OutputBranchPolicy string                 `yaml:"outputBranchPolicy" json:"outputBranchPolicy"`
+	RunType            string                 `yaml:"runType" json:"runType"`
+	Title              string                 `yaml:"title" json:"title"`
+	Context            string                 `yaml:"context" json:"context"`
+	Files              []string               `yaml:"files" json:"files"`
+	BranchOnly         bool                   `yaml:"branchOnly" json:"branchOnly"`
+	PullRequest        *PullRequestConfig     `yaml:"pullRequest,omitempty" json:"pullRequest,omitempty"`
+	Metadata           map[string]interface{} `yaml:"metadata,omitempty" json:"metadata,omitempty"`
 }
 
 // ParseYAMLConfig reads and parses a YAML configuration file
@@ -93,6 +98,21 @@ func parseYAMLWithUnknownFieldsAndPrompts(data []byte) (*models.RunConfig, *prom
 	if target, ok := genericMap["target"].(string); ok {
 		config.Target = target
 	}
+	if baseBranch, ok := genericMap["baseBranch"].(string); ok {
+		config.BaseBranch = baseBranch
+	}
+	if outputMode, ok := genericMap["outputMode"].(string); ok {
+		config.OutputMode = outputMode
+	}
+	if outputBranch, ok := genericMap["outputBranch"].(string); ok {
+		config.OutputBranch = outputBranch
+	}
+	if prTargetBranch, ok := genericMap["prTargetBranch"].(string); ok {
+		config.PRTargetBranch = prTargetBranch
+	}
+	if outputBranchPolicy, ok := genericMap["outputBranchPolicy"].(string); ok {
+		config.OutputBranchPolicy = outputBranchPolicy
+	}
 	if runType, ok := genericMap["runType"].(string); ok {
 		config.RunType = runType
 	}
@@ -149,15 +169,20 @@ func parseYAMLWithUnknownFieldsAndPrompts(data []byte) (*models.RunConfig, *prom
 
 	// Convert to RunConfig (only supported fields are included)
 	runConfig := &models.RunConfig{
-		Prompt:     config.Prompt,
-		Repository: config.Repository,
-		Source:     config.Source,
-		Target:     config.Target,
-		RunType:    config.RunType,
-		Title:      config.Title,
-		Context:    config.Context,
-		Files:      config.Files,
-		BranchOnly: config.BranchOnly,
+		Prompt:             config.Prompt,
+		Repository:         config.Repository,
+		Source:             config.Source,
+		Target:             config.Target,
+		BaseBranch:         config.BaseBranch,
+		OutputMode:         config.OutputMode,
+		OutputBranch:       config.OutputBranch,
+		PRTargetBranch:     config.PRTargetBranch,
+		OutputBranchPolicy: config.OutputBranchPolicy,
+		RunType:            config.RunType,
+		Title:              config.Title,
+		Context:            config.Context,
+		Files:              config.Files,
+		BranchOnly:         config.BranchOnly,
 	}
 
 	// Return the config and prompts (but no validation error prompts)
@@ -174,22 +199,28 @@ func findUnsupportedYAMLFields(data map[string]interface{}) []string {
 // findUnsupportedYAMLFieldsWithSuggestions identifies fields and returns suggestions
 func findUnsupportedYAMLFieldsWithSuggestions(data map[string]interface{}) ([]string, map[string]string) {
 	supportedFields := map[string]bool{
-		"prompt":      true,
-		"repository":  true,
-		"source":      true,
-		"target":      true,
-		"runType":     true,
-		"title":       true,
-		"context":     true,
-		"files":       true,
-		"branchOnly":  true,
-		"pullRequest": true,
-		"metadata":    true,
+		"prompt":             true,
+		"repository":         true,
+		"source":             true,
+		"target":             true,
+		"baseBranch":         true,
+		"outputMode":         true,
+		"outputBranch":       true,
+		"prTargetBranch":     true,
+		"outputBranchPolicy": true,
+		"runType":            true,
+		"title":              true,
+		"context":            true,
+		"files":              true,
+		"branchOnly":         true,
+		"pullRequest":        true,
+		"metadata":           true,
 	}
 
 	supportedFieldsList := []string{
-		"prompt", "repository", "source", "target", "runType",
-		"title", "context", "files", "branchOnly", "pullRequest", "metadata",
+		"prompt", "repository", "source", "target", "baseBranch",
+		"outputMode", "outputBranch", "prTargetBranch", "outputBranchPolicy",
+		"runType", "title", "context", "files", "branchOnly", "pullRequest", "metadata",
 	}
 
 	var unsupported []string
@@ -213,15 +244,20 @@ func findUnsupportedYAMLFieldsWithSuggestions(data map[string]interface{}) ([]st
 func validateYAMLConfigForPrompts(config *YAMLConfig) error {
 	// Convert to RunConfig for validation
 	runConfig := &models.RunConfig{
-		Prompt:     config.Prompt,
-		Repository: config.Repository,
-		Source:     config.Source,
-		Target:     config.Target,
-		RunType:    config.RunType,
-		Title:      config.Title,
-		Context:    config.Context,
-		Files:      config.Files,
-		BranchOnly: config.BranchOnly,
+		Prompt:             config.Prompt,
+		Repository:         config.Repository,
+		Source:             config.Source,
+		Target:             config.Target,
+		BaseBranch:         config.BaseBranch,
+		OutputMode:         config.OutputMode,
+		OutputBranch:       config.OutputBranch,
+		PRTargetBranch:     config.PRTargetBranch,
+		OutputBranchPolicy: config.OutputBranchPolicy,
+		RunType:            config.RunType,
+		Title:              config.Title,
+		Context:            config.Context,
+		Files:              config.Files,
+		BranchOnly:         config.BranchOnly,
 	}
 
 	// Apply defaults first

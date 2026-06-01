@@ -110,6 +110,20 @@ Content`,
 			errorContains: "invalid runType",
 		},
 		{
+			name: "branchOnly conflicts with PR output mode",
+			input: `---
+prompt: "Fix bug"
+repository: "acme/webapp"
+outputMode: "pr"
+branchOnly: true
+title: "Fix bug"
+---
+
+Content`,
+			wantErr:       true,
+			errorContains: "branchOnly cannot be true",
+		},
+		{
 			name: "does not default source when not specified",
 			input: `---
 prompt: "Fix bug"

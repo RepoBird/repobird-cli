@@ -138,16 +138,20 @@ func TestRunID_UnmarshalJSON(t *testing.T) {
 
 func TestCreateRunRequest_JSONFields(t *testing.T) {
 	req := CreateRunRequest{
-		Prompt:         "Fix the bug",
-		RepositoryName: "test/repo",
-		SourceBranch:   "main",
-		TargetBranch:   "fix/bug",
-		RunType:        "run",
-		Agent:          "opencode",
-		BranchOnly:     true,
-		Title:          "Bug Fix",
-		Context:        "Users report issues",
-		Files:          []string{"file1.go", "file2.go"},
+		Prompt:             "Fix the bug",
+		RepositoryName:     "test/repo",
+		SourceBranch:       "main",
+		TargetBranch:       "fix/bug",
+		BaseBranch:         "main",
+		OutputMode:         "branch",
+		OutputBranch:       "fix/bug",
+		OutputBranchPolicy: "reuse",
+		RunType:            "run",
+		Agent:              "opencode",
+		BranchOnly:         true,
+		Title:              "Bug Fix",
+		Context:            "Users report issues",
+		Files:              []string{"file1.go", "file2.go"},
 	}
 
 	// Marshal to JSON
@@ -164,6 +168,10 @@ func TestCreateRunRequest_JSONFields(t *testing.T) {
 	assert.Equal(t, "test/repo", result["repositoryName"])
 	assert.Equal(t, "main", result["sourceBranch"])
 	assert.Equal(t, "fix/bug", result["targetBranch"])
+	assert.Equal(t, "main", result["baseBranch"])
+	assert.Equal(t, "branch", result["outputMode"])
+	assert.Equal(t, "fix/bug", result["outputBranch"])
+	assert.Equal(t, "reuse", result["outputBranchPolicy"])
 	assert.Equal(t, "run", result["runType"])
 	assert.Equal(t, "opencode", result["agent"])
 	assert.Equal(t, true, result["branchOnly"])

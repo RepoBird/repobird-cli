@@ -29,18 +29,23 @@ import (
 )
 
 var (
-	dryRun      bool
-	follow      bool
-	repo        string
-	prompt      string
-	source      string
-	target      string
-	title       string
-	runType     string
-	contextFlag string
-	basicRun    bool
-	proRun      bool
-	branchOnly  bool
+	dryRun             bool
+	follow             bool
+	repo               string
+	prompt             string
+	source             string
+	target             string
+	baseBranch         string
+	outputMode         string
+	outputBranch       string
+	prTargetBranch     string
+	outputBranchPolicy string
+	title              string
+	runType            string
+	contextFlag        string
+	basicRun           bool
+	proRun             bool
+	branchOnly         bool
 )
 
 type runPreset struct {
@@ -115,8 +120,13 @@ func init() {
 	// Flags for direct run creation
 	runCmd.Flags().StringVarP(&repo, "repo", "r", "", "repository name (owner/repo or numeric ID)")
 	runCmd.Flags().StringVarP(&prompt, "prompt", "p", "", "prompt for the run (use @file to read from file, - for stdin)")
-	runCmd.Flags().StringVar(&source, "source", "", "source branch (optional)")
-	runCmd.Flags().StringVar(&target, "target", "", "target branch (optional)")
+	runCmd.Flags().StringVar(&source, "source", "", "legacy alias for --base-branch")
+	runCmd.Flags().StringVar(&target, "target", "", "legacy target branch alias")
+	runCmd.Flags().StringVar(&baseBranch, "base-branch", "", "base branch to start work from (optional)")
+	runCmd.Flags().StringVar(&outputMode, "output-mode", "", "output mode: 'pr' or 'branch' (optional, default: pr)")
+	runCmd.Flags().StringVar(&outputBranch, "output-branch", "", "branch to push generated commits to (optional)")
+	runCmd.Flags().StringVar(&prTargetBranch, "pr-target-branch", "", "branch the pull request targets (optional)")
+	runCmd.Flags().StringVar(&outputBranchPolicy, "output-branch-policy", "", "output branch policy: 'create' or 'reuse' (optional)")
 	runCmd.Flags().StringVar(&title, "title", "", "title for the run (optional)")
 	runCmd.Flags().StringVar(&runType, "run-type", "", "type of run: 'run' or 'plan' (optional, default: run)")
 	runCmd.Flags().BoolVar(&basicRun, "basic", false, "use the Basic cloud agent preset")
@@ -171,14 +181,19 @@ func runCommandWithPreset(cmd *cobra.Command, args []string, presetName string) 
 
 		// Create run from flags
 		runConfig := &models.RunConfig{
-			Repository: repo,
-			Prompt:     processedPrompt,
-			Source:     source,
-			Target:     target,
-			Title:      title,
-			RunType:    selectedRunType(selectedPreset),
-			Context:    processedContext,
-			BranchOnly: branchOnly,
+			Repository:         repo,
+			Prompt:             processedPrompt,
+			Source:             source,
+			Target:             target,
+			BaseBranch:         baseBranch,
+			OutputMode:         outputMode,
+			OutputBranch:       outputBranch,
+			PRTargetBranch:     prTargetBranch,
+			OutputBranchPolicy: outputBranchPolicy,
+			Title:              title,
+			RunType:            selectedRunType(selectedPreset),
+			Context:            processedContext,
+			BranchOnly:         branchOnly,
 		}
 
 		// Set default run type if not specified
@@ -296,6 +311,8 @@ func processSingleRun(runConfig *models.RunConfig, additionalContext string) err
 		}
 	}
 
+	runConfig.NormalizeBranchOutput()
+
 	// Validate the configuration
 	if err := utils.ValidateRunConfig(runConfig); err != nil {
 		return fmt.Errorf("validation failed: %w", err)
@@ -303,18 +320,23 @@ func processSingleRun(runConfig *models.RunConfig, additionalContext string) err
 
 	// Convert to domain request
 	createReq := domain.CreateRunRequest{
-		Prompt:           runConfig.Prompt,
-		RepositoryName:   runConfig.Repository,
-		SourceBranch:     runConfig.Source,
-		TargetBranch:     runConfig.Target,
-		RunType:          runConfig.RunType,
-		Agent:            "opencode",
-		OpenCodeModel:    modelForRunType(runConfig.RunType),
-		OpenCodeProvider: providerForRunType(runConfig.RunType),
-		Title:            runConfig.Title,
-		Context:          runConfig.Context,
-		Files:            runConfig.Files,
-		BranchOnly:       runConfig.BranchOnly,
+		Prompt:             runConfig.Prompt,
+		RepositoryName:     runConfig.Repository,
+		SourceBranch:       runConfig.Source,
+		TargetBranch:       runConfig.Target,
+		BaseBranch:         runConfig.BaseBranch,
+		OutputMode:         runConfig.OutputMode,
+		OutputBranch:       runConfig.OutputBranch,
+		PRTargetBranch:     runConfig.PRTargetBranch,
+		OutputBranchPolicy: runConfig.OutputBranchPolicy,
+		RunType:            runConfig.RunType,
+		Agent:              "opencode",
+		OpenCodeModel:      modelForRunType(runConfig.RunType),
+		OpenCodeProvider:   providerForRunType(runConfig.RunType),
+		Title:              runConfig.Title,
+		Context:            runConfig.Context,
+		Files:              runConfig.Files,
+		BranchOnly:         runConfig.BranchOnly,
 	}
 
 	// Append additional markdown context if present
@@ -382,8 +404,13 @@ func newRunPresetCommand(presetName string) *cobra.Command {
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "validate input without creating a run")
 	cmd.Flags().BoolVar(&follow, "follow", false, "follow the run status after creation")
 	cmd.Flags().StringVarP(&repo, "repo", "r", "", "repository name (owner/repo or numeric ID)")
-	cmd.Flags().StringVar(&source, "source", "", "source branch (optional)")
-	cmd.Flags().StringVar(&target, "target", "", "target branch (optional)")
+	cmd.Flags().StringVar(&source, "source", "", "legacy alias for --base-branch")
+	cmd.Flags().StringVar(&target, "target", "", "legacy target branch alias")
+	cmd.Flags().StringVar(&baseBranch, "base-branch", "", "base branch to start work from (optional)")
+	cmd.Flags().StringVar(&outputMode, "output-mode", "", "output mode: 'pr' or 'branch' (optional, default: pr)")
+	cmd.Flags().StringVar(&outputBranch, "output-branch", "", "branch to push generated commits to (optional)")
+	cmd.Flags().StringVar(&prTargetBranch, "pr-target-branch", "", "branch the pull request targets (optional)")
+	cmd.Flags().StringVar(&outputBranchPolicy, "output-branch-policy", "", "output branch policy: 'create' or 'reuse' (optional)")
 	cmd.Flags().StringVar(&title, "title", "", "title for the run (optional)")
 	cmd.Flags().BoolVar(&branchOnly, "branch-only", false, "push commits to a branch without creating a pull request")
 	cmd.Flags().BoolVar(&branchOnly, "no-pr", false, "alias for --branch-only")
