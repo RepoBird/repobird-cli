@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Stabilize main GitHub CI by installing Linux clipboard dependencies, using GoReleaser v2 for config checks, and correcting generated package asset paths.
+
 ## [0.5.0] - 2026-06-01
 
 ### Added

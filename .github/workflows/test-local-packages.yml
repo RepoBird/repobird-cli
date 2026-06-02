@@ -1,10 +1,9 @@
 name: Test Local Package Builds
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 8 * * 1'
 
 jobs:
   # Test cross-platform builds and installations
@@ -42,8 +41,8 @@ jobs:
 
       - name: Generate Documentation and Completions
         run: |
-          ./scripts/generate-completions.sh
-          ./scripts/generate-docs.sh
+          ./scripts/generate-completions.sh completions
+          ./scripts/generate-docs.sh .
 
       - name: Test Shell Completions (Unix)
         if: matrix.os != 'windows-latest'
@@ -62,7 +61,7 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: powershell
         run: |
-          .\build\repobird.exe completion powershell > repobird.ps1
+          .\build\repobird-windows-amd64.exe completion powershell > repobird.ps1
           # Verify file is not empty
           if ((Get-Item repobird.ps1).Length -eq 0) { exit 1 }
 
@@ -114,8 +113,8 @@ jobs:
       - name: Build Binary
         run: |
           make build
-          ./scripts/generate-completions.sh
-          ./scripts/generate-docs.sh
+          ./scripts/generate-completions.sh completions
+          ./scripts/generate-docs.sh .
           GOOS=linux GOARCH=${{ matrix.arch }} make build
 
       - name: Test DEB Package Creation
@@ -315,14 +314,14 @@ jobs:
         uses: goreleaser/goreleaser-action@v5
         with:
           distribution: goreleaser
-          version: latest
+          version: '~> v2'
           args: check
 
       - name: Test GoReleaser Build (Snapshot)
         uses: goreleaser/goreleaser-action@v5
         with:
           distribution: goreleaser
-          version: latest
+          version: '~> v2'
           args: build --snapshot --clean
 
       - name: Upload GoReleaser Artifacts

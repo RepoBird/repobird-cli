@@ -1,6 +1,8 @@
 project: RepoBird CLI
 versions:
-    unreleased: {}
+    unreleased:
+        fixed:
+            - Stabilize main GitHub CI by installing Linux clipboard dependencies, using GoReleaser v2 for config checks, and correcting generated package asset paths.
     0.5.0:
         date: 2026-06-01
         added:

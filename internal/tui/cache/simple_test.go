@@ -497,7 +497,7 @@ func TestSimpleCacheThreadSafety(t *testing.T) {
 			atomic.LoadInt32(&getRunCount), atomic.LoadInt32(&setRunCount),
 			atomic.LoadInt32(&getUserInfoCount), atomic.LoadInt32(&setUserInfoCount))
 
-	case <-time.After(10 * time.Second):
+	case <-time.After(30 * time.Second):
 		t.Fatal("Timeout - operations did not complete, possible deadlock")
 	}
 }

@@ -48,8 +48,10 @@ func InitClipboard() error {
 	err := clipboard.Init()
 	if err == nil {
 		cgoAvailable = true
-		clipboardInitialized = true
+	} else {
+		cgoAvailable = false
 	}
+	clipboardInitialized = true
 	return nil
 }
 

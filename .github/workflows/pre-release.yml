@@ -22,8 +22,16 @@ jobs:
         with:
           go-version-file: 'go.mod'
 
+      - name: Install Linux test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libx11-dev
+
       - name: Run tests
         run: make test
+
+      - name: Install golangci-lint
+        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.4
 
       - name: Run linter
         run: make lint
@@ -34,14 +42,14 @@ jobs:
       - name: Generate completions and docs
         run: |
           mkdir -p completions man docs/cli
-          ./scripts/generate-completions.sh
-          ./scripts/generate-docs.sh
+          ./scripts/generate-completions.sh completions
+          ./scripts/generate-docs.sh .
 
       - name: Test GoReleaser config
         uses: goreleaser/goreleaser-action@v5
         with:
           distribution: goreleaser
-          version: latest
+          version: '~> v2'
           args: check
 
   test-cross-compile:
@@ -90,8 +98,8 @@ jobs:
       - name: Test DEB package creation
         run: |
           make build
-          ./scripts/generate-completions.sh
-          ./scripts/generate-docs.sh
+          ./scripts/generate-completions.sh completions
+          ./scripts/generate-docs.sh .
           
           # Create test DEB package structure
           mkdir -p test-deb/DEBIAN
