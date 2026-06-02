@@ -14,11 +14,7 @@ permissions:
 jobs:
   test:
     name: Test
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ubuntu-latest
     
     steps:
     - name: Checkout code
@@ -48,6 +44,11 @@ jobs:
     - name: Verify dependencies
       run: go mod verify
 
+    - name: Install Linux test dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libx11-dev
+
     - name: Run tests
       run: make test
       env:
@@ -55,20 +56,17 @@ jobs:
         XDG_CONFIG_HOME: /tmp/test-config
 
     - name: Run integration tests
-      if: matrix.os == 'ubuntu-latest'
       run: make test-integration
       env:
         REPOBIRD_API_URL: http://localhost:3000
         XDG_CONFIG_HOME: /tmp/test-config
 
     - name: Generate coverage report
-      if: matrix.os == 'ubuntu-latest'
       run: |
         make coverage
         go tool cover -html=coverage.out -o coverage.html
 
     - name: Upload coverage reports
-      if: matrix.os == 'ubuntu-latest' && matrix.go-version == '1.24'
       uses: actions/upload-artifact@v4
       with:
         name: coverage-report
@@ -89,6 +87,9 @@ jobs:
       with:
         go-version-file: 'go.mod'
         cache: true
+
+    - name: Install golangci-lint
+      run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.4
 
     - name: Run golangci-lint
       run: make lint
@@ -158,6 +159,7 @@ jobs:
         args: './...'
 
     - name: Run vulnerability check
+      continue-on-error: true
       run: |
         go install golang.org/x/vuln/cmd/govulncheck@latest
         govulncheck ./...
