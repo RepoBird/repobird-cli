@@ -273,6 +273,7 @@ Main branch: `main`
 - GitHub (`gh`) is release-facing only: keep only `main` and release tags there.
 - Never push `dev` or `develop` to GitHub. If either branch exists on the GitHub remote, delete only that GitHub remote branch and leave GitLab untouched.
 - GitHub Actions push triggers should target `main` only unless a release tag workflow explicitly requires tags.
+- Before creating or pushing a release tag, verify the latest `main` GitHub CI gates are green. Do not publish a release from an unvalidated `main`.
 
 ## Final Checklist for Significant Changes
 When completing major features:

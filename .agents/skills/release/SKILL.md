@@ -148,11 +148,21 @@ make build
 chlog check
 git ls-tree -r --name-only HEAD -- .agents
 git push glab main
+git push gh main
 ```
 
 Do not proceed if `.agents/` appears in the staged merge diff or in `HEAD` on `main` after the guard commands. Fix the merge before pushing.
 
 If CI fails after pushing `main`, inspect logs and fix on `dev`, then merge forward again. Avoid direct `main` hotfixes unless explicitly requested.
+
+Before creating or pushing a release tag, verify the latest GitHub `main` CI gates are green:
+
+```bash
+gh run list --branch main --limit 10
+gh run watch <run-id> --exit-status
+```
+
+Do not publish a release from an unvalidated `main`.
 
 ## Tag And Publish
 
@@ -165,10 +175,9 @@ git tag -a vX.Y.Z -m "Release vX.Y.Z"
 git push glab vX.Y.Z
 ```
 
-Push only the same `main` commit and tag to GitHub so GitHub Actions can publish:
+Push only the same tag to GitHub so GitHub Actions can publish:
 
 ```bash
-git push gh main
 git push gh vX.Y.Z
 ```
 
