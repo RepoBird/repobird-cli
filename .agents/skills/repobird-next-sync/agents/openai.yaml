@@ -1,0 +1,7 @@
+interface:
+  display_name: "RepoBird Next Sync"
+  short_description: "Sync CLI API work with repobird-next"
+  default_prompt: "Use $repobird-next-sync to compare RepoBird CLI API integration changes against ../repobird-next."
+
+policy:
+  allow_implicit_invocation: true
