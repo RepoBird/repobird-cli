@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -55,6 +56,107 @@ func TestNewClient(t *testing.T) {
 				t.Errorf("expected debug %v, got %v", tt.debug, client.debug)
 			}
 		})
+	}
+}
+
+func TestGetRepositorySupportsBranchDefaults(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/repositories/repo_123" {
+			t.Errorf("expected path /api/v1/repositories/repo_123, got %s", r.URL.Path)
+		}
+		if r.Method != httpMethodGET {
+			t.Errorf("expected GET, got %s", r.Method)
+		}
+
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"id":                    1,
+			"name":                  "RepoBird CLI",
+			"repoName":              "repobird-cli",
+			"repoOwner":             "RepoBird",
+			"defaultBranch":         "main",
+			"defaultBaseBranch":     "develop",
+			"defaultPrTargetBranch": "release",
+			"defaultOutputBranch":   "automation/repobird",
+		})
+	}))
+	defer server.Close()
+
+	client := NewClient("test-key", server.URL, false)
+	repo, err := client.GetRepository("repo_123")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if repo.FullName() != "RepoBird/repobird-cli" {
+		t.Errorf("expected full name RepoBird/repobird-cli, got %s", repo.FullName())
+	}
+	if repo.DefaultBaseBranch == nil || *repo.DefaultBaseBranch != "develop" {
+		t.Fatalf("expected default base branch develop, got %#v", repo.DefaultBaseBranch)
+	}
+	if repo.DefaultPRTargetBranch == nil || *repo.DefaultPRTargetBranch != "release" {
+		t.Fatalf("expected default PR target branch release, got %#v", repo.DefaultPRTargetBranch)
+	}
+	if repo.DefaultOutputBranch == nil || *repo.DefaultOutputBranch != "automation/repobird" {
+		t.Fatalf("expected default output branch automation/repobird, got %#v", repo.DefaultOutputBranch)
+	}
+}
+
+func TestUpdateRepositoryDefaultsSendsSetAndClearPayload(t *testing.T) {
+	var requestBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/repositories/42" {
+			t.Errorf("expected path /api/v1/repositories/42, got %s", r.URL.Path)
+		}
+		if r.Method != http.MethodPut {
+			t.Errorf("expected PUT, got %s", r.Method)
+		}
+		if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
+			t.Fatalf("failed to decode request: %v", err)
+		}
+
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"id":                    42,
+			"name":                  "webapp",
+			"repoName":              "webapp",
+			"repoOwner":             "acme",
+			"defaultBranch":         "main",
+			"defaultBaseBranch":     "develop",
+			"defaultPrTargetBranch": nil,
+			"defaultOutputBranch":   nil,
+		})
+	}))
+	defer server.Close()
+
+	baseBranch := "develop"
+	client := NewClient("test-key", server.URL, false)
+	_, err := client.UpdateRepositoryDefaults("42", models.RepositoryDefaultsUpdate{
+		DefaultBaseBranch:        &baseBranch,
+		ClearDefaultPRTarget:     true,
+		ClearDefaultOutputBranch: true,
+		ClearDefaultBaseBranch:   false,
+		DefaultPRTargetBranch:    nil,
+		DefaultOutputBranch:      nil,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if got := requestBody["defaultBaseBranch"]; got != "develop" {
+		t.Errorf("expected defaultBaseBranch develop, got %#v", got)
+	}
+	if got, ok := requestBody["defaultPrTargetBranch"]; !ok || got != nil {
+		t.Errorf("expected defaultPrTargetBranch null, got %#v (present=%v)", got, ok)
+	}
+	if got, ok := requestBody["defaultOutputBranch"]; !ok || got != nil {
+		t.Errorf("expected defaultOutputBranch null, got %#v (present=%v)", got, ok)
+	}
+}
+
+func TestUpdateRepositoryDefaultsRequiresAChange(t *testing.T) {
+	client := NewClient("test-key", "https://example.test", false)
+	_, err := client.UpdateRepositoryDefaults("42", models.RepositoryDefaultsUpdate{})
+	if err == nil || !strings.Contains(err.Error(), "at least one repository default") {
+		t.Fatalf("expected missing change error, got %v", err)
 	}
 }
 

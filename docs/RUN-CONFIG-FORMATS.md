@@ -25,12 +25,18 @@ The `repobird run` command supports multiple configuration file formats to defin
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `target` | string | auto-generated | Target branch name for the changes |
+| `baseBranch` | string | repository default branch | Branch to start work from |
+| `outputMode` | string | `pr` | Output mode: `pr` to create a pull request, `branch` to push without a PR |
+| `outputBranch` | string | auto-generated | Branch to push generated commits to |
+| `prTargetBranch` | string | `baseBranch` | Branch the pull request targets when `outputMode` is `pr` |
+| `outputBranchPolicy` | string | `create` | Output branch policy: `create` or `reuse` |
 | `title` | string | auto-generated | Human-readable title for the run |
-| `source` | string | `main` | Source branch to work from |
+| `source` | string | repository default branch | Legacy alias for `baseBranch` |
+| `target` | string | auto-generated | Legacy alias; in branch-only runs it maps to `outputBranch` |
 | `runType` | string | `run` | Type of run: `run` or `plan` |
 | `context` | string | - | Additional context or instructions for the AI |
 | `files` | array | - | List of specific files to include in the context |
+| `branchOnly` | boolean | `false` | Legacy alias for `outputMode: branch` |
 
 ## Format Examples
 
@@ -59,11 +65,15 @@ repobird run -r myorg/webapp -p @task.txt
 # Read prompt from stdin
 echo "Fix the login bug" | repobird run -r myorg/webapp -p -
 
+# Push commits to an output branch without opening a PR
+repobird run -r myorg/webapp -p "Update generated docs" --output-branch automation/docs --branch-only
+
 # With additional options
 repobird run --repo myorg/webapp \
   --prompt "Fix the login bug where users cannot authenticate after 5 failed attempts" \
-  --source main \
-  --target fix/login-rate-limit \
+  --base-branch main \
+  --output-branch fix/login-rate-limit \
+  --pr-target-branch main \
   --title "Fix authentication rate limiting issue" \
   --context "Users report being permanently locked out. Should reset after 15 minutes." \
   --follow
@@ -84,12 +94,18 @@ repobird run -r myorg/webapp -p "Add unit tests for auth module" --follow
   - Use `@filename` to read from a file
   - Use `-` to read from stdin
   - Use `@@` to escape a literal `@` at the beginning
-- `--source` - Source branch (optional, defaults to repository's default branch)
-- `--target` - Target branch (optional, auto-generated if not specified)
+- `--base-branch` - Branch to start work from (optional, defaults to repository's default branch)
+- `--output-mode` - Output mode: `pr` or `branch` (optional, defaults to `pr`)
+- `--output-branch` - Branch to push generated commits to (optional, auto-generated if not specified)
+- `--pr-target-branch` - Branch the pull request targets (optional, defaults to `baseBranch`)
+- `--output-branch-policy` - Output branch policy: `create` or `reuse` (optional, defaults to `create`)
+- `--source` - Legacy alias for `--base-branch`
+- `--target` - Legacy target alias; with `--branch-only`, maps to `--output-branch`
 - `--title` - Human-readable title (optional, auto-generated if not specified)
 - `--run-type` - Type of run: 'run' or 'plan' (optional, defaults to 'run')
 - `--basic` - Use the Basic cloud-agent preset (DeepSeek V4 Flash)
 - `--pro` - Use the Pro cloud-agent preset (Kimi K2.6)
+- `--branch-only`, `--no-pr` - Push commits to the output branch without creating a PR
 - `--context` - Additional context (optional, also supports `@filename` and `-`)
 - `--follow` - Follow the run status after creation
 - `--dry-run` - Validate without creating the run
@@ -102,8 +118,11 @@ Create a file `task.json`:
 {
   "prompt": "Fix the login bug where users cannot authenticate after 5 failed attempts",
   "repository": "myorg/webapp",
-  "source": "main",
-  "target": "fix/login-rate-limit",
+  "baseBranch": "main",
+  "outputMode": "pr",
+  "outputBranch": "fix/login-rate-limit",
+  "prTargetBranch": "main",
+  "outputBranchPolicy": "create",
   "title": "Fix authentication rate limiting issue",
   "runType": "run",
   "context": "Users report being permanently locked out after 5 failed login attempts. The rate limiting should reset after 15 minutes.",
@@ -129,8 +148,11 @@ Create a file `task.yaml`:
 ```yaml
 prompt: Fix the login bug where users cannot authenticate after 5 failed attempts
 repository: myorg/webapp
-source: main
-target: fix/login-rate-limit
+baseBranch: main
+outputMode: pr
+outputBranch: fix/login-rate-limit
+prTargetBranch: main
+outputBranchPolicy: create
 title: Fix authentication rate limiting issue
 runType: run
 context: |
@@ -155,8 +177,10 @@ Create a file `task.md`:
 ---
 prompt: Fix the login bug where users cannot authenticate after 5 failed attempts
 repository: myorg/webapp
-source: main
-target: fix/login-rate-limit
+baseBranch: main
+outputMode: pr
+outputBranch: fix/login-rate-limit
+prTargetBranch: main
 title: Fix authentication rate limiting issue
 runType: run
 files:

@@ -112,6 +112,9 @@ repobird run -r your-org/your-repo -p "Fix the login bug where users get stuck o
 repobird basic -r your-org/your-repo "Fix a small bug"  # DeepSeek V4 Flash
 repobird pro -r your-org/your-repo "Implement OAuth"    # Kimi K2.6
 
+# Push commits to an output branch without opening a PR
+repobird run -r your-org/your-repo -p "Update generated docs" --output-branch automation/docs --branch-only
+
 # Inside a git repo with an origin remote, the repo can be auto-detected
 repobird pro "Fix the login bug where users get stuck on loading screen"
 
@@ -178,6 +181,18 @@ repobird status --follow RUN_ID # Live updates
 
 # Interactive dashboard
 repobird tui                    # Launch terminal UI
+```
+
+### Repository Defaults
+
+When repository branch defaults are enabled on the API, the CLI can inspect and update persisted defaults. Per-run flags such as `--base-branch`, `--pr-target-branch`, `--output-branch`, and `--branch-only` still override repository defaults.
+
+```bash
+repobird repo list
+repobird repo show repo_123
+repobird repo defaults repo_123 --base develop --pr-target release
+repobird repo defaults repo_123 --clear-base --clear-pr-target
+repobird repo defaults repo_123 --clear-output  # branch-only runs generate an output branch
 ```
 
 ### Terminal UI Navigation

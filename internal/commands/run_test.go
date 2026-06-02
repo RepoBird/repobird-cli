@@ -121,6 +121,11 @@ func TestRunCommand_WithFlags(t *testing.T) {
 				prompt = ""
 				source = ""
 				target = ""
+				baseBranch = ""
+				outputMode = ""
+				outputBranch = ""
+				prTargetBranch = ""
+				outputBranchPolicy = ""
 				title = ""
 				runType = ""
 				contextFlag = ""
@@ -253,6 +258,11 @@ func TestRunCommand_ValidationWithFlags(t *testing.T) {
 				prompt = ""
 				source = ""
 				target = ""
+				baseBranch = ""
+				outputMode = ""
+				outputBranch = ""
+				prTargetBranch = ""
+				outputBranchPolicy = ""
 				title = ""
 				runType = ""
 				contextFlag = ""
@@ -304,6 +314,249 @@ func TestRunCommand_ValidationWithFlags(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRunCommand_BranchOnlyFlag(t *testing.T) {
+	ensureRunTestConfig()
+	originalAPIKey := cfg.APIKey
+	cfg.APIKey = "test-key"
+	defer func() {
+		cfg.APIKey = originalAPIKey
+		repo = ""
+		prompt = ""
+		source = ""
+		target = ""
+		baseBranch = ""
+		outputMode = ""
+		outputBranch = ""
+		prTargetBranch = ""
+		outputBranchPolicy = ""
+		title = ""
+		runType = ""
+		contextFlag = ""
+		branchOnly = false
+		dryRun = false
+	}()
+
+	err := runCmd.ParseFlags([]string{
+		"-r", "owner/repo",
+		"-p", "Push commits to a branch",
+		"--target", "automation/maintenance",
+		"--branch-only",
+		"--dry-run",
+	})
+	require.NoError(t, err)
+
+	old := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	cmdErr := runCommand(runCmd, []string{})
+
+	w.Close()
+	os.Stdout = old
+
+	var buf bytes.Buffer
+	buf.ReadFrom(r)
+	output := buf.String()
+
+	require.NoError(t, cmdErr)
+	assert.Contains(t, output, "Validation successful")
+
+	jsonStart := strings.Index(output, "{")
+	jsonEnd := strings.LastIndex(output, "}") + 1
+	require.True(t, jsonStart >= 0 && jsonEnd > jsonStart, "JSON output not found")
+
+	var result map[string]interface{}
+	err = json.Unmarshal([]byte(output[jsonStart:jsonEnd]), &result)
+	require.NoError(t, err)
+	assert.Equal(t, true, result["BranchOnly"])
+	assert.Equal(t, "branch", result["OutputMode"])
+	assert.Equal(t, "automation/maintenance", result["OutputBranch"])
+}
+
+func TestRunCommand_BranchOutputFields(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     []string
+		expected map[string]interface{}
+	}{
+		{
+			name: "PR mode defaults target to base branch",
+			args: []string{
+				"-r", "owner/repo",
+				"-p", "Open a PR",
+				"--base-branch", "main",
+				"--dry-run",
+			},
+			expected: map[string]interface{}{
+				"BaseBranch":     "main",
+				"OutputMode":     "pr",
+				"PRTargetBranch": "main",
+			},
+		},
+		{
+			name: "branch-only maps legacy target to output branch",
+			args: []string{
+				"-r", "owner/repo",
+				"-p", "Push without PR",
+				"--source", "main",
+				"--target", "automation/docs",
+				"--branch-only",
+				"--dry-run",
+			},
+			expected: map[string]interface{}{
+				"BaseBranch":   "main",
+				"OutputMode":   "branch",
+				"OutputBranch": "automation/docs",
+				"BranchOnly":   true,
+			},
+		},
+		{
+			name: "explicit reuse policy is preserved",
+			args: []string{
+				"-r", "owner/repo",
+				"-p", "Reuse branch",
+				"--base-branch", "main",
+				"--output-mode", "branch",
+				"--output-branch", "automation/docs",
+				"--output-branch-policy", "reuse",
+				"--dry-run",
+			},
+			expected: map[string]interface{}{
+				"BaseBranch":         "main",
+				"OutputMode":         "branch",
+				"OutputBranch":       "automation/docs",
+				"OutputBranchPolicy": "reuse",
+				"BranchOnly":         true,
+			},
+		},
+		{
+			name: "legacy source aliases base branch",
+			args: []string{
+				"-r", "owner/repo",
+				"-p", "Legacy config",
+				"--source", "develop",
+				"--dry-run",
+			},
+			expected: map[string]interface{}{
+				"BaseBranch":     "develop",
+				"SourceBranch":   "develop",
+				"OutputMode":     "pr",
+				"PRTargetBranch": "develop",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ensureRunTestConfig()
+			originalAPIKey := cfg.APIKey
+			cfg.APIKey = "test-key"
+			defer func() {
+				cfg.APIKey = originalAPIKey
+				repo = ""
+				prompt = ""
+				source = ""
+				target = ""
+				baseBranch = ""
+				outputMode = ""
+				outputBranch = ""
+				prTargetBranch = ""
+				outputBranchPolicy = ""
+				title = ""
+				runType = ""
+				contextFlag = ""
+				branchOnly = false
+				dryRun = false
+			}()
+
+			err := runCmd.ParseFlags(tt.args)
+			require.NoError(t, err)
+
+			old := os.Stdout
+			r, w, _ := os.Pipe()
+			os.Stdout = w
+
+			cmdErr := runCommand(runCmd, []string{})
+
+			w.Close()
+			os.Stdout = old
+
+			var buf bytes.Buffer
+			buf.ReadFrom(r)
+			output := buf.String()
+
+			require.NoError(t, cmdErr)
+			jsonStart := strings.Index(output, "{")
+			jsonEnd := strings.LastIndex(output, "}") + 1
+			require.True(t, jsonStart >= 0 && jsonEnd > jsonStart, "JSON output not found")
+
+			var result map[string]interface{}
+			err = json.Unmarshal([]byte(output[jsonStart:jsonEnd]), &result)
+			require.NoError(t, err)
+			for key, expected := range tt.expected {
+				assert.Equal(t, expected, result[key], key)
+			}
+		})
+	}
+}
+
+func TestRunPresetCommand_BranchOnlyFlag(t *testing.T) {
+	ensureRunTestConfig()
+	originalAPIKey := cfg.APIKey
+	cfg.APIKey = "test-key"
+	defer func() {
+		cfg.APIKey = originalAPIKey
+		repo = ""
+		prompt = ""
+		source = ""
+		target = ""
+		baseBranch = ""
+		outputMode = ""
+		outputBranch = ""
+		prTargetBranch = ""
+		outputBranchPolicy = ""
+		title = ""
+		runType = ""
+		contextFlag = ""
+		branchOnly = false
+		dryRun = false
+	}()
+
+	cmd := newRunPresetCommand("basic")
+	err := cmd.ParseFlags([]string{
+		"-r", "owner/repo",
+		"--target", "automation/maintenance",
+		"--branch-only",
+		"--dry-run",
+	})
+	require.NoError(t, err)
+
+	old := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	cmdErr := runCommandWithPreset(cmd, []string{"Push commits to a branch"}, "basic")
+
+	w.Close()
+	os.Stdout = old
+
+	var buf bytes.Buffer
+	buf.ReadFrom(r)
+	output := buf.String()
+
+	require.NoError(t, cmdErr)
+	assert.Contains(t, output, "Validation successful")
+
+	jsonStart := strings.Index(output, "{")
+	jsonEnd := strings.LastIndex(output, "}") + 1
+	require.True(t, jsonStart >= 0 && jsonEnd > jsonStart, "JSON output not found")
+
+	var result map[string]interface{}
+	err = json.Unmarshal([]byte(output[jsonStart:jsonEnd]), &result)
+	require.NoError(t, err)
+	assert.Equal(t, true, result["BranchOnly"])
 }
 
 func TestRunCommand_RejectsConflictingPresetFlags(t *testing.T) {

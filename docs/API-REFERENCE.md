@@ -74,6 +74,8 @@ func (c *Client) ListRuns(ctx context.Context, opts ListOptions) (*RunList, erro
 - `GET /api/v1/runs/{id}/logs` - Stream run logs
 - `GET /api/v1/user` - Get user info and credit balance
 - `GET /api/v1/repositories` - List accessible repositories
+- `GET /api/repos/{id}` - Get repository details, including branch defaults when enabled
+- `PUT /api/repos/{id}` - Set or clear repository branch defaults when the repository-branch-defaults feature is enabled
 
 ## Error Handling
 

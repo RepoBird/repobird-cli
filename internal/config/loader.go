@@ -42,6 +42,7 @@ func (c *ConfigLoader) LoadConfig(filePath string) (*models.RunRequest, error) {
 		Title:      runConfig.Title,
 		Context:    runConfig.Context,
 		Files:      runConfig.Files,
+		BranchOnly: runConfig.BranchOnly,
 	}
 
 	// Append markdown body to context if present

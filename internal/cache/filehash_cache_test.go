@@ -264,6 +264,29 @@ func TestCalculateConfigHash(t *testing.T) {
 	}
 }
 
+func TestCalculateConfigHash_DiffersForBranchOnly(t *testing.T) {
+	prConfig := &models.RunConfig{
+		Prompt:     "Update generated docs",
+		Repository: "owner/repo",
+		Target:     "automation/docs",
+	}
+	branchOnlyConfig := *prConfig
+	branchOnlyConfig.BranchOnly = true
+
+	prHash, err := CalculateConfigHash(prConfig)
+	if err != nil {
+		t.Fatalf("unexpected error hashing PR config: %v", err)
+	}
+	branchOnlyHash, err := CalculateConfigHash(&branchOnlyConfig)
+	if err != nil {
+		t.Fatalf("unexpected error hashing branch-only config: %v", err)
+	}
+
+	if prHash == branchOnlyHash {
+		t.Fatal("branch-only config should not hash the same as PR config")
+	}
+}
+
 func TestFileHashCache_NewCache(t *testing.T) {
 	cache := NewFileHashCache()
 

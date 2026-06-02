@@ -1,9 +1,13 @@
 package utils
 
 import (
+	"bytes"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestParseYAMLConfig(t *testing.T) {
@@ -60,6 +64,46 @@ func TestParseYAMLConfig(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestParseYAMLConfig_BranchOutputFields(t *testing.T) {
+	input := bytes.NewBufferString(`
+prompt: "Update generated docs"
+repository: "owner/repo"
+baseBranch: "main"
+outputMode: "branch"
+outputBranch: "automation/docs"
+outputBranchPolicy: "reuse"
+runType: "run"
+`)
+
+	config, err := ParseYAMLConfigFromReader(input)
+	require.NoError(t, err)
+	config.NormalizeBranchOutput()
+
+	assert.Equal(t, "main", config.BaseBranch)
+	assert.Equal(t, "branch", config.OutputMode)
+	assert.Equal(t, "automation/docs", config.OutputBranch)
+	assert.Equal(t, "reuse", config.OutputBranchPolicy)
+	assert.True(t, config.BranchOnly)
+}
+
+func TestParseYAMLConfig_LegacyBranchOnlyTargetMapsToOutputBranch(t *testing.T) {
+	input := bytes.NewBufferString(`
+prompt: "Update generated docs"
+repository: "owner/repo"
+source: "main"
+target: "automation/docs"
+branchOnly: true
+`)
+
+	config, err := ParseYAMLConfigFromReader(input)
+	require.NoError(t, err)
+	config.NormalizeBranchOutput()
+
+	assert.Equal(t, "main", config.BaseBranch)
+	assert.Equal(t, "branch", config.OutputMode)
+	assert.Equal(t, "automation/docs", config.OutputBranch)
 }
 
 func TestLoadConfigFromFile(t *testing.T) {

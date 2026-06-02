@@ -141,6 +141,15 @@ repobird run [flags] <input-file>
   -w, --watch            Watch for status updates
   --repo string          Target repository (owner/name)
   --branch string        Target branch
+  --branch-only          Push commits to an output branch without creating a pull request
+  --output-branch string Branch to push generated commits to
+  --output-mode string   Output mode: pr or branch
+  --output-branch-policy string
+                         Output branch policy: create or reuse
+  --base-branch string   Base branch to start work from
+  --pr-target-branch string
+                         Branch the pull request targets
+  --no-pr                Alias for --branch-only
   --dry-run              Validate without executing
 
 # Check status of runs

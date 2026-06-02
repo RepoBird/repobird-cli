@@ -35,57 +35,121 @@ const (
 )
 
 type RunRequest struct {
-	Prompt     string   `json:"prompt"`
-	Repository string   `json:"repository"` // User-facing field name
-	Source     string   `json:"source"`     // User-facing field name
-	Target     string   `json:"target"`     // User-facing field name
-	RunType    RunType  `json:"runType"`
-	Title      string   `json:"title,omitempty"`
-	Context    string   `json:"context,omitempty"`
-	Files      []string `json:"files,omitempty"`
+	Prompt             string   `json:"prompt"`
+	Repository         string   `json:"repository"` // User-facing field name
+	Source             string   `json:"source"`     // Legacy alias for baseBranch
+	Target             string   `json:"target"`     // Legacy alias; branch-only maps to outputBranch
+	BaseBranch         string   `json:"baseBranch,omitempty"`
+	OutputMode         string   `json:"outputMode,omitempty"`
+	OutputBranch       string   `json:"outputBranch,omitempty"`
+	PRTargetBranch     string   `json:"prTargetBranch,omitempty"`
+	OutputBranchPolicy string   `json:"outputBranchPolicy,omitempty"`
+	RunType            RunType  `json:"runType"`
+	Title              string   `json:"title,omitempty"`
+	Context            string   `json:"context,omitempty"`
+	Files              []string `json:"files,omitempty"`
+	BranchOnly         bool     `json:"branchOnly,omitempty"`
 }
 
 // RunConfig is a unified configuration structure for both JSON and Markdown configs
 type RunConfig struct {
-	Prompt     string   `json:"prompt" yaml:"prompt"`
-	Repository string   `json:"repository" yaml:"repository"`
-	Source     string   `json:"source" yaml:"source"`
-	Target     string   `json:"target" yaml:"target"`
-	RunType    string   `json:"runType" yaml:"runType"`
-	Title      string   `json:"title,omitempty" yaml:"title,omitempty"`
-	Context    string   `json:"context,omitempty" yaml:"context,omitempty"`
-	Files      []string `json:"files,omitempty" yaml:"files,omitempty"`
+	Prompt             string   `json:"prompt" yaml:"prompt"`
+	Repository         string   `json:"repository" yaml:"repository"`
+	Source             string   `json:"source" yaml:"source"`
+	Target             string   `json:"target" yaml:"target"`
+	BaseBranch         string   `json:"baseBranch,omitempty" yaml:"baseBranch,omitempty"`
+	OutputMode         string   `json:"outputMode,omitempty" yaml:"outputMode,omitempty"`
+	OutputBranch       string   `json:"outputBranch,omitempty" yaml:"outputBranch,omitempty"`
+	PRTargetBranch     string   `json:"prTargetBranch,omitempty" yaml:"prTargetBranch,omitempty"`
+	OutputBranchPolicy string   `json:"outputBranchPolicy,omitempty" yaml:"outputBranchPolicy,omitempty"`
+	RunType            string   `json:"runType" yaml:"runType"`
+	Title              string   `json:"title,omitempty" yaml:"title,omitempty"`
+	Context            string   `json:"context,omitempty" yaml:"context,omitempty"`
+	Files              []string `json:"files,omitempty" yaml:"files,omitempty"`
+	BranchOnly         bool     `json:"branchOnly,omitempty" yaml:"branchOnly,omitempty"`
 }
 
 // APIRunRequest is the structure that matches the actual API expectations
 type APIRunRequest struct {
-	Prompt           string   `json:"prompt"`
-	RepositoryName   string   `json:"repositoryName"`
-	SourceBranch     string   `json:"sourceBranch"`
-	TargetBranch     string   `json:"targetBranch"`
-	RunType          RunType  `json:"runType"`
-	Agent            string   `json:"agent,omitempty"`
-	OpenCodeModel    string   `json:"opencodeModel,omitempty"`
-	OpenCodeProvider string   `json:"opencodeProvider,omitempty"`
-	Title            string   `json:"title,omitempty"`
-	Context          string   `json:"context,omitempty"`
-	Files            []string `json:"files,omitempty"`
-	FileHash         string   `json:"fileHash,omitempty"`
-	Force            bool     `json:"force,omitempty"`
+	Prompt             string   `json:"prompt"`
+	RepositoryName     string   `json:"repositoryName"`
+	SourceBranch       string   `json:"sourceBranch,omitempty"`
+	TargetBranch       string   `json:"targetBranch,omitempty"`
+	BaseBranch         string   `json:"baseBranch,omitempty"`
+	OutputMode         string   `json:"outputMode,omitempty"`
+	OutputBranch       string   `json:"outputBranch,omitempty"`
+	PRTargetBranch     string   `json:"prTargetBranch,omitempty"`
+	OutputBranchPolicy string   `json:"outputBranchPolicy,omitempty"`
+	RunType            RunType  `json:"runType"`
+	Agent              string   `json:"agent,omitempty"`
+	OpenCodeModel      string   `json:"opencodeModel,omitempty"`
+	OpenCodeProvider   string   `json:"opencodeProvider,omitempty"`
+	Title              string   `json:"title,omitempty"`
+	Context            string   `json:"context,omitempty"`
+	Files              []string `json:"files,omitempty"`
+	FileHash           string   `json:"fileHash,omitempty"`
+	Force              bool     `json:"force,omitempty"`
+	BranchOnly         bool     `json:"branchOnly,omitempty"`
 }
 
 // ToAPIRequest converts user-facing RunRequest to API-compatible structure
 func (r *RunRequest) ToAPIRequest() *APIRunRequest {
+	config := &RunConfig{
+		Source:             r.Source,
+		Target:             r.Target,
+		BaseBranch:         r.BaseBranch,
+		OutputMode:         r.OutputMode,
+		OutputBranch:       r.OutputBranch,
+		PRTargetBranch:     r.PRTargetBranch,
+		OutputBranchPolicy: r.OutputBranchPolicy,
+		BranchOnly:         r.BranchOnly,
+	}
+	config.NormalizeBranchOutput()
+
 	return &APIRunRequest{
-		Prompt:         r.Prompt,
-		RepositoryName: r.Repository,
-		SourceBranch:   r.Source,
-		TargetBranch:   r.Target,
-		RunType:        r.RunType,
-		Agent:          "opencode",
-		Title:          r.Title,
-		Context:        r.Context,
-		Files:          r.Files,
+		Prompt:             r.Prompt,
+		RepositoryName:     r.Repository,
+		SourceBranch:       config.Source,
+		TargetBranch:       config.Target,
+		BaseBranch:         config.BaseBranch,
+		OutputMode:         config.OutputMode,
+		OutputBranch:       config.OutputBranch,
+		PRTargetBranch:     config.PRTargetBranch,
+		OutputBranchPolicy: config.OutputBranchPolicy,
+		RunType:            r.RunType,
+		Agent:              "opencode",
+		Title:              r.Title,
+		Context:            r.Context,
+		Files:              r.Files,
+		BranchOnly:         config.BranchOnly,
+	}
+}
+
+// NormalizeBranchOutput applies legacy branch aliases to the branch-output model.
+func (c *RunConfig) NormalizeBranchOutput() {
+	if c.BaseBranch == "" {
+		c.BaseBranch = c.Source
+	}
+	if c.OutputMode == "" {
+		if c.BranchOnly {
+			c.OutputMode = "branch"
+		} else {
+			c.OutputMode = "pr"
+		}
+	}
+	if c.OutputMode == "branch" {
+		c.BranchOnly = true
+		if c.OutputBranch == "" {
+			c.OutputBranch = c.Target
+		}
+		return
+	}
+	if c.PRTargetBranch == "" {
+		if c.Target != "" {
+			c.PRTargetBranch = c.Target
+		} else {
+			c.PRTargetBranch = c.BaseBranch
+		}
 	}
 }
 
@@ -275,14 +339,20 @@ func parseJSONWithUnknownFieldsAndPrompts(file *os.File) (*RunConfig, *prompts.V
 
 	// Convert RunRequest to RunConfig (only supported fields are included)
 	runConfig := &RunConfig{
-		Prompt:     runReq.Prompt,
-		Repository: runReq.Repository,
-		Source:     runReq.Source,
-		Target:     runReq.Target,
-		RunType:    string(runReq.RunType),
-		Title:      runReq.Title,
-		Context:    runReq.Context,
-		Files:      runReq.Files,
+		Prompt:             runReq.Prompt,
+		Repository:         runReq.Repository,
+		Source:             runReq.Source,
+		Target:             runReq.Target,
+		BaseBranch:         runReq.BaseBranch,
+		OutputMode:         runReq.OutputMode,
+		OutputBranch:       runReq.OutputBranch,
+		PRTargetBranch:     runReq.PRTargetBranch,
+		OutputBranchPolicy: runReq.OutputBranchPolicy,
+		RunType:            string(runReq.RunType),
+		Title:              runReq.Title,
+		Context:            runReq.Context,
+		Files:              runReq.Files,
+		BranchOnly:         runReq.BranchOnly,
 	}
 
 	return runConfig, promptHandler, nil
@@ -297,19 +367,26 @@ func findUnsupportedJSONFields(data map[string]interface{}) []string {
 // findUnsupportedJSONFieldsWithSuggestions identifies fields and returns suggestions
 func findUnsupportedJSONFieldsWithSuggestions(data map[string]interface{}) ([]string, map[string]string) {
 	supportedFields := map[string]bool{
-		"prompt":     true,
-		"repository": true,
-		"source":     true,
-		"target":     true,
-		"runType":    true,
-		"title":      true,
-		"context":    true,
-		"files":      true,
+		"prompt":             true,
+		"repository":         true,
+		"source":             true,
+		"target":             true,
+		"baseBranch":         true,
+		"outputMode":         true,
+		"outputBranch":       true,
+		"prTargetBranch":     true,
+		"outputBranchPolicy": true,
+		"runType":            true,
+		"title":              true,
+		"context":            true,
+		"files":              true,
+		"branchOnly":         true,
 	}
 
 	supportedFieldsList := []string{
-		"prompt", "repository", "source", "target", "runType",
-		"title", "context", "files",
+		"prompt", "repository", "source", "target", "baseBranch",
+		"outputMode", "outputBranch", "prTargetBranch", "outputBranchPolicy",
+		"runType", "title", "context", "files", "branchOnly",
 	}
 
 	var unsupported []string

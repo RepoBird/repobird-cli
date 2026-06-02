@@ -9,45 +9,56 @@ import (
 
 // Run represents a RepoBird run in the domain layer
 type Run struct {
-	ID             string
-	Status         string
-	StatusMessage  string
-	Prompt         string
-	RepositoryName string
-	SourceBranch   string
-	TargetBranch   string
-	PullRequestURL string
-	RunType        string
-	Title          string
-	Context        string
-	Files          []string
-	UserID         int
-	RepositoryID   int
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	CompletedAt    *time.Time
-	Cost           float64
-	InputTokens    int
-	OutputTokens   int
-	FileCount      int
-	FilesChanged   []string
-	Summary        string
-	Error          string
+	ID                 string
+	Status             string
+	StatusMessage      string
+	Prompt             string
+	RepositoryName     string
+	SourceBranch       string
+	TargetBranch       string
+	BaseBranch         string
+	OutputMode         string
+	OutputBranch       string
+	PRTargetBranch     string
+	OutputBranchPolicy string
+	PullRequestURL     string
+	RunType            string
+	Title              string
+	Context            string
+	Files              []string
+	UserID             int
+	RepositoryID       int
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+	CompletedAt        *time.Time
+	Cost               float64
+	InputTokens        int
+	OutputTokens       int
+	FileCount          int
+	FilesChanged       []string
+	Summary            string
+	Error              string
 }
 
 // CreateRunRequest represents a request to create a new run
 type CreateRunRequest struct {
-	Prompt           string
-	RepositoryName   string
-	SourceBranch     string
-	TargetBranch     string
-	RunType          string
-	Agent            string
-	OpenCodeModel    string
-	OpenCodeProvider string
-	Title            string
-	Context          string
-	Files            []string
+	Prompt             string
+	RepositoryName     string
+	SourceBranch       string
+	TargetBranch       string
+	BaseBranch         string
+	OutputMode         string
+	OutputBranch       string
+	PRTargetBranch     string
+	OutputBranchPolicy string
+	RunType            string
+	Agent              string
+	OpenCodeModel      string
+	OpenCodeProvider   string
+	Title              string
+	Context            string
+	Files              []string
+	BranchOnly         bool
 }
 
 // ListOptions represents options for listing runs

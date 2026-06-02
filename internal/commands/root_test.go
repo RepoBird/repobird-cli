@@ -22,6 +22,7 @@ func TestRootCommand_NoDuplicateCommands(t *testing.T) {
 	testRootCmd.AddCommand(versionCmd)
 	testRootCmd.AddCommand(runCmd)
 	testRootCmd.AddCommand(statusCmd)
+	testRootCmd.AddCommand(repoCmd)
 	testRootCmd.AddCommand(configCmd)
 	testRootCmd.AddCommand(loginCmd)
 	testRootCmd.AddCommand(logoutCmd)
@@ -55,6 +56,7 @@ func TestRootCommand_HasExpectedCommands(t *testing.T) {
 		"basic",
 		"pro",
 		"status",
+		"repo",
 		"config",
 		"login",
 		"logout",
@@ -86,6 +88,7 @@ func TestRootCommand_CommandDescriptions(t *testing.T) {
 		"basic":      "Create a Basic cloud agent run",
 		"pro":        "Create a Pro cloud agent run",
 		"status":     "Check the status of runs",
+		"repo":       "Manage connected repositories",
 		"config":     "Manage RepoBird configuration",
 		"login":      "Configure your API key securely",
 		"logout":     "Remove stored API key",

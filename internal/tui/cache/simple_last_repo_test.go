@@ -5,6 +5,7 @@ package cache
 
 import (
 	"testing"
+	"time"
 
 	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/stretchr/testify/assert"
@@ -50,6 +51,7 @@ func TestSimpleCache_LastRepository_FallbackToRecentRun(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", tmpDir)
 
 	cache := NewSimpleCache()
+	now := time.Now()
 
 	// Add some runs to cache
 	runs := []models.RunResponse{
@@ -57,11 +59,13 @@ func TestSimpleCache_LastRepository_FallbackToRecentRun(t *testing.T) {
 			ID:         "run1",
 			Repository: "recent/repo1",
 			Status:     "completed",
+			CreatedAt:  now,
 		},
 		{
 			ID:         "run2",
 			Repository: "recent/repo2",
 			Status:     "running",
+			CreatedAt:  now.Add(-time.Minute),
 		},
 	}
 	cache.SetRuns(runs)

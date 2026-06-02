@@ -1,6 +1,17 @@
 project: RepoBird CLI
 versions:
     unreleased: {}
+    0.5.0:
+        date: 2026-06-01
+        added:
+            - Branch-only run submission is now available from the CLI with --branch-only/--no-pr and branchOnly config files.
+            - Added feature-gated repo commands to inspect and update repository branch defaults.
+        changed:
+            - Run creation now supports baseBranch/outputMode/outputBranch/prTargetBranch/outputBranchPolicy while preserving source/target/branchOnly compatibility.
+        internal:
+            fixed:
+                - Made cache last-repository test ordering deterministic under race-enabled full-suite runs.
+                - Point repository detail and branch-default CLI calls at the API-key-authenticated /api/v1/repositories endpoint instead of the Clerk-protected dashboard route.
     0.4.0:
         date: 2026-05-27
         added:

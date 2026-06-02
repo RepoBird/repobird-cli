@@ -571,6 +571,76 @@ func (c *Client) ListRepositories(ctx context.Context) ([]models.APIRepository, 
 	return repoListResp.Data, nil
 }
 
+// GetRepository retrieves one repository by API-visible identifier.
+func (c *Client) GetRepository(id string) (*models.APIRepository, error) {
+	if id == "" {
+		return nil, fmt.Errorf("repository ID cannot be empty")
+	}
+	resp, err := c.doRequest("GET", RepositoryDetailsURL(id), nil)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if err := ValidateResponseOK(resp); err != nil {
+		return nil, err
+	}
+
+	repo, err := decodeRepositoryResponse(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode repository response: %w", err)
+	}
+	return repo, nil
+}
+
+// UpdateRepositoryDefaults sets or clears persisted repository branch defaults.
+func (c *Client) UpdateRepositoryDefaults(id string, update models.RepositoryDefaultsUpdate) (*models.APIRepository, error) {
+	if id == "" {
+		return nil, fmt.Errorf("repository ID cannot be empty")
+	}
+
+	payload := update.Payload()
+	if len(payload) == 0 {
+		return nil, fmt.Errorf("at least one repository default must be set or cleared")
+	}
+
+	resp, err := c.doRequest("PUT", RepositoryDetailsURL(id), payload)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if err := ValidateResponseOK(resp); err != nil {
+		return nil, err
+	}
+
+	repo, err := decodeRepositoryResponse(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode repository response: %w", err)
+	}
+	return repo, nil
+}
+
+func decodeRepositoryResponse(body io.Reader) (*models.APIRepository, error) {
+	bodyBytes, err := io.ReadAll(body)
+	if err != nil {
+		return nil, err
+	}
+
+	var wrapped struct {
+		Data *models.APIRepository `json:"data"`
+	}
+	if err := json.Unmarshal(bodyBytes, &wrapped); err == nil && wrapped.Data != nil {
+		return wrapped.Data, nil
+	}
+
+	var repo models.APIRepository
+	if err := json.Unmarshal(bodyBytes, &repo); err != nil {
+		return nil, err
+	}
+	return &repo, nil
+}
+
 // GetFileHashes retrieves all file hashes for the authenticated user's runs
 func (c *Client) GetFileHashes(ctx context.Context) ([]models.FileHashEntry, error) {
 	resp, err := c.doRequestWithRetry(ctx, "GET", EndpointRunsHashes, nil)

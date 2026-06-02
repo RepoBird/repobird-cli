@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-06-01
+
+### Added
+
+- Branch-only run submission is now available from the CLI with --branch-only/--no-pr and branchOnly config files.
+- Added feature-gated repo commands to inspect and update repository branch defaults.
+
+### Changed
+
+- Run creation now supports baseBranch/outputMode/outputBranch/prTargetBranch/outputBranchPolicy while preserving source/target/branchOnly compatibility.
+
 ## [0.4.0] - 2026-05-27
 
 ### Added
@@ -71,7 +82,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Configuration management
 - API integration with RepoBird platform
 
-[Unreleased]: https://github.com/RepoBird/repobird-cli/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/RepoBird/repobird-cli/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/RepoBird/repobird-cli/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/RepoBird/repobird-cli/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/RepoBird/repobird-cli/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/RepoBird/repobird-cli/compare/v0.1.2...v0.2.0
