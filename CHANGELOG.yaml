@@ -9,6 +9,7 @@ versions:
         internal:
             fixed:
                 - Made cache last-repository test ordering deterministic under race-enabled full-suite runs.
+                - Point repository detail and branch-default CLI calls at the API-key-authenticated /api/v1/repositories endpoint instead of the Clerk-protected dashboard route.
     0.4.0:
         date: 2026-05-27
         added:

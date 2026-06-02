@@ -61,8 +61,8 @@ func TestNewClient(t *testing.T) {
 
 func TestGetRepositorySupportsBranchDefaults(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/repos/repo_123" {
-			t.Errorf("expected path /api/repos/repo_123, got %s", r.URL.Path)
+		if r.URL.Path != "/api/v1/repositories/repo_123" {
+			t.Errorf("expected path /api/v1/repositories/repo_123, got %s", r.URL.Path)
 		}
 		if r.Method != httpMethodGET {
 			t.Errorf("expected GET, got %s", r.Method)
@@ -104,8 +104,8 @@ func TestGetRepositorySupportsBranchDefaults(t *testing.T) {
 func TestUpdateRepositoryDefaultsSendsSetAndClearPayload(t *testing.T) {
 	var requestBody map[string]any
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/repos/42" {
-			t.Errorf("expected path /api/repos/42, got %s", r.URL.Path)
+		if r.URL.Path != "/api/v1/repositories/42" {
+			t.Errorf("expected path /api/v1/repositories/42, got %s", r.URL.Path)
 		}
 		if r.Method != http.MethodPut {
 			t.Errorf("expected PUT, got %s", r.Method)

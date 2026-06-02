@@ -22,8 +22,8 @@ const (
 	// EndpointRepositories is the endpoint for listing repositories
 	EndpointRepositories = "/api/v1/repositories"
 
-	// EndpointRepoDetailsTemplate is the endpoint template for repository details and settings updates.
-	EndpointRepoDetailsTemplate = "/api/repos/%s"
+	// EndpointRepoDetailsTemplate is the API-key-authenticated endpoint template for repository details and settings updates.
+	EndpointRepoDetailsTemplate = "/api/v1/repositories/%s"
 
 	// EndpointUser is the endpoint for getting user information
 	EndpointUser = "/api/v1/user"
