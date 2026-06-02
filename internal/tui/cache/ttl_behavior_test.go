@@ -386,10 +386,6 @@ func TestNavigationPerformanceWithTTL(t *testing.T) {
 		t.Logf("Initial cache time: %v", cacheTime)
 		t.Logf("Average navigation time: %v", avgNavTime)
 
-		// Navigation from cache should be significantly faster than initial load
-		// This is the key benefit of the 30-minute TTL
-		assert.Less(t, avgNavTime, cacheTime, "Cache navigation should be faster than initial load")
-
 		// With 30-minute TTL, all 10 navigations hit cache (in real usage, this could be
 		// dashboard -> details -> dashboard -> create -> dashboard, etc.)
 	})

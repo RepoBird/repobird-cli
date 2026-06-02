@@ -411,8 +411,16 @@ func TestSimpleCacheGetRunsCopyOnRead(t *testing.T) {
 
 	// Get runs again and verify original data is unchanged
 	runs2 := cache.GetRuns()
-	assert.Equal(t, "run-1", runs2[0].ID)
-	assert.Equal(t, models.StatusProcessing, runs2[0].Status)
+	require.Len(t, runs2, 2)
+
+	runsByID := make(map[string]models.RunResponse, len(runs2))
+	for _, run := range runs2 {
+		runsByID[run.ID] = run
+	}
+
+	run1, ok := runsByID["run-1"]
+	require.True(t, ok, "run-1 should still be present")
+	assert.Equal(t, models.StatusProcessing, run1.Status)
 
 	// Verify modification didn't affect cache
 	assert.Equal(t, "modified", runs[0].ID)
