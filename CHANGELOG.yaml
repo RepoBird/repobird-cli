@@ -1,6 +1,8 @@
 project: RepoBird CLI
 versions:
-    unreleased:
+    unreleased: {}
+    0.5.0:
+        date: 2026-06-01
         added:
             - Branch-only run submission is now available from the CLI with --branch-only/--no-pr and branchOnly config files.
             - Added feature-gated repo commands to inspect and update repository branch defaults.
