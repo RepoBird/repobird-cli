@@ -268,6 +268,12 @@ grep "CACHE\|NAV\|KEY" /tmp/repobird_debug.log
 Working on branch: `code-smells`
 Main branch: `main`
 
+## Branch And Remote Policy
+- GitLab (`glab`) owns normal development branches, including `dev`.
+- GitHub (`gh`) is release-facing only: keep only `main` and release tags there.
+- Never push `dev` or `develop` to GitHub. If either branch exists on the GitHub remote, delete only that GitHub remote branch and leave GitLab untouched.
+- GitHub Actions push triggers should target `main` only unless a release tag workflow explicitly requires tags.
+
 ## Final Checklist for Significant Changes
 When completing major features:
 1. ☐ Update relevant docs/ files if patterns changed
