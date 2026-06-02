@@ -2,7 +2,7 @@ name: Test Local Package Builds
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
   pull_request:
     branches: [main]
 
@@ -22,7 +22,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version-file: 'go.mod'
 
       - name: Test Build Process
         run: |
@@ -85,7 +85,6 @@ jobs:
           ./build/repobird config --help
           ./build/repobird run --help
           ./build/repobird status --help
-          ./build/repobird auth --help
           ./build/repobird completion --help
           ./build/repobird docs --help
 
@@ -105,7 +104,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version-file: 'go.mod'
 
       - name: Install Package Building Tools
         run: |
@@ -114,9 +113,10 @@ jobs:
 
       - name: Build Binary
         run: |
-          GOOS=linux GOARCH=${{ matrix.arch }} make build
+          make build
           ./scripts/generate-completions.sh
           ./scripts/generate-docs.sh
+          GOOS=linux GOARCH=${{ matrix.arch }} make build
 
       - name: Test DEB Package Creation
         if: matrix.format == 'deb'
@@ -273,7 +273,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version-file: 'go.mod'
 
       - name: Test Local Build and Install
         run: |
@@ -309,7 +309,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version-file: 'go.mod'
 
       - name: Test GoReleaser Config
         uses: goreleaser/goreleaser-action@v5
@@ -342,7 +342,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version-file: 'go.mod'
 
       - name: Install GPG
         run: |

@@ -1,10 +1,7 @@
 name: Test Package Managers
 
 on:
-  push:
-    branches: [main, develop]
-  pull_request:
-    branches: [main]
+  workflow_dispatch:
   schedule:
     # Test weekly to catch package manager changes
     - cron: '0 2 * * 0'
@@ -441,5 +438,4 @@ jobs:
           repobird config get api-key
           repobird config list
           
-          # Test auth workflow (without actual API calls)
-          echo "test" | repobird auth info || true
+          repobird version

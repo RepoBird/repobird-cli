@@ -20,6 +20,12 @@ Product behavior should reflect credits-based runs. Do not model usage, quotas, 
 - Use message-based navigation in the TUI; route transitions through `internal/tui/app.go`.
 - Never log sensitive data such as API keys or tokens.
 
+## Branch And Remote Policy
+- GitLab (`glab`) owns normal development branches, including `dev`.
+- GitHub (`gh`) is release-facing only: keep only `main` and release tags there.
+- Never push `dev` or `develop` to GitHub. If either branch exists on the GitHub remote, delete only that GitHub remote branch and leave GitLab untouched.
+- GitHub Actions push triggers should target `main` only unless a release tag workflow explicitly requires tags.
+
 ## Validation
 - Run focused tests for changed code first.
 - For Go changes, run `make test` before handoff when feasible.
