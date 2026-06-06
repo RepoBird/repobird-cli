@@ -182,8 +182,9 @@ func buildRepositoryDefaultsUpdate(opts repositoryDefaultsOptions) models.Reposi
 }
 
 func printRepositoryList(out io.Writer, repos []models.APIRepository) {
+	styler := styleFor(out)
 	if len(repos) == 0 {
-		_, _ = fmt.Fprintln(out, "No repositories found")
+		_, _ = fmt.Fprintln(out, styler.Muted("No repositories found"))
 		return
 	}
 	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
@@ -202,12 +203,13 @@ func printRepositoryList(out io.Writer, repos []models.APIRepository) {
 }
 
 func printRepositoryDetails(out io.Writer, repo *models.APIRepository) {
-	_, _ = fmt.Fprintf(out, "Repository: %s\n", repo.FullName())
-	_, _ = fmt.Fprintf(out, "ID: %d\n", repo.ID)
-	_, _ = fmt.Fprintf(out, "Default Branch: %s\n", displayDefault(repo.DefaultBranch, "(unknown)"))
-	_, _ = fmt.Fprintf(out, "Default Base Branch: %s\n", displayStringPtr(repo.DefaultBaseBranch, "(repo default)"))
-	_, _ = fmt.Fprintf(out, "Default PR Target Branch: %s\n", displayStringPtr(repo.DefaultPRTargetBranch, "(base branch)"))
-	_, _ = fmt.Fprintf(out, "Default Output Branch: %s\n", displayStringPtr(repo.DefaultOutputBranch, "(generated)"))
+	styler := styleFor(out)
+	_, _ = fmt.Fprintf(out, "%s %s\n", styler.Label("Repository:"), repo.FullName())
+	_, _ = fmt.Fprintf(out, "%s %d\n", styler.Label("ID:"), repo.ID)
+	_, _ = fmt.Fprintf(out, "%s %s\n", styler.Label("Default Branch:"), displayDefault(repo.DefaultBranch, "(unknown)"))
+	_, _ = fmt.Fprintf(out, "%s %s\n", styler.Label("Default Base Branch:"), displayStringPtr(repo.DefaultBaseBranch, "(repo default)"))
+	_, _ = fmt.Fprintf(out, "%s %s\n", styler.Label("Default PR Target Branch:"), displayStringPtr(repo.DefaultPRTargetBranch, "(base branch)"))
+	_, _ = fmt.Fprintf(out, "%s %s\n", styler.Label("Default Output Branch:"), displayStringPtr(repo.DefaultOutputBranch, "(generated)"))
 }
 
 func displayStringPtr(value *string, fallback string) string {

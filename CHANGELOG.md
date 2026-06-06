@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Colored human-readable CLI output is enabled by default for terminal users, with config/env opt-outs via color=never, REPOBIRD_COLOR, and NO_COLOR.
+
 ### Fixed
 
 - Prevent login and progress output from emitting duplicate redraw lines in non-interactive terminals.

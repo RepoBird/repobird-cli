@@ -47,8 +47,9 @@ var loginCmd = &cobra.Command{
 The key will be stored in your system keyring when available,
 or in an encrypted file as a fallback.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("Welcome to RepoBird CLI!")
-		fmt.Printf("Get your API key at: %s\n", config.GetAPIKeysURL())
+		styler := stdoutStyle()
+		fmt.Println(styler.Heading("Welcome to RepoBird CLI!"))
+		fmt.Printf("%s %s\n", styler.Label("Get your API key at:"), styler.URL(config.GetAPIKeysURL()))
 		fmt.Println()
 
 		// Check if API key is provided as argument (for CI/CD)
@@ -95,22 +96,22 @@ or in an encrypted file as a fallback.`,
 		// Show storage information
 		storageInfo := secureConfig.GetStorageInfo()
 		fmt.Println()
-		fmt.Println("✓ API key validated and stored successfully!")
-		fmt.Printf("  Email: %s\n", userInfo.Email)
-		fmt.Printf("  Tier: %s\n", userInfo.Tier)
+		fmt.Println(styler.Success("✓ API key validated and stored successfully!"))
+		fmt.Printf("  %s %s\n", styler.Label("Email:"), userInfo.Email)
+		fmt.Printf("  %s %s\n", styler.Label("Tier:"), userInfo.Tier)
 		printAccountUsage(userInfo)
 
 		// Display storage method
 		fmt.Println()
 		switch storageInfo["source"] {
 		case "system_keyring":
-			fmt.Printf("  Storage: %s (secure)\n", storageInfo["keyring_type"])
+			fmt.Printf("  %s %s (secure)\n", styler.Label("Storage:"), storageInfo["keyring_type"])
 		case "encrypted_file":
-			fmt.Println("  Storage: Encrypted file (secure)")
+			fmt.Printf("  %s Encrypted file (secure)\n", styler.Label("Storage:"))
 		case "environment":
-			fmt.Println("  Storage: Environment variable")
+			fmt.Printf("  %s Environment variable\n", styler.Label("Storage:"))
 		default:
-			fmt.Println("  Storage: Encrypted file (secure fallback)")
+			fmt.Printf("  %s Encrypted file (secure fallback)\n", styler.Label("Storage:"))
 		}
 
 		return nil

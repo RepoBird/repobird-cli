@@ -23,8 +23,9 @@ func printStatusAccountUsage(userInfo *models.UserInfo) {
 }
 
 func formatAccountUsage(userInfo *models.UserInfo, indent, tierSuffix string) string {
+	styler := stdoutStyle()
 	if userInfo.CreditBalance != nil {
-		line := fmt.Sprintf("%sCredits: %s available", indent, models.FormatCredits(userInfo.CreditBalance.AvailableCredits))
+		line := fmt.Sprintf("%s%s %s available", indent, styler.Label("Credits:"), models.FormatCredits(userInfo.CreditBalance.AvailableCredits))
 		if userInfo.CreditBalance.ReservedCredits > 0 {
 			line += fmt.Sprintf(" (%s reserved)", models.FormatCredits(userInfo.CreditBalance.ReservedCredits))
 		}
@@ -32,12 +33,12 @@ func formatAccountUsage(userInfo *models.UserInfo, indent, tierSuffix string) st
 	}
 
 	if !hasLegacyRunUsage(userInfo) {
-		return fmt.Sprintf("%sCredits: unavailable%s\n", indent, tierSuffix)
+		return fmt.Sprintf("%s%s unavailable%s\n", indent, styler.Label("Credits:"), tierSuffix)
 	}
 
-	text := fmt.Sprintf("%sRuns: %d/%d%s\n", indent, userInfo.RemainingProRuns, userInfo.ProTotalRuns, tierSuffix)
+	text := fmt.Sprintf("%s%s %d/%d%s\n", indent, styler.Label("Runs:"), userInfo.RemainingProRuns, userInfo.ProTotalRuns, tierSuffix)
 	if userInfo.PlanTotalRuns > 0 || userInfo.RemainingPlanRuns > 0 {
-		text += fmt.Sprintf("%sPlan Runs: %d/%d\n", indent, userInfo.RemainingPlanRuns, userInfo.PlanTotalRuns)
+		text += fmt.Sprintf("%s%s %d/%d\n", indent, styler.Label("Plan Runs:"), userInfo.RemainingPlanRuns, userInfo.PlanTotalRuns)
 	}
 	return text
 }
@@ -52,13 +53,14 @@ func hasLegacyRunUsage(userInfo *models.UserInfo) bool {
 }
 
 func printAccountReset(userInfo *models.UserInfo) {
+	styler := stdoutStyle()
 	if userInfo.LastPeriodResetDate != nil {
-		fmt.Printf("  Resets: %s\n", userInfo.LastPeriodResetDate.Format("2006-01-02"))
+		fmt.Printf("  %s %s\n", styler.Label("Resets:"), userInfo.LastPeriodResetDate.Format("2006-01-02"))
 		return
 	}
 
 	now := time.Now()
 	nextMonth := now.AddDate(0, 1, 0)
 	resetDate := time.Date(nextMonth.Year(), nextMonth.Month(), 1, 0, 0, 0, 0, time.UTC)
-	fmt.Printf("  Resets: %s\n", resetDate.Format("2006-01-02"))
+	fmt.Printf("  %s %s\n", styler.Label("Resets:"), resetDate.Format("2006-01-02"))
 }

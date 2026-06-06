@@ -40,7 +40,7 @@ require (
 	github.com/mattn/go-runewidth v0.0.16 // indirect; indirect - Unicode character width calculation for terminal display
 	github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6 // indirect; indirect - ANSI sequence parser and writer
 	github.com/muesli/cancelreader v0.2.2 // indirect; indirect - Cancelable reader for terminal input
-	github.com/muesli/termenv v0.16.0 // indirect; indirect - Terminal environment detection and styling
+	github.com/muesli/termenv v0.16.0 // Terminal environment detection and styling
 	github.com/nsf/termbox-go v1.1.1 // indirect; indirect - Terminal UI library (alternative backend)
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect; indirect - TOML configuration format support (Viper dependency)
 	github.com/pkg/errors v0.9.1 // indirect; indirect - Error handling with stack traces

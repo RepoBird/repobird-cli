@@ -1,6 +1,8 @@
 project: RepoBird CLI
 versions:
     unreleased:
+        added:
+            - Colored human-readable CLI output is enabled by default for terminal users, with config/env opt-outs via color=never, REPOBIRD_COLOR, and NO_COLOR.
         fixed:
             - Prevent login and progress output from emitting duplicate redraw lines in non-interactive terminals.
             - Account info, status, and TUI usage displays now show credit balances instead of all-zero legacy run quotas.
