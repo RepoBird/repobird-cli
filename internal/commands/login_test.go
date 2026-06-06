@@ -26,6 +26,18 @@ func TestReadAPIKeyInteractiveNonTerminalPromptsOnce(t *testing.T) {
 	require.NotContains(t, output.String(), "\033[")
 }
 
+func TestLoginAPIURLIgnoresPersistedCustomURLByDefault(t *testing.T) {
+	t.Setenv("REPOBIRD_API_URL", "")
+	t.Setenv("REPOBIRD_ENV", "")
+
+	got := loginAPIURL("https://custom.api.com")
+	want := "https://repobird.ai"
+
+	if got != want {
+		t.Fatalf("loginAPIURL() = %q, want %q", got, want)
+	}
+}
+
 func pipeWithInput(t *testing.T, input string) *os.File {
 	t.Helper()
 
@@ -37,4 +49,28 @@ func pipeWithInput(t *testing.T, input string) *os.File {
 	require.NoError(t, writer.Close())
 
 	return reader
+}
+
+func TestLoginAPIURLAllowsExplicitEnvironmentOverride(t *testing.T) {
+	t.Setenv("REPOBIRD_API_URL", "https://staging.repobird.ai")
+	t.Setenv("REPOBIRD_ENV", "")
+
+	got := loginAPIURL("https://custom.api.com")
+	want := "https://staging.repobird.ai"
+
+	if got != want {
+		t.Fatalf("loginAPIURL() = %q, want %q", got, want)
+	}
+}
+
+func TestLoginAPIURLAllowsDevEnvironment(t *testing.T) {
+	t.Setenv("REPOBIRD_API_URL", "")
+	t.Setenv("REPOBIRD_ENV", "dev")
+
+	got := loginAPIURL("https://custom.api.com")
+	want := "http://localhost:3000"
+
+	if got != want {
+		t.Fatalf("loginAPIURL() = %q, want %q", got, want)
+	}
 }

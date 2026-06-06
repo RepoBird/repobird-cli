@@ -179,6 +179,8 @@ The CLI uses the following priority order to determine the API URL:
 3. Config file URL setting
 4. Default production → `https://repobird.ai`
 
+`repobird login` is the exception: it ignores persisted custom API URLs and uses production by default unless `REPOBIRD_API_URL` or `REPOBIRD_ENV=dev` is set for that invocation.
+
 ```bash
 # Option 1: Use dev environment (auto-connects to localhost:3000)
 export REPOBIRD_ENV=dev

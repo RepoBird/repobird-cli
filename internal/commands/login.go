@@ -19,6 +19,12 @@ import (
 	"github.com/repobird/repobird-cli/internal/utils"
 )
 
+// loginAPIURL intentionally ignores persisted API URL config so first-run auth
+// verification defaults to the production RepoBird API unless env selects dev.
+func loginAPIURL(_ string) string {
+	return utils.GetAPIURL()
+}
+
 func readAPIKeyInteractive(stdin *os.File, output io.Writer) (string, error) {
 	const prompt = "Enter your API key: "
 
@@ -71,7 +77,7 @@ or in an encrypted file as a fallback.`,
 		}
 
 		// Verify the API key first
-		apiURL := utils.GetAPIURL(cfg.APIURL)
+		apiURL := loginAPIURL(cfg.APIURL)
 		client := api.NewClient(apiKey, apiURL, cfg.Debug)
 		userInfo, err := client.VerifyAuth()
 		if err != nil {
