@@ -16,6 +16,8 @@ import (
 	"time"
 )
 
+const ansiEscape = "\x1b["
+
 // TestVersionCommand tests the version command
 func TestVersionCommand(t *testing.T) {
 	tests := []struct {
@@ -130,10 +132,104 @@ func TestConfigCommands(t *testing.T) {
 		// This would need proper mocking or a test-specific keyring implementation
 	})
 
-	t.Run("config path", func(t *testing.T) {
-		result := RunCommandWithEnv(t, env, "config", "path")
+	t.Run("config help shows XDG storage", func(t *testing.T) {
+		result := RunCommandWithEnv(t, env, "config", "--help")
 		AssertSuccess(t, result)
-		AssertContains(t, result.Stdout, ".repobird")
+		AssertContains(t, result.Stdout, ".config/repobird")
+	})
+}
+
+func TestXDGAPIKeyStorageAndLegacyMigration(t *testing.T) {
+	homeDir := SetupTestConfig(t)
+	xdgConfigHome := filepath.Join(homeDir, ".config")
+	legacyDir := filepath.Join(homeDir, ".repobird")
+	xdgAPIKeyPath := filepath.Join(xdgConfigHome, "repobird", ".api_key.enc")
+
+	env := map[string]string{
+		"HOME":               homeDir,
+		"XDG_CONFIG_HOME":    xdgConfigHome,
+		"REPOBIRD_TEST_MODE": "true",
+		"NO_COLOR":           "true",
+	}
+
+	t.Run("config set stores API key under XDG config", func(t *testing.T) {
+		result := RunCommandWithEnv(t, env, "config", "set", "api-key", "MY_TEST_KEY")
+		AssertSuccess(t, result)
+		AssertContains(t, result.Stdout, "API key configured successfully")
+
+		if _, err := os.Stat(xdgAPIKeyPath); err != nil {
+			t.Fatalf("expected XDG encrypted API key at %s: %v", xdgAPIKeyPath, err)
+		}
+		if _, err := os.Stat(filepath.Join(legacyDir, ".api_key.enc")); !os.IsNotExist(err) {
+			t.Fatalf("expected no legacy encrypted API key, got err=%v", err)
+		}
+	})
+
+	t.Run("legacy plain text key is read and migrated to XDG", func(t *testing.T) {
+		legacyHome := SetupTestConfig(t)
+		legacyXDGHome := filepath.Join(legacyHome, ".config")
+		legacyConfigDir := filepath.Join(legacyHome, ".repobird")
+		if err := os.MkdirAll(legacyConfigDir, 0755); err != nil {
+			t.Fatalf("failed to create legacy config dir: %v", err)
+		}
+		legacyConfigPath := filepath.Join(legacyConfigDir, "config.yaml")
+		if err := os.WriteFile(legacyConfigPath, []byte("api_key: LEGACY_TEST_KEY\napi_url: https://repobird.ai\n"), 0600); err != nil {
+			t.Fatalf("failed to write legacy config: %v", err)
+		}
+
+		legacyEnv := map[string]string{
+			"HOME":               legacyHome,
+			"XDG_CONFIG_HOME":    legacyXDGHome,
+			"REPOBIRD_TEST_MODE": "true",
+			"NO_COLOR":           "true",
+		}
+
+		result := RunCommandWithEnv(t, legacyEnv, "config", "get", "api-key")
+		AssertSuccess(t, result)
+		AssertContains(t, result.Stdout, "LEGA")
+
+		migratedPath := filepath.Join(legacyXDGHome, "repobird", ".api_key.enc")
+		if _, err := os.Stat(migratedPath); err != nil {
+			t.Fatalf("expected migrated XDG encrypted API key at %s: %v", migratedPath, err)
+		}
+
+		legacyConfig, err := os.ReadFile(legacyConfigPath)
+		if err != nil {
+			t.Fatalf("failed to read legacy config after migration: %v", err)
+		}
+		if strings.Contains(string(legacyConfig), "api_key:") {
+			t.Fatalf("expected legacy plain text API key to be removed, got:\n%s", legacyConfig)
+		}
+	})
+}
+
+func TestBinaryColorPolicy(t *testing.T) {
+	homeDir := SetupTestConfig(t)
+	env := map[string]string{
+		"HOME":            homeDir,
+		"XDG_CONFIG_HOME": filepath.Join(homeDir, ".config"),
+		"NO_COLOR":        "true",
+		"REPOBIRD_COLOR":  "always",
+	}
+
+	t.Run("REPOBIRD_COLOR always colors non-TTY help despite NO_COLOR", func(t *testing.T) {
+		result := RunCommandWithEnv(t, env, "help")
+		AssertSuccess(t, result)
+		AssertContains(t, result.Stdout, ansiEscape)
+	})
+
+	t.Run("config color never disables non-TTY version color", func(t *testing.T) {
+		configEnv := map[string]string{
+			"HOME":            homeDir,
+			"XDG_CONFIG_HOME": filepath.Join(homeDir, ".config"),
+			"NO_COLOR":        "",
+		}
+		result := RunCommandWithEnv(t, configEnv, "config", "set", "color", "never")
+		AssertSuccess(t, result)
+
+		result = RunCommandWithEnv(t, configEnv, "version")
+		AssertSuccess(t, result)
+		AssertNotContains(t, result.Stdout, ansiEscape)
 	})
 }
 
@@ -217,6 +313,31 @@ title: Test YAML Run
 		AssertFailure(t, result)
 		AssertContains(t, result.Stderr, "no such file")
 	})
+
+	t.Run("run sends prompt-risk acknowledgement to API", func(t *testing.T) {
+		result := RunCommandWithEnv(t, env,
+			"run",
+			"--repo", "test/repo",
+			"--prompt", "Test task",
+			"--acknowledge-prompt-risk",
+		)
+		AssertSuccess(t, result)
+
+		var createBody map[string]interface{}
+		for _, req := range mockServer.Requests() {
+			if req.Method == "POST" && req.Path == "/api/v1/runs" {
+				if err := json.Unmarshal(req.Body, &createBody); err != nil {
+					t.Fatalf("failed to unmarshal create-run body: %v\n%s", err, req.Body)
+				}
+			}
+		}
+		if createBody == nil {
+			t.Fatal("expected create-run request")
+		}
+		if got, ok := createBody["acknowledgePromptRisk"].(bool); !ok || !got {
+			t.Fatalf("expected acknowledgePromptRisk=true in create-run request, got %#v", createBody["acknowledgePromptRisk"])
+		}
+	})
 }
 
 // TestStatusCommand tests the status command
@@ -252,6 +373,35 @@ func TestStatusCommand(t *testing.T) {
 		AssertSuccess(t, result)
 		AssertContains(t, result.Stdout, `"id":`)
 		AssertContains(t, result.Stdout, `"status":`)
+	})
+
+	t.Run("status shows credits instead of zero legacy run quotas", func(t *testing.T) {
+		result := RunCommandWithEnv(t, env, "status")
+		AssertSuccess(t, result)
+		AssertContains(t, result.Stdout, "Credits:")
+		AssertContains(t, result.Stdout, "42.75 available")
+		AssertContains(t, result.Stdout, "1.25 reserved")
+		AssertNotContains(t, result.Stdout, "Runs:")
+		AssertNotContains(t, result.Stdout, "Plan Runs:")
+	})
+
+	t.Run("status list sends page and limit query parameters", func(t *testing.T) {
+		result := RunCommandWithEnv(t, env, "status", "--limit", "7")
+		AssertSuccess(t, result)
+
+		var seenRunsRequest bool
+		for _, req := range mockServer.Requests() {
+			if req.Method == "GET" && req.Path == "/api/v1/runs" {
+				seenRunsRequest = true
+				if strings.Contains(req.RawQuery, "page=1") && strings.Contains(req.RawQuery, "limit=7") {
+					return
+				}
+			}
+		}
+		if seenRunsRequest {
+			t.Fatal("expected one list-runs request to include page=1 and limit=7")
+		}
+		t.Fatal("expected list-runs request")
 	})
 }
 

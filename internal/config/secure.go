@@ -100,6 +100,10 @@ func (s *SecureStorage) GetAPIKey() (string, error) {
 	if err == nil && apiKey != "" {
 		if err := s.SaveAPIKey(apiKey); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to migrate legacy API key to secure storage: %v\n", err)
+		} else {
+			if err := os.Remove(filepath.Join(s.legacyDir, ".api_key.enc")); err != nil && !os.IsNotExist(err) {
+				fmt.Fprintf(os.Stderr, "Warning: failed to remove legacy encrypted API key after migration: %v\n", err)
+			}
 		}
 		return apiKey, nil
 	}
@@ -119,6 +123,8 @@ func (s *SecureStorage) GetAPIKey() (string, error) {
 	if apiKey != "" {
 		if err := s.SaveAPIKey(apiKey); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to migrate legacy API key to secure storage: %v\n", err)
+		} else {
+			s.removeAPIKeyFromLegacyConfig()
 		}
 		return apiKey, nil
 	}

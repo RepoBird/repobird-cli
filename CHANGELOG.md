@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Store API keys under the XDG config directory by default while reading and migrating legacy ~/.repobird keys.
 - Prevent local tests from overwriting the desktop keyring API key.
 - Secondary run-list repository pagination now sends page/limit parameters to match the current /api/v1/runs API
+- Remove legacy API key files and plain-text config entries after migrating them into XDG secure storage
 
 ## [0.5.0] - 2026-06-01
 

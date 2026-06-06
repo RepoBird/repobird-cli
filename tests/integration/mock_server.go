@@ -9,6 +9,7 @@ package integration
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -27,6 +28,15 @@ type MockServer struct {
 	rateLimits   map[string]int
 	failNext     bool
 	responseTime time.Duration
+	requests     []RecordedRequest
+}
+
+// RecordedRequest captures requests received by the mock API.
+type RecordedRequest struct {
+	Method   string
+	Path     string
+	RawQuery string
+	Body     []byte
 }
 
 // MockRun represents a mock run object
@@ -122,6 +132,8 @@ func NewMockServer(t *testing.T) *MockServer {
 
 // handler routes requests to appropriate handlers
 func (ms *MockServer) handler(w http.ResponseWriter, r *http.Request) {
+	ms.recordRequest(r)
+
 	// Add response delay if configured
 	ms.mu.RLock()
 	responseTime := ms.responseTime
@@ -190,6 +202,20 @@ func (ms *MockServer) handleAuthVerify(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"valid":   true,
 		"message": "API key is valid",
+		"data": map[string]interface{}{
+			"id":             "user_test123",
+			"email":          "test@example.com",
+			"name":           "Test User",
+			"githubUsername": "testuser",
+			"tier":           "pro",
+			"creditBalance": map[string]interface{}{
+				"availableCredits":       42.75,
+				"monthlyIncludedCredits": 50,
+				"purchasedCredits":       10,
+				"reservedCredits":        1.25,
+			},
+			"lastPeriodResetDate": time.Now().Format(time.RFC3339),
+		},
 	})
 }
 
@@ -383,6 +409,32 @@ func (ms *MockServer) ResetRateLimits() {
 	ms.mu.Lock()
 	defer ms.mu.Unlock()
 	ms.rateLimits = make(map[string]int)
+}
+
+func (ms *MockServer) Requests() []RecordedRequest {
+	ms.mu.RLock()
+	defer ms.mu.RUnlock()
+
+	requests := make([]RecordedRequest, len(ms.requests))
+	copy(requests, ms.requests)
+	return requests
+}
+
+func (ms *MockServer) recordRequest(r *http.Request) {
+	var body []byte
+	if r.Body != nil {
+		body, _ = io.ReadAll(r.Body)
+		r.Body = io.NopCloser(strings.NewReader(string(body)))
+	}
+
+	ms.mu.Lock()
+	defer ms.mu.Unlock()
+	ms.requests = append(ms.requests, RecordedRequest{
+		Method:   r.Method,
+		Path:     r.URL.Path,
+		RawQuery: r.URL.RawQuery,
+		Body:     body,
+	})
 }
 
 func getStringField(data map[string]interface{}, field string) string {
