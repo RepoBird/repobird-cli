@@ -1,6 +1,8 @@
 project: RepoBird CLI
 versions:
-    unreleased:
+    unreleased: {}
+    0.6.0:
+        date: 2026-06-05
         added:
             - Colored human-readable CLI output is enabled by default for terminal users, with config/env opt-outs via color=never, REPOBIRD_COLOR, and NO_COLOR.
             - Run creation now supports --acknowledge-prompt-risk and acknowledgePromptRisk config files for explicit prompt-risk acknowledgement
