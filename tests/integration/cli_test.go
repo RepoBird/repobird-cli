@@ -542,6 +542,17 @@ func TestCompletionCommand(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("completion installer dry run", func(t *testing.T) {
+		homeDir := t.TempDir()
+		result := RunCommandWithEnv(t, map[string]string{
+			"HOME": homeDir,
+		}, "completion", "install", "bash", "--dry-run")
+
+		AssertSuccess(t, result)
+		AssertContains(t, result.Stdout, "Would update")
+		AssertContains(t, result.Stdout, filepath.Join(homeDir, ".bashrc"))
+	})
 }
 
 // TestTUICommand tests basic TUI launching (can't test interaction)

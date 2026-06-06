@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Colored human-readable CLI output is enabled by default for terminal users, with config/env opt-outs via color=never, REPOBIRD_COLOR, and NO_COLOR.
 - Run creation now supports --acknowledge-prompt-risk and acknowledgePromptRisk config files for explicit prompt-risk acknowledgement
+- Add `repobird completion install` to configure shell completions for bash, zsh, fish, and PowerShell.
 
 ### Fixed
 

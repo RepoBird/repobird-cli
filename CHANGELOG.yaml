@@ -4,6 +4,7 @@ versions:
         added:
             - Colored human-readable CLI output is enabled by default for terminal users, with config/env opt-outs via color=never, REPOBIRD_COLOR, and NO_COLOR.
             - Run creation now supports --acknowledge-prompt-risk and acknowledgePromptRisk config files for explicit prompt-risk acknowledgement
+            - Add `repobird completion install` to configure shell completions for bash, zsh, fish, and PowerShell.
         fixed:
             - Prevent login and progress output from emitting duplicate redraw lines in non-interactive terminals.
             - Account info, status, and TUI usage displays now show credit balances instead of all-zero legacy run quotas.

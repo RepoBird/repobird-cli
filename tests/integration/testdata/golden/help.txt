@@ -9,7 +9,7 @@ Usage:
 
 Available Commands:
   basic       Create a Basic cloud agent run
-  completion  Generate shell completion scripts
+  completion  Generate or install shell completion scripts
   config      Manage RepoBird configuration
   docs        Generate documentation
   examples    Show configuration schemas and generate example files

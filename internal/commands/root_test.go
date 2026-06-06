@@ -98,7 +98,7 @@ func TestRootCommand_CommandDescriptions(t *testing.T) {
 		"info":       "Display authentication information",
 		"bulk":       "Submit multiple runs from configuration files (development only)",
 		"tui":        "Launch the interactive Terminal User Interface",
-		"completion": "Generate shell completion scripts",
+		"completion": "Generate or install shell completion scripts",
 		"docs":       "Generate documentation",
 	}
 
