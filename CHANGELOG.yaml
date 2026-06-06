@@ -1,6 +1,8 @@
 project: RepoBird CLI
 versions:
     unreleased:
+        fixed:
+            - Make login use the production API URL by default instead of persisted custom API endpoint overrides.
         internal:
             fixed:
                 - Generate GitHub release notes from curated chlog entries instead of raw commit subjects.
