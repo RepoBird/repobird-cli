@@ -13,6 +13,14 @@ func IsDevelopmentEnvironment() bool {
 	return env == "dev" || env == "development"
 }
 
+func IsPlanRunsEnabled() bool {
+	return IsDevelopmentEnvironment()
+}
+
+func PlanRunsUnavailableMessage() string {
+	return "plan runs are temporarily unavailable during the OpenCode migration; set REPOBIRD_ENV=development to test plan mode against a development server"
+}
+
 func IsBulkRunsEnabled() bool {
 	if !IsDevelopmentEnvironment() {
 		return false

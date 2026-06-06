@@ -5,9 +5,11 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
+	"github.com/repobird/repobird-cli/internal/config"
 	"github.com/repobird/repobird-cli/internal/domain"
 	"github.com/repobird/repobird-cli/internal/utils"
 )
@@ -160,6 +162,10 @@ func (s *runService) validateCreateRequest(req domain.CreateRunRequest) error {
 		req.RunType != domain.RunTypeBasic &&
 		req.RunType != domain.RunTypePro {
 		return fmt.Errorf("invalid run type: %s", req.RunType)
+	}
+
+	if req.RunType == domain.RunTypePlan && !config.IsPlanRunsEnabled() {
+		return errors.New(config.PlanRunsUnavailableMessage())
 	}
 
 	return nil

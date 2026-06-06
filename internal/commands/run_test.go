@@ -45,7 +45,7 @@ func TestRunCommand_WithFlags(t *testing.T) {
 			expectDryRun: true,
 		},
 		{
-			name: "Valid with all optional flags",
+			name: "Plan type blocked outside development",
 			args: []string{
 				"--repo", "test/repo",
 				"--prompt", "Fix authentication",
@@ -59,8 +59,8 @@ func TestRunCommand_WithFlags(t *testing.T) {
 			setupConfig: func() {
 				cfg.APIKey = "test-key"
 			},
-			expectError:  false,
-			expectDryRun: true,
+			expectError:   true,
+			errorContains: "plan runs are temporarily unavailable",
 		},
 		{
 			name: "Missing prompt flag",
@@ -196,15 +196,6 @@ func TestRunCommand_ValidationWithFlags(t *testing.T) {
 			},
 		},
 		{
-			name: "Plan type explicitly set",
-			args: []string{"-r", "test/repo", "-p", "Fix bug", "--run-type", "plan", "--dry-run"},
-			expectInJSON: map[string]string{
-				"RunType":        "plan",
-				"RepositoryName": "test/repo",
-				"Prompt":         "Fix bug",
-			},
-		},
-		{
 			name: "Basic preset selects DeepSeek model",
 			args: []string{"-r", "test/repo", "-p", "Fix bug", "--basic", "--dry-run"},
 			expectInJSON: map[string]string{
@@ -314,6 +305,52 @@ func TestRunCommand_ValidationWithFlags(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRunCommand_PlanTypeAllowedInDevelopment(t *testing.T) {
+	t.Setenv(config.EnvEnvironment, "development")
+	ensureRunTestConfig()
+
+	originalAPIKey := cfg.APIKey
+	cfg.APIKey = "test-key"
+	defer func() {
+		cfg.APIKey = originalAPIKey
+		repo = ""
+		prompt = ""
+		source = ""
+		target = ""
+		baseBranch = ""
+		outputMode = ""
+		outputBranch = ""
+		prTargetBranch = ""
+		outputBranchPolicy = ""
+		title = ""
+		runType = ""
+		contextFlag = ""
+		basicRun = false
+		proRun = false
+		dryRun = false
+	}()
+
+	err := runCmd.ParseFlags([]string{"-r", "test/repo", "-p", "Fix bug", "--run-type", "plan", "--dry-run"})
+	require.NoError(t, err)
+
+	old := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	cmdErr := runCommand(runCmd, []string{})
+
+	w.Close()
+	os.Stdout = old
+
+	var buf bytes.Buffer
+	buf.ReadFrom(r)
+	output := buf.String()
+
+	require.NoError(t, cmdErr)
+	assert.Contains(t, output, "Validation successful")
+	assert.Contains(t, output, `"RunType": "plan"`)
 }
 
 func TestRunCommand_BranchOnlyFlag(t *testing.T) {

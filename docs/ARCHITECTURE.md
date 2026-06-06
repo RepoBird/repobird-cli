@@ -90,7 +90,7 @@ Hybrid cache with automatic persistence:
 Multi-backend secure configuration:
 1. Environment variables (`REPOBIRD_API_KEY`)
 2. System keyring (secure desktop storage)
-3. Encrypted file fallback (`~/.repobird/config.yaml`)
+3. Encrypted file fallback (`~/.config/repobird/.api_key.enc`; legacy `~/.repobird/.api_key.enc` is still read)
 
 See **[Configuration Guide](CONFIGURATION-GUIDE.md)** for details.
 

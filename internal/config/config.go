@@ -25,23 +25,25 @@ var (
 		Debug:  false,
 		Color:  "auto",
 	}
+	configFileOverride string
 )
 
 func LoadConfig() (*Config, error) {
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
 
-	homeDir, err := os.UserHomeDir()
-	if err == nil {
-		configDir := filepath.Join(homeDir, ".repobird")
+	if configFileOverride != "" {
+		viper.SetConfigFile(configFileOverride)
+	} else {
+		configDir := ConfigDir()
 		if err := os.MkdirAll(configDir, 0755); err != nil {
 			// Log error but continue - config can still work from current directory
 			fmt.Fprintf(os.Stderr, "Warning: failed to create config directory %s: %v\n", configDir, err)
 		}
 		viper.AddConfigPath(configDir)
+		viper.AddConfigPath(LegacyConfigDir())
+		viper.AddConfigPath(".")
 	}
-
-	viper.AddConfigPath(".")
 
 	viper.SetEnvPrefix("REPOBIRD")
 	viper.AutomaticEnv()
@@ -82,27 +84,52 @@ func LoadConfig() (*Config, error) {
 }
 
 func SaveConfig(config *Config) error {
-	viper.Set("api_key", config.APIKey)
+	viper.Set("api_key", "")
 	viper.Set("api_url", config.APIURL)
 	viper.Set("debug", config.Debug)
 	viper.Set("color", normalizeColor(config.Color))
 
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return fmt.Errorf("failed to get home directory: %w", err)
+	configDir := ConfigDir()
+	configFile := filepath.Join(configDir, "config.yaml")
+	if configFileOverride != "" {
+		configFile = configFileOverride
+		configDir = filepath.Dir(configFile)
 	}
-
-	configDir := filepath.Join(homeDir, ".repobird")
 	if err := os.MkdirAll(configDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
-	configFile := filepath.Join(configDir, "config.yaml")
 	if err := viper.WriteConfigAs(configFile); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 
 	return nil
+}
+
+func SetConfigFile(path string) {
+	configFileOverride = path
+}
+
+func ConfigDir() string {
+	if configHome := os.Getenv("XDG_CONFIG_HOME"); configHome != "" {
+		return filepath.Join(configHome, "repobird")
+	}
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return filepath.Join(".config", "repobird")
+	}
+
+	return filepath.Join(homeDir, ".config", "repobird")
+}
+
+func LegacyConfigDir() string {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return filepath.Join(".repobird")
+	}
+
+	return filepath.Join(homeDir, ".repobird")
 }
 
 func normalizeColor(value string) string {

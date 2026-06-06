@@ -121,7 +121,7 @@ export REPOBIRD_COLOR=never                      # Disable color output
 ## Configuration File
 
 ```yaml
-# ~/.repobird/config.yaml
+# ~/.config/repobird/config.yaml
 api_key: <your-api-key>
 api_url: https://repobird.ai
 color: auto

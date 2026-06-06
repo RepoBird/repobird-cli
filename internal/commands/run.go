@@ -127,7 +127,7 @@ func init() {
 	runCmd.Flags().StringVar(&prTargetBranch, "pr-target-branch", "", "branch the pull request targets (optional)")
 	runCmd.Flags().StringVar(&outputBranchPolicy, "output-branch-policy", "", "output branch policy: 'create' or 'reuse' (optional)")
 	runCmd.Flags().StringVar(&title, "title", "", "title for the run (optional)")
-	runCmd.Flags().StringVar(&runType, "run-type", "", "type of run: 'run' or 'plan' (optional, default: run)")
+	runCmd.Flags().StringVar(&runType, "run-type", "", "type of run: 'run' (optional, default: run); 'plan' is development-only during the OpenCode migration")
 	runCmd.Flags().BoolVar(&basicRun, "basic", false, "use the Basic cloud agent preset")
 	runCmd.Flags().BoolVar(&proRun, "pro", false, "use the Pro cloud agent preset")
 	runCmd.Flags().BoolVar(&branchOnly, "branch-only", false, "push commits to a branch without creating a pull request")
@@ -313,6 +313,10 @@ func processSingleRun(runConfig *models.RunConfig, additionalContext string) err
 	runConfig.NormalizeBranchOutput()
 
 	// Validate the configuration
+	if runConfig.RunType == string(models.RunTypePlan) && !config.IsPlanRunsEnabled() {
+		return netstderrors.New(config.PlanRunsUnavailableMessage())
+	}
+
 	if err := utils.ValidateRunConfig(runConfig); err != nil {
 		return fmt.Errorf("validation failed: %w", err)
 	}

@@ -51,8 +51,10 @@ export REPOBIRD_API_KEY=<your-api-key>
 ## Configuration File
 
 **Location:**
-- Linux/macOS: `~/.repobird/config.yaml`
-- Windows: `%USERPROFILE%\.repobird\config.yaml`
+- Linux/macOS: `~/.config/repobird/config.yaml` or `$XDG_CONFIG_HOME/repobird/config.yaml`
+- Windows: `%USERPROFILE%\.config\repobird\config.yaml`
+
+Legacy `~/.repobird/config.yaml` files are still read for backward compatibility.
 
 **Example:**
 ```yaml
@@ -136,7 +138,7 @@ repobird examples generate run -f yaml -o task.yaml
 - `source` - Source branch (defaults to repository's default branch if not specified)
 - `target` - Target branch (auto-generated)
 - `title` - Run title (auto-generated)
-- `runType` - "run" or "plan" (default: run)
+- `runType` - "run" (default); "plan" is development-only during the OpenCode migration
 - `context` - Additional instructions
 - `files` - Specific files to include
 
@@ -232,14 +234,14 @@ repobird --profile staging status
 # Check all sources
 repobird config get api-key
 echo $REPOBIRD_API_KEY
-cat ~/.repobird/config.yaml | grep api_key
+cat ~/.config/repobird/config.yaml | grep api_key
 ```
 
 ### Permission Denied
 ```bash
 # Fix config directory permissions
-chmod 700 ~/.repobird
-chmod 600 ~/.repobird/config.yaml
+chmod 700 ~/.config/repobird
+chmod 600 ~/.config/repobird/config.yaml
 ```
 
 ### Keyring Issues

@@ -122,7 +122,7 @@ func showRunSchema() {
 	fmt.Println("  • target      (string)  - Target branch name for changes (default: auto-generated)")
 	fmt.Println("  • title       (string)  - Human-readable title for the run (default: auto-generated)")
 	fmt.Println("  • source      (string)  - Source branch (default: 'main', auto-detected in git repos)")
-	fmt.Println("  • runType     (string)  - Type: 'run' or 'plan' (default: 'run')")
+	fmt.Println("  • runType     (string)  - Type: 'run' (default); 'plan' is development-only during the OpenCode migration")
 	fmt.Println("  • context     (string)  - Additional context or instructions")
 	fmt.Println("  • files       (array)   - List of specific files to include")
 	fmt.Println()

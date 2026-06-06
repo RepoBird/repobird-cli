@@ -328,7 +328,7 @@ components:
           type: string
           enum: [run, plan, basic, pro]
           default: run
-          description: Type of run. Legacy run/plan values remain supported; CLI Basic/Pro shortcuts send basic/pro with the matching OpenCode model.
+          description: Type of run. Legacy plan remains a development-only compatibility value during the OpenCode migration; CLI Basic/Pro shortcuts send basic/pro with the matching OpenCode model.
           example: run
         agent:
           type: string

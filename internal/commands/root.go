@@ -34,6 +34,7 @@ Base URL: %s
 Get API Key: %s`, config.GetURLs().BaseURL, config.GetAPIKeysURL()),
 	PersistentPreRunE: func(_ *cobra.Command, _ []string) error {
 		var err error
+		config.SetConfigFile(cfgFile)
 		cfg, err = config.LoadSecureConfig()
 		if err != nil {
 			// Don't fail if config doesn't exist yet
@@ -77,7 +78,7 @@ func init() {
 	rootCmd.SetHelpFunc(coloredHelp)
 	rootCmd.SetUsageFunc(coloredUsage)
 
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.repobird/config.yaml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $XDG_CONFIG_HOME/repobird/config.yaml or $HOME/.config/repobird/config.yaml)")
 	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "enable debug output")
 	rootCmd.PersistentFlags().BoolVar(&debugUser, "debug-user", false, "enable debug user mode with mock data")
 

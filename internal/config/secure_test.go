@@ -243,6 +243,52 @@ func TestSecureStorage_PlainTextMigration(t *testing.T) {
 	}
 }
 
+func TestNewSecureStorage_UsesXDGConfigDir(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmpDir)
+	t.Setenv("HOME", filepath.Join(tmpDir, "home"))
+
+	storage := NewSecureStorage()
+
+	want := filepath.Join(tmpDir, "repobird")
+	if storage.configDir != want {
+		t.Fatalf("config dir = %q, want %q", storage.configDir, want)
+	}
+}
+
+func TestSecureStorage_LegacyEncryptedFileMigration(t *testing.T) {
+	tmpDir := t.TempDir()
+	xdgDir := filepath.Join(tmpDir, "xdg")
+	homeDir := filepath.Join(tmpDir, "home")
+	newDir := filepath.Join(xdgDir, "repobird")
+	legacyDir := filepath.Join(homeDir, ".repobird")
+	testKey := "legacy-encrypted-api-key"
+	t.Setenv("XDG_CONFIG_HOME", xdgDir)
+	t.Setenv("HOME", homeDir)
+
+	legacyStorage := &SecureStorage{
+		useKeyring: false,
+		configDir:  legacyDir,
+	}
+	if err := legacyStorage.SaveAPIKey(testKey); err != nil {
+		t.Fatalf("failed to save legacy key: %v", err)
+	}
+
+	storage := NewSecureStorage()
+	storage.useKeyring = false
+	got, err := storage.GetAPIKey()
+	if err != nil {
+		t.Fatalf("GetAPIKey failed: %v", err)
+	}
+	if got != testKey {
+		t.Fatalf("got %q, want %q", redactKey(got), redactKey(testKey))
+	}
+
+	if _, err := os.Stat(filepath.Join(newDir, ".api_key.enc")); err != nil {
+		t.Fatalf("expected migrated encrypted key in new config dir: %v", err)
+	}
+}
+
 func TestGetStorageInfo(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "repobird-test-*")
 	if err != nil {
@@ -295,5 +341,11 @@ func TestIsKeyringAvailable(t *testing.T) {
 		if available {
 			t.Error("Keyring should not be available in CI/container environment")
 		}
+	}
+}
+
+func TestIsKeyringAvailable_DisabledDuringTests(t *testing.T) {
+	if isKeyringAvailable() {
+		t.Fatal("keyring must be disabled while running Go tests")
 	}
 }

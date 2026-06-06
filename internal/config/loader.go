@@ -77,8 +77,12 @@ func (c *ConfigLoader) ValidateConfig(config *models.RunRequest) error {
 
 	// Validate runType
 	switch config.RunType {
-	case models.RunTypeRun, models.RunTypePlan:
+	case models.RunTypeRun:
 		// Valid
+	case models.RunTypePlan:
+		if !IsPlanRunsEnabled() {
+			errors = append(errors, PlanRunsUnavailableMessage())
+		}
 	case "":
 		config.RunType = models.RunTypeRun // Set default
 	default:

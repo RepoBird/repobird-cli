@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/zalando/go-keyring"
 )
@@ -36,19 +37,18 @@ const (
 type SecureStorage struct {
 	useKeyring bool
 	configDir  string
+	legacyDir  string
 }
 
 // NewSecureStorage creates a new secure storage instance
 func NewSecureStorage() *SecureStorage {
-	homeDir, _ := os.UserHomeDir()
-	configDir := filepath.Join(homeDir, ".repobird")
-
 	// Check if keyring is available
 	useKeyring := isKeyringAvailable()
 
 	return &SecureStorage{
 		useKeyring: useKeyring,
-		configDir:  configDir,
+		configDir:  ConfigDir(),
+		legacyDir:  LegacyConfigDir(),
 	}
 }
 
@@ -62,8 +62,10 @@ func (s *SecureStorage) SaveAPIKey(apiKey string) error {
 	if s.useKeyring {
 		err := keyring.Set(keyringService, keyringAccount, apiKey)
 		if err == nil {
-			// Successfully stored in keyring, remove from config file if exists
-			s.removeAPIKeyFromConfig()
+			// Keep an encrypted XDG fallback so keyring availability changes do not lose auth.
+			if err := s.saveEncryptedAPIKey(apiKey); err != nil {
+				return fmt.Errorf("failed to save encrypted API key fallback: %w", err)
+			}
 			return nil
 		}
 		// Fall back to encrypted file if keyring fails
@@ -94,6 +96,14 @@ func (s *SecureStorage) GetAPIKey() (string, error) {
 		return apiKey, nil
 	}
 
+	apiKey, err = s.getLegacyEncryptedAPIKey()
+	if err == nil && apiKey != "" {
+		if err := s.SaveAPIKey(apiKey); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to migrate legacy API key to secure storage: %v\n", err)
+		}
+		return apiKey, nil
+	}
+
 	// Check plain text config as last resort (for backward compatibility)
 	apiKey = s.getPlainTextAPIKey()
 	if apiKey != "" {
@@ -101,6 +111,14 @@ func (s *SecureStorage) GetAPIKey() (string, error) {
 		if err := s.SaveAPIKey(apiKey); err != nil {
 			// Log migration failure but continue - API key is still available
 			fmt.Fprintf(os.Stderr, "Warning: failed to migrate API key to secure storage: %v\n", err)
+		}
+		return apiKey, nil
+	}
+
+	apiKey = s.getLegacyPlainTextAPIKey()
+	if apiKey != "" {
+		if err := s.SaveAPIKey(apiKey); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to migrate legacy API key to secure storage: %v\n", err)
 		}
 		return apiKey, nil
 	}
@@ -136,12 +154,26 @@ func (s *SecureStorage) DeleteAPIKey() error {
 		removedAny = true
 	}
 
+	legacyEncryptedFile := filepath.Join(s.legacyDir, ".api_key.enc")
+	if err := os.Remove(legacyEncryptedFile); err != nil {
+		if !os.IsNotExist(err) {
+			errors = append(errors, fmt.Sprintf("legacy encrypted file: %v", err))
+		}
+	} else {
+		removedAny = true
+	}
+
 	// Remove from plain text config
 	s.removeAPIKeyFromConfig()
+	s.removeAPIKeyFromLegacyConfig()
 
 	// Check if we actually had an API key stored anywhere
 	configFile := filepath.Join(s.configDir, "config.yaml")
 	if _, err := os.Stat(configFile); err == nil {
+		removedAny = true
+	}
+	legacyConfigFile := filepath.Join(s.legacyDir, "config.yaml")
+	if _, err := os.Stat(legacyConfigFile); err == nil {
 		removedAny = true
 	}
 
@@ -194,7 +226,18 @@ func (s *SecureStorage) saveEncryptedAPIKey(apiKey string) error {
 
 // getEncryptedAPIKey retrieves the API key from encrypted file
 func (s *SecureStorage) getEncryptedAPIKey() (string, error) {
-	encryptedFile := filepath.Join(s.configDir, ".api_key.enc")
+	return s.getEncryptedAPIKeyFromDir(s.configDir)
+}
+
+func (s *SecureStorage) getLegacyEncryptedAPIKey() (string, error) {
+	if s.legacyDir == "" || s.legacyDir == s.configDir {
+		return "", nil
+	}
+	return s.getEncryptedAPIKeyFromDir(s.legacyDir)
+}
+
+func (s *SecureStorage) getEncryptedAPIKeyFromDir(dir string) (string, error) {
+	encryptedFile := filepath.Join(dir, ".api_key.enc")
 
 	data, err := os.ReadFile(encryptedFile)
 	if err != nil {
@@ -258,7 +301,18 @@ func (s *SecureStorage) getEncryptionKey() []byte {
 
 // getPlainTextAPIKey reads API key from plain text config (backward compatibility)
 func (s *SecureStorage) getPlainTextAPIKey() string {
-	configFile := filepath.Join(s.configDir, "config.yaml")
+	return getPlainTextAPIKeyFromDir(s.configDir)
+}
+
+func (s *SecureStorage) getLegacyPlainTextAPIKey() string {
+	if s.legacyDir == "" || s.legacyDir == s.configDir {
+		return ""
+	}
+	return getPlainTextAPIKeyFromDir(s.legacyDir)
+}
+
+func getPlainTextAPIKeyFromDir(dir string) string {
+	configFile := filepath.Join(dir, "config.yaml")
 	data, err := os.ReadFile(configFile)
 	if err != nil {
 		return ""
@@ -276,7 +330,17 @@ func (s *SecureStorage) getPlainTextAPIKey() string {
 
 // removeAPIKeyFromConfig removes API key from plain text config
 func (s *SecureStorage) removeAPIKeyFromConfig() {
-	configFile := filepath.Join(s.configDir, "config.yaml")
+	removeAPIKeyFromConfigFile(filepath.Join(s.configDir, "config.yaml"))
+}
+
+func (s *SecureStorage) removeAPIKeyFromLegacyConfig() {
+	if s.legacyDir == "" || s.legacyDir == s.configDir {
+		return
+	}
+	removeAPIKeyFromConfigFile(filepath.Join(s.legacyDir, "config.yaml"))
+}
+
+func removeAPIKeyFromConfigFile(configFile string) {
 	data, err := os.ReadFile(configFile)
 	if err != nil {
 		return
@@ -298,6 +362,10 @@ func (s *SecureStorage) removeAPIKeyFromConfig() {
 
 // isKeyringAvailable checks if system keyring is available
 func isKeyringAvailable() bool {
+	if isTestProcess() || strings.EqualFold(os.Getenv("REPOBIRD_TEST_MODE"), "true") {
+		return false
+	}
+
 	// Only use keyring on systems where it's reliably available:
 	// - macOS (always has Keychain)
 	// - Windows (always has Credential Manager)
@@ -336,6 +404,11 @@ func isKeyringAvailable() bool {
 	default:
 		return false
 	}
+}
+
+func isTestProcess() bool {
+	executable := filepath.Base(os.Args[0])
+	return strings.HasSuffix(executable, ".test") || strings.Contains(executable, "repobird-test")
 }
 
 // encrypt encrypts data using AES-GCM

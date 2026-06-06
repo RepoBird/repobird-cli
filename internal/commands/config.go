@@ -39,7 +39,7 @@ Available configuration keys:
   color      Color output mode: auto, always, or never
 
 Storage locations:
-  Config file: ~/.repobird/config.yaml
+  Config file: ~/.config/repobird/config.yaml
   API key:     Secure storage (system keyring or encrypted file)
   Cache:       ~/.config/repobird/cache/
 

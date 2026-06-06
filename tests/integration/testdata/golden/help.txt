@@ -26,7 +26,7 @@ Available Commands:
   version     Print version information
 
 Flags:
-      --config string   config file (default is $HOME/.repobird/config.yaml)
+      --config string   config file (default is $XDG_CONFIG_HOME/repobird/config.yaml or $HOME/.config/repobird/config.yaml)
       --debug           enable debug output
       --debug-user      enable debug user mode with mock data
   -h, --help            help for repobird

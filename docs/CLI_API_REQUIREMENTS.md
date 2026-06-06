@@ -46,7 +46,7 @@ interface CreateRunRequest {
   branchOnly?: boolean;        // Legacy alias for outputMode='branch'
   
   // Agent configuration
-  runType?: 'run' | 'plan' | 'basic' | 'pro'; // CLI presets use 'basic'/'pro'; legacy run/plan remain supported
+  runType?: 'run' | 'plan' | 'basic' | 'pro'; // CLI presets use 'basic'/'pro'; legacy plan is development-only during the OpenCode migration
   agent?: 'opencode';          // CLI sends OpenCode for cloud-agent runs
   opencodeModel?: string;      // Basic default: openrouter/deepseek/deepseek-v4-flash; Pro default: openrouter/moonshotai/kimi-k2.6
   opencodeProvider?: 'openrouter';
@@ -334,7 +334,7 @@ curl -X GET https://repobird.ai/api/v1/runs?page=1&limit=10 \
    - Support .env file for development API URL override
    - Repository resolution: name → repoId via API
    - Auto-detect repo from git config if not specified
-   - Preserve legacy CLI runType values ('run' → 'pro', 'plan' → 'pro-plan') while exposing Basic/Pro presets
+   - Preserve legacy CLI runType values for compatibility, but keep plan submissions development-only during the OpenCode migration while exposing Basic/Pro presets
    - Basic preset uses DeepSeek V4 Flash; Pro preset uses Kimi K2.6
    - Handle status enum values correctly
 

@@ -32,7 +32,7 @@ func TestLoadConfig_WithExistingFile(t *testing.T) {
 	tempDir := setupTempHome(t)
 
 	// Create config file
-	configDir := filepath.Join(tempDir, ".repobird")
+	configDir := filepath.Join(tempDir, "repobird")
 	err := os.MkdirAll(configDir, 0755)
 	require.NoError(t, err)
 
@@ -109,7 +109,7 @@ func TestLoadConfig_FileAndEnvironmentPrecedence(t *testing.T) {
 	tempDir := setupTempHome(t)
 
 	// Create config file
-	configDir := filepath.Join(tempDir, ".repobird")
+	configDir := filepath.Join(tempDir, "repobird")
 	err := os.MkdirAll(configDir, 0755)
 	require.NoError(t, err)
 
@@ -156,7 +156,7 @@ func TestLoadConfig_InvalidConfigFile(t *testing.T) {
 	tempDir := setupTempHome(t)
 
 	// Create invalid config file
-	configDir := filepath.Join(tempDir, ".repobird")
+	configDir := filepath.Join(tempDir, "repobird")
 	err := os.MkdirAll(configDir, 0755)
 	require.NoError(t, err)
 
@@ -190,15 +190,18 @@ func TestSaveConfig(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify file was created
-	configFile := filepath.Join(tempDir, ".repobird", "config.yaml")
+	configFile := filepath.Join(tempDir, "repobird", "config.yaml")
 	assert.FileExists(t, configFile)
+	data, err := os.ReadFile(configFile)
+	require.NoError(t, err)
+	assert.NotContains(t, string(data), config.APIKey)
 
 	// Load and verify content
 	loadedConfig, err := LoadConfig()
 	require.NoError(t, err)
 
 	assert.Equal(t, config.APIURL, loadedConfig.APIURL)
-	assert.Equal(t, config.APIKey, loadedConfig.APIKey)
+	assert.Empty(t, loadedConfig.APIKey)
 	assert.Equal(t, config.Debug, loadedConfig.Debug)
 	assert.Equal(t, config.Color, loadedConfig.Color)
 }
@@ -207,7 +210,7 @@ func TestSaveConfig_CreatesDirectory(t *testing.T) {
 	tempDir := setupTempHome(t)
 
 	// Ensure directory doesn't exist
-	configDir := filepath.Join(tempDir, ".repobird")
+	configDir := filepath.Join(tempDir, "repobird")
 	_, err := os.Stat(configDir)
 	require.True(t, os.IsNotExist(err))
 
@@ -229,13 +232,32 @@ func TestSaveConfig_CreatesDirectory(t *testing.T) {
 func TestGetConfigPath(t *testing.T) {
 	tempDir := setupTempHome(t)
 
-	expected := filepath.Join(tempDir, ".repobird", "config.yaml")
+	expected := filepath.Join(tempDir, "repobird", "config.yaml")
 
 	// Since getConfigPath isn't exported, test the path used by SaveConfig
-	configDir := filepath.Join(tempDir, ".repobird")
+	configDir := filepath.Join(tempDir, "repobird")
 	actualPath := filepath.Join(configDir, "config.yaml")
 
 	assert.Equal(t, expected, actualPath)
+}
+
+func TestLoadConfig_LegacyRepobirdConfigFallback(t *testing.T) {
+	tempDir := setupTempHome(t)
+
+	legacyDir := filepath.Join(tempDir, ".repobird")
+	require.NoError(t, os.MkdirAll(legacyDir, 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(legacyDir, "config.yaml"), []byte(`
+api_url: https://legacy.api.com
+debug: true
+color: never
+`), 0644))
+
+	config, err := LoadConfig()
+	require.NoError(t, err)
+
+	assert.Equal(t, "https://legacy.api.com", config.APIURL)
+	assert.True(t, config.Debug)
+	assert.Equal(t, "never", config.Color)
 }
 
 func TestConfig_Validation(t *testing.T) {
@@ -295,7 +317,7 @@ func TestConfig_Validation(t *testing.T) {
 				assert.NoError(t, err)
 
 				assert.Equal(t, tt.config.APIURL, loadedConfig.APIURL)
-				assert.Equal(t, tt.config.APIKey, loadedConfig.APIKey)
+				assert.Empty(t, loadedConfig.APIKey)
 				assert.Equal(t, tt.config.Debug, loadedConfig.Debug)
 			}
 		})
@@ -322,7 +344,7 @@ func TestConfig_EdgeCases(t *testing.T) {
 
 		loadedConfig, err := LoadConfig()
 		require.NoError(t, err)
-		assert.Equal(t, config.APIKey, loadedConfig.APIKey)
+		assert.Empty(t, loadedConfig.APIKey)
 	})
 
 	t.Run("Config with special characters in API key", func(t *testing.T) {
@@ -339,7 +361,7 @@ func TestConfig_EdgeCases(t *testing.T) {
 
 		loadedConfig, err := LoadConfig()
 		require.NoError(t, err)
-		assert.Equal(t, config.APIKey, loadedConfig.APIKey)
+		assert.Empty(t, loadedConfig.APIKey)
 	})
 
 	t.Run("Config with non-standard API URL", func(t *testing.T) {
@@ -373,11 +395,13 @@ func setupTempHome(t *testing.T) string {
 	viper.New()
 
 	// Reset viper to clear any cached config
+	SetConfigFile("")
 	viper.Reset()
 
 	t.Cleanup(func() {
 		// Note: t.Setenv automatically restores original values
 		// t.TempDir automatically removes directory
+		SetConfigFile("")
 		viper.Reset() // Reset viper after test
 	})
 
