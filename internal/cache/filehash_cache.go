@@ -188,7 +188,6 @@ func (c *FileHashCache) FetchFromAPI(ctx context.Context, apiClient interface {
 	}
 
 	c.mu.Lock()
-	defer c.mu.Unlock()
 
 	// Clear and rebuild the hash map
 	c.hashes = make(map[string]bool)
@@ -200,11 +199,9 @@ func (c *FileHashCache) FetchFromAPI(ctx context.Context, apiClient interface {
 
 	c.loaded = true
 	c.loadedAt = time.Now()
+	c.mu.Unlock()
 
-	// Save to file after fetching
-	go func() {
-		_ = c.SaveToFile()
-	}()
+	_ = c.SaveToFile()
 
 	return nil
 }

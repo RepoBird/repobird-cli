@@ -437,6 +437,10 @@ func TestFileHashCache_EnsureLoaded(t *testing.T) {
 		t.Error("Cache should contain hash from API")
 	}
 
+	if _, err := os.Stat(cache.cacheFile); err != nil {
+		t.Fatalf("Cache file should be persisted before EnsureLoaded returns: %v", err)
+	}
+
 	// Second call should not fetch again (already loaded)
 	mockClient.shouldErr = true // This would cause error if it tries to fetch
 	err = cache.EnsureLoaded(context.Background(), mockClient)
