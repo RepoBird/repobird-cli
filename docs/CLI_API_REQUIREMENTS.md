@@ -44,6 +44,7 @@ interface CreateRunRequest {
   issueNumber?: number;        // GitHub issue number to work on
   pullRequestNumber?: number;  // Existing PR to modify
   branchOnly?: boolean;        // Legacy alias for outputMode='branch'
+  acknowledgePromptRisk?: boolean; // Resend only after reviewing PROMPT_RISK_ACK_REQUIRED
   
   // Agent configuration
   runType?: 'run' | 'plan' | 'basic' | 'pro'; // CLI presets use 'basic'/'pro'; legacy plan is development-only during the OpenCode migration

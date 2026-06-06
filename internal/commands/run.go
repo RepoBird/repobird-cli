@@ -28,23 +28,24 @@ import (
 )
 
 var (
-	dryRun             bool
-	follow             bool
-	repo               string
-	prompt             string
-	source             string
-	target             string
-	baseBranch         string
-	outputMode         string
-	outputBranch       string
-	prTargetBranch     string
-	outputBranchPolicy string
-	title              string
-	runType            string
-	contextFlag        string
-	basicRun           bool
-	proRun             bool
-	branchOnly         bool
+	dryRun                bool
+	follow                bool
+	repo                  string
+	prompt                string
+	source                string
+	target                string
+	baseBranch            string
+	outputMode            string
+	outputBranch          string
+	prTargetBranch        string
+	outputBranchPolicy    string
+	title                 string
+	runType               string
+	contextFlag           string
+	basicRun              bool
+	proRun                bool
+	branchOnly            bool
+	acknowledgePromptRisk bool
 )
 
 type runPreset struct {
@@ -132,6 +133,7 @@ func init() {
 	runCmd.Flags().BoolVar(&proRun, "pro", false, "use the Pro cloud agent preset")
 	runCmd.Flags().BoolVar(&branchOnly, "branch-only", false, "push commits to a branch without creating a pull request")
 	runCmd.Flags().BoolVar(&branchOnly, "no-pr", false, "alias for --branch-only")
+	runCmd.Flags().BoolVar(&acknowledgePromptRisk, "acknowledge-prompt-risk", false, "acknowledge prompt-risk warning and create the run")
 	runCmd.Flags().StringVar(&contextFlag, "context", "", "additional context (use @file to read from file, - for stdin)")
 }
 
@@ -180,19 +182,20 @@ func runCommandWithPreset(cmd *cobra.Command, args []string, presetName string) 
 
 		// Create run from flags
 		runConfig := &models.RunConfig{
-			Repository:         repo,
-			Prompt:             processedPrompt,
-			Source:             source,
-			Target:             target,
-			BaseBranch:         baseBranch,
-			OutputMode:         outputMode,
-			OutputBranch:       outputBranch,
-			PRTargetBranch:     prTargetBranch,
-			OutputBranchPolicy: outputBranchPolicy,
-			Title:              title,
-			RunType:            selectedRunType(selectedPreset),
-			Context:            processedContext,
-			BranchOnly:         branchOnly,
+			Repository:            repo,
+			Prompt:                processedPrompt,
+			Source:                source,
+			Target:                target,
+			BaseBranch:            baseBranch,
+			OutputMode:            outputMode,
+			OutputBranch:          outputBranch,
+			PRTargetBranch:        prTargetBranch,
+			OutputBranchPolicy:    outputBranchPolicy,
+			Title:                 title,
+			RunType:               selectedRunType(selectedPreset),
+			Context:               processedContext,
+			BranchOnly:            branchOnly,
+			AcknowledgePromptRisk: acknowledgePromptRisk,
 		}
 
 		// Set default run type if not specified
@@ -323,23 +326,24 @@ func processSingleRun(runConfig *models.RunConfig, additionalContext string) err
 
 	// Convert to domain request
 	createReq := domain.CreateRunRequest{
-		Prompt:             runConfig.Prompt,
-		RepositoryName:     runConfig.Repository,
-		SourceBranch:       runConfig.Source,
-		TargetBranch:       runConfig.Target,
-		BaseBranch:         runConfig.BaseBranch,
-		OutputMode:         runConfig.OutputMode,
-		OutputBranch:       runConfig.OutputBranch,
-		PRTargetBranch:     runConfig.PRTargetBranch,
-		OutputBranchPolicy: runConfig.OutputBranchPolicy,
-		RunType:            runConfig.RunType,
-		Agent:              "opencode",
-		OpenCodeModel:      modelForRunType(runConfig.RunType),
-		OpenCodeProvider:   providerForRunType(runConfig.RunType),
-		Title:              runConfig.Title,
-		Context:            runConfig.Context,
-		Files:              runConfig.Files,
-		BranchOnly:         runConfig.BranchOnly,
+		Prompt:                runConfig.Prompt,
+		RepositoryName:        runConfig.Repository,
+		SourceBranch:          runConfig.Source,
+		TargetBranch:          runConfig.Target,
+		BaseBranch:            runConfig.BaseBranch,
+		OutputMode:            runConfig.OutputMode,
+		OutputBranch:          runConfig.OutputBranch,
+		PRTargetBranch:        runConfig.PRTargetBranch,
+		OutputBranchPolicy:    runConfig.OutputBranchPolicy,
+		RunType:               runConfig.RunType,
+		Agent:                 "opencode",
+		OpenCodeModel:         modelForRunType(runConfig.RunType),
+		OpenCodeProvider:      providerForRunType(runConfig.RunType),
+		Title:                 runConfig.Title,
+		Context:               runConfig.Context,
+		Files:                 runConfig.Files,
+		BranchOnly:            runConfig.BranchOnly,
+		AcknowledgePromptRisk: runConfig.AcknowledgePromptRisk,
 	}
 
 	// Append additional markdown context if present
@@ -418,6 +422,7 @@ func newRunPresetCommand(presetName string) *cobra.Command {
 	cmd.Flags().StringVar(&title, "title", "", "title for the run (optional)")
 	cmd.Flags().BoolVar(&branchOnly, "branch-only", false, "push commits to a branch without creating a pull request")
 	cmd.Flags().BoolVar(&branchOnly, "no-pr", false, "alias for --branch-only")
+	cmd.Flags().BoolVar(&acknowledgePromptRisk, "acknowledge-prompt-risk", false, "acknowledge prompt-risk warning and create the run")
 	cmd.Flags().StringVar(&contextFlag, "context", "", "additional context (use @file to read from file, - for stdin)")
 	return cmd
 }

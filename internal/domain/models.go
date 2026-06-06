@@ -42,23 +42,24 @@ type Run struct {
 
 // CreateRunRequest represents a request to create a new run
 type CreateRunRequest struct {
-	Prompt             string
-	RepositoryName     string
-	SourceBranch       string
-	TargetBranch       string
-	BaseBranch         string
-	OutputMode         string
-	OutputBranch       string
-	PRTargetBranch     string
-	OutputBranchPolicy string
-	RunType            string
-	Agent              string
-	OpenCodeModel      string
-	OpenCodeProvider   string
-	Title              string
-	Context            string
-	Files              []string
-	BranchOnly         bool
+	Prompt                string
+	RepositoryName        string
+	SourceBranch          string
+	TargetBranch          string
+	BaseBranch            string
+	OutputMode            string
+	OutputBranch          string
+	PRTargetBranch        string
+	OutputBranchPolicy    string
+	RunType               string
+	Agent                 string
+	OpenCodeModel         string
+	OpenCodeProvider      string
+	Title                 string
+	Context               string
+	Files                 []string
+	BranchOnly            bool
+	AcknowledgePromptRisk bool
 }
 
 // ListOptions represents options for listing runs

@@ -9,7 +9,7 @@ OPTIONAL FIELDS:
   • target      (string)  - Target branch name for changes (default: auto-generated)
   • title       (string)  - Human-readable title for the run (default: auto-generated)
   • source      (string)  - Source branch (default: 'main', auto-detected in git repos)
-  • runType     (string)  - Type: 'run' or 'plan' (default: 'run')
+  • runType     (string)  - Type: 'run' (default); 'plan' is development-only during the OpenCode migration
   • context     (string)  - Additional context or instructions
   • files       (array)   - List of specific files to include
 

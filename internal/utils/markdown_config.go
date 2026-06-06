@@ -12,22 +12,23 @@ import (
 
 // MarkdownConfig represents the frontmatter structure in markdown task files
 type MarkdownConfig struct {
-	Prompt             string                 `yaml:"prompt" json:"prompt"`
-	Repository         string                 `yaml:"repository" json:"repository"`
-	Source             string                 `yaml:"source" json:"source"`
-	Target             string                 `yaml:"target" json:"target"`
-	BaseBranch         string                 `yaml:"baseBranch" json:"baseBranch"`
-	OutputMode         string                 `yaml:"outputMode" json:"outputMode"`
-	OutputBranch       string                 `yaml:"outputBranch" json:"outputBranch"`
-	PRTargetBranch     string                 `yaml:"prTargetBranch" json:"prTargetBranch"`
-	OutputBranchPolicy string                 `yaml:"outputBranchPolicy" json:"outputBranchPolicy"`
-	RunType            string                 `yaml:"runType" json:"runType"`
-	Title              string                 `yaml:"title" json:"title"`
-	Context            string                 `yaml:"context" json:"context"`
-	Files              []string               `yaml:"files" json:"files"`
-	BranchOnly         bool                   `yaml:"branchOnly" json:"branchOnly"`
-	PullRequest        *PullRequestConfig     `yaml:"pullRequest,omitempty" json:"pullRequest,omitempty"`
-	Metadata           map[string]interface{} `yaml:"metadata,omitempty" json:"metadata,omitempty"`
+	Prompt                string                 `yaml:"prompt" json:"prompt"`
+	Repository            string                 `yaml:"repository" json:"repository"`
+	Source                string                 `yaml:"source" json:"source"`
+	Target                string                 `yaml:"target" json:"target"`
+	BaseBranch            string                 `yaml:"baseBranch" json:"baseBranch"`
+	OutputMode            string                 `yaml:"outputMode" json:"outputMode"`
+	OutputBranch          string                 `yaml:"outputBranch" json:"outputBranch"`
+	PRTargetBranch        string                 `yaml:"prTargetBranch" json:"prTargetBranch"`
+	OutputBranchPolicy    string                 `yaml:"outputBranchPolicy" json:"outputBranchPolicy"`
+	RunType               string                 `yaml:"runType" json:"runType"`
+	Title                 string                 `yaml:"title" json:"title"`
+	Context               string                 `yaml:"context" json:"context"`
+	Files                 []string               `yaml:"files" json:"files"`
+	BranchOnly            bool                   `yaml:"branchOnly" json:"branchOnly"`
+	AcknowledgePromptRisk bool                   `yaml:"acknowledgePromptRisk" json:"acknowledgePromptRisk"`
+	PullRequest           *PullRequestConfig     `yaml:"pullRequest,omitempty" json:"pullRequest,omitempty"`
+	Metadata              map[string]interface{} `yaml:"metadata,omitempty" json:"metadata,omitempty"`
 }
 
 // PullRequestConfig represents pull request configuration
@@ -62,20 +63,21 @@ func ParseMarkdownConfigFromReader(r io.Reader) (*models.RunConfig, string, erro
 
 	// Convert to RunConfig
 	runConfig := &models.RunConfig{
-		Prompt:             config.Prompt,
-		Repository:         config.Repository,
-		Source:             config.Source,
-		Target:             config.Target,
-		BaseBranch:         config.BaseBranch,
-		OutputMode:         config.OutputMode,
-		OutputBranch:       config.OutputBranch,
-		PRTargetBranch:     config.PRTargetBranch,
-		OutputBranchPolicy: config.OutputBranchPolicy,
-		RunType:            config.RunType,
-		Title:              config.Title,
-		Context:            config.Context,
-		Files:              config.Files,
-		BranchOnly:         config.BranchOnly,
+		Prompt:                config.Prompt,
+		Repository:            config.Repository,
+		Source:                config.Source,
+		Target:                config.Target,
+		BaseBranch:            config.BaseBranch,
+		OutputMode:            config.OutputMode,
+		OutputBranch:          config.OutputBranch,
+		PRTargetBranch:        config.PRTargetBranch,
+		OutputBranchPolicy:    config.OutputBranchPolicy,
+		RunType:               config.RunType,
+		Title:                 config.Title,
+		Context:               config.Context,
+		Files:                 config.Files,
+		BranchOnly:            config.BranchOnly,
+		AcknowledgePromptRisk: config.AcknowledgePromptRisk,
 	}
 
 	// Extract markdown content (rest) as additional context if present
@@ -88,20 +90,21 @@ func ParseMarkdownConfigFromReader(r io.Reader) (*models.RunConfig, string, erro
 func validateMarkdownConfig(config *MarkdownConfig) error {
 	// Convert to RunConfig for validation
 	runConfig := &models.RunConfig{
-		Prompt:             config.Prompt,
-		Repository:         config.Repository,
-		Source:             config.Source,
-		Target:             config.Target,
-		BaseBranch:         config.BaseBranch,
-		OutputMode:         config.OutputMode,
-		OutputBranch:       config.OutputBranch,
-		PRTargetBranch:     config.PRTargetBranch,
-		OutputBranchPolicy: config.OutputBranchPolicy,
-		RunType:            config.RunType,
-		Title:              config.Title,
-		Context:            config.Context,
-		Files:              config.Files,
-		BranchOnly:         config.BranchOnly,
+		Prompt:                config.Prompt,
+		Repository:            config.Repository,
+		Source:                config.Source,
+		Target:                config.Target,
+		BaseBranch:            config.BaseBranch,
+		OutputMode:            config.OutputMode,
+		OutputBranch:          config.OutputBranch,
+		PRTargetBranch:        config.PRTargetBranch,
+		OutputBranchPolicy:    config.OutputBranchPolicy,
+		RunType:               config.RunType,
+		Title:                 config.Title,
+		Context:               config.Context,
+		Files:                 config.Files,
+		BranchOnly:            config.BranchOnly,
+		AcknowledgePromptRisk: config.AcknowledgePromptRisk,
 	}
 
 	// Use shared validation

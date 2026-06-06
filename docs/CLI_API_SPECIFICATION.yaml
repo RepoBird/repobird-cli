@@ -406,6 +406,11 @@ components:
           deprecated: true
           description: Legacy alias for outputMode=branch. Successful runs return a branch URL instead of a pull request URL.
           example: true
+        acknowledgePromptRisk:
+          type: boolean
+          default: false
+          description: Explicitly acknowledges a PROMPT_RISK_ACK_REQUIRED response after the user reviews the prompt-risk warning.
+          example: true
         fileHash:
           type: string
           description: SHA-256 hash of the task file for tracking purposes (duplicates allowed)
@@ -878,6 +883,13 @@ paths:
                   outputMode: branch
                   outputBranch: automation/generated-docs
                   outputBranchPolicy: reuse
+              acknowledgedPromptRisk:
+                summary: Run after reviewing a prompt-risk acknowledgement error
+                value:
+                  repositoryName: acme/webapp
+                  prompt: Reviewed prompt that previously required acknowledgement
+                  title: Reviewed prompt-risk run
+                  acknowledgePromptRisk: true
               withHash:
                 summary: Run with file hash for tracking
                 value:

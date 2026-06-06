@@ -138,20 +138,21 @@ func TestRunID_UnmarshalJSON(t *testing.T) {
 
 func TestCreateRunRequest_JSONFields(t *testing.T) {
 	req := CreateRunRequest{
-		Prompt:             "Fix the bug",
-		RepositoryName:     "test/repo",
-		SourceBranch:       "main",
-		TargetBranch:       "fix/bug",
-		BaseBranch:         "main",
-		OutputMode:         "branch",
-		OutputBranch:       "fix/bug",
-		OutputBranchPolicy: "reuse",
-		RunType:            "run",
-		Agent:              "opencode",
-		BranchOnly:         true,
-		Title:              "Bug Fix",
-		Context:            "Users report issues",
-		Files:              []string{"file1.go", "file2.go"},
+		Prompt:                "Fix the bug",
+		RepositoryName:        "test/repo",
+		SourceBranch:          "main",
+		TargetBranch:          "fix/bug",
+		BaseBranch:            "main",
+		OutputMode:            "branch",
+		OutputBranch:          "fix/bug",
+		OutputBranchPolicy:    "reuse",
+		RunType:               "run",
+		Agent:                 "opencode",
+		BranchOnly:            true,
+		AcknowledgePromptRisk: true,
+		Title:                 "Bug Fix",
+		Context:               "Users report issues",
+		Files:                 []string{"file1.go", "file2.go"},
 	}
 
 	// Marshal to JSON
@@ -175,12 +176,26 @@ func TestCreateRunRequest_JSONFields(t *testing.T) {
 	assert.Equal(t, "run", result["runType"])
 	assert.Equal(t, "opencode", result["agent"])
 	assert.Equal(t, true, result["branchOnly"])
+	assert.Equal(t, true, result["acknowledgePromptRisk"])
 	assert.Equal(t, "Bug Fix", result["title"])
 	assert.Equal(t, "Users report issues", result["context"])
 
 	files, ok := result["files"].([]interface{})
 	assert.True(t, ok)
 	assert.Len(t, files, 2)
+}
+
+func TestCreateRunRequest_OmitsPromptRiskAcknowledgementByDefault(t *testing.T) {
+	data, err := json.Marshal(CreateRunRequest{
+		Prompt:         "Fix the bug",
+		RepositoryName: "test/repo",
+		RunType:        "run",
+	})
+	require.NoError(t, err)
+
+	var result map[string]interface{}
+	require.NoError(t, json.Unmarshal(data, &result))
+	assert.NotContains(t, result, "acknowledgePromptRisk")
 }
 
 func TestRunResponse_AllFields(t *testing.T) {

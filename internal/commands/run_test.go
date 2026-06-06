@@ -257,6 +257,7 @@ func TestRunCommand_ValidationWithFlags(t *testing.T) {
 				title = ""
 				runType = ""
 				contextFlag = ""
+				acknowledgePromptRisk = false
 				basicRun = false
 				proRun = false
 				dryRun = false
@@ -481,6 +482,18 @@ func TestRunCommand_BranchOutputFields(t *testing.T) {
 				"SourceBranch":   "develop",
 				"OutputMode":     "pr",
 				"PRTargetBranch": "develop",
+			},
+		},
+		{
+			name: "Prompt risk acknowledgement flag is included only when selected",
+			args: []string{
+				"-r", "owner/repo",
+				"-p", "Risky prompt reviewed intentionally",
+				"--acknowledge-prompt-risk",
+				"--dry-run",
+			},
+			expected: map[string]interface{}{
+				"AcknowledgePromptRisk": true,
 			},
 		},
 	}

@@ -43,23 +43,24 @@ func NewAPIRunRepository(httpClient HTTPClient, baseURL, apiKey string, debug bo
 func (r *apiRunRepository) Create(ctx context.Context, req domain.CreateRunRequest) (*domain.Run, error) {
 	// Convert domain request to API DTO
 	apiReq := &dto.CreateRunRequest{
-		Prompt:             req.Prompt,
-		RepositoryName:     req.RepositoryName,
-		SourceBranch:       req.SourceBranch,
-		TargetBranch:       req.TargetBranch,
-		BaseBranch:         req.BaseBranch,
-		OutputMode:         req.OutputMode,
-		OutputBranch:       req.OutputBranch,
-		PRTargetBranch:     req.PRTargetBranch,
-		OutputBranchPolicy: req.OutputBranchPolicy,
-		RunType:            req.RunType,
-		Agent:              agentOrDefault(req.Agent),
-		OpenCodeModel:      req.OpenCodeModel,
-		OpenCodeProvider:   req.OpenCodeProvider,
-		Title:              req.Title,
-		Context:            req.Context,
-		Files:              req.Files,
-		BranchOnly:         req.BranchOnly,
+		Prompt:                req.Prompt,
+		RepositoryName:        req.RepositoryName,
+		SourceBranch:          req.SourceBranch,
+		TargetBranch:          req.TargetBranch,
+		BaseBranch:            req.BaseBranch,
+		OutputMode:            req.OutputMode,
+		OutputBranch:          req.OutputBranch,
+		PRTargetBranch:        req.PRTargetBranch,
+		OutputBranchPolicy:    req.OutputBranchPolicy,
+		RunType:               req.RunType,
+		Agent:                 agentOrDefault(req.Agent),
+		OpenCodeModel:         req.OpenCodeModel,
+		OpenCodeProvider:      req.OpenCodeProvider,
+		Title:                 req.Title,
+		Context:               req.Context,
+		Files:                 req.Files,
+		BranchOnly:            req.BranchOnly,
+		AcknowledgePromptRisk: req.AcknowledgePromptRisk,
 	}
 
 	// Make API request
@@ -155,7 +156,7 @@ func (r *apiRunRepository) Get(ctx context.Context, id string) (*domain.Run, err
 
 // List retrieves a list of runs
 func (r *apiRunRepository) List(ctx context.Context, opts domain.ListOptions) ([]*domain.Run, error) {
-	path := fmt.Sprintf("/api/v1/runs?limit=%d&offset=%d", opts.Limit, opts.Offset)
+	path := fmt.Sprintf("/api/v1/runs?limit=%d&page=%d", opts.Limit, pageFromListOptions(opts))
 	resp, err := r.doRequest(ctx, "GET", path, nil)
 	if err != nil {
 		return nil, err
@@ -194,6 +195,16 @@ func (r *apiRunRepository) List(ctx context.Context, opts domain.ListOptions) ([
 		runs[i] = r.toDomainRun(runResp)
 	}
 	return runs, nil
+}
+
+func pageFromListOptions(opts domain.ListOptions) int {
+	if opts.Limit <= 0 {
+		return 1
+	}
+	if opts.Offset <= 0 {
+		return 1
+	}
+	return opts.Offset/opts.Limit + 1
 }
 
 // doRequest performs an HTTP request

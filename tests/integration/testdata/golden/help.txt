@@ -32,4 +32,4 @@ Flags:
   -h, --help            help for repobird
   -v, --version         version for repobird
 
-Use "repobird [command] --help" for more information about a command.
+Tip: Use "repobird [command] --help" for more information about a command.

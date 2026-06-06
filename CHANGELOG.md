@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - Colored human-readable CLI output is enabled by default for terminal users, with config/env opt-outs via color=never, REPOBIRD_COLOR, and NO_COLOR.
+- Run creation now supports --acknowledge-prompt-risk and acknowledgePromptRisk config files for explicit prompt-risk acknowledgement
 
 ### Fixed
 
@@ -17,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Cobra-generated help and version output now use the same colored output policy as other human-readable CLI output.
 - Store API keys under the XDG config directory by default while reading and migrating legacy ~/.repobird keys.
 - Prevent local tests from overwriting the desktop keyring API key.
+- Secondary run-list repository pagination now sends page/limit parameters to match the current /api/v1/runs API
 
 ## [0.5.0] - 2026-06-01
 

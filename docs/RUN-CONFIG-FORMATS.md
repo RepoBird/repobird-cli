@@ -37,6 +37,7 @@ The `repobird run` command supports multiple configuration file formats to defin
 | `context` | string | - | Additional context or instructions for the AI |
 | `files` | array | - | List of specific files to include in the context |
 | `branchOnly` | boolean | `false` | Legacy alias for `outputMode: branch` |
+| `acknowledgePromptRisk` | boolean | `false` | Explicitly acknowledge a `PROMPT_RISK_ACK_REQUIRED` response after reviewing the prompt |
 
 ## Format Examples
 
@@ -106,6 +107,7 @@ repobird run -r myorg/webapp -p "Add unit tests for auth module" --follow
 - `--basic` - Use the Basic cloud-agent preset (DeepSeek V4 Flash)
 - `--pro` - Use the Pro cloud-agent preset (Kimi K2.6)
 - `--branch-only`, `--no-pr` - Push commits to the output branch without creating a PR
+- `--acknowledge-prompt-risk` - Resend after reviewing a prompt-risk acknowledgement error
 - `--context` - Additional context (optional, also supports `@filename` and `-`)
 - `--follow` - Follow the run status after creation
 - `--dry-run` - Validate without creating the run
@@ -125,6 +127,7 @@ Create a file `task.json`:
   "outputBranchPolicy": "create",
   "title": "Fix authentication rate limiting issue",
   "runType": "run",
+  "acknowledgePromptRisk": false,
   "context": "Users report being permanently locked out after 5 failed login attempts. The rate limiting should reset after 15 minutes.",
   "files": [
     "src/auth/login.js",
@@ -155,6 +158,7 @@ prTargetBranch: main
 outputBranchPolicy: create
 title: Fix authentication rate limiting issue
 runType: run
+acknowledgePromptRisk: false
 context: |
   Users report being permanently locked out after 5 failed login attempts.
   The rate limiting should reset after 15 minutes.

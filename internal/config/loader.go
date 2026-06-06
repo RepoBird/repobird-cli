@@ -34,15 +34,16 @@ func (c *ConfigLoader) LoadConfig(filePath string) (*models.RunRequest, error) {
 
 	// Convert RunConfig to RunRequest
 	runRequest := &models.RunRequest{
-		Prompt:     runConfig.Prompt,
-		Repository: runConfig.Repository,
-		Source:     runConfig.Source,
-		Target:     runConfig.Target,
-		RunType:    models.RunType(runConfig.RunType),
-		Title:      runConfig.Title,
-		Context:    runConfig.Context,
-		Files:      runConfig.Files,
-		BranchOnly: runConfig.BranchOnly,
+		Prompt:                runConfig.Prompt,
+		Repository:            runConfig.Repository,
+		Source:                runConfig.Source,
+		Target:                runConfig.Target,
+		RunType:               models.RunType(runConfig.RunType),
+		Title:                 runConfig.Title,
+		Context:               runConfig.Context,
+		Files:                 runConfig.Files,
+		BranchOnly:            runConfig.BranchOnly,
+		AcknowledgePromptRisk: runConfig.AcknowledgePromptRisk,
 	}
 
 	// Append markdown body to context if present

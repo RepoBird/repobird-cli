@@ -83,6 +83,7 @@ func showExamples(cmd *cobra.Command, args []string) error {
 	fmt.Println("  • -p @file.txt         - Read prompt from file")
 	fmt.Println("  • -p -                 - Read prompt from stdin")
 	fmt.Println("  • --context @file.md   - Read context from file")
+	fmt.Println("  • --acknowledge-prompt-risk - Resend after reviewing prompt-risk warning")
 	fmt.Println()
 	fmt.Println(styler.Label("COMMANDS:"))
 	fmt.Println("  schema [type]     Show configuration schema")
