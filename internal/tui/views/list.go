@@ -559,42 +559,12 @@ func (v *RunListView) renderStatusBar() string {
 				tier = "free"
 			}
 
-			// Show tier-specific runs with hardcoded totals
-			if v.userInfo.TierDetails != nil {
-				// Hardcoded tier totals
-				// Check if tier contains "free" or "Free" (handles "Free Plan v1", etc.)
-				var totalProRuns, totalPlanRuns int
-				tierLower := strings.ToLower(tier)
-				if strings.Contains(tierLower, "free") {
-					// Free tier
-					totalProRuns = 3
-					totalPlanRuns = 5
-				} else if strings.Contains(tierLower, "pro") {
-					// Pro tier
-					totalProRuns = 30
-					totalPlanRuns = 35
-				} else {
-					// Default to pro tier totals for unknown tiers
-					totalProRuns = 30
-					totalPlanRuns = 35
-				}
-
-				// Handle admin credits that exceed defaults
-				actualProTotal := totalProRuns
-				actualPlanTotal := totalPlanRuns
-				if v.userInfo.TierDetails.RemainingProRuns > totalProRuns {
-					actualProTotal = v.userInfo.TierDetails.RemainingProRuns
-				}
-				if v.userInfo.TierDetails.RemainingPlanRuns > totalPlanRuns {
-					actualPlanTotal = v.userInfo.TierDetails.RemainingPlanRuns
-				}
-
-				dataInfo += fmt.Sprintf(" | %s: %d/%d pro, %d/%d plan", tier,
-					v.userInfo.TierDetails.RemainingProRuns, actualProTotal,
-					v.userInfo.TierDetails.RemainingPlanRuns, actualPlanTotal)
-			} else {
-				// Fallback to legacy display
+			if v.userInfo.CreditBalance != nil {
+				dataInfo += fmt.Sprintf(" | %s: %s credits", tier, models.FormatCredits(v.userInfo.CreditBalance.AvailableCredits))
+			} else if hasListLegacyRunUsage(v.userInfo) {
 				dataInfo += fmt.Sprintf(" | %s: %d/%d runs", tier, v.userInfo.RemainingRuns, v.userInfo.TotalRuns)
+			} else {
+				dataInfo += fmt.Sprintf(" | %s: credits unavailable", tier)
 			}
 		}
 
@@ -614,6 +584,15 @@ func (v *RunListView) renderStatusBar() string {
 	return statusLine.
 		SetLoading(isLoadingData).
 		Render()
+}
+
+func hasListLegacyRunUsage(userInfo *models.UserInfo) bool {
+	return userInfo.RemainingProRuns != 0 ||
+		userInfo.ProTotalRuns != 0 ||
+		userInfo.RemainingPlanRuns != 0 ||
+		userInfo.PlanTotalRuns != 0 ||
+		userInfo.RemainingRuns != 0 ||
+		userInfo.TotalRuns != 0
 }
 
 func (v *RunListView) loadRuns() tea.Cmd {

@@ -4,9 +4,12 @@
 package commands
 
 import (
+	"bytes"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
@@ -150,6 +153,35 @@ func TestUserInfoDisplay(t *testing.T) {
 	}
 }
 
+func TestPrintAccountUsageUsesCreditsWhenAvailable(t *testing.T) {
+	userInfo := &models.UserInfo{
+		RemainingProRuns: 0,
+		ProTotalRuns:     0,
+		CreditBalance: &models.CreditBalance{
+			AvailableCredits: 42.5,
+			ReservedCredits:  3.25,
+		},
+	}
+
+	output := captureStdout(t, func() {
+		printAccountUsage(userInfo)
+	})
+
+	assert.Contains(t, output, "  Credits: 42.5 available (3.25 reserved)")
+	assert.NotContains(t, output, "Runs:")
+}
+
+func TestPrintAccountUsageDoesNotShowZeroRunQuotaWithoutCredits(t *testing.T) {
+	userInfo := &models.UserInfo{}
+
+	output := captureStdout(t, func() {
+		printAccountUsage(userInfo)
+	})
+
+	assert.Contains(t, output, "  Credits: unavailable")
+	assert.NotContains(t, output, "Runs: 0/0")
+}
+
 // TestStatusCommandUserInfoDisplay tests status command display logic
 func TestStatusCommandUserInfoDisplay(t *testing.T) {
 	tests := []struct {
@@ -228,6 +260,26 @@ func TestStatusCommandUserInfoDisplay(t *testing.T) {
 			}
 		})
 	}
+}
+
+func captureStdout(t *testing.T, fn func()) string {
+	t.Helper()
+
+	old := os.Stdout
+	reader, writer, err := os.Pipe()
+	require.NoError(t, err)
+	os.Stdout = writer
+
+	fn()
+
+	require.NoError(t, writer.Close())
+	os.Stdout = old
+
+	var buf bytes.Buffer
+	_, err = io.Copy(&buf, reader)
+	require.NoError(t, err)
+
+	return buf.String()
 }
 
 // TestFieldOrderInOutput verifies fields appear in correct order

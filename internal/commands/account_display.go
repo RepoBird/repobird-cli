@@ -11,19 +11,44 @@ import (
 )
 
 func printAccountUsage(userInfo *models.UserInfo) {
+	fmt.Print(formatAccountUsage(userInfo, "  ", ""))
+}
+
+func printStatusAccountUsage(userInfo *models.UserInfo) {
+	tierSuffix := ""
+	if userInfo.Tier != "" {
+		tierSuffix = fmt.Sprintf(" (%s tier)", userInfo.Tier)
+	}
+	fmt.Print(formatAccountUsage(userInfo, "", tierSuffix))
+}
+
+func formatAccountUsage(userInfo *models.UserInfo, indent, tierSuffix string) string {
 	if userInfo.CreditBalance != nil {
-		fmt.Printf("  Credits: %d available", userInfo.CreditBalance.AvailableCredits)
+		line := fmt.Sprintf("%sCredits: %s available", indent, models.FormatCredits(userInfo.CreditBalance.AvailableCredits))
 		if userInfo.CreditBalance.ReservedCredits > 0 {
-			fmt.Printf(" (%d reserved)", userInfo.CreditBalance.ReservedCredits)
+			line += fmt.Sprintf(" (%s reserved)", models.FormatCredits(userInfo.CreditBalance.ReservedCredits))
 		}
-		fmt.Println()
-		return
+		return line + tierSuffix + "\n"
 	}
 
-	fmt.Printf("  Runs: %d/%d\n", userInfo.RemainingProRuns, userInfo.ProTotalRuns)
-	if userInfo.PlanTotalRuns > 0 || userInfo.RemainingPlanRuns > 0 {
-		fmt.Printf("  Plan Runs: %d/%d\n", userInfo.RemainingPlanRuns, userInfo.PlanTotalRuns)
+	if !hasLegacyRunUsage(userInfo) {
+		return fmt.Sprintf("%sCredits: unavailable%s\n", indent, tierSuffix)
 	}
+
+	text := fmt.Sprintf("%sRuns: %d/%d%s\n", indent, userInfo.RemainingProRuns, userInfo.ProTotalRuns, tierSuffix)
+	if userInfo.PlanTotalRuns > 0 || userInfo.RemainingPlanRuns > 0 {
+		text += fmt.Sprintf("%sPlan Runs: %d/%d\n", indent, userInfo.RemainingPlanRuns, userInfo.PlanTotalRuns)
+	}
+	return text
+}
+
+func hasLegacyRunUsage(userInfo *models.UserInfo) bool {
+	return userInfo.RemainingProRuns != 0 ||
+		userInfo.ProTotalRuns != 0 ||
+		userInfo.RemainingPlanRuns != 0 ||
+		userInfo.PlanTotalRuns != 0 ||
+		userInfo.RemainingRuns != 0 ||
+		userInfo.TotalRuns != 0
 }
 
 func printAccountReset(userInfo *models.UserInfo) {

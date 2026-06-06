@@ -6,6 +6,7 @@ package models
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -241,10 +242,15 @@ type UserInfo struct {
 }
 
 type CreditBalance struct {
-	AvailableCredits       int `json:"availableCredits"`
-	MonthlyIncludedCredits int `json:"monthlyIncludedCredits"`
-	PurchasedCredits       int `json:"purchasedCredits"`
-	ReservedCredits        int `json:"reservedCredits"`
+	AvailableCredits       float64 `json:"availableCredits"`
+	MonthlyIncludedCredits float64 `json:"monthlyIncludedCredits"`
+	PurchasedCredits       float64 `json:"purchasedCredits"`
+	ReservedCredits        float64 `json:"reservedCredits"`
+}
+
+func FormatCredits(value float64) string {
+	rounded := math.Round(value*100) / 100
+	return strconv.FormatFloat(rounded, 'f', -1, 64)
 }
 
 type ListRunsResponse struct {

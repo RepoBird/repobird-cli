@@ -501,12 +501,21 @@ func (s *StatusView) initializeStatusFields() {
 
 		if s.userInfo.CreditBalance != nil {
 			s.statusKeys = append(s.statusKeys, "Credits:")
-			s.statusFields = append(s.statusFields, fmt.Sprintf("%d available", s.userInfo.CreditBalance.AvailableCredits))
+			credits := fmt.Sprintf("%s available", models.FormatCredits(s.userInfo.CreditBalance.AvailableCredits))
+			if s.userInfo.CreditBalance.ReservedCredits > 0 {
+				credits += fmt.Sprintf(" (%s reserved)", models.FormatCredits(s.userInfo.CreditBalance.ReservedCredits))
+			}
+			s.statusFields = append(s.statusFields, credits)
 			s.fieldLines = append(s.fieldLines, lineNum)
 			lineNum++
-		} else if s.userInfo.ProTotalRuns > 0 {
+		} else if hasStatusLegacyRunUsage(s.userInfo) {
 			s.statusKeys = append(s.statusKeys, "Runs:")
 			s.statusFields = append(s.statusFields, fmt.Sprintf("%d/%d", s.userInfo.RemainingProRuns, s.userInfo.ProTotalRuns))
+			s.fieldLines = append(s.fieldLines, lineNum)
+			lineNum++
+		} else {
+			s.statusKeys = append(s.statusKeys, "Credits:")
+			s.statusFields = append(s.statusFields, "unavailable")
 			s.fieldLines = append(s.fieldLines, lineNum)
 			lineNum++
 		}
@@ -595,6 +604,15 @@ func (s *StatusView) initializeStatusFields() {
 	if len(s.statusFields) > 0 && s.selectedRow >= len(s.statusFields) {
 		s.selectedRow = 0
 	}
+}
+
+func hasStatusLegacyRunUsage(userInfo *models.UserInfo) bool {
+	return userInfo.RemainingProRuns != 0 ||
+		userInfo.ProTotalRuns != 0 ||
+		userInfo.RemainingPlanRuns != 0 ||
+		userInfo.PlanTotalRuns != 0 ||
+		userInfo.RemainingRuns != 0 ||
+		userInfo.TotalRuns != 0
 }
 
 // Message types for async operations

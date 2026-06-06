@@ -78,6 +78,35 @@ func TestNewRunListViewWithCache_LoadsWhenCacheExpired(t *testing.T) {
 	assert.True(t, view.loading, "Should be loading when no cached data")
 }
 
+func TestRunListStatusBarUsesCreditsWhenAvailable(t *testing.T) {
+	client := api.NewClient("test-key", "http://localhost:8080", false)
+	testCache := cache.NewSimpleCache()
+	runs := []models.RunResponse{
+		{ID: "run-1", Status: models.StatusDone, Repository: "test/repo", CreatedAt: time.Now()},
+	}
+	testCache.SetRuns(runs)
+
+	view := NewRunListViewWithCache(client, runs, true, time.Now(), nil, 0, testCache)
+	view.width = 120
+	view.userInfo = &models.UserInfo{
+		Tier:             "pro",
+		RemainingRuns:    0,
+		TotalRuns:        0,
+		RemainingProRuns: 0,
+		ProTotalRuns:     0,
+		CreditBalance: &models.CreditBalance{
+			AvailableCredits: 5.1864,
+		},
+	}
+	view.updateTableFromRuns(runs)
+
+	statusBar := view.renderStatusBar()
+
+	assert.Contains(t, statusBar, "pro: 5.19 credits")
+	assert.NotContains(t, statusBar, "0/0 runs")
+	assert.NotContains(t, statusBar, "0/0 pro")
+}
+
 func TestFilterRuns_PreservesRunIDs(t *testing.T) {
 	// Use temp directory to avoid cache pollution
 	tempDir := t.TempDir()
