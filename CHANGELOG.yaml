@@ -1,6 +1,8 @@
 project: RepoBird CLI
 versions:
     unreleased:
+        fixed:
+            - Prevent login and progress output from emitting duplicate redraw lines in non-interactive terminals.
         internal:
             fixed:
                 - Stabilize main GitHub CI by installing Linux clipboard dependencies, using GoReleaser v2 for config checks, and correcting generated package asset paths.

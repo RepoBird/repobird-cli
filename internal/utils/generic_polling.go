@@ -138,9 +138,9 @@ func (p *GenericPoller[T]) PollUntilComplete(
 			}
 
 			// Show progress if enabled
-			if p.config.ShowProgress {
+			if p.config.ShowProgress && stdoutIsTerminal() {
 				elapsed := time.Since(p.startTime)
-				fmt.Printf("\rPolling... [%s elapsed]", FormatDuration(elapsed))
+				writeLiveUpdate(os.Stdout, true, "Polling... [%s elapsed]", FormatDuration(elapsed))
 			}
 		}
 	}

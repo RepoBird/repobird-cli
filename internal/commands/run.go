@@ -570,6 +570,7 @@ func followRunStatus(runService domain.RunService, runID string) error {
 	ctx := context.Background()
 	startTime := time.Now()
 	lastStatus := ""
+	isTTY := stdoutIsTerminal()
 
 	// Check if debug is enabled via environment variable or flag
 	isDebug := debug || os.Getenv("REPOBIRD_DEBUG_LOG") == "1"
@@ -577,16 +578,20 @@ func followRunStatus(runService domain.RunService, runID string) error {
 	callback := func(status string, message string) {
 		displayStatus := formatStatusForDisplay(status)
 		if displayStatus != lastStatus {
-			fmt.Printf("\r\033[K") // Clear line
+			clearLiveOutput(os.Stdout, isTTY)
 			fmt.Printf("[%s] Status: %s\n", time.Now().Format("15:04:05"), displayStatus)
 			lastStatus = displayStatus
+			return
+		}
+		if !isTTY {
+			return
+		}
+
+		elapsed := time.Since(startTime)
+		if message != "" {
+			printLiveUpdate(os.Stdout, isTTY, "[%s] %s - %s", formatDuration(elapsed), displayStatus, message)
 		} else {
-			elapsed := time.Since(startTime)
-			if message != "" {
-				fmt.Printf("\r[%s] %s - %s", formatDuration(elapsed), displayStatus, message)
-			} else {
-				fmt.Printf("\r[%s] %s", formatDuration(elapsed), displayStatus)
-			}
+			printLiveUpdate(os.Stdout, isTTY, "[%s] %s", formatDuration(elapsed), displayStatus)
 		}
 	}
 
@@ -627,7 +632,7 @@ func followRunStatus(runService domain.RunService, runID string) error {
 		// If fetch fails, we still have the basic run info from polling
 	}
 
-	fmt.Printf("\r\033[K") // Clear line
+	clearLiveOutput(os.Stdout, isTTY)
 	if finalRun.Status == domain.StatusFailed && finalRun.Error != "" {
 		fmt.Printf("Run failed: %s\n", finalRun.Error)
 	} else {
@@ -720,29 +725,32 @@ func executeBulkRuns(bulkConfig *bulk.BulkConfig) error {
 	fmt.Printf("Total runs: %d\n", len(bulkConfig.Runs))
 	fmt.Println("\nThis may take up to 5 minutes. Please wait...")
 
-	// Show a progress indicator with elapsed time
-	startTime := time.Now()
-	spinner := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
-	spinnerIdx := 0
 	done := make(chan bool, 1) // Buffered to prevent goroutine leak
 
-	// Start spinner in background
-	go func() {
-		ticker := time.NewTicker(100 * time.Millisecond)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-done:
-				fmt.Print("\r\033[K") // Clear the spinner line
-				return
-			case <-ticker.C:
-				elapsed := time.Since(startTime)
-				fmt.Printf("\r%s Processing... (%.0fs)", spinner[spinnerIdx], elapsed.Seconds())
-				_ = os.Stdout.Sync() // Force flush to ensure animation
-				spinnerIdx = (spinnerIdx + 1) % len(spinner)
+	if stdoutIsTerminal() {
+		// Show a progress indicator with elapsed time
+		startTime := time.Now()
+		spinner := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+		spinnerIdx := 0
+
+		// Start spinner in background
+		go func() {
+			ticker := time.NewTicker(100 * time.Millisecond)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-done:
+					clearLiveOutput(os.Stdout, true)
+					return
+				case <-ticker.C:
+					elapsed := time.Since(startTime)
+					printLiveUpdate(os.Stdout, true, "%s Processing... (%.0fs)", spinner[spinnerIdx], elapsed.Seconds())
+					_ = os.Stdout.Sync() // Force flush to ensure animation
+					spinnerIdx = (spinnerIdx + 1) % len(spinner)
+				}
 			}
-		}
-	}()
+		}()
+	}
 
 	bulkResp, err := client.CreateBulkRuns(ctx, bulkRequest)
 	done <- true // Stop spinner

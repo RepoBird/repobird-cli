@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Prevent login and progress output from emitting duplicate redraw lines in non-interactive terminals.
+
 ## [0.5.0] - 2026-06-01
 
 ### Added

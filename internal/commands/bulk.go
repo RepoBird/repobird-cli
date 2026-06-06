@@ -269,6 +269,10 @@ func showProgressSpinner() chan bool {
 	spinnerIdx := 0
 	done := make(chan bool, 1) // Buffered to prevent goroutine leak
 
+	if !stdoutIsTerminal() {
+		return done
+	}
+
 	// Start spinner in background
 	go func() {
 		ticker := time.NewTicker(100 * time.Millisecond)
@@ -276,11 +280,11 @@ func showProgressSpinner() chan bool {
 		for {
 			select {
 			case <-done:
-				fmt.Print("\r\033[K") // Clear the spinner line
+				clearLiveOutput(os.Stdout, true)
 				return
 			case <-ticker.C:
 				elapsed := time.Since(startTime)
-				fmt.Printf("\r%s Processing... (%.0fs)", spinner[spinnerIdx], elapsed.Seconds())
+				printLiveUpdate(os.Stdout, true, "%s Processing... (%.0fs)", spinner[spinnerIdx], elapsed.Seconds())
 				_ = os.Stdout.Sync()
 				spinnerIdx = (spinnerIdx + 1) % len(spinner)
 			}
@@ -395,6 +399,7 @@ func followBulkProgress(ctx context.Context, client *api.Client, batchID string)
 	startTime := time.Now()
 	var lastRunCount int
 	var lastStatus dto.BulkStatusData
+	isTTY := stdoutIsTerminal()
 
 	// Start with a loading indicator immediately
 	ticker := time.NewTicker(100 * time.Millisecond)
@@ -409,11 +414,9 @@ func followBulkProgress(ctx context.Context, client *api.Client, batchID string)
 					// Clear all lines
 					if lastRunCount > 0 {
 						// Clear including header line
-						for i := 0; i <= lastRunCount; i++ {
-							fmt.Print("\033[A\033[2K") // Move up and clear line
-						}
+						clearPreviousLiveLines(os.Stdout, isTTY, lastRunCount+1)
 					} else {
-						fmt.Print("\r\033[2K") // Clear loading line
+						clearLiveOutput(os.Stdout, isTTY)
 					}
 					return fmt.Errorf("polling timeout exceeded (maximum wait time: 1h 30m). The batch may still be processing on the server")
 				}
@@ -430,12 +433,10 @@ func followBulkProgress(ctx context.Context, client *api.Client, batchID string)
 			// Clear previous display before updating
 			if lastRunCount > 0 {
 				// Clear the multi-line display
-				for i := 0; i <= lastRunCount; i++ {
-					fmt.Print("\033[A\033[2K") // Move up and clear line
-				}
+				clearPreviousLiveLines(os.Stdout, isTTY, lastRunCount+1)
 			} else {
 				// Clear the single loading line
-				fmt.Print("\r\033[2K")
+				clearLiveOutput(os.Stdout, isTTY)
 			}
 
 			// Store the latest status and display it
@@ -447,9 +448,7 @@ func followBulkProgress(ctx context.Context, client *api.Client, batchID string)
 			if status.Data.Status == BatchStatusCompleted || status.Data.Status == BatchStatusPartiallyFailed || status.Data.Status == BatchStatusFailed {
 				// Clear the display before showing results (including header line)
 				if lastRunCount > 0 {
-					for i := 0; i <= lastRunCount; i++ {
-						fmt.Print("\033[A\033[2K") // Move up and clear line
-					}
+					clearPreviousLiveLines(os.Stdout, isTTY, lastRunCount+1)
 				}
 				fmt.Println("\nBatch completed!")
 				displayBulkResults(status.Data)
@@ -457,32 +456,32 @@ func followBulkProgress(ctx context.Context, client *api.Client, batchID string)
 			}
 
 		case <-ticker.C:
+			if !isTTY {
+				continue
+			}
+
 			// Animate the spinner
 			spinnerIdx = (spinnerIdx + 1) % len(spinner)
 
 			// Update display with animated spinner
 			if lastRunCount > 0 {
 				// Clear previous lines (including the header line)
-				for i := 0; i <= lastRunCount; i++ {
-					fmt.Print("\033[A\033[2K") // Move up and clear line
-				}
+				clearPreviousLiveLines(os.Stdout, isTTY, lastRunCount+1)
 				// Redraw with new spinner frame
 				displayMultiLineBulkStatus(lastStatus, spinner[spinnerIdx], startTime)
 			} else {
 				// Initial loading state
 				elapsed := time.Since(startTime)
-				fmt.Printf("\r%s Following batch progress... [%s]", spinner[spinnerIdx], formatDuration(elapsed))
+				printLiveUpdate(os.Stdout, isTTY, "%s Following batch progress... [%s]", spinner[spinnerIdx], formatDuration(elapsed))
 			}
 
 		case <-ctx.Done():
 			// Clear all lines
 			if lastRunCount > 0 {
 				// Clear including header line
-				for i := 0; i <= lastRunCount; i++ {
-					fmt.Print("\033[A\033[2K") // Move up and clear line
-				}
+				clearPreviousLiveLines(os.Stdout, isTTY, lastRunCount+1)
 			} else {
-				fmt.Print("\r\033[2K") // Clear loading line
+				clearLiveOutput(os.Stdout, isTTY)
 			}
 			elapsed := time.Since(startTime)
 			return fmt.Errorf("polling timeout exceeded after %v (maximum wait time: 1h 30m). The batch may still be processing on the server", elapsed)
