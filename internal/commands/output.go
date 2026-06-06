@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 
+	configpkg "github.com/repobird/repobird-cli/internal/config"
 	"github.com/repobird/repobird-cli/internal/output"
 )
 
@@ -14,6 +15,8 @@ func styleFor(out io.Writer) output.Styler {
 	mode := output.ColorAuto
 	if cfg != nil && cfg.Config != nil {
 		mode = cfg.Color
+	} else if loaded, err := configpkg.LoadSecureConfig(); err == nil && loaded.Config != nil {
+		mode = loaded.Color
 	}
 	return output.NewStyler(out, output.ModeFromEnv(mode))
 }

@@ -4,10 +4,12 @@
 package commands
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRootCommand_NoDuplicateCommands(t *testing.T) {
@@ -107,4 +109,32 @@ func TestRootCommand_CommandDescriptions(t *testing.T) {
 			assert.Equal(t, expectedDesc, cmd.Short, "Command '%s' has incorrect description", cmd.Name())
 		}
 	}
+}
+
+func TestRootCommandHelpUsesColorWhenForced(t *testing.T) {
+	t.Setenv("REPOBIRD_COLOR", "always")
+	t.Setenv("NO_COLOR", "")
+
+	var out bytes.Buffer
+	rootCmd.SetOut(&out)
+	t.Cleanup(func() { rootCmd.SetOut(nil) })
+
+	require.NoError(t, rootCmd.Help())
+
+	assert.Contains(t, out.String(), "\x1b[")
+	assert.Contains(t, out.String(), "Available Commands:")
+}
+
+func TestVersionCommandUsesColorWhenForced(t *testing.T) {
+	t.Setenv("REPOBIRD_COLOR", "always")
+	t.Setenv("NO_COLOR", "")
+
+	var out bytes.Buffer
+	versionCmd.SetOut(&out)
+	t.Cleanup(func() { versionCmd.SetOut(nil) })
+
+	versionCmd.Run(versionCmd, nil)
+
+	assert.Contains(t, out.String(), "\x1b[")
+	assert.Contains(t, out.String(), "Version:")
 }

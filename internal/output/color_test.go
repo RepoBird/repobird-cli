@@ -57,17 +57,26 @@ func TestColorModeFromEnv(t *testing.T) {
 		t.Setenv("NO_COLOR", "1")
 		t.Setenv("REPOBIRD_COLOR", "")
 
-		if got := ModeFromEnv(ColorAlways); got != ColorNever {
-			t.Fatalf("ModeFromEnv(always) = %q, want %q", got, ColorNever)
+		if got := ModeFromEnv(ColorAuto); got != ColorNever {
+			t.Fatalf("ModeFromEnv(auto) = %q, want %q", got, ColorNever)
 		}
 	})
 
-	t.Run("REPOBIRD_COLOR overrides config", func(t *testing.T) {
-		t.Setenv("NO_COLOR", "")
+	t.Run("REPOBIRD_COLOR overrides config and NO_COLOR", func(t *testing.T) {
+		t.Setenv("NO_COLOR", "1")
 		t.Setenv("REPOBIRD_COLOR", ColorAlways)
 
 		if got := ModeFromEnv(ColorNever); got != ColorAlways {
 			t.Fatalf("ModeFromEnv(never) = %q, want %q", got, ColorAlways)
+		}
+	})
+
+	t.Run("explicit config overrides NO_COLOR", func(t *testing.T) {
+		t.Setenv("NO_COLOR", "1")
+		t.Setenv("REPOBIRD_COLOR", "")
+
+		if got := ModeFromEnv(ColorAlways); got != ColorAlways {
+			t.Fatalf("ModeFromEnv(always) = %q, want %q", got, ColorAlways)
 		}
 	})
 }

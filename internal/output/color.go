@@ -47,13 +47,17 @@ func NormalizeColorMode(mode string) string {
 }
 
 func ModeFromEnv(configMode string) string {
-	if os.Getenv("NO_COLOR") != "" {
-		return ColorNever
-	}
 	if envMode := os.Getenv("REPOBIRD_COLOR"); envMode != "" {
 		return NormalizeColorMode(envMode)
 	}
-	return NormalizeColorMode(configMode)
+	mode := NormalizeColorMode(configMode)
+	if mode == ColorAlways || mode == ColorNever {
+		return mode
+	}
+	if os.Getenv("NO_COLOR") != "" {
+		return ColorNever
+	}
+	return ColorAuto
 }
 
 func (s Styler) Success(text string) string {

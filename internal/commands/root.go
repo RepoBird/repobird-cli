@@ -6,6 +6,7 @@ package commands
 import (
 	"fmt"
 	"os"
+	"runtime"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -73,6 +74,8 @@ func Execute() {
 func init() {
 	// Set custom version template to show just the version info
 	rootCmd.SetVersionTemplate(version.GetBuildInfo() + "\n")
+	rootCmd.SetHelpFunc(coloredHelp)
+	rootCmd.SetUsageFunc(coloredUsage)
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.repobird/config.yaml)")
 	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "enable debug output")
@@ -102,7 +105,13 @@ var versionCmd = &cobra.Command{
 	Use:     "version",
 	Aliases: []string{"v"},
 	Short:   "Print version information",
-	Run: func(_ *cobra.Command, _ []string) {
-		fmt.Println(version.GetBuildInfo())
+	Run: func(cmd *cobra.Command, _ []string) {
+		styler := styleFor(cmd.OutOrStdout())
+		out := cmd.OutOrStdout()
+		fmt.Fprintf(out, "%s %s\n", styler.Label("Version:"), version.GetVersion())
+		fmt.Fprintf(out, "%s %s\n", styler.Label("Git Commit:"), version.GitCommit)
+		fmt.Fprintf(out, "%s %s\n", styler.Label("Build Date:"), version.BuildDate)
+		fmt.Fprintf(out, "%s %s\n", styler.Label("Go Version:"), runtime.Version())
+		fmt.Fprintf(out, "%s %s/%s\n", styler.Label("OS/Arch:"), runtime.GOOS, runtime.GOARCH)
 	},
 }

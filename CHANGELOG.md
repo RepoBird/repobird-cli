@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Prevent login and progress output from emitting duplicate redraw lines in non-interactive terminals.
 - Account info, status, and TUI usage displays now show credit balances instead of all-zero legacy run quotas.
+- Cobra-generated help and version output now use the same colored output policy as other human-readable CLI output.
 
 ## [0.5.0] - 2026-06-01
 

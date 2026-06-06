@@ -6,6 +6,7 @@ versions:
         fixed:
             - Prevent login and progress output from emitting duplicate redraw lines in non-interactive terminals.
             - Account info, status, and TUI usage displays now show credit balances instead of all-zero legacy run quotas.
+            - Cobra-generated help and version output now use the same colored output policy as other human-readable CLI output.
         internal:
             fixed:
                 - Stabilize main GitHub CI by installing Linux clipboard dependencies, using GoReleaser v2 for config checks, and correcting generated package asset paths.
