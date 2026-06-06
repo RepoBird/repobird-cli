@@ -37,6 +37,7 @@ build/
 dist/
 
 # Generated documentation and completions (created during release)
+.release-notes.md
 man/
 completions/
 docs/cli/
