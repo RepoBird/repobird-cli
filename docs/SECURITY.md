@@ -11,13 +11,15 @@ RepoBird CLI implements multiple layers of security for API key storage, automat
 - **Windows**: Credential Manager  
 - **Linux**: GNOME Keyring, KWallet, or Secret Service (when desktop environment is available)
 
-This is the default and most secure storage method when available.
+This is the default primary storage method when available. The CLI also writes an encrypted XDG fallback so authentication survives keyring availability changes.
 
 #### 2. Encrypted File Storage (Secure Fallback)
 - Uses AES-256-GCM encryption
 - Key derived from machine-specific identifiers
 - File permissions set to 0600 (owner read/write only)
-- Location: `~/.repobird/.api_key.enc`
+- Location: `~/.config/repobird/.api_key.enc`
+
+Legacy encrypted keys in `~/.repobird/.api_key.enc` are still read and migrated.
 
 Automatically used on headless servers, containers, or when keyring is unavailable.
 

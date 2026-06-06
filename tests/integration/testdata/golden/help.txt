@@ -9,7 +9,7 @@ Usage:
 
 Available Commands:
   basic       Create a Basic cloud agent run
-  completion  Generate shell completion scripts
+  completion  Generate or install shell completion scripts
   config      Manage RepoBird configuration
   docs        Generate documentation
   examples    Show configuration schemas and generate example files
@@ -26,10 +26,10 @@ Available Commands:
   version     Print version information
 
 Flags:
-      --config string   config file (default is $HOME/.repobird/config.yaml)
+      --config string   config file (default is $XDG_CONFIG_HOME/repobird/config.yaml or $HOME/.config/repobird/config.yaml)
       --debug           enable debug output
       --debug-user      enable debug user mode with mock data
   -h, --help            help for repobird
   -v, --version         version for repobird
 
-Use "repobird [command] --help" for more information about a command.
+Tip: Use "repobird [command] --help" for more information about a command.

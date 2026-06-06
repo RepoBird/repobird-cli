@@ -33,10 +33,11 @@ The `repobird run` command supports multiple configuration file formats to defin
 | `title` | string | auto-generated | Human-readable title for the run |
 | `source` | string | repository default branch | Legacy alias for `baseBranch` |
 | `target` | string | auto-generated | Legacy alias; in branch-only runs it maps to `outputBranch` |
-| `runType` | string | `run` | Type of run: `run` or `plan` |
+| `runType` | string | `run` | Type of run: `run`; `plan` is development-only during the OpenCode migration |
 | `context` | string | - | Additional context or instructions for the AI |
 | `files` | array | - | List of specific files to include in the context |
 | `branchOnly` | boolean | `false` | Legacy alias for `outputMode: branch` |
+| `acknowledgePromptRisk` | boolean | `false` | Explicitly acknowledge a `PROMPT_RISK_ACK_REQUIRED` response after reviewing the prompt |
 
 ## Format Examples
 
@@ -102,10 +103,11 @@ repobird run -r myorg/webapp -p "Add unit tests for auth module" --follow
 - `--source` - Legacy alias for `--base-branch`
 - `--target` - Legacy target alias; with `--branch-only`, maps to `--output-branch`
 - `--title` - Human-readable title (optional, auto-generated if not specified)
-- `--run-type` - Type of run: 'run' or 'plan' (optional, defaults to 'run')
+- `--run-type` - Type of run: `run` (optional, defaults to `run`); `plan` is development-only during the OpenCode migration
 - `--basic` - Use the Basic cloud-agent preset (DeepSeek V4 Flash)
 - `--pro` - Use the Pro cloud-agent preset (Kimi K2.6)
 - `--branch-only`, `--no-pr` - Push commits to the output branch without creating a PR
+- `--acknowledge-prompt-risk` - Resend after reviewing a prompt-risk acknowledgement error
 - `--context` - Additional context (optional, also supports `@filename` and `-`)
 - `--follow` - Follow the run status after creation
 - `--dry-run` - Validate without creating the run
@@ -125,6 +127,7 @@ Create a file `task.json`:
   "outputBranchPolicy": "create",
   "title": "Fix authentication rate limiting issue",
   "runType": "run",
+  "acknowledgePromptRisk": false,
   "context": "Users report being permanently locked out after 5 failed login attempts. The rate limiting should reset after 15 minutes.",
   "files": [
     "src/auth/login.js",
@@ -155,6 +158,7 @@ prTargetBranch: main
 outputBranchPolicy: create
 title: Fix authentication rate limiting issue
 runType: run
+acknowledgePromptRisk: false
 context: |
   Users report being permanently locked out after 5 failed login attempts.
   The rate limiting should reset after 15 minutes.
@@ -340,19 +344,23 @@ repobird run bugfix.yaml --follow
 ```
 
 ### Feature Development Workflow
+
+Plan runs are temporarily development-only during the OpenCode migration. Use
+`runType: run` for normal CLI submissions.
+
 ```bash
-# 1. Plan the feature first
+# 1. Capture planning context locally
 cat > feature-plan.yaml << EOF
 prompt: Plan implementation for user notifications system
 repository: myorg/webapp
 target: feature/notifications
 title: User notifications system
-runType: plan
+runType: run
 EOF
 
 repobird run feature-plan.yaml
 
-# 2. After reviewing plan, implement
+# 2. Submit implementation context
 cat > feature-impl.yaml << EOF
 prompt: Implement user notifications as planned
 repository: myorg/webapp

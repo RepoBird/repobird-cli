@@ -115,6 +115,9 @@ repobird pro -r your-org/your-repo "Implement OAuth"    # Kimi K2.6
 # Push commits to an output branch without opening a PR
 repobird run -r your-org/your-repo -p "Update generated docs" --output-branch automation/docs --branch-only
 
+# Resend only after reviewing a prompt-risk acknowledgement error
+repobird run -r your-org/your-repo -p @reviewed-task.md --acknowledge-prompt-risk
+
 # Inside a git repo with an origin remote, the repo can be auto-detected
 repobird pro "Fix the login bug where users get stuck on loading screen"
 
@@ -144,6 +147,9 @@ repobird logout         # Remove stored credentials
 
 # Alternative: Use environment variable
 export REPOBIRD_API_KEY=your-api-key
+
+# Optional: disable colored human-readable output
+repobird config set color never
 ```
 
 ### Submitting Tasks

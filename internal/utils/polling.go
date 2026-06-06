@@ -112,10 +112,9 @@ func (p *Poller) Poll(ctx context.Context, fn PollFunc, onUpdate func(*models.Ru
 			}
 
 			// Show progress if enabled
-			if p.config.ShowProgress {
+			if p.config.ShowProgress && stdoutIsTerminal() {
 				elapsed := time.Since(p.startTime)
-				fmt.Printf("\rPolling... [%s elapsed] Status: %s",
-					FormatDuration(elapsed), run.Status)
+				writeLiveUpdate(os.Stdout, true, "Polling... [%s elapsed] Status: %s", FormatDuration(elapsed), run.Status)
 			}
 		}
 	}
@@ -136,13 +135,14 @@ func IsTerminalStatus(status models.RunStatus) bool {
 
 func ShowPollingProgress(startTime time.Time, status string, message string) {
 	elapsed := time.Since(startTime)
+	isTTY := stdoutIsTerminal()
 	if message != "" {
-		fmt.Printf("\r[%s] %s - %s", FormatDuration(elapsed), status, message)
+		writeLiveUpdate(os.Stdout, isTTY, "[%s] %s - %s", FormatDuration(elapsed), status, message)
 	} else {
-		fmt.Printf("\r[%s] %s", FormatDuration(elapsed), status)
+		writeLiveUpdate(os.Stdout, isTTY, "[%s] %s", FormatDuration(elapsed), status)
 	}
 }
 
 func ClearLine() {
-	fmt.Print("\r\033[K")
+	clearLiveOutput(os.Stdout, stdoutIsTerminal())
 }

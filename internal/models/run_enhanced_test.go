@@ -92,6 +92,37 @@ func TestRunRequest_Validation(t *testing.T) {
 	}
 }
 
+func TestAPIRunRequest_PromptRiskAcknowledgementJSON(t *testing.T) {
+	req := APIRunRequest{
+		Prompt:                "Fix the bug",
+		RepositoryName:        "test/repo",
+		RunType:               RunTypeRun,
+		Agent:                 "opencode",
+		AcknowledgePromptRisk: true,
+	}
+
+	data, err := json.Marshal(req)
+	require.NoError(t, err)
+
+	var result map[string]interface{}
+	require.NoError(t, json.Unmarshal(data, &result))
+	assert.Equal(t, true, result["acknowledgePromptRisk"])
+}
+
+func TestAPIRunRequest_OmitsPromptRiskAcknowledgementByDefault(t *testing.T) {
+	data, err := json.Marshal(APIRunRequest{
+		Prompt:         "Fix the bug",
+		RepositoryName: "test/repo",
+		RunType:        RunTypeRun,
+		Agent:          "opencode",
+	})
+	require.NoError(t, err)
+
+	var result map[string]interface{}
+	require.NoError(t, json.Unmarshal(data, &result))
+	assert.NotContains(t, result, "acknowledgePromptRisk")
+}
+
 func TestRunResponse_JSONSerialization(t *testing.T) {
 	now := time.Now()
 	response := RunResponse{

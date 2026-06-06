@@ -65,29 +65,31 @@ func init() {
 }
 
 func showExamples(cmd *cobra.Command, args []string) error {
-	fmt.Println("RepoBird Configuration Examples")
-	fmt.Println("================================")
+	styler := stdoutStyle()
+	fmt.Println(styler.Heading("RepoBird Configuration Examples"))
+	fmt.Println(styler.Muted("================================"))
 	fmt.Println()
-	fmt.Println("QUICK START:")
+	fmt.Println(styler.Label("QUICK START:"))
 	fmt.Println("  repobird examples schema        # Show configuration fields")
 	fmt.Println("  repobird examples generate      # Generate example file")
 	fmt.Println()
-	fmt.Println("SINGLE RUN FORMATS:")
+	fmt.Println(styler.Label("SINGLE RUN FORMATS:"))
 	fmt.Println("  • JSON (.json)         - Standard JSON configuration")
 	fmt.Println("  • YAML (.yaml, .yml)   - Human-friendly YAML format")
 	fmt.Println("  • Markdown (.md)       - Documentation with YAML frontmatter")
 	fmt.Println()
-	fmt.Println("COMMAND-LINE PROMPT OPTIONS:")
+	fmt.Println(styler.Label("COMMAND-LINE PROMPT OPTIONS:"))
 	fmt.Println("  • -p \"text\"            - Direct prompt text")
 	fmt.Println("  • -p @file.txt         - Read prompt from file")
 	fmt.Println("  • -p -                 - Read prompt from stdin")
 	fmt.Println("  • --context @file.md   - Read context from file")
+	fmt.Println("  • --acknowledge-prompt-risk - Resend after reviewing prompt-risk warning")
 	fmt.Println()
-	fmt.Println("COMMANDS:")
+	fmt.Println(styler.Label("COMMANDS:"))
 	fmt.Println("  schema [type]     Show configuration schema")
 	fmt.Println("  generate [type]   Generate example configuration files")
 	fmt.Println()
-	fmt.Println("For detailed documentation, see: docs/run-config-formats.md")
+	fmt.Printf("%s For detailed documentation, see: docs/run-config-formats.md\n", styler.Info("Tip:"))
 	return nil
 }
 
@@ -109,26 +111,27 @@ func showSchema(cmd *cobra.Command, args []string) error {
 }
 
 func showRunSchema() {
-	fmt.Println("SINGLE RUN CONFIGURATION SCHEMA")
-	fmt.Println("================================")
+	styler := stdoutStyle()
+	fmt.Println(styler.Heading("SINGLE RUN CONFIGURATION SCHEMA"))
+	fmt.Println(styler.Muted("================================"))
 	fmt.Println()
-	fmt.Println("REQUIRED FIELDS:")
+	fmt.Println(styler.Label("REQUIRED FIELDS:"))
 	fmt.Println("  • prompt      (string)  - Task description/instructions for the AI")
 	fmt.Println("  • repository  (string)  - Repository in format 'owner/repo' (auto-detected in git repos)")
 	fmt.Println()
-	fmt.Println("OPTIONAL FIELDS:")
+	fmt.Println(styler.Label("OPTIONAL FIELDS:"))
 	fmt.Println("  • target      (string)  - Target branch name for changes (default: auto-generated)")
 	fmt.Println("  • title       (string)  - Human-readable title for the run (default: auto-generated)")
 	fmt.Println("  • source      (string)  - Source branch (default: 'main', auto-detected in git repos)")
-	fmt.Println("  • runType     (string)  - Type: 'run' or 'plan' (default: 'run')")
+	fmt.Println("  • runType     (string)  - Type: 'run' (default); 'plan' is development-only during the OpenCode migration")
 	fmt.Println("  • context     (string)  - Additional context or instructions")
 	fmt.Println("  • files       (array)   - List of specific files to include")
 	fmt.Println()
-	fmt.Println("RUN TYPES:")
+	fmt.Println(styler.Label("RUN TYPES:"))
 	fmt.Println("  • run      - AI makes changes and creates PR automatically")
 	fmt.Println("  • plan     - AI creates detailed plan without code changes")
 	fmt.Println()
-	fmt.Println("EXAMPLES:")
+	fmt.Println(styler.Label("EXAMPLES:"))
 	fmt.Println("  repobird examples generate          # Generate JSON example")
 	fmt.Println("  repobird examples generate -f yaml  # Generate YAML example")
 	fmt.Println("  repobird examples generate -f md    # Generate Markdown example")
@@ -173,11 +176,12 @@ func generateExample(cmd *cobra.Command, args []string) error {
 		if err := os.WriteFile(outputFile, []byte(content), 0644); err != nil {
 			return fmt.Errorf("failed to write file: %w", err)
 		}
-		fmt.Printf("✓ Example configuration written to: %s\n", outputFile)
-		fmt.Printf("Run with: repobird run %s\n", outputFile)
+		styler := stdoutStyle()
+		fmt.Printf("%s %s\n", styler.Success("✓ Example configuration written to:"), outputFile)
+		fmt.Printf("%s repobird run %s\n", styler.Info("Run with:"), outputFile)
 	} else {
 		// When no output file specified, just show what would be generated
-		fmt.Printf("Example %s configuration (%s format):\n\n", exampleType, formatType)
+		fmt.Printf("%s %s configuration (%s format):\n\n", stdoutStyle().Heading("Example"), exampleType, formatType)
 		fmt.Println(content)
 	}
 

@@ -32,7 +32,7 @@ var logoutCmd = &cobra.Command{
 		response = strings.ToLower(strings.TrimSpace(response))
 
 		if response != "y" && response != "yes" {
-			fmt.Println("Logout cancelled.")
+			fmt.Println(stdoutStyle().Muted("Logout cancelled."))
 			return nil
 		}
 
@@ -44,7 +44,7 @@ var logoutCmd = &cobra.Command{
 		// Clear the current user cache
 		services.ClearCurrentUser()
 
-		fmt.Println("✓ API key removed from secure storage")
+		fmt.Println(stdoutStyle().Success("✓ API key removed from secure storage"))
 		return nil
 	},
 }

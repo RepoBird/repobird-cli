@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-06-05
+
+### Added
+
+- Colored human-readable CLI output is enabled by default for terminal users, with config/env opt-outs via color=never, REPOBIRD_COLOR, and NO_COLOR.
+- Run creation now supports --acknowledge-prompt-risk and acknowledgePromptRisk config files for explicit prompt-risk acknowledgement
+- Add `repobird completion install` to configure shell completions for bash, zsh, fish, and PowerShell.
+
+### Fixed
+
+- Prevent login and progress output from emitting duplicate redraw lines in non-interactive terminals.
+- Account info, status, and TUI usage displays now show credit balances instead of all-zero legacy run quotas.
+- Cobra-generated help and version output now use the same colored output policy as other human-readable CLI output.
+- Store API keys under the XDG config directory by default while reading and migrating legacy ~/.repobird keys.
+- Prevent local tests from overwriting the desktop keyring API key.
+- Secondary run-list repository pagination now sends page/limit parameters to match the current /api/v1/runs API
+- Remove legacy API key files and plain-text config entries after migrating them into XDG secure storage
+
 ## [0.5.0] - 2026-06-01
 
 ### Added
@@ -82,7 +100,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Configuration management
 - API integration with RepoBird platform
 
-[Unreleased]: https://github.com/RepoBird/repobird-cli/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/RepoBird/repobird-cli/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/RepoBird/repobird-cli/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/RepoBird/repobird-cli/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/RepoBird/repobird-cli/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/RepoBird/repobird-cli/compare/v0.2.0...v0.3.0

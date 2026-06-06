@@ -169,6 +169,23 @@ go install github.com/repobird/repobird-cli/cmd/repobird@latest
 
 After installation, enable shell completions for better CLI experience:
 
+### Recommended Setup
+
+Use the built-in installer for your shell. Add `--dry-run` first if you want to preview which files will be changed.
+
+```bash
+repobird completion install bash
+repobird completion install zsh
+repobird completion install fish
+repobird completion install powershell
+```
+
+The installer configures completions for both `repobird` and the `rb` alias where the shell supports aliases.
+
+### Manual Setup
+
+Use these commands when packaging RepoBird, installing completions system-wide, or managing shell startup files yourself.
+
 ### Bash
 ```bash
 # Install completion

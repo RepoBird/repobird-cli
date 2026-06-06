@@ -6,6 +6,7 @@ package commands
 import (
 	"fmt"
 	"os"
+	"runtime"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -33,6 +34,7 @@ Base URL: %s
 Get API Key: %s`, config.GetURLs().BaseURL, config.GetAPIKeysURL()),
 	PersistentPreRunE: func(_ *cobra.Command, _ []string) error {
 		var err error
+		config.SetConfigFile(cfgFile)
 		cfg, err = config.LoadSecureConfig()
 		if err != nil {
 			// Don't fail if config doesn't exist yet
@@ -51,17 +53,18 @@ Get API Key: %s`, config.GetURLs().BaseURL, config.GetAPIKeysURL()),
 
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
+		styler := stderrStyle()
 		// Format error message for better user experience
 		errorMsg := errors.FormatUserError(err)
-		fmt.Fprintf(os.Stderr, "Error: %s\n", errorMsg)
+		fmt.Fprintf(os.Stderr, "%s %s\n", styler.Error("Error:"), errorMsg)
 
 		// Add helpful hints for common errors
 		if errors.IsQuotaExceeded(err) || strings.Contains(strings.ToLower(errorMsg), "no runs remaining") {
-			fmt.Fprintf(os.Stderr, "\nHint: Upgrade your plan at %s\n", config.GetPricingURL())
+			fmt.Fprintf(os.Stderr, "\n%s Upgrade your plan at %s\n", styler.Info("Hint:"), config.GetPricingURL())
 		} else if errors.IsAuthError(err) && !strings.Contains(strings.ToLower(errorMsg), "no runs remaining") {
-			fmt.Fprintf(os.Stderr, "\nHint: Run 'repobird config set api-key YOUR_API_KEY' to configure authentication\n")
+			fmt.Fprintf(os.Stderr, "\n%s Run 'repobird config set api-key YOUR_API_KEY' to configure authentication\n", styler.Info("Hint:"))
 		} else if errors.IsNetworkError(err) {
-			fmt.Fprintf(os.Stderr, "\nHint: Check your internet connection and try again\n")
+			fmt.Fprintf(os.Stderr, "\n%s Check your internet connection and try again\n", styler.Info("Hint:"))
 		}
 
 		os.Exit(1)
@@ -72,8 +75,10 @@ func Execute() {
 func init() {
 	// Set custom version template to show just the version info
 	rootCmd.SetVersionTemplate(version.GetBuildInfo() + "\n")
+	rootCmd.SetHelpFunc(coloredHelp)
+	rootCmd.SetUsageFunc(coloredUsage)
 
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.repobird/config.yaml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $XDG_CONFIG_HOME/repobird/config.yaml or $HOME/.config/repobird/config.yaml)")
 	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "enable debug output")
 	rootCmd.PersistentFlags().BoolVar(&debugUser, "debug-user", false, "enable debug user mode with mock data")
 
@@ -101,7 +106,13 @@ var versionCmd = &cobra.Command{
 	Use:     "version",
 	Aliases: []string{"v"},
 	Short:   "Print version information",
-	Run: func(_ *cobra.Command, _ []string) {
-		fmt.Println(version.GetBuildInfo())
+	Run: func(cmd *cobra.Command, _ []string) {
+		styler := styleFor(cmd.OutOrStdout())
+		out := cmd.OutOrStdout()
+		fmt.Fprintf(out, "%s %s\n", styler.Label("Version:"), version.GetVersion())
+		fmt.Fprintf(out, "%s %s\n", styler.Label("Git Commit:"), version.GitCommit)
+		fmt.Fprintf(out, "%s %s\n", styler.Label("Build Date:"), version.BuildDate)
+		fmt.Fprintf(out, "%s %s\n", styler.Label("Go Version:"), runtime.Version())
+		fmt.Fprintf(out, "%s %s/%s\n", styler.Label("OS/Arch:"), runtime.GOOS, runtime.GOARCH)
 	},
 }

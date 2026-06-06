@@ -15,9 +15,10 @@ COMMAND-LINE PROMPT OPTIONS:
   • -p @file.txt         - Read prompt from file
   • -p -                 - Read prompt from stdin
   • --context @file.md   - Read context from file
+  • --acknowledge-prompt-risk - Resend after reviewing prompt-risk warning
 
 COMMANDS:
   schema [type]     Show configuration schema
   generate [type]   Generate example configuration files
 
-For detailed documentation, see: docs/run-config-formats.md
+Tip: For detailed documentation, see: docs/run-config-formats.md

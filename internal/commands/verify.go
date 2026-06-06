@@ -41,9 +41,10 @@ var verifyCmd = &cobra.Command{
 		// Set the current user for cache initialization
 		services.SetCurrentUser(userInfo)
 
-		fmt.Println("✓ API key is valid")
-		fmt.Printf("  Email: %s\n", userInfo.Email)
-		fmt.Printf("  Tier: %s\n", userInfo.Tier)
+		styler := stdoutStyle()
+		fmt.Println(styler.Success("✓ API key is valid"))
+		fmt.Printf("  %s %s\n", styler.Label("Email:"), userInfo.Email)
+		fmt.Printf("  %s %s\n", styler.Label("Tier:"), userInfo.Tier)
 		printAccountUsage(userInfo)
 		printAccountReset(userInfo)
 

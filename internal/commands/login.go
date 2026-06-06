@@ -6,6 +6,7 @@ package commands
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -18,75 +19,25 @@ import (
 	"github.com/repobird/repobird-cli/internal/utils"
 )
 
-// readMaskedInput reads input character by character, showing first 3 chars then asterisks
-func readMaskedInput() (string, error) {
-	// First print the prompt before entering raw mode
-	fmt.Print("Enter your API key: ")
+func readAPIKeyInteractive(stdin *os.File, output io.Writer) (string, error) {
+	const prompt = "Enter your API key: "
 
-	// Set terminal to raw mode to read char by char
-	oldState, err := term.MakeRaw(getStdinFD())
-	if err != nil {
-		return "", err
-	}
-
-	var interrupted bool
-	defer func() {
-		// Clear the line before restoring to avoid duplicate prompt
-		if interrupted {
-			fmt.Print("\r\033[K")
-		}
-		_ = term.Restore(getStdinFD(), oldState)
-		if !interrupted {
-			fmt.Println() // Only add newline if not interrupted
-		}
-	}()
-
-	var input []byte
-	reader := bufio.NewReader(os.Stdin)
-
-	for {
-		char, err := reader.ReadByte()
+	fmt.Fprint(output, prompt)
+	if term.IsTerminal(int(stdin.Fd())) {
+		bytePassword, err := term.ReadPassword(int(stdin.Fd()))
+		fmt.Fprintln(output)
 		if err != nil {
 			return "", err
 		}
-
-		switch char {
-		case '\n', '\r': // Enter key
-			return string(input), nil
-		case 127, '\b': // Backspace
-			if len(input) > 0 {
-				input = input[:len(input)-1]
-				// Clear current line and redraw
-				fmt.Print("\r\033[K")
-				fmt.Print("Enter your API key: ")
-				displayMasked(input)
-			}
-		case 3: // Ctrl+C
-			interrupted = true
-			return "", fmt.Errorf("interrupted")
-		default:
-			if char >= 32 && char < 127 { // Printable characters
-				input = append(input, char)
-				// Clear current line and redraw
-				fmt.Print("\r\033[K")
-				fmt.Print("Enter your API key: ")
-				displayMasked(input)
-			}
-		}
+		return strings.TrimSpace(string(bytePassword)), nil
 	}
-}
 
-// displayMasked shows first 3 chars then asterisks for the rest
-func displayMasked(input []byte) {
-	inputStr := string(input)
-	if len(inputStr) <= 3 {
-		fmt.Print(inputStr)
-	} else {
-		fmt.Print(inputStr[:3])
-		for i := 3; i < len(inputStr); i++ {
-			fmt.Print("*")
-		}
+	reader := bufio.NewReader(stdin)
+	input, err := reader.ReadString('\n')
+	if err != nil && err != io.EOF {
+		return "", err
 	}
+	return strings.TrimSpace(input), nil
 }
 
 var loginCmd = &cobra.Command{
@@ -96,8 +47,9 @@ var loginCmd = &cobra.Command{
 The key will be stored in your system keyring when available,
 or in an encrypted file as a fallback.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("Welcome to RepoBird CLI!")
-		fmt.Printf("Get your API key at: %s\n", config.GetAPIKeysURL())
+		styler := stdoutStyle()
+		fmt.Println(styler.Heading("Welcome to RepoBird CLI!"))
+		fmt.Printf("%s %s\n", styler.Label("Get your API key at:"), styler.URL(config.GetAPIKeysURL()))
 		fmt.Println()
 
 		// Check if API key is provided as argument (for CI/CD)
@@ -105,25 +57,10 @@ or in an encrypted file as a fallback.`,
 		if len(args) > 0 {
 			apiKey = args[0]
 		} else {
-			// Interactive prompt for API key with masked input
-			maskedKey, err := readMaskedInput()
+			// Interactive prompt for API key.
+			maskedKey, err := readAPIKeyInteractive(os.Stdin, os.Stdout)
 			if err != nil {
-				if err.Error() == "interrupted" {
-					fmt.Println("\nLogin cancelled.")
-					return nil
-				}
-				// Fallback to regular password input if custom reader fails
-				fmt.Print("Enter your API key: ")
-				bytePassword, err := term.ReadPassword(getStdinFD())
-				if err != nil {
-					// Final fallback to regular input
-					reader := bufio.NewReader(os.Stdin)
-					input, _ := reader.ReadString('\n')
-					apiKey = strings.TrimSpace(input)
-				} else {
-					apiKey = string(bytePassword)
-					fmt.Println() // Add newline after hidden input
-				}
+				return err
 			} else {
 				apiKey = strings.TrimSpace(maskedKey)
 			}
@@ -159,22 +96,22 @@ or in an encrypted file as a fallback.`,
 		// Show storage information
 		storageInfo := secureConfig.GetStorageInfo()
 		fmt.Println()
-		fmt.Println("✓ API key validated and stored successfully!")
-		fmt.Printf("  Email: %s\n", userInfo.Email)
-		fmt.Printf("  Tier: %s\n", userInfo.Tier)
+		fmt.Println(styler.Success("✓ API key validated and stored successfully!"))
+		fmt.Printf("  %s %s\n", styler.Label("Email:"), userInfo.Email)
+		fmt.Printf("  %s %s\n", styler.Label("Tier:"), userInfo.Tier)
 		printAccountUsage(userInfo)
 
 		// Display storage method
 		fmt.Println()
 		switch storageInfo["source"] {
 		case "system_keyring":
-			fmt.Printf("  Storage: %s (secure)\n", storageInfo["keyring_type"])
+			fmt.Printf("  %s %s (secure)\n", styler.Label("Storage:"), storageInfo["keyring_type"])
 		case "encrypted_file":
-			fmt.Println("  Storage: Encrypted file (secure)")
+			fmt.Printf("  %s Encrypted file (secure)\n", styler.Label("Storage:"))
 		case "environment":
-			fmt.Println("  Storage: Environment variable")
+			fmt.Printf("  %s Environment variable\n", styler.Label("Storage:"))
 		default:
-			fmt.Println("  Storage: Encrypted file (secure fallback)")
+			fmt.Printf("  %s Encrypted file (secure fallback)\n", styler.Label("Storage:"))
 		}
 
 		return nil
