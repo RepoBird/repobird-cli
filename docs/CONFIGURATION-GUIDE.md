@@ -57,6 +57,7 @@ export REPOBIRD_API_KEY=<your-api-key>
 **Example:**
 ```yaml
 api_url: https://repobird.ai
+color: auto
 timeout: 45m
 debug: false
 output_format: table
@@ -74,9 +75,11 @@ tui:
 |----------|-------------|---------|
 | `REPOBIRD_API_KEY` | API authentication key | - |
 | `REPOBIRD_API_URL` | API endpoint | `https://repobird.ai` |
+| `REPOBIRD_COLOR` | Color output mode: `auto`, `always`, or `never` | `auto` |
 | `REPOBIRD_ENV` | Environment (prod/dev) | `prod` |
 | `REPOBIRD_DEBUG_LOG` | Debug logging (0/1) | `0` |
 | `REPOBIRD_TIMEOUT` | Request timeout | `45m` |
+| `NO_COLOR` | Disable ANSI color output when set | - |
 
 ## CLI Commands
 
@@ -85,10 +88,12 @@ tui:
 # Set values
 repobird config set api-key <your-api-key>
 repobird config set api-url https://custom.url
+repobird config set color never
 
 # Get values
 repobird config get api-key
 repobird config get api-url
+repobird config get color
 
 # List all
 repobird config list

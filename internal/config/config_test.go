@@ -25,6 +25,7 @@ func TestLoadConfig_Default(t *testing.T) {
 	assert.Equal(t, "https://repobird.ai", config.APIURL)
 	assert.Empty(t, config.APIKey)
 	assert.False(t, config.Debug)
+	assert.Equal(t, "auto", config.Color)
 }
 
 func TestLoadConfig_WithExistingFile(t *testing.T) {
@@ -40,6 +41,7 @@ func TestLoadConfig_WithExistingFile(t *testing.T) {
 api_url: https://custom.api.com
 api_key: test-key-123
 debug: true
+color: never
 `
 	err = os.WriteFile(configFile, []byte(configContent), 0644)
 	require.NoError(t, err)
@@ -51,6 +53,7 @@ debug: true
 	assert.Equal(t, "https://custom.api.com", config.APIURL)
 	assert.Equal(t, "test-key-123", config.APIKey)
 	assert.True(t, config.Debug)
+	assert.Equal(t, "never", config.Color)
 }
 
 func TestLoadConfig_EnvironmentVariables(t *testing.T) {
@@ -60,6 +63,7 @@ func TestLoadConfig_EnvironmentVariables(t *testing.T) {
 	originalAPIURL := os.Getenv(EnvAPIURL)
 	originalAPIKey := os.Getenv(EnvAPIKey)
 	originalDebug := os.Getenv(EnvDebug)
+	originalColor := os.Getenv(EnvColor)
 
 	defer func() {
 		// Restore original values
@@ -78,11 +82,17 @@ func TestLoadConfig_EnvironmentVariables(t *testing.T) {
 		} else {
 			_ = os.Unsetenv(EnvDebug)
 		}
+		if originalColor != "" {
+			_ = os.Setenv(EnvColor, originalColor)
+		} else {
+			_ = os.Unsetenv(EnvColor)
+		}
 	}()
 
 	_ = os.Setenv(EnvAPIURL, "https://env.api.com")
 	_ = os.Setenv(EnvAPIKey, "env-key-456")
 	_ = os.Setenv(EnvDebug, "true")
+	_ = os.Setenv(EnvColor, "always")
 
 	config, err := LoadConfig()
 	require.NoError(t, err)
@@ -92,6 +102,7 @@ func TestLoadConfig_EnvironmentVariables(t *testing.T) {
 	assert.Equal(t, "https://env.api.com", config.APIURL)
 	assert.Equal(t, "env-key-456", config.APIKey)
 	assert.True(t, config.Debug)
+	assert.Equal(t, "always", config.Color)
 }
 
 func TestLoadConfig_FileAndEnvironmentPrecedence(t *testing.T) {
@@ -172,6 +183,7 @@ func TestSaveConfig(t *testing.T) {
 		APIURL: "https://saved.api.com",
 		APIKey: "saved-key-789",
 		Debug:  true,
+		Color:  "never",
 	}
 
 	err := SaveConfig(config)
@@ -188,6 +200,7 @@ func TestSaveConfig(t *testing.T) {
 	assert.Equal(t, config.APIURL, loadedConfig.APIURL)
 	assert.Equal(t, config.APIKey, loadedConfig.APIKey)
 	assert.Equal(t, config.Debug, loadedConfig.Debug)
+	assert.Equal(t, config.Color, loadedConfig.Color)
 }
 
 func TestSaveConfig_CreatesDirectory(t *testing.T) {

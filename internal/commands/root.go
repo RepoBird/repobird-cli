@@ -51,17 +51,18 @@ Get API Key: %s`, config.GetURLs().BaseURL, config.GetAPIKeysURL()),
 
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
+		styler := stderrStyle()
 		// Format error message for better user experience
 		errorMsg := errors.FormatUserError(err)
-		fmt.Fprintf(os.Stderr, "Error: %s\n", errorMsg)
+		fmt.Fprintf(os.Stderr, "%s %s\n", styler.Error("Error:"), errorMsg)
 
 		// Add helpful hints for common errors
 		if errors.IsQuotaExceeded(err) || strings.Contains(strings.ToLower(errorMsg), "no runs remaining") {
-			fmt.Fprintf(os.Stderr, "\nHint: Upgrade your plan at %s\n", config.GetPricingURL())
+			fmt.Fprintf(os.Stderr, "\n%s Upgrade your plan at %s\n", styler.Info("Hint:"), config.GetPricingURL())
 		} else if errors.IsAuthError(err) && !strings.Contains(strings.ToLower(errorMsg), "no runs remaining") {
-			fmt.Fprintf(os.Stderr, "\nHint: Run 'repobird config set api-key YOUR_API_KEY' to configure authentication\n")
+			fmt.Fprintf(os.Stderr, "\n%s Run 'repobird config set api-key YOUR_API_KEY' to configure authentication\n", styler.Info("Hint:"))
 		} else if errors.IsNetworkError(err) {
-			fmt.Fprintf(os.Stderr, "\nHint: Check your internet connection and try again\n")
+			fmt.Fprintf(os.Stderr, "\n%s Check your internet connection and try again\n", styler.Info("Hint:"))
 		}
 
 		os.Exit(1)

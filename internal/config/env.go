@@ -14,6 +14,9 @@ const (
 	// EnvDebug is the environment variable for debug mode
 	EnvDebug = "REPOBIRD_DEBUG"
 
+	// EnvColor controls CLI color output: auto, always, or never
+	EnvColor = "REPOBIRD_COLOR"
+
 	// EnvEnvironment is the environment variable for setting the environment (prod/dev)
 	EnvEnvironment = "REPOBIRD_ENV"
 

@@ -144,6 +144,9 @@ repobird logout         # Remove stored credentials
 
 # Alternative: Use environment variable
 export REPOBIRD_API_KEY=your-api-key
+
+# Optional: disable colored human-readable output
+repobird config set color never
 ```
 
 ### Submitting Tasks

@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 
 	"github.com/repobird/repobird-cli/internal/api"
@@ -233,13 +232,13 @@ func runCommandWithPreset(cmd *cobra.Command, args []string, presetName string) 
 		if promptHandler != nil && promptHandler.HasUnknownFields() {
 			unknownFields := promptHandler.GetUnknownFields()
 			if len(unknownFields) > 0 {
-				fmt.Fprintf(os.Stderr, "Note: Ignoring unknown fields in configuration: %s\n", strings.Join(unknownFields, ", "))
+				fmt.Fprintf(os.Stderr, "%s Ignoring unknown fields in configuration: %s\n", stderrStyle().Info("Note:"), strings.Join(unknownFields, ", "))
 
 				// Show suggestions if available
 				suggestions := promptHandler.GetFieldSuggestions()
 				for field, suggestion := range suggestions {
 					if suggestion != "" {
-						fmt.Fprintf(os.Stderr, "      Did you mean '%s' instead of '%s'?\n", suggestion, field)
+						fmt.Fprintf(os.Stderr, "      %s Did you mean '%s' instead of '%s'?\n", stderrStyle().Info("Hint:"), suggestion, field)
 					}
 				}
 			}
@@ -280,13 +279,13 @@ func runCommandWithPreset(cmd *cobra.Command, args []string, presetName string) 
 	if promptHandler != nil && promptHandler.HasUnknownFields() {
 		unknownFields := promptHandler.GetUnknownFields()
 		if len(unknownFields) > 0 {
-			fmt.Fprintf(os.Stderr, "Note: Ignoring unknown fields in configuration: %s\n", strings.Join(unknownFields, ", "))
+			fmt.Fprintf(os.Stderr, "%s Ignoring unknown fields in configuration: %s\n", stderrStyle().Info("Note:"), strings.Join(unknownFields, ", "))
 
 			// Show suggestions if available
 			suggestions := promptHandler.GetFieldSuggestions()
 			for field, suggestion := range suggestions {
 				if suggestion != "" {
-					fmt.Fprintf(os.Stderr, "      Did you mean '%s' instead of '%s'?\n", suggestion, field)
+					fmt.Fprintf(os.Stderr, "      %s Did you mean '%s' instead of '%s'?\n", stderrStyle().Info("Hint:"), suggestion, field)
 				}
 			}
 		}
@@ -303,10 +302,10 @@ func processSingleRun(runConfig *models.RunConfig, additionalContext string) err
 		if gitService.IsGitRepository() {
 			repoName, err := gitService.GetRepositoryName()
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Warning: Could not auto-detect repository: %v\n", err)
+				fmt.Fprintf(os.Stderr, "%s Could not auto-detect repository: %v\n", stderrStyle().Warning("Warning:"), err)
 			} else {
 				runConfig.Repository = repoName
-				fmt.Printf("Auto-detected repository: %s\n", repoName)
+				fmt.Printf("%s %s\n", stdoutStyle().Info("Auto-detected repository:"), repoName)
 			}
 		}
 	}
@@ -349,7 +348,7 @@ func processSingleRun(runConfig *models.RunConfig, additionalContext string) err
 	}
 
 	if dryRun {
-		fmt.Println("Validation successful. Run would be created with:")
+		fmt.Println(stdoutStyle().Success("Validation successful. Run would be created with:"))
 		printRunSelection(createReq)
 		b, _ := json.MarshalIndent(createReq, "", "  ")
 		fmt.Println(string(b))
@@ -362,26 +361,27 @@ func processSingleRun(runConfig *models.RunConfig, additionalContext string) err
 	ctx := context.Background()
 
 	printRunSelection(createReq)
-	fmt.Println("Creating run...")
+	fmt.Println(stdoutStyle().Info("Creating run..."))
 	run, err := runService.CreateRun(ctx, createReq)
 	if err != nil {
 		return fmt.Errorf("failed to create run: %s", errors.FormatUserError(err))
 	}
 
-	fmt.Printf("Run created successfully!\n")
-	fmt.Printf("ID: %s\n", run.ID)
-	fmt.Printf("Status: %s\n", formatStatusForDisplay(run.Status))
-	fmt.Printf("Repository: %s\n", run.RepositoryName)
-	fmt.Printf("Source: %s → Target: %s\n", run.SourceBranch, run.TargetBranch)
+	styler := stdoutStyle()
+	fmt.Println(styler.Success("Run created successfully!"))
+	fmt.Printf("%s %s\n", styler.Label("ID:"), run.ID)
+	fmt.Printf("%s %s\n", styler.Label("Status:"), styler.Status(formatStatusForDisplay(run.Status)))
+	fmt.Printf("%s %s\n", styler.Label("Repository:"), run.RepositoryName)
+	fmt.Printf("%s %s → %s\n", styler.Label("Source:"), run.SourceBranch, run.TargetBranch)
 
 	// Print the RepoBird URL for the run
 	runURL := utils.GenerateRepoBirdURL(run.ID)
 	if runURL != "" {
-		fmt.Printf("URL: %s\n", runURL)
+		fmt.Printf("%s %s\n", styler.Label("URL:"), styler.URL(runURL))
 	}
 
 	if follow {
-		fmt.Println("\nFollowing run status...")
+		fmt.Printf("\n%s\n", styler.Info("Following run status..."))
 		return followRunStatus(runService, run.ID)
 	}
 
@@ -474,8 +474,9 @@ func printRunSelection(req domain.CreateRunRequest) {
 	if !ok {
 		return
 	}
-	fmt.Printf("Run type: %s\n", preset.Label)
-	fmt.Printf("Model: %s (%s)\n", modelDisplayName(preset.Model), preset.Model)
+	styler := stdoutStyle()
+	fmt.Printf("%s %s\n", styler.Label("Run type:"), preset.Label)
+	fmt.Printf("%s %s (%s)\n", styler.Label("Model:"), modelDisplayName(preset.Model), preset.Model)
 }
 
 func modelDisplayName(model string) string {
@@ -526,11 +527,12 @@ func processBulkRuns(filename string) error {
 	// }
 
 	if dryRun {
-		fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Render("✓ Configuration valid"))
-		fmt.Printf("Repository: %s\n", bulkConfig.Repository)
-		fmt.Printf("Source: %s\n", bulkConfig.Source)
-		fmt.Printf("RunType: %s\n", bulkConfig.RunType)
-		fmt.Printf("Total runs: %d\n", len(bulkConfig.Runs))
+		styler := stdoutStyle()
+		fmt.Println(styler.Success("✓ Configuration valid"))
+		fmt.Printf("%s %s\n", styler.Label("Repository:"), bulkConfig.Repository)
+		fmt.Printf("%s %s\n", styler.Label("Source:"), bulkConfig.Source)
+		fmt.Printf("%s %s\n", styler.Label("RunType:"), bulkConfig.RunType)
+		fmt.Printf("%s %d\n", styler.Label("Total runs:"), len(bulkConfig.Runs))
 		for i, run := range bulkConfig.Runs {
 			title := run.Title
 			if title == "" {
@@ -579,7 +581,7 @@ func followRunStatus(runService domain.RunService, runID string) error {
 		displayStatus := formatStatusForDisplay(status)
 		if displayStatus != lastStatus {
 			clearLiveOutput(os.Stdout, isTTY)
-			fmt.Printf("[%s] Status: %s\n", time.Now().Format("15:04:05"), displayStatus)
+			fmt.Printf("[%s] %s %s\n", time.Now().Format("15:04:05"), stdoutStyle().Label("Status:"), stdoutStyle().Status(displayStatus))
 			lastStatus = displayStatus
 			return
 		}
@@ -634,13 +636,14 @@ func followRunStatus(runService domain.RunService, runID string) error {
 
 	clearLiveOutput(os.Stdout, isTTY)
 	if finalRun.Status == domain.StatusFailed && finalRun.Error != "" {
-		fmt.Printf("Run failed: %s\n", finalRun.Error)
+		fmt.Printf("%s %s\n", stdoutStyle().Error("Run failed:"), finalRun.Error)
 	} else {
-		fmt.Printf("Run completed with status: %s\n", formatStatusForDisplay(finalRun.Status))
+		styler := stdoutStyle()
+		fmt.Printf("%s %s\n", styler.Success("Run completed with status:"), styler.Status(formatStatusForDisplay(finalRun.Status)))
 
 		// Display PR URL if run completed successfully and URL is available
 		if finalRun.Status == domain.StatusCompleted && finalRun.PullRequestURL != "" {
-			fmt.Printf("Pull Request: %s\n", finalRun.PullRequestURL)
+			fmt.Printf("%s %s\n", styler.Label("Pull Request:"), styler.URL(finalRun.PullRequestURL))
 		} else if isDebug && finalRun.Status == domain.StatusCompleted {
 			fmt.Printf("DEBUG: Run completed but no PR URL available (PullRequestURL='%s')\n", finalRun.PullRequestURL)
 		}
@@ -720,9 +723,10 @@ func executeBulkRuns(bulkConfig *bulk.BulkConfig) error {
 	ctx := context.Background()
 
 	// Display submission info
-	fmt.Println(lipgloss.NewStyle().Bold(true).Render("Submitting bulk runs..."))
-	fmt.Printf("Repository: %s\n", bulkConfig.Repository)
-	fmt.Printf("Total runs: %d\n", len(bulkConfig.Runs))
+	styler := stdoutStyle()
+	fmt.Println(styler.Heading("Submitting bulk runs..."))
+	fmt.Printf("%s %s\n", styler.Label("Repository:"), bulkConfig.Repository)
+	fmt.Printf("%s %d\n", styler.Label("Total runs:"), len(bulkConfig.Runs))
 	fmt.Println("\nThis may take up to 5 minutes. Please wait...")
 
 	done := make(chan bool, 1) // Buffered to prevent goroutine leak
@@ -782,32 +786,32 @@ func executeBulkRuns(bulkConfig *bulk.BulkConfig) error {
 	// Handle different status codes
 	if bulkResp.StatusCode == http.StatusMultiStatus {
 		// 207 Multi-Status: Some runs still processing
-		fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render("\n⚠ Bulk submission in progress:"))
+		fmt.Println("\n" + styler.Warning("⚠ Bulk submission in progress:"))
 		fmt.Printf("The server is still processing your runs. This is normal for large batches.\n")
 		fmt.Printf("Created: %d/%d runs so far\n", bulkResp.Data.Metadata.TotalSuccessful, bulkResp.Data.Metadata.TotalRequested)
 
 		if len(bulkResp.Data.Failed) > 0 {
-			fmt.Println("\nFailed runs:")
+			fmt.Println("\n" + styler.Error("Failed runs:"))
 			for _, runErr := range bulkResp.Data.Failed {
-				fmt.Printf("  ✗ Run %d: %s\n", runErr.RequestIndex+1, runErr.Message)
+				fmt.Printf("  %s Run %d: %s\n", styler.Error("✗"), runErr.RequestIndex+1, runErr.Message)
 			}
 		}
 
-		fmt.Println("\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("14")).Render("ℹ  The remaining runs are being processed in the background."))
+		fmt.Println("\n" + styler.Info("ℹ  The remaining runs are being processed in the background."))
 		fmt.Println("Use --follow or check status to monitor progress.")
 	} else if len(bulkResp.Data.Failed) > 0 {
 		// Some runs failed
-		fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render("\n⚠ Partial success:"))
+		fmt.Println("\n" + styler.Warning("⚠ Partial success:"))
 		fmt.Printf("Created: %d/%d runs\n", bulkResp.Data.Metadata.TotalSuccessful, bulkResp.Data.Metadata.TotalRequested)
 
 		// Check if failures are due to duplicates
 		for _, runErr := range bulkResp.Data.Failed {
-			fmt.Printf("  ✗ Run %d: %s\n", runErr.RequestIndex+1, runErr.Message)
+			fmt.Printf("  %s Run %d: %s\n", styler.Error("✗"), runErr.RequestIndex+1, runErr.Message)
 			// Note: Duplicates are no longer blocked as --force is deprecated
 		}
 	} else {
 		// All runs created successfully
-		fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Render("\n✓ All runs created successfully"))
+		fmt.Println("\n" + styler.Success("✓ All runs created successfully"))
 	}
 
 	// Display created runs
@@ -820,14 +824,14 @@ func executeBulkRuns(bulkConfig *bulk.BulkConfig) error {
 
 	// Follow progress if requested
 	if follow && len(bulkResp.Data.Successful) > 0 {
-		fmt.Println("\nFollowing batch progress...")
+		fmt.Println("\n" + styler.Info("Following batch progress..."))
 		// Create context with 1h 30m timeout
 		followCtx, cancel := context.WithTimeout(context.Background(), 90*time.Minute)
 		defer cancel()
 		return followBulkProgress(followCtx, client, bulkResp.Data.BatchID)
 	}
 
-	fmt.Printf("\nBatch ID: %s\n", bulkResp.Data.BatchID)
+	fmt.Printf("\n%s %s\n", styler.Label("Batch ID:"), bulkResp.Data.BatchID)
 	fmt.Println("Use 'repobird bulk status " + bulkResp.Data.BatchID + "' to check progress")
 
 	return nil

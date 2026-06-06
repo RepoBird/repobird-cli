@@ -60,8 +60,9 @@ Get API Key: %s`, config.GetAPIKeysURL()),
 			return fmt.Errorf("failed to add aliases to man pages: %w", err)
 		}
 
-		fmt.Printf("✓ Man pages generated in %s directory\n", outputDir)
-		fmt.Println("Tip: The 'run' command supports single run configurations.")
+		styler := stdoutStyle()
+		fmt.Printf("%s in %s directory\n", styler.Success("✓ Man pages generated"), outputDir)
+		fmt.Printf("%s The 'run' command supports single run configurations.\n", styler.Info("Tip:"))
 		fmt.Println("     You can also use @filename to read prompts from files. Use 'repobird examples' for format details.")
 		return nil
 	},
@@ -96,8 +97,9 @@ Get API Key: %s`, config.GetAPIKeysURL()),
 			return fmt.Errorf("failed to add aliases to markdown docs: %w", err)
 		}
 
-		fmt.Printf("✓ Markdown documentation generated in %s directory\n", outputDir)
-		fmt.Println("Tip: The 'run' command supports single run configurations.")
+		styler := stdoutStyle()
+		fmt.Printf("%s in %s directory\n", styler.Success("✓ Markdown documentation generated"), outputDir)
+		fmt.Printf("%s The 'run' command supports single run configurations.\n", styler.Info("Tip:"))
 		fmt.Println("     You can also use @filename to read prompts from files. Use 'repobird examples' for format details.")
 		return nil
 	},
@@ -132,8 +134,9 @@ Get API Key: %s`, config.GetAPIKeysURL()),
 			return fmt.Errorf("failed to add aliases to YAML docs: %w", err)
 		}
 
-		fmt.Printf("✓ YAML documentation generated in %s directory\n", outputDir)
-		fmt.Println("Tip: The 'run' command supports single run configurations.")
+		styler := stdoutStyle()
+		fmt.Printf("%s in %s directory\n", styler.Success("✓ YAML documentation generated"), outputDir)
+		fmt.Printf("%s The 'run' command supports single run configurations.\n", styler.Info("Tip:"))
 		fmt.Println("     You can also use @filename to read prompts from files. Use 'repobird examples' for format details.")
 		return nil
 	},

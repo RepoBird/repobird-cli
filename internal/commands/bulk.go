@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/repobird/repobird-cli/internal/api"
 	"github.com/repobird/repobird-cli/internal/api/dto"
 	"github.com/repobird/repobird-cli/internal/bulk"
@@ -173,9 +172,10 @@ func expandFilePaths(args []string) ([]string, error) {
 }
 
 func printDryRunSummary(bulkConfig *bulk.BulkConfig) error {
-	fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Render("✓ Configuration valid"))
-	fmt.Printf("Repository: %s\n", bulkConfig.Repository)
-	fmt.Printf("Total runs: %d\n", len(bulkConfig.Runs))
+	styler := stdoutStyle()
+	fmt.Println(styler.Success("✓ Configuration valid"))
+	fmt.Printf("%s %s\n", styler.Label("Repository:"), bulkConfig.Repository)
+	fmt.Printf("%s %d\n", styler.Label("Total runs:"), len(bulkConfig.Runs))
 	for i, run := range bulkConfig.Runs {
 		title := run.Title
 		if title == "" {
@@ -244,9 +244,10 @@ func submitBulkRunsWithProgress(client *api.Client, bulkRequest *dto.BulkRunRequ
 	ctx := context.Background()
 
 	// Display submission info
-	fmt.Println(lipgloss.NewStyle().Bold(true).Render("Submitting bulk runs..."))
-	fmt.Printf("Repository: %s\n", bulkConfig.Repository)
-	fmt.Printf("Total runs: %d\n", len(bulkConfig.Runs))
+	styler := stdoutStyle()
+	fmt.Println(styler.Heading("Submitting bulk runs..."))
+	fmt.Printf("%s %s\n", styler.Label("Repository:"), bulkConfig.Repository)
+	fmt.Printf("%s %d\n", styler.Label("Total runs:"), len(bulkConfig.Runs))
 	fmt.Println("\nThis may take up to 5 minutes. Please wait...")
 
 	// Show progress spinner
@@ -323,7 +324,7 @@ func displayBulkSubmissionResults(bulkResp *dto.BulkRunResponse) {
 	} else if len(bulkResp.Data.Failed) > 0 {
 		displayPartialSuccessResult(bulkResp)
 	} else {
-		fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Render("\n✓ All runs created successfully"))
+		fmt.Println("\n" + stdoutStyle().Success("✓ All runs created successfully"))
 	}
 
 	// Display created runs
@@ -336,27 +337,29 @@ func displayBulkSubmissionResults(bulkResp *dto.BulkRunResponse) {
 }
 
 func displayMultiStatusResult(bulkResp *dto.BulkRunResponse) {
-	fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render("\n⚠ Bulk submission in progress:"))
+	styler := stdoutStyle()
+	fmt.Println("\n" + styler.Warning("⚠ Bulk submission in progress:"))
 	fmt.Printf("The server is still processing your runs. This is normal for large batches.\n")
 	fmt.Printf("Created: %d/%d runs so far\n", bulkResp.Data.Metadata.TotalSuccessful, bulkResp.Data.Metadata.TotalRequested)
 
 	if len(bulkResp.Data.Failed) > 0 {
-		fmt.Println("\nFailed runs:")
+		fmt.Println("\n" + styler.Error("Failed runs:"))
 		for _, runErr := range bulkResp.Data.Failed {
-			fmt.Printf("  ✗ Run %d: %s\n", runErr.RequestIndex+1, runErr.Message)
+			fmt.Printf("  %s Run %d: %s\n", styler.Error("✗"), runErr.RequestIndex+1, runErr.Message)
 		}
 	}
 
-	fmt.Println("\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("14")).Render("ℹ  The remaining runs are being processed in the background."))
+	fmt.Println("\n" + styler.Info("ℹ  The remaining runs are being processed in the background."))
 	fmt.Println("Use --follow or check status to monitor progress.")
 }
 
 func displayPartialSuccessResult(bulkResp *dto.BulkRunResponse) {
-	fmt.Println(lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render("\n⚠ Partial success:"))
+	styler := stdoutStyle()
+	fmt.Println("\n" + styler.Warning("⚠ Partial success:"))
 	fmt.Printf("Created: %d/%d runs\n", bulkResp.Data.Metadata.TotalSuccessful, bulkResp.Data.Metadata.TotalRequested)
 
 	for _, runErr := range bulkResp.Data.Failed {
-		fmt.Printf("  ✗ Run %d: %s\n", runErr.RequestIndex+1, runErr.Message)
+		fmt.Printf("  %s Run %d: %s\n", styler.Error("✗"), runErr.RequestIndex+1, runErr.Message)
 	}
 }
 
@@ -490,83 +493,50 @@ func followBulkProgress(ctx context.Context, client *api.Client, batchID string)
 }
 
 func displayMultiLineBulkStatus(status dto.BulkStatusData, spinnerChar string, startTime time.Time) {
+	styler := stdoutStyle()
 	// Display elapsed time on first line with spinner
 	elapsed := time.Since(startTime)
-	fmt.Printf("%s Following batch progress... [%s]\n", spinnerChar, formatDuration(elapsed))
+	fmt.Printf("%s %s [%s]\n", spinnerChar, styler.Info("Following batch progress..."), formatDuration(elapsed))
 
 	// Display each run on its own line with ID: STATUS format (no spinner)
 	for _, run := range status.Runs {
-		statusText := "QUEUED"
-		statusColor := lipgloss.Color("8")
-
-		// Check actual API status values (server uses uppercase strings)
-		switch run.Status {
-		case "DONE":
-			statusText = "DONE"
-			statusColor = lipgloss.Color("10")
-		case "FAILED":
-			statusText = "FAILED"
-			statusColor = lipgloss.Color("9")
-		case "PROCESSING", "RUNNING":
-			statusText = "PROCESSING"
-			statusColor = lipgloss.Color("11")
-		case "INITIALIZING":
-			statusText = "INITIALIZING"
-			statusColor = lipgloss.Color("11")
-		case "QUEUED":
-			statusText = "QUEUED"
-			statusColor = lipgloss.Color("8")
-		default:
-			// Use the raw status value if unknown
-			statusText = run.Status
-			statusColor = lipgloss.Color("7")
-		}
-
-		style := lipgloss.NewStyle().Foreground(statusColor)
-		fmt.Printf("  [%d]: %s\n", run.ID, style.Render(statusText))
+		fmt.Printf("  [%d]: %s\n", run.ID, styler.Status(normalizeBulkStatus(run.Status)))
 	}
 }
 
 func displayBulkResults(status dto.BulkStatusData) {
-	fmt.Println("\nResults:")
+	styler := stdoutStyle()
+	fmt.Println("\n" + styler.Heading("Results:"))
 
 	for _, run := range status.Runs {
 		statusIcon := "○"
-		statusColor := lipgloss.Color("7")
 
 		// Check actual API status values (server uses uppercase strings)
 		switch run.Status {
 		case "DONE":
 			statusIcon = "✓"
-			statusColor = lipgloss.Color("10")
 		case "FAILED":
 			statusIcon = "✗"
-			statusColor = lipgloss.Color("9")
 		case "PROCESSING", "RUNNING":
 			statusIcon = "●"
-			statusColor = lipgloss.Color("11")
 		case "INITIALIZING":
 			statusIcon = "●"
-			statusColor = lipgloss.Color("11")
 		case "QUEUED":
 			statusIcon = "○"
-			statusColor = lipgloss.Color("8")
 		default:
 			// Unknown status - show with question mark
 			statusIcon = "?"
-			statusColor = lipgloss.Color("7")
 		}
 
-		style := lipgloss.NewStyle().Foreground(statusColor)
 		fmt.Printf("  %s %s (ID: %d)\n",
-			style.Render(statusIcon),
+			styler.Status(statusIcon),
 			run.Title,
 			run.ID,
 		)
 
 		// Display PR URL if available
 		if run.PRURL != nil && *run.PRURL != "" {
-			fmt.Printf("    Pull Request: %s\n", *run.PRURL)
+			fmt.Printf("    %s %s\n", styler.Label("Pull Request:"), styler.URL(*run.PRURL))
 		}
 	}
 
@@ -577,4 +547,13 @@ func displayBulkResults(status dto.BulkStatusData) {
 	fmt.Printf("  Failed: %d\n", status.Metadata.Failed)
 	fmt.Printf("  Processing: %d\n", status.Metadata.Processing)
 	fmt.Printf("  Queued: %d\n", status.Metadata.Queued)
+}
+
+func normalizeBulkStatus(status string) string {
+	switch status {
+	case "RUNNING":
+		return "PROCESSING"
+	default:
+		return status
+	}
 }

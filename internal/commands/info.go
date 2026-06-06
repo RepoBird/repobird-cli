@@ -25,40 +25,41 @@ var infoCmd = &cobra.Command{
 		}
 
 		storageInfo := secureConfig.GetStorageInfo()
+		styler := stdoutStyle()
 
 		// Display storage information
-		fmt.Println("Authentication Status:")
+		fmt.Println(styler.Heading("Authentication Status:"))
 		fmt.Println()
 
 		switch storageInfo["source"] {
 		case "environment":
-			fmt.Println("  Method: Environment Variable")
-			fmt.Println("  Source: REPOBIRD_API_KEY")
-			fmt.Println("  Security: ⚠️  Semi-secure (suitable for CI/CD)")
+			fmt.Printf("  %s Environment Variable\n", styler.Label("Method:"))
+			fmt.Printf("  %s REPOBIRD_API_KEY\n", styler.Label("Source:"))
+			fmt.Printf("  %s %s\n", styler.Label("Security:"), styler.Warning("⚠️  Semi-secure (suitable for CI/CD)"))
 			fmt.Println()
-			fmt.Println("  For better security in development, use 'repobird login'")
+			fmt.Printf("  %s For better security in development, use 'repobird login'\n", styler.Info("Tip:"))
 
 		case "system_keyring":
-			fmt.Printf("  Method: System Keyring\n")
-			fmt.Printf("  Type: %s\n", storageInfo["keyring_type"])
-			fmt.Println("  Security: ✓ Secure")
+			fmt.Printf("  %s System Keyring\n", styler.Label("Method:"))
+			fmt.Printf("  %s %s\n", styler.Label("Type:"), storageInfo["keyring_type"])
+			fmt.Printf("  %s %s\n", styler.Label("Security:"), styler.Success("✓ Secure"))
 
 		case "encrypted_file":
-			fmt.Println("  Method: Encrypted File")
-			fmt.Printf("  Location: %s\n", storageInfo["location"])
-			fmt.Println("  Security: ✓ Secure (AES-256-GCM)")
+			fmt.Printf("  %s Encrypted File\n", styler.Label("Method:"))
+			fmt.Printf("  %s %s\n", styler.Label("Location:"), storageInfo["location"])
+			fmt.Printf("  %s %s\n", styler.Label("Security:"), styler.Success("✓ Secure (AES-256-GCM)"))
 
 		case "plain_text_config":
-			fmt.Println("  Method: Plain Text Config")
-			fmt.Printf("  Location: %s\n", storageInfo["location"])
-			fmt.Println("  Security: ⚠️  NOT SECURE")
+			fmt.Printf("  %s Plain Text Config\n", styler.Label("Method:"))
+			fmt.Printf("  %s %s\n", styler.Label("Location:"), storageInfo["location"])
+			fmt.Printf("  %s %s\n", styler.Label("Security:"), styler.Warning("⚠️  NOT SECURE"))
 			fmt.Println()
-			fmt.Printf("  Warning: %s\n", storageInfo["warning"])
+			fmt.Printf("  %s %s\n", styler.Warning("Warning:"), storageInfo["warning"])
 
 		default:
-			fmt.Println("  Status: Not configured")
+			fmt.Printf("  %s %s\n", styler.Label("Status:"), styler.Muted("Not configured"))
 			fmt.Println()
-			fmt.Println("  Run 'repobird login' to configure your API key")
+			fmt.Printf("  %s Run 'repobird login' to configure your API key\n", styler.Info("Hint:"))
 			return nil
 		}
 
@@ -70,15 +71,15 @@ var infoCmd = &cobra.Command{
 			if userInfo, err := client.VerifyAuth(); err == nil {
 				// Set the current user for cache initialization
 				services.SetCurrentUser(userInfo)
-				fmt.Println("Account Information:")
-				fmt.Printf("  Email: %s\n", userInfo.Email)
-				fmt.Printf("  Tier: %s\n", userInfo.Tier)
+				fmt.Println(styler.Heading("Account Information:"))
+				fmt.Printf("  %s %s\n", styler.Label("Email:"), userInfo.Email)
+				fmt.Printf("  %s %s\n", styler.Label("Tier:"), userInfo.Tier)
 				printAccountUsage(userInfo)
 				printAccountReset(userInfo)
 			} else {
 				fmt.Println()
-				fmt.Println("  ⚠️  Could not fetch account information")
-				fmt.Println("  Run 'repobird verify' to check your API key")
+				fmt.Println("  " + styler.Warning("⚠️  Could not fetch account information"))
+				fmt.Printf("  %s Run 'repobird verify' to check your API key\n", styler.Info("Hint:"))
 			}
 		}
 

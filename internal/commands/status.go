@@ -84,6 +84,7 @@ func getRunStatus(client *api.Client, runID string) error {
 }
 
 func listRuns(client *api.Client) error {
+	styler := stdoutStyle()
 	// Always show version info in dev/debug mode or when there's an error
 	env := os.Getenv("REPOBIRD_ENV")
 	showDebugInfo := strings.ToLower(env) == "dev" || strings.ToLower(env) == "development" || cfg.Debug
@@ -94,31 +95,31 @@ func listRuns(client *api.Client) error {
 	// If API/auth error, show version info and error, then exit
 	if authErr != nil && (errors.IsAuthError(authErr) || errors.IsNetworkError(authErr)) {
 		// Always show version/debug info when there's an API error
-		fmt.Printf("Build: %s", version.GetVersion())
+		fmt.Printf("%s %s", styler.Label("Build:"), version.GetVersion())
 		if version.GetVersion() == "dev" {
 			fmt.Printf(" (development)")
 		}
-		fmt.Printf(" | Commit: %s", version.GitCommit)
+		fmt.Printf(" | %s %s", styler.Label("Commit:"), version.GitCommit)
 		if cfg.Debug {
-			fmt.Printf(" | Debug: ON")
+			fmt.Printf(" | %s %s", styler.Label("Debug:"), styler.Warning("ON"))
 		}
 		fmt.Println()
 		fmt.Println()
 
 		// Show the error below version info
-		fmt.Fprintf(os.Stderr, "Error: %s\n", errors.FormatUserError(authErr))
+		fmt.Fprintf(os.Stderr, "%s %s\n", stderrStyle().Error("Error:"), errors.FormatUserError(authErr))
 		return nil // Return nil to prevent cobra from showing usage and error again
 	}
 
 	// Show version info in dev/debug mode for successful requests
 	if showDebugInfo {
-		fmt.Printf("Build: %s", version.GetVersion())
+		fmt.Printf("%s %s", styler.Label("Build:"), version.GetVersion())
 		if version.GetVersion() == "dev" {
 			fmt.Printf(" (development)")
 		}
-		fmt.Printf(" | Commit: %s", version.GitCommit)
+		fmt.Printf(" | %s %s", styler.Label("Commit:"), version.GitCommit)
 		if cfg.Debug {
-			fmt.Printf(" | Debug: ON")
+			fmt.Printf(" | %s %s", styler.Label("Debug:"), styler.Warning("ON"))
 		}
 		fmt.Println()
 		fmt.Println()
@@ -126,17 +127,17 @@ func listRuns(client *api.Client) error {
 
 	// If auth succeeded but had a warning-level error, show warning
 	if authErr != nil {
-		fmt.Fprintf(os.Stderr, "Warning: Could not fetch user info: %s\n", errors.FormatUserError(authErr))
+		fmt.Fprintf(os.Stderr, "%s Could not fetch user info: %s\n", stderrStyle().Warning("Warning:"), errors.FormatUserError(authErr))
 	} else if userInfo != nil {
 		// Set the current user for cache initialization and show user info
 		services.SetCurrentUser(userInfo)
 
 		if userInfo.CreditBalance != nil {
-			fmt.Printf("Credits: %d available (%s tier)\n", userInfo.CreditBalance.AvailableCredits, userInfo.Tier)
+			fmt.Printf("%s %d available (%s tier)\n", styler.Label("Credits:"), userInfo.CreditBalance.AvailableCredits, userInfo.Tier)
 		} else {
-			fmt.Printf("Runs: %d/%d (%s tier)\n", userInfo.RemainingProRuns, userInfo.ProTotalRuns, userInfo.Tier)
+			fmt.Printf("%s %d/%d (%s tier)\n", styler.Label("Runs:"), userInfo.RemainingProRuns, userInfo.ProTotalRuns, userInfo.Tier)
 			if userInfo.PlanTotalRuns > 0 || userInfo.RemainingPlanRuns > 0 {
-				fmt.Printf("Plan Runs: %d/%d\n", userInfo.RemainingPlanRuns, userInfo.PlanTotalRuns)
+				fmt.Printf("%s %d/%d\n", styler.Label("Plan Runs:"), userInfo.RemainingPlanRuns, userInfo.PlanTotalRuns)
 			}
 		}
 		fmt.Println()
@@ -146,25 +147,25 @@ func listRuns(client *api.Client) error {
 	if err != nil {
 		// If this is also an API/auth error and we haven't shown version info yet, show it
 		if !showDebugInfo && (errors.IsAuthError(err) || errors.IsNetworkError(err)) {
-			fmt.Printf("Build: %s", version.GetVersion())
+			fmt.Printf("%s %s", styler.Label("Build:"), version.GetVersion())
 			if version.GetVersion() == "dev" {
 				fmt.Printf(" (development)")
 			}
-			fmt.Printf(" | Commit: %s", version.GitCommit)
+			fmt.Printf(" | %s %s", styler.Label("Commit:"), version.GitCommit)
 			if cfg.Debug {
-				fmt.Printf(" | Debug: ON")
+				fmt.Printf(" | %s %s", styler.Label("Debug:"), styler.Warning("ON"))
 			}
 			fmt.Println()
 			fmt.Println()
 
-			fmt.Fprintf(os.Stderr, "Error: failed to list runs: %s\n", errors.FormatUserError(err))
+			fmt.Fprintf(os.Stderr, "%s failed to list runs: %s\n", stderrStyle().Error("Error:"), errors.FormatUserError(err))
 			return nil // Return nil to prevent cobra from showing usage and error again
 		}
 		return fmt.Errorf("failed to list runs: %s", errors.FormatUserError(err))
 	}
 
 	if len(runs) == 0 {
-		fmt.Println("No runs found")
+		fmt.Println(styler.Muted("No runs found"))
 		return nil
 	}
 
@@ -190,7 +191,7 @@ func listRuns(client *api.Client) error {
 		}
 		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
 			idStr,
-			run.Status,
+			styler.Status(string(run.Status)),
 			run.GetRepositoryName(),
 			created,
 			title,
@@ -221,7 +222,7 @@ func followSingleRun(client *api.Client, runID string) error {
 			utils.ClearLine()
 			printRunDetails(run)
 			lastStatus = string(run.Status)
-			fmt.Println("\nFollowing run status...")
+			fmt.Printf("\n%s\n", stdoutStyle().Info("Following run status..."))
 		} else {
 			utils.ShowPollingProgress(startTime, string(run.Status), run.Error)
 		}
@@ -233,23 +234,24 @@ func followSingleRun(client *api.Client, runID string) error {
 	}
 
 	utils.ClearLine()
-	fmt.Println("\nFinal status:")
+	fmt.Printf("\n%s\n", stdoutStyle().Heading("Final status:"))
 	printRunDetails(finalRun)
 	return nil
 }
 
 func printRunDetails(run *models.RunResponse) {
-	fmt.Printf("Run ID: %s\n", run.GetIDString())
-	fmt.Printf("Status: %s\n", run.Status)
-	fmt.Printf("Repository: %s\n", run.Repository)
-	fmt.Printf("Branch: %s → %s\n", run.Source, run.Target)
+	styler := stdoutStyle()
+	fmt.Printf("%s %s\n", styler.Label("Run ID:"), run.GetIDString())
+	fmt.Printf("%s %s\n", styler.Label("Status:"), styler.Status(string(run.Status)))
+	fmt.Printf("%s %s\n", styler.Label("Repository:"), run.Repository)
+	fmt.Printf("%s %s → %s\n", styler.Label("Branch:"), run.Source, run.Target)
 	if run.Title != "" {
-		fmt.Printf("Title: %s\n", run.Title)
+		fmt.Printf("%s %s\n", styler.Label("Title:"), run.Title)
 	}
-	fmt.Printf("Created: %s\n", run.CreatedAt.Format("2006-01-02 15:04:05"))
-	fmt.Printf("Updated: %s\n", run.UpdatedAt.Format("2006-01-02 15:04:05"))
+	fmt.Printf("%s %s\n", styler.Label("Created:"), run.CreatedAt.Format("2006-01-02 15:04:05"))
+	fmt.Printf("%s %s\n", styler.Label("Updated:"), run.UpdatedAt.Format("2006-01-02 15:04:05"))
 	if run.Error != "" {
-		fmt.Printf("Error: %s\n", run.Error)
+		fmt.Printf("%s %s\n", styler.Error("Error:"), run.Error)
 	}
 }
 
