@@ -92,6 +92,10 @@ changelog:
       - "^perf"
       - "^build"
       - "^ci"
+      - "^feat\\(changelog\\)"
+      - "^fix\\(ci\\)"
+      - "^fix\\(test\\)"
+      - "^fix: avoid async file hash cache save race"
       # Also exclude Merge commits
       - "^Merge "
   # Only include user-facing changes: feat, fix, and BREAKING CHANGE

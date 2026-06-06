@@ -20,6 +20,10 @@ User instructions for the current release take precedence over this workflow. Pr
 - Version source: `VERSION`
 - Changelog source: `CHANGELOG.yaml`, rendered to `CHANGELOG.md` with `chlog`
 - Release publishing: GitHub Actions release workflow and/or local GoReleaser scripts
+- GitHub release notes must be curated from `CHANGELOG.yaml` using `chlog extract`.
+  Do not rely on GoReleaser's raw commit changelog for public release notes:
+  changelog-maintenance commits, CI fixes, tests, and other internal work must not
+  appear as user-facing features or fixes on the release page.
 
 Remote policy:
 
@@ -191,6 +195,19 @@ gh run list --limit 10
 gh run watch
 gh release view vX.Y.Z --json tagName,url,body,assets
 ```
+
+After publication, inspect the release body and fix it immediately if it contains
+commit-level internals:
+
+```bash
+chlog extract X.Y.Z
+gh release view vX.Y.Z --json body --jq .body
+```
+
+The public release body should contain installation instructions, curated
+`Added`/`Changed`/`Fixed` entries from `CHANGELOG.yaml`, and checksum
+instructions. It should not include `feat(changelog)`, `fix(ci)`, test/cache
+stabilization details, merge commits, or raw commit hashes.
 
 If `gh run list --branch main` is empty after pushing a tag, run `gh run list --limit 10`; release workflows triggered by tag pushes appear on the tag ref, not the `main` branch.
 

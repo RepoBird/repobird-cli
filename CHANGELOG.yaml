@@ -1,6 +1,9 @@
 project: RepoBird CLI
 versions:
-    unreleased: {}
+    unreleased:
+        internal:
+            fixed:
+                - Generate GitHub release notes from curated chlog entries instead of raw commit subjects.
     0.6.0:
         date: 2026-06-05
         added:

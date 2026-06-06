@@ -44,6 +44,16 @@ jobs:
           ./scripts/generate-docs.sh /tmp/repobird-docs
           cp -R /tmp/repobird-docs/man/. man/
 
+      - name: Generate release notes
+        run: |
+          go install github.com/ariel-frischer/chlog/cmd/chlog@v0.3.1-0.20260303051013-22403e8281e9
+          VERSION="${GITHUB_REF_NAME#v}"
+          {
+            echo "## Changelog"
+            echo
+            chlog extract "$VERSION" | sed '/^## \[/d'
+          } > .release-notes.md
+
       - name: Import GPG key
         id: import_gpg
         if: ${{ env.HAS_GPG_PRIVATE_KEY == 'true' }}
@@ -55,9 +65,9 @@ jobs:
       - name: Set GoReleaser args
         run: |
           if [ "$HAS_GPG_PRIVATE_KEY" = "true" ]; then
-            echo "GORELEASER_ARGS=release --clean --skip=sbom" >> "$GITHUB_ENV"
+            echo "GORELEASER_ARGS=release --clean --release-notes=.release-notes.md --skip=sbom" >> "$GITHUB_ENV"
           else
-            echo "GORELEASER_ARGS=release --clean --skip=sign,sbom" >> "$GITHUB_ENV"
+            echo "GORELEASER_ARGS=release --clean --release-notes=.release-notes.md --skip=sign,sbom" >> "$GITHUB_ENV"
           fi
 
       - name: Run GoReleaser
