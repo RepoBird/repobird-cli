@@ -4,6 +4,7 @@
 package views
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -96,6 +97,43 @@ func TestNewRunDetailsViewWithCache_HandlesNilCache(t *testing.T) {
 	// Assert - loading is false because run has Status
 	assert.False(t, view.loading, "Should not be loading when run has status")
 	assert.Equal(t, run.ID, view.run.ID, "Should preserve original run")
+}
+
+func TestRunDetailsViewDisplaysCanonicalBranchFields(t *testing.T) {
+	client := api.NewClient("test-key", "http://localhost:8080", false)
+	testCache := cache.NewSimpleCache()
+
+	var run models.RunResponse
+	err := json.Unmarshal([]byte(`{
+		"id": 123,
+		"publicId": "run_123e4567-e89b-12d3-a456-426614174000",
+		"status": "QUEUED",
+		"repositoryName": "acme/webapp",
+		"source": "legacy-source",
+		"target": "legacy-target",
+		"baseBranch": "main",
+		"outputMode": "pull_request",
+		"outputBranch": "repobird/fix-auth",
+		"prTargetBranch": "release",
+		"outputBranchPolicy": "create",
+		"createdAt": "2026-06-07T00:00:00Z",
+		"updatedAt": "2026-06-07T00:00:00Z"
+	}`), &run)
+	assert.NoError(t, err)
+
+	view := NewRunDetailsViewWithData(client, testCache, run)
+	content := view.viewport.View()
+
+	assert.Contains(t, content, "Run ID: 123")
+	assert.Contains(t, content, "Public ID: run_123e4567-e89b-12d3-a456-426614174000")
+	assert.Contains(t, content, "Repository: acme/webapp")
+	assert.Contains(t, content, "Base Branch: main")
+	assert.Contains(t, content, "Output Branch: repobird/fix-auth")
+	assert.Contains(t, content, "PR Target Branch: release")
+	assert.Contains(t, content, "Output Mode: pull_request")
+	assert.Contains(t, content, "Output Branch Policy: create")
+	assert.NotContains(t, content, "Source Branch: legacy-source")
+	assert.NotContains(t, content, "Target Branch: legacy-target")
 }
 
 func TestRunDetailsView_LoadingStateHandling(t *testing.T) {

@@ -1,6 +1,8 @@
 project: RepoBird CLI
 versions:
-    unreleased: {}
+    unreleased:
+        changed:
+            - Run creation success output now preserves public run IDs and canonical branch-output fields from the API response.
     0.6.1:
         date: 2026-06-06
         fixed:

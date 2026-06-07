@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- Run creation success output now preserves public run IDs and canonical branch-output fields from the API response.
+
 ## [0.6.1] - 2026-06-06
 
 ### Fixed

@@ -35,7 +35,7 @@ interface CreateRunRequest {
   // Optional fields
   title?: string;              // Title for the run (auto-generated if not provided, defaults to "No Title")
   baseBranch?: string;         // Branch to start work from (default: repo's defaultBranch)
-  outputMode?: 'pr' | 'branch'; // 'pr' creates a pull request; 'branch' pushes commits without a PR
+  outputMode?: 'pull_request' | 'branch'; // 'pull_request' creates a pull request; 'branch' pushes commits without a PR. CLI accepts 'pr' as an alias.
   outputBranch?: string;       // Branch to push generated commits to
   prTargetBranch?: string;     // PR target branch (defaults to baseBranch)
   outputBranchPolicy?: 'create' | 'reuse'; // Whether to create or reuse outputBranch
@@ -69,6 +69,7 @@ interface CreateRunRequest {
 ```typescript
 interface RunResponse {
   id: number;                 // Unique run ID
+  publicId?: string;          // Public run ID used in dashboard URLs
   status: 'QUEUED' | 'INITIALIZING' | 'PROCESSING' | 'POST_PROCESS' | 'DONE' | 'FAILED';
   createdAt: string;          // ISO timestamp
   updatedAt: string;          // Last update timestamp
@@ -77,7 +78,7 @@ interface RunResponse {
   repoId: number;
   repository: string;         // Full repo name (owner/repo)
   baseBranch?: string;        // Branch started from
-  outputMode?: 'pr' | 'branch';
+  outputMode?: 'pull_request' | 'branch';
   outputBranch?: string;      // Branch generated commits were pushed to
   prTargetBranch?: string;    // PR target branch
   source?: string;            // Legacy branch started from

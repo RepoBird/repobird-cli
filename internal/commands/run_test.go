@@ -429,7 +429,7 @@ func TestRunCommand_BranchOutputFields(t *testing.T) {
 			},
 			expected: map[string]interface{}{
 				"BaseBranch":     "main",
-				"OutputMode":     "pr",
+				"OutputMode":     "pull_request",
 				"PRTargetBranch": "main",
 			},
 		},
@@ -480,7 +480,7 @@ func TestRunCommand_BranchOutputFields(t *testing.T) {
 			expected: map[string]interface{}{
 				"BaseBranch":     "develop",
 				"SourceBranch":   "develop",
-				"OutputMode":     "pr",
+				"OutputMode":     "pull_request",
 				"PRTargetBranch": "develop",
 			},
 		},

@@ -67,6 +67,7 @@ type CreateRunRequest struct {
 // RunResponse represents the API response for a run
 type RunResponse struct {
 	ID                 RunID      `json:"id"`
+	PublicID           string     `json:"publicId,omitempty"`
 	Status             string     `json:"status"`
 	StatusMessage      string     `json:"statusMessage,omitempty"`
 	Prompt             string     `json:"prompt"`
@@ -99,11 +100,20 @@ type RunResponse struct {
 
 // CreateRunResponse represents the wrapped API response for create operations
 type CreateRunResponse struct {
-	Data struct {
-		ID      RunID  `json:"id"`
-		Message string `json:"message"`
-		Status  string `json:"status"`
-	} `json:"data"`
+	Data *CreateRunData `json:"data"`
+}
+
+// CreateRunData represents the data object returned by POST /api/v1/runs.
+type CreateRunData struct {
+	ID                 RunID  `json:"id"`
+	PublicID           string `json:"publicId,omitempty"`
+	Message            string `json:"message,omitempty"`
+	Status             string `json:"status"`
+	BaseBranch         string `json:"baseBranch,omitempty"`
+	OutputMode         string `json:"outputMode,omitempty"`
+	OutputBranch       string `json:"outputBranch,omitempty"`
+	PRTargetBranch     string `json:"prTargetBranch,omitempty"`
+	OutputBranchPolicy string `json:"outputBranchPolicy,omitempty"`
 }
 
 // SingleRunResponse represents the wrapped API response for get operations

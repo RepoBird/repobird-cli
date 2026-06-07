@@ -10,6 +10,7 @@ import (
 // Run represents a RepoBird run in the domain layer
 type Run struct {
 	ID                 string
+	PublicID           string
 	Status             string
 	StatusMessage      string
 	Prompt             string

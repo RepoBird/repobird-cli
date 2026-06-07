@@ -33,3 +33,45 @@ func TestAPIRunRepositoryListUsesPageBasedPagination(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "https://example.test/api/v1/runs?limit=25&page=3", requestedURL)
 }
+
+func TestAPIRunRepositoryCreatePreservesCanonicalBranchFields(t *testing.T) {
+	repo := NewAPIRunRepository(roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		require.Equal(t, http.MethodPost, req.Method)
+		require.Equal(t, "/api/v1/runs", req.URL.Path)
+
+		return &http.Response{
+			StatusCode: http.StatusCreated,
+			Body: io.NopCloser(strings.NewReader(`{
+				"data": {
+					"id": 123,
+					"publicId": "run_123e4567-e89b-12d3-a456-426614174000",
+					"status": "QUEUED",
+					"baseBranch": "main",
+					"outputMode": "pull_request",
+					"outputBranch": "repobird/fix-auth",
+					"prTargetBranch": "release",
+					"outputBranchPolicy": "create"
+				}
+			}`)),
+			Header: make(http.Header),
+		}, nil
+	}), "https://example.test", "test-key", false)
+
+	run, err := repo.Create(context.Background(), domain.CreateRunRequest{
+		Prompt:         "Fix auth",
+		RepositoryName: "acme/webapp",
+		RunType:        domain.RunTypeRun,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, run)
+
+	require.Equal(t, "123", run.ID)
+	require.Equal(t, domain.StatusQueued, run.Status)
+	require.Equal(t, "acme/webapp", run.RepositoryName)
+	require.Equal(t, "main", run.BaseBranch)
+	require.Equal(t, "pull_request", run.OutputMode)
+	require.Equal(t, "repobird/fix-auth", run.OutputBranch)
+	require.Equal(t, "release", run.PRTargetBranch)
+	require.Equal(t, "create", run.OutputBranchPolicy)
+	require.Equal(t, "run_123e4567-e89b-12d3-a456-426614174000", run.PublicID)
+}
