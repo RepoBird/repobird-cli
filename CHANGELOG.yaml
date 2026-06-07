@@ -1,6 +1,8 @@
 project: RepoBird CLI
 versions:
-    unreleased: {}
+    unreleased:
+        added:
+            - Added an installable default RepoBird CLI agent skill and README quickstart guidance for npx skills add.
     0.6.1:
         date: 2026-06-06
         fixed:

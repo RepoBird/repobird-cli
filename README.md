@@ -28,6 +28,7 @@ Write your issue description once, and autonomous OpenCode-based agents handle t
 - 🔒 **Isolated VM Execution**: Each agent runs in its own secure Debian microVM with full development tools
 - 💳 **Credit-Based Usage**: Runs consume credits based on cloud agent work instead of fixed Basic/Pro run limits
 - 🌐 **Complete Dev Environment**: Multi-language support, package managers, databases - everything needed to build real software
+- 🤖 **AI Agent Skill**: `.skills/default/SKILL.md` teaches coding agents how to install, configure, and use RepoBird CLI
 
 ## 🎯 Why RepoBird?
 
@@ -90,11 +91,21 @@ sudo cp build/repobird /usr/local/bin/
 
 ## 🚀 Quick Start
 
-### 1. Get Your API Key
+### 1. Install the Agent Skill
+
+Install the default skill so your coding agent knows how to use RepoBird CLI:
+
+```bash
+npx skills add RepoBird/repobird-cli
+```
+
+Then ask your agent to use the `repobird-cli` skill when you want it to submit, monitor, or troubleshoot RepoBird runs from your terminal.
+
+### 2. Get Your API Key
 
 Sign up for a free account at [RepoBird.ai](https://repobird.ai) and get your API key from [Dashboard → API Keys](https://repobird.ai/dashboard/user-profile/api-keys).
 
-### 2. Authenticate
+### 3. Authenticate
 
 ```bash
 # One-time setup
@@ -102,7 +113,7 @@ repobird login
 # Enter your API key when prompted
 ```
 
-### 3. Submit Your First Task (One-Shot)
+### 4. Submit Your First Task (One-Shot)
 
 ```bash
 # Quickest way - direct command with flags (no file needed)

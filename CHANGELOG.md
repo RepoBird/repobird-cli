@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Added an installable default RepoBird CLI agent skill and README quickstart guidance for npx skills add.
+
 ## [0.6.1] - 2026-06-06
 
 ### Fixed
