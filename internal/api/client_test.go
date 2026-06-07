@@ -213,6 +213,66 @@ func TestCreateRun(t *testing.T) {
 	}
 }
 
+func TestCreateRunAPIPreservesCanonicalBranchFields(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != EndpointRuns {
+			t.Errorf("expected path /api/v1/runs, got %s", r.URL.Path)
+		}
+		if r.Method != http.MethodPost {
+			t.Errorf("expected POST, got %s", r.Method)
+		}
+
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"data": map[string]any{
+				"id":                 123,
+				"publicId":           "run_123e4567-e89b-12d3-a456-426614174000",
+				"status":             "QUEUED",
+				"baseBranch":         "main",
+				"outputMode":         "branch",
+				"outputBranch":       "automation/generated-docs",
+				"outputBranchPolicy": "reuse",
+			},
+		})
+	}))
+	defer server.Close()
+
+	client := NewClient("test-key", server.URL, false)
+	resp, err := client.CreateRunAPI(&models.APIRunRequest{
+		Prompt:         "Update docs",
+		RepositoryName: "acme/docs",
+		RunType:        models.RunTypeRun,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if resp.ID != "123" {
+		t.Errorf("expected ID 123, got %s", resp.ID)
+	}
+	if resp.Status != models.StatusQueued {
+		t.Errorf("expected status QUEUED, got %s", resp.Status)
+	}
+	if resp.PublicID != "run_123e4567-e89b-12d3-a456-426614174000" {
+		t.Errorf("expected public ID, got %s", resp.PublicID)
+	}
+	if resp.BaseBranch != "main" {
+		t.Errorf("expected base branch main, got %s", resp.BaseBranch)
+	}
+	if resp.OutputMode != "branch" {
+		t.Errorf("expected output mode branch, got %s", resp.OutputMode)
+	}
+	if resp.OutputBranch != "automation/generated-docs" {
+		t.Errorf("expected output branch automation/generated-docs, got %s", resp.OutputBranch)
+	}
+	if resp.OutputBranchPolicy != "reuse" {
+		t.Errorf("expected output branch policy reuse, got %s", resp.OutputBranchPolicy)
+	}
+	if resp.GetRepositoryName() != "acme/docs" {
+		t.Errorf("expected repository from request, got %s", resp.GetRepositoryName())
+	}
+}
+
 func TestGetRun(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != RunDetailsURL(testRunID) {

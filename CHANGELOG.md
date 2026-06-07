@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-06-06
+
+### Added
+
+- Added an installable default RepoBird CLI agent skill and README quickstart guidance for npx skills add.
+
+### Changed
+
+- Run creation success output now preserves public run IDs and canonical branch-output fields from the API response.
+
 ## [0.6.1] - 2026-06-06
 
 ### Fixed
@@ -106,7 +116,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Configuration management
 - API integration with RepoBird platform
 
-[Unreleased]: https://github.com/RepoBird/repobird-cli/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/RepoBird/repobird-cli/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/RepoBird/repobird-cli/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/RepoBird/repobird-cli/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/RepoBird/repobird-cli/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/RepoBird/repobird-cli/compare/v0.4.0...v0.5.0

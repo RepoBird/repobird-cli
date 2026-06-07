@@ -123,7 +123,7 @@ func init() {
 	runCmd.Flags().StringVar(&source, "source", "", "legacy alias for --base-branch")
 	runCmd.Flags().StringVar(&target, "target", "", "legacy target branch alias")
 	runCmd.Flags().StringVar(&baseBranch, "base-branch", "", "base branch to start work from (optional)")
-	runCmd.Flags().StringVar(&outputMode, "output-mode", "", "output mode: 'pr' or 'branch' (optional, default: pr)")
+	runCmd.Flags().StringVar(&outputMode, "output-mode", "", "output mode: 'pull_request' or 'branch' (optional, default: pull_request; 'pr' accepted as an alias)")
 	runCmd.Flags().StringVar(&outputBranch, "output-branch", "", "branch to push generated commits to (optional)")
 	runCmd.Flags().StringVar(&prTargetBranch, "pr-target-branch", "", "branch the pull request targets (optional)")
 	runCmd.Flags().StringVar(&outputBranchPolicy, "output-branch-policy", "", "output branch policy: 'create' or 'reuse' (optional)")
@@ -375,25 +375,60 @@ func processSingleRun(runConfig *models.RunConfig, additionalContext string) err
 		return fmt.Errorf("failed to create run: %s", errors.FormatUserError(err))
 	}
 
-	styler := stdoutStyle()
-	fmt.Println(styler.Success("Run created successfully!"))
-	fmt.Printf("%s %s\n", styler.Label("ID:"), run.ID)
-	fmt.Printf("%s %s\n", styler.Label("Status:"), styler.Status(formatStatusForDisplay(run.Status)))
-	fmt.Printf("%s %s\n", styler.Label("Repository:"), run.RepositoryName)
-	fmt.Printf("%s %s → %s\n", styler.Label("Source:"), run.SourceBranch, run.TargetBranch)
-
-	// Print the RepoBird URL for the run
-	runURL := utils.GenerateRepoBirdURL(run.ID)
-	if runURL != "" {
-		fmt.Printf("%s %s\n", styler.Label("URL:"), styler.URL(runURL))
-	}
+	printCreatedRunDetails(run)
 
 	if follow {
-		fmt.Printf("\n%s\n", styler.Info("Following run status..."))
+		fmt.Printf("\n%s\n", stdoutStyle().Info("Following run status..."))
 		return followRunStatus(runService, run.ID)
 	}
 
 	return nil
+}
+
+func printCreatedRunDetails(run *domain.Run) {
+	styler := stdoutStyle()
+	fmt.Println(styler.Success("Run created successfully!"))
+	printCreatedField(styler.Label("Run ID:"), run.ID)
+	printCreatedField(styler.Label("Public ID:"), run.PublicID)
+	if run.Status != "" {
+		printCreatedField(styler.Label("Status:"), styler.Status(formatStatusForDisplay(run.Status)))
+	}
+	printCreatedField(styler.Label("Repository:"), run.RepositoryName)
+
+	if hasCanonicalBranchFields(run) {
+		printCreatedField(styler.Label("Base branch:"), run.BaseBranch)
+		printCreatedField(styler.Label("Output branch:"), run.OutputBranch)
+		printCreatedField(styler.Label("PR target branch:"), run.PRTargetBranch)
+		printCreatedField(styler.Label("Output mode:"), run.OutputMode)
+		printCreatedField(styler.Label("Output branch policy:"), run.OutputBranchPolicy)
+	} else if run.SourceBranch != "" || run.TargetBranch != "" {
+		fmt.Printf("%s %s → %s\n", styler.Label("Source:"), run.SourceBranch, run.TargetBranch)
+	}
+
+	runURL := utils.GenerateRepoBirdURL(createdRunURLID(run))
+	printCreatedField(styler.Label("URL:"), styler.URL(runURL))
+}
+
+func printCreatedField(label, value string) {
+	if value == "" {
+		return
+	}
+	fmt.Printf("%s %s\n", label, value)
+}
+
+func hasCanonicalBranchFields(run *domain.Run) bool {
+	return run.BaseBranch != "" ||
+		run.OutputMode != "" ||
+		run.OutputBranch != "" ||
+		run.PRTargetBranch != "" ||
+		run.OutputBranchPolicy != ""
+}
+
+func createdRunURLID(run *domain.Run) string {
+	if run.PublicID != "" {
+		return run.PublicID
+	}
+	return run.ID
 }
 
 func newRunPresetCommand(presetName string) *cobra.Command {
@@ -415,7 +450,7 @@ func newRunPresetCommand(presetName string) *cobra.Command {
 	cmd.Flags().StringVar(&source, "source", "", "legacy alias for --base-branch")
 	cmd.Flags().StringVar(&target, "target", "", "legacy target branch alias")
 	cmd.Flags().StringVar(&baseBranch, "base-branch", "", "base branch to start work from (optional)")
-	cmd.Flags().StringVar(&outputMode, "output-mode", "", "output mode: 'pr' or 'branch' (optional, default: pr)")
+	cmd.Flags().StringVar(&outputMode, "output-mode", "", "output mode: 'pull_request' or 'branch' (optional, default: pull_request; 'pr' accepted as an alias)")
 	cmd.Flags().StringVar(&outputBranch, "output-branch", "", "branch to push generated commits to (optional)")
 	cmd.Flags().StringVar(&prTargetBranch, "pr-target-branch", "", "branch the pull request targets (optional)")
 	cmd.Flags().StringVar(&outputBranchPolicy, "output-branch-policy", "", "output branch policy: 'create' or 'reuse' (optional)")

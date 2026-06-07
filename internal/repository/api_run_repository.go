@@ -83,12 +83,8 @@ func (r *apiRunRepository) Create(ctx context.Context, req domain.CreateRunReque
 
 	// Try to decode as CreateRunResponse first
 	var createResp dto.CreateRunResponse
-	if err := json.Unmarshal(body, &createResp); err == nil && createResp.Data.ID.String() != "" {
-		// Convert to domain model with minimal info from create response
-		return &domain.Run{
-			ID:     createResp.Data.ID.String(),
-			Status: createResp.Data.Status,
-		}, nil
+	if err := json.Unmarshal(body, &createResp); err == nil && createResp.Data != nil && createResp.Data.ID.String() != "" {
+		return r.createdRunToDomain(createResp.Data, req), nil
 	}
 
 	// Fall back to direct RunResponse decoding
@@ -276,6 +272,7 @@ func mapAPIStatusToDomain(apiStatus string) string {
 func (r *apiRunRepository) toDomainRun(resp *dto.RunResponse) *domain.Run {
 	return &domain.Run{
 		ID:                 resp.ID.String(),
+		PublicID:           resp.PublicID,
 		Status:             mapAPIStatusToDomain(resp.Status),
 		StatusMessage:      resp.StatusMessage,
 		Prompt:             resp.Prompt,
@@ -305,4 +302,34 @@ func (r *apiRunRepository) toDomainRun(resp *dto.RunResponse) *domain.Run {
 		Summary:            resp.Summary,
 		Error:              resp.Error,
 	}
+}
+
+func (r *apiRunRepository) createdRunToDomain(resp *dto.CreateRunData, req domain.CreateRunRequest) *domain.Run {
+	return &domain.Run{
+		ID:                 resp.ID.String(),
+		PublicID:           resp.PublicID,
+		Status:             mapAPIStatusToDomain(resp.Status),
+		Prompt:             req.Prompt,
+		RepositoryName:     req.RepositoryName,
+		SourceBranch:       req.SourceBranch,
+		TargetBranch:       req.TargetBranch,
+		BaseBranch:         firstNonEmpty(resp.BaseBranch, req.BaseBranch, req.SourceBranch),
+		OutputMode:         firstNonEmpty(resp.OutputMode, req.OutputMode),
+		OutputBranch:       firstNonEmpty(resp.OutputBranch, req.OutputBranch),
+		PRTargetBranch:     firstNonEmpty(resp.PRTargetBranch, req.PRTargetBranch),
+		OutputBranchPolicy: firstNonEmpty(resp.OutputBranchPolicy, req.OutputBranchPolicy),
+		RunType:            req.RunType,
+		Title:              req.Title,
+		Context:            req.Context,
+		Files:              req.Files,
+	}
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }

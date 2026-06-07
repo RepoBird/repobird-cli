@@ -503,10 +503,19 @@ func (v *RunDetailsView) updateContentOld() {
 			lineCount++
 		}
 		addField("Run ID", v.run.GetIDString())
-		addField("Repository", v.run.Repository)
-		addField("Source Branch", v.run.Source)
-		if v.run.Target != "" && v.run.Target != v.run.Source {
-			addField("Target Branch", v.run.Target)
+		addField("Public ID", v.run.PublicID)
+		addField("Repository", v.run.GetRepositoryName())
+		if runHasCanonicalBranchFields(v.run) {
+			addField("Base Branch", v.run.BaseBranch)
+			addField("Output Branch", v.run.OutputBranch)
+			addField("PR Target Branch", v.run.PRTargetBranch)
+			addField("Output Mode", v.run.OutputMode)
+			addField("Output Branch Policy", v.run.OutputBranchPolicy)
+		} else {
+			addField("Source Branch", v.run.Source)
+			if v.run.Target != "" && v.run.Target != v.run.Source {
+				addField("Target Branch", v.run.Target)
+			}
 		}
 		if v.run.RunType != "" {
 			addField("Run Type", v.run.RunType)
@@ -834,8 +843,8 @@ func (v *RunDetailsView) renderBasicFields(content *strings.Builder, lines *[]st
 	}
 
 	lineCount = addField("Run ID", v.run.GetIDString())
-	lineCount = addField("Repository", v.run.Repository)
-	lineCount = addField("Source Branch", v.run.Source)
+	lineCount = addField("Public ID", v.run.PublicID)
+	lineCount = addField("Repository", v.run.GetRepositoryName())
 
 	return lineCount
 }
@@ -866,8 +875,17 @@ func (v *RunDetailsView) renderDescription(content *strings.Builder, lines *[]st
 
 // renderOptionalFields renders optional run fields
 func (v *RunDetailsView) renderOptionalFields(content *strings.Builder, lines *[]string, lineCount int, addField func(string, string) int) int {
-	if v.run.Target != "" && v.run.Target != v.run.Source {
-		lineCount = addField("Target Branch", v.run.Target)
+	if runHasCanonicalBranchFields(v.run) {
+		lineCount = addField("Base Branch", v.run.BaseBranch)
+		lineCount = addField("Output Branch", v.run.OutputBranch)
+		lineCount = addField("PR Target Branch", v.run.PRTargetBranch)
+		lineCount = addField("Output Mode", v.run.OutputMode)
+		lineCount = addField("Output Branch Policy", v.run.OutputBranchPolicy)
+	} else {
+		lineCount = addField("Source Branch", v.run.Source)
+		if v.run.Target != "" && v.run.Target != v.run.Source {
+			lineCount = addField("Target Branch", v.run.Target)
+		}
 	}
 	if v.run.RunType != "" {
 		lineCount = addField("Run Type", v.run.RunType)
@@ -886,6 +904,14 @@ func (v *RunDetailsView) renderOptionalFields(content *strings.Builder, lines *[
 	}
 
 	return lineCount
+}
+
+func runHasCanonicalBranchFields(run models.RunResponse) bool {
+	return run.BaseBranch != "" ||
+		run.OutputMode != "" ||
+		run.OutputBranch != "" ||
+		run.PRTargetBranch != "" ||
+		run.OutputBranchPolicy != ""
 }
 
 // renderStatusHistory renders the status history section

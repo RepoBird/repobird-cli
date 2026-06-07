@@ -156,44 +156,71 @@ func (c *Client) CreateRunAPI(request *models.APIRunRequest) (*models.RunRespons
 		logger.Debug("CreateRunAPI response", "body", string(body))
 	}
 
-	// The CreateRun API returns a wrapped response: {data: {id, message, status}}
-	// We need to extract the basic info and create a RunResponse
-	var createResp struct {
-		Data struct {
-			ID      interface{} `json:"id"`
-			Message string      `json:"message"`
-			Status  string      `json:"status"`
-		} `json:"data"`
+	var createResp models.SingleRunResponse
+	if err := json.Unmarshal(body, &createResp); err == nil && createResp.Data != nil && createResp.Data.GetIDString() != "" {
+		hydrateCreatedRunResponse(createResp.Data, request)
+		return createResp.Data, nil
 	}
 
-	if err := json.Unmarshal(body, &createResp); err != nil {
-		// Fall back to direct RunResponse decoding for backward compatibility
-		var runResp models.RunResponse
-		if err := json.Unmarshal(body, &runResp); err != nil {
-			return nil, fmt.Errorf("failed to decode response: %w", err)
+	// Fall back to direct RunResponse decoding for backward compatibility.
+	var runResp models.RunResponse
+	if err := json.Unmarshal(body, &runResp); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+	hydrateCreatedRunResponse(&runResp, request)
+
+	return &runResp, nil
+}
+
+func hydrateCreatedRunResponse(run *models.RunResponse, request *models.APIRunRequest) {
+	if run.RepositoryName == "" {
+		run.RepositoryName = request.RepositoryName
+	}
+	if run.Repository == "" {
+		run.Repository = request.RepositoryName
+	}
+	if run.Source == "" {
+		run.Source = request.SourceBranch
+	}
+	if run.Target == "" {
+		run.Target = request.TargetBranch
+	}
+	if run.BaseBranch == "" {
+		run.BaseBranch = firstNonEmpty(request.BaseBranch, request.SourceBranch)
+	}
+	if run.OutputMode == "" {
+		run.OutputMode = request.OutputMode
+	}
+	if run.OutputBranch == "" {
+		run.OutputBranch = request.OutputBranch
+	}
+	if run.PRTargetBranch == "" {
+		run.PRTargetBranch = request.PRTargetBranch
+	}
+	if run.OutputBranchPolicy == "" {
+		run.OutputBranchPolicy = request.OutputBranchPolicy
+	}
+	if run.RunType == "" {
+		run.RunType = string(request.RunType)
+	}
+	if run.Prompt == "" {
+		run.Prompt = request.Prompt
+	}
+	if run.Title == "" {
+		run.Title = request.Title
+	}
+	if run.Context == "" {
+		run.Context = request.Context
+	}
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
 		}
-		return &runResp, nil
 	}
-
-	// Convert the create response to RunResponse format
-	var idStr string
-	switch v := createResp.Data.ID.(type) {
-	case string:
-		idStr = v
-	case float64:
-		idStr = fmt.Sprintf("%.0f", v)
-	case int:
-		idStr = fmt.Sprintf("%d", v)
-	default:
-		idStr = fmt.Sprintf("%v", v)
-	}
-
-	runResp := &models.RunResponse{
-		ID:     idStr,
-		Status: models.RunStatus(createResp.Data.Status),
-	}
-
-	return runResp, nil
+	return ""
 }
 
 func (c *Client) GetRun(id string) (*models.RunResponse, error) {

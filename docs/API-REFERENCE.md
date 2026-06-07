@@ -25,12 +25,35 @@ REST API client implementation for RepoBird AI platform with resilience patterns
 **Request:**
 ```json
 {
-  "prompt": "string",           // Required: Task description
-  "repository": "org/repo",     // Required: GitHub/GitLab repo
-  "source": "main",            // Required: Source branch
-  "target": "feature/xyz",     // Optional: Target branch
-  "runType": "run|approval",   // Required: Execution mode
-  "files": ["path/to/file"]    // Optional: Specific files
+  "prompt": "Fix authentication bug",
+  "repositoryName": "org/repo",
+  "baseBranch": "main",
+  "outputMode": "pull_request",
+  "outputBranch": "repobird/fix-authentication",
+  "prTargetBranch": "release",
+  "outputBranchPolicy": "create",
+  "runType": "run",
+  "agent": "opencode",
+  "files": ["path/to/file"]
+}
+```
+
+`sourceBranch`/`targetBranch`, `source`/`target`, and `branchOnly` remain legacy compatibility aliases. New create-run responses return canonical branch fields.
+
+**Create Response:**
+```json
+{
+  "data": {
+    "id": 12345,
+    "publicId": "run_123e4567-e89b-12d3-a456-426614174000",
+    "status": "QUEUED",
+    "message": "Run created successfully",
+    "baseBranch": "main",
+    "outputMode": "pull_request",
+    "outputBranch": "repobird/fix-authentication",
+    "prTargetBranch": "release",
+    "outputBranchPolicy": "create"
+  }
 }
 ```
 
@@ -186,10 +209,11 @@ REPOBIRD_DEBUG=true                  # Enable debug logging
 ```go
 // Create run
 run, err := client.CreateRunWithRetry(ctx, &api.RunRequest{
-    Prompt:     "Fix authentication bug",
-    Repository: "org/repo",
-    Source:     "main",
-    RunType:    "run",
+    Prompt:       "Fix authentication bug",
+    Repository:   "org/repo",
+    BaseBranch:   "main",
+    OutputMode:   "pull_request",
+    RunType:      "run",
 })
 
 // Poll for completion

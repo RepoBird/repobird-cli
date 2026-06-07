@@ -163,12 +163,15 @@ func ValidateRunConfig(config *models.RunConfig) error {
 		errors = append(errors, fmt.Sprintf("invalid runType '%s', must be 'run', 'plan', 'basic', or 'pro'", config.RunType))
 	}
 
-	if config.OutputMode != "" && config.OutputMode != "pr" && config.OutputMode != "branch" {
-		errors = append(errors, fmt.Sprintf("invalid outputMode '%s', must be 'pr' or 'branch'", config.OutputMode))
+	if config.OutputMode == "pr" {
+		config.OutputMode = "pull_request"
+	}
+	if config.OutputMode != "" && config.OutputMode != "pull_request" && config.OutputMode != "branch" {
+		errors = append(errors, fmt.Sprintf("invalid outputMode '%s', must be 'pull_request' or 'branch'", config.OutputMode))
 	}
 
-	if config.BranchOnly && config.OutputMode == "pr" {
-		errors = append(errors, "branchOnly cannot be true when outputMode is 'pr'")
+	if config.BranchOnly && config.OutputMode == "pull_request" {
+		errors = append(errors, "branchOnly cannot be true when outputMode is 'pull_request'")
 	}
 
 	if config.OutputBranchPolicy != "" && config.OutputBranchPolicy != "create" && config.OutputBranchPolicy != "reuse" {
