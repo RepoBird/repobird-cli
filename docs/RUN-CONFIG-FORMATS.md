@@ -26,9 +26,9 @@ The `repobird run` command supports multiple configuration file formats to defin
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `baseBranch` | string | repository default branch | Branch to start work from |
-| `outputMode` | string | `pr` | Output mode: `pr` to create a pull request, `branch` to push without a PR |
+| `outputMode` | string | `pull_request` | Output mode: `pull_request` to create a pull request, `branch` to push without a PR. `pr` is accepted as a CLI alias. |
 | `outputBranch` | string | auto-generated | Branch to push generated commits to |
-| `prTargetBranch` | string | `baseBranch` | Branch the pull request targets when `outputMode` is `pr` |
+| `prTargetBranch` | string | `baseBranch` | Branch the pull request targets when `outputMode` is `pull_request` |
 | `outputBranchPolicy` | string | `create` | Output branch policy: `create` or `reuse` |
 | `title` | string | auto-generated | Human-readable title for the run |
 | `source` | string | repository default branch | Legacy alias for `baseBranch` |
@@ -96,7 +96,7 @@ repobird run -r myorg/webapp -p "Add unit tests for auth module" --follow
   - Use `-` to read from stdin
   - Use `@@` to escape a literal `@` at the beginning
 - `--base-branch` - Branch to start work from (optional, defaults to repository's default branch)
-- `--output-mode` - Output mode: `pr` or `branch` (optional, defaults to `pr`)
+- `--output-mode` - Output mode: `pull_request` or `branch` (optional, defaults to `pull_request`; `pr` is accepted as an alias)
 - `--output-branch` - Branch to push generated commits to (optional, auto-generated if not specified)
 - `--pr-target-branch` - Branch the pull request targets (optional, defaults to `baseBranch`)
 - `--output-branch-policy` - Output branch policy: `create` or `reuse` (optional, defaults to `create`)
@@ -121,7 +121,7 @@ Create a file `task.json`:
   "prompt": "Fix the login bug where users cannot authenticate after 5 failed attempts",
   "repository": "myorg/webapp",
   "baseBranch": "main",
-  "outputMode": "pr",
+  "outputMode": "pull_request",
   "outputBranch": "fix/login-rate-limit",
   "prTargetBranch": "main",
   "outputBranchPolicy": "create",
@@ -152,7 +152,7 @@ Create a file `task.yaml`:
 prompt: Fix the login bug where users cannot authenticate after 5 failed attempts
 repository: myorg/webapp
 baseBranch: main
-outputMode: pr
+outputMode: pull_request
 outputBranch: fix/login-rate-limit
 prTargetBranch: main
 outputBranchPolicy: create
@@ -182,7 +182,7 @@ Create a file `task.md`:
 prompt: Fix the login bug where users cannot authenticate after 5 failed attempts
 repository: myorg/webapp
 baseBranch: main
-outputMode: pr
+outputMode: pull_request
 outputBranch: fix/login-rate-limit
 prTargetBranch: main
 title: Fix authentication rate limiting issue

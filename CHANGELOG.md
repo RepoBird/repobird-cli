@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Added an installable default RepoBird CLI agent skill and README quickstart guidance for npx skills add.
 
+### Changed
+
+- Run creation success output now preserves public run IDs and canonical branch-output fields from the API response.
+
 ## [0.6.1] - 2026-06-06
 
 ### Fixed

@@ -301,6 +301,7 @@ func (v *CreateRunView) handleRunCreated(msg runCreatedMsg) (tea.Model, tea.Cmd)
 		return messages.NavigateToDetailsMsg{
 			RunID:      msg.run.GetIDString(),
 			FromCreate: true,
+			RunData:    msg.run,
 		}
 	}
 }

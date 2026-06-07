@@ -163,17 +163,25 @@ func GenerateMockRuns(numRepos, runsPerRepo int) []*models.RunResponse {
 			runType := runTypes[rand.Intn(len(runTypes))]
 
 			// Create base run
+			source := branches[rand.Intn(len(branches))]
+			target := fmt.Sprintf("repobird/%s-%d", runType, j+1)
 			run := &models.RunResponse{
-				ID:         runID,
-				Status:     status,
-				Repository: repo,
-				Source:     branches[rand.Intn(len(branches))],
-				Target:     fmt.Sprintf("repobird/%s-%d", runType, j+1),
-				RunType:    runType,
-				Title:      titles[rand.Intn(len(titles))],
-				Prompt:     prompts[rand.Intn(len(prompts))],
-				CreatedAt:  time.Now().Add(-time.Duration(rand.Intn(72)) * time.Hour),
-				UpdatedAt:  time.Now().Add(-time.Duration(rand.Intn(24)) * time.Hour),
+				ID:                 runID,
+				PublicID:           runID,
+				Status:             status,
+				Repository:         repo,
+				Source:             source,
+				Target:             target,
+				BaseBranch:         source,
+				OutputMode:         "pull_request",
+				OutputBranch:       target,
+				PRTargetBranch:     source,
+				OutputBranchPolicy: "create",
+				RunType:            runType,
+				Title:              titles[rand.Intn(len(titles))],
+				Prompt:             prompts[rand.Intn(len(prompts))],
+				CreatedAt:          time.Now().Add(-time.Duration(rand.Intn(72)) * time.Hour),
+				UpdatedAt:          time.Now().Add(-time.Duration(rand.Intn(24)) * time.Hour),
 			}
 
 			// Add status-specific details
@@ -279,16 +287,22 @@ func (m *MockClient) GetRun(id string) (*models.RunResponse, error) {
 	}
 	// If not found in mock data, generate a new one
 	return &models.RunResponse{
-		ID:         id,
-		Status:     models.StatusDone,
-		Repository: "debug/test-repo",
-		Source:     "main",
-		Target:     "feature/test",
-		RunType:    "run",
-		Title:      "Mock Run",
-		Prompt:     "This is a mock run for testing",
-		CreatedAt:  time.Now().Add(-2 * time.Hour),
-		UpdatedAt:  time.Now().Add(-1 * time.Hour),
+		ID:                 id,
+		PublicID:           id,
+		Status:             models.StatusDone,
+		Repository:         "debug/test-repo",
+		Source:             "main",
+		Target:             "feature/test",
+		BaseBranch:         "main",
+		OutputMode:         "pull_request",
+		OutputBranch:       "feature/test",
+		PRTargetBranch:     "main",
+		OutputBranchPolicy: "create",
+		RunType:            "run",
+		Title:              "Mock Run",
+		Prompt:             "This is a mock run for testing",
+		CreatedAt:          time.Now().Add(-2 * time.Hour),
+		UpdatedAt:          time.Now().Add(-1 * time.Hour),
 	}, nil
 }
 
@@ -324,18 +338,33 @@ func (m *MockClient) VerifyAuth() (*models.UserInfo, error) {
 func (m *MockClient) CreateRunAPI(request *models.APIRunRequest) (*models.RunResponse, error) {
 	runID := fmt.Sprintf("run_new_%d", rand.Intn(10000))
 	return &models.RunResponse{
-		ID:             runID,
-		Status:         models.StatusQueued,
-		RepositoryName: request.RepositoryName,
-		Source:         request.SourceBranch,
-		Target:         request.TargetBranch,
-		RunType:        string(request.RunType),
-		Title:          request.Title,
-		Prompt:         request.Prompt,
-		Context:        request.Context,
-		CreatedAt:      time.Now(),
-		UpdatedAt:      time.Now(),
+		ID:                 runID,
+		PublicID:           runID,
+		Status:             models.StatusQueued,
+		RepositoryName:     request.RepositoryName,
+		Source:             request.SourceBranch,
+		Target:             request.TargetBranch,
+		BaseBranch:         firstNonEmpty(request.BaseBranch, request.SourceBranch),
+		OutputMode:         request.OutputMode,
+		OutputBranch:       request.OutputBranch,
+		PRTargetBranch:     request.PRTargetBranch,
+		OutputBranchPolicy: request.OutputBranchPolicy,
+		RunType:            string(request.RunType),
+		Title:              request.Title,
+		Prompt:             request.Prompt,
+		Context:            request.Context,
+		CreatedAt:          time.Now(),
+		UpdatedAt:          time.Now(),
 	}, nil
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 // ListRepositories returns mock repositories

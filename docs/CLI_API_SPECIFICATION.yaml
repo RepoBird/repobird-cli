@@ -382,10 +382,10 @@ components:
           example: main
         outputMode:
           type: string
-          enum: [pr, branch]
-          default: pr
-          description: Use pr to create a pull request, or branch to push commits without creating a pull request.
-          example: pr
+          enum: [pull_request, branch]
+          default: pull_request
+          description: Use pull_request to create a pull request, or branch to push commits without creating a pull request. The CLI accepts pr as a compatibility alias and normalizes it to pull_request.
+          example: pull_request
         outputBranch:
           type: string
           description: Branch to push generated commits to. If omitted, the API may generate one.
@@ -428,7 +428,7 @@ components:
         runType: run
         prompt: Implement JWT authentication with refresh tokens
         baseBranch: main
-        outputMode: pr
+        outputMode: pull_request
         prTargetBranch: main
         title: Add authentication system
         fileHash: a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3
@@ -917,13 +917,42 @@ paths:
                       message:
                         type: string
                         example: Run created successfully
+                      publicId:
+                        type: string
+                        nullable: true
+                        example: run_123e4567-e89b-12d3-a456-426614174000
+                      baseBranch:
+                        type: string
+                        example: main
+                      outputMode:
+                        type: string
+                        enum: [pull_request, branch]
+                        example: pull_request
+                      outputBranch:
+                        type: string
+                        nullable: true
+                        example: repobird/auth-refresh
+                      prTargetBranch:
+                        type: string
+                        nullable: true
+                        example: main
+                      outputBranchPolicy:
+                        type: string
+                        enum: [create, reuse]
+                        example: create
               examples:
                 success:
                   value:
                     data:
                       id: 12345
+                      publicId: run_123e4567-e89b-12d3-a456-426614174000
                       status: QUEUED
                       message: Run created successfully
+                      baseBranch: main
+                      outputMode: pull_request
+                      outputBranch: repobird/auth-refresh
+                      prTargetBranch: main
+                      outputBranchPolicy: create
         '400':
           description: Invalid input (including branch not found)
           content:

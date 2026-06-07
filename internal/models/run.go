@@ -135,11 +135,14 @@ func (c *RunConfig) NormalizeBranchOutput() {
 	if c.BaseBranch == "" {
 		c.BaseBranch = c.Source
 	}
+	if c.OutputMode == "pr" {
+		c.OutputMode = "pull_request"
+	}
 	if c.OutputMode == "" {
 		if c.BranchOnly {
 			c.OutputMode = "branch"
 		} else {
-			c.OutputMode = "pr"
+			c.OutputMode = "pull_request"
 		}
 	}
 	if c.OutputMode == "branch" {
@@ -159,25 +162,31 @@ func (c *RunConfig) NormalizeBranchOutput() {
 }
 
 type RunResponse struct {
-	ID             string    `json:"id"` // Now stored as string internally
-	Status         RunStatus `json:"status"`
-	Repository     string    `json:"repository,omitempty"`     // Legacy field
-	RepositoryName string    `json:"repositoryName,omitempty"` // New API field
-	RepoID         int       `json:"repoId,omitempty"`
-	Source         string    `json:"source"`
-	Target         string    `json:"target"`
-	CreatedAt      time.Time `json:"createdAt"`
-	UpdatedAt      time.Time `json:"updatedAt"`
-	Prompt         string    `json:"prompt"`
-	Title          string    `json:"title,omitempty"`
-	Description    string    `json:"description,omitempty"`
-	Context        string    `json:"context,omitempty"`
-	Error          string    `json:"error,omitempty"`
-	PullRequestURL *string   `json:"prUrl,omitempty"`
-	TriggerSource  *string   `json:"triggerSource,omitempty"`
-	RunType        string    `json:"runType,omitempty"`
-	Plan           string    `json:"plan,omitempty"`
-	FileHash       string    `json:"fileHash,omitempty"`
+	ID                 string    `json:"id"` // Now stored as string internally
+	PublicID           string    `json:"publicId,omitempty"`
+	Status             RunStatus `json:"status"`
+	Repository         string    `json:"repository,omitempty"`     // Legacy field
+	RepositoryName     string    `json:"repositoryName,omitempty"` // New API field
+	RepoID             int       `json:"repoId,omitempty"`
+	Source             string    `json:"source"`
+	Target             string    `json:"target"`
+	BaseBranch         string    `json:"baseBranch,omitempty"`
+	OutputMode         string    `json:"outputMode,omitempty"`
+	OutputBranch       string    `json:"outputBranch,omitempty"`
+	PRTargetBranch     string    `json:"prTargetBranch,omitempty"`
+	OutputBranchPolicy string    `json:"outputBranchPolicy,omitempty"`
+	CreatedAt          time.Time `json:"createdAt"`
+	UpdatedAt          time.Time `json:"updatedAt"`
+	Prompt             string    `json:"prompt"`
+	Title              string    `json:"title,omitempty"`
+	Description        string    `json:"description,omitempty"`
+	Context            string    `json:"context,omitempty"`
+	Error              string    `json:"error,omitempty"`
+	PullRequestURL     *string   `json:"prUrl,omitempty"`
+	TriggerSource      *string   `json:"triggerSource,omitempty"`
+	RunType            string    `json:"runType,omitempty"`
+	Plan               string    `json:"plan,omitempty"`
+	FileHash           string    `json:"fileHash,omitempty"`
 }
 
 // GetIDString returns the ID as a string
@@ -186,6 +195,14 @@ func (r *RunResponse) GetIDString() string {
 		return ""
 	}
 	return r.ID
+}
+
+// GetURLID returns the preferred run identifier for browser URLs.
+func (r *RunResponse) GetURLID() string {
+	if r.PublicID != "" && r.PublicID != "null" {
+		return r.PublicID
+	}
+	return r.GetIDString()
 }
 
 // GetRepositoryName returns the repository name from either field
