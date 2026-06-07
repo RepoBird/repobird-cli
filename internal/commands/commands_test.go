@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -249,6 +250,31 @@ func TestConfigCommand_Execute(t *testing.T) {
 	}
 }
 
+func TestConfigCommand_DoesNotWriteRealXDGConfigDuringTests(t *testing.T) {
+	realXDG := t.TempDir()
+	realConfigDir := filepath.Join(realXDG, "repobird")
+	require.NoError(t, os.MkdirAll(realConfigDir, 0o755))
+
+	realConfigFile := filepath.Join(realConfigDir, "config.yaml")
+	realConfig := "api_url: https://repobird.ai\ncolor: auto\ndebug: false\n"
+	require.NoError(t, os.WriteFile(realConfigFile, []byte(realConfig), 0o644))
+
+	t.Setenv("XDG_CONFIG_HOME", realXDG)
+	cleanup := setupTestEnvironment(t)
+	defer cleanup()
+
+	rootCmd := NewRootCommand()
+	configCmd := NewConfigCommand()
+	rootCmd.AddCommand(configCmd)
+	rootCmd.SetArgs([]string{"config", "set", "api-url", "https://custom.api.com"})
+
+	require.NoError(t, rootCmd.Execute())
+
+	data, err := os.ReadFile(realConfigFile)
+	require.NoError(t, err)
+	assert.Equal(t, realConfig, string(data))
+}
+
 func TestAuthCommands_Execute(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -445,13 +471,7 @@ func TestCommandValidation(t *testing.T) {
 		cleanup := setupTestEnvironment(t)
 		defer cleanup()
 
-		rootCmd := NewRootCommand()
-		configCmd := NewConfigCommand()
-		rootCmd.AddCommand(configCmd)
-
-		rootCmd.SetArgs([]string{"config", "set"})
-
-		err := rootCmd.Execute()
+		err := configSetCmd.Args(configSetCmd, []string{})
 		assert.Error(t, err)
 	})
 }
@@ -497,13 +517,38 @@ func setupTempHome(t *testing.T) string {
 func setupTestEnvironment(t *testing.T) func() {
 	tempDir := setupTempHome(t)
 
-	t.Setenv("HOME", tempDir)
-	_ = os.Unsetenv(config.EnvAPIKey)
-	_ = os.Unsetenv(config.EnvAPIURL)
+	t.Setenv("HOME", filepath.Join(tempDir, "home"))
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tempDir, "xdg"))
+	t.Setenv(config.EnvAPIKey, "")
+	t.Setenv(config.EnvAPIURL, "")
+
+	cfgFile = ""
+	config.SetConfigFile("")
+	viper.Reset()
+	resetCommandState(rootCmd)
 
 	return func() {
-		// Note: t.Setenv automatically restores HOME
-		// t.TempDir automatically removes tempDir
+		resetCommandState(rootCmd)
+		cfgFile = ""
+		config.SetConfigFile("")
+		viper.Reset()
+		// Note: t.Setenv automatically restores environment variables.
+		// t.TempDir automatically removes tempDir.
+	}
+}
+
+func resetCommandState(cmd *cobra.Command) {
+	if cmd == nil {
+		return
+	}
+
+	cmd.SetArgs([]string{})
+	cmd.SetOut(nil)
+	cmd.SetErr(nil)
+	cmd.SetIn(nil)
+
+	for _, child := range cmd.Commands() {
+		resetCommandState(child)
 	}
 }
 

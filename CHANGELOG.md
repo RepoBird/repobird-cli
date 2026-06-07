@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Isolate command tests from real XDG RepoBird configuration so config command tests cannot overwrite user settings.
+
 ## [0.7.0] - 2026-06-06
 
 ### Added

@@ -1,6 +1,8 @@
 project: RepoBird CLI
 versions:
-    unreleased: {}
+    unreleased:
+        fixed:
+            - Isolate command tests from real XDG RepoBird configuration so config command tests cannot overwrite user settings.
     0.7.0:
         date: 2026-06-06
         added:
