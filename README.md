@@ -201,6 +201,9 @@ The `basic` and `pro` commands auto-detect the repository from the current git r
 repobird status                 # List all runs
 repobird status RUN_ID          # Check specific run
 repobird status --follow RUN_ID # Live updates
+repobird logs RUN_ID            # Inspect agent conversation logs
+repobird logs RUN_ID --json     # Current log snapshot as JSON
+repobird logs RUN_ID --follow   # Poll for new log messages as NDJSON
 
 # Interactive dashboard
 repobird tui                    # Launch terminal UI
