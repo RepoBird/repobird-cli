@@ -1,6 +1,8 @@
 project: RepoBird CLI
 versions:
     unreleased:
+        added:
+            - Single-run creation now supports retry-safe idempotency keys with a 30-second local duplicate-submission guard and --force override.
         fixed:
             - Isolate command tests from real XDG RepoBird configuration so config command tests cannot overwrite user settings.
             - Omit bulk follow spinner frames from piped output while preserving TTY animation.

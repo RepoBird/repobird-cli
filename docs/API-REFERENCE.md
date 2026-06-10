@@ -34,11 +34,14 @@ REST API client implementation for RepoBird AI platform with resilience patterns
   "outputBranchPolicy": "create",
   "runType": "run",
   "agent": "opencode",
+  "idempotencyKey": "task-2026-06-10-auth",
   "files": ["path/to/file"]
 }
 ```
 
 `sourceBranch`/`targetBranch`, `source`/`target`, and `branchOnly` remain legacy compatibility aliases. New create-run responses return canonical branch fields.
+
+The CLI also sends a non-empty `idempotencyKey` as the `Idempotency-Key` header. Current CLI builds protect retries locally by blocking identical repository, prompt, and run type submissions for 30 seconds unless `--force` is passed.
 
 **Create Response:**
 ```json

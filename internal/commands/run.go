@@ -22,6 +22,7 @@ import (
 	"github.com/repobird/repobird-cli/internal/config"
 	"github.com/repobird/repobird-cli/internal/domain"
 	"github.com/repobird/repobird-cli/internal/errors"
+	"github.com/repobird/repobird-cli/internal/idempotency"
 	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/repobird/repobird-cli/internal/prompts"
 	"github.com/repobird/repobird-cli/internal/utils"
@@ -46,6 +47,8 @@ var (
 	proRun                bool
 	branchOnly            bool
 	acknowledgePromptRisk bool
+	idempotencyKey        string
+	forceRun              bool
 )
 
 type runPreset struct {
@@ -134,6 +137,8 @@ func init() {
 	runCmd.Flags().BoolVar(&branchOnly, "branch-only", false, "push commits to a branch without creating a pull request")
 	runCmd.Flags().BoolVar(&branchOnly, "no-pr", false, "alias for --branch-only")
 	runCmd.Flags().BoolVar(&acknowledgePromptRisk, "acknowledge-prompt-risk", false, "acknowledge prompt-risk warning and create the run")
+	runCmd.Flags().StringVar(&idempotencyKey, "idempotency-key", "", "stable key for safely retrying run creation")
+	runCmd.Flags().BoolVar(&forceRun, "force", false, "bypass the local duplicate-submission guard")
 	runCmd.Flags().StringVar(&contextFlag, "context", "", "additional context (use @file to read from file, - for stdin)")
 }
 
@@ -344,6 +349,7 @@ func processSingleRun(runConfig *models.RunConfig, additionalContext string) err
 		Files:                 runConfig.Files,
 		BranchOnly:            runConfig.BranchOnly,
 		AcknowledgePromptRisk: runConfig.AcknowledgePromptRisk,
+		IdempotencyKey:        selectedIdempotencyKey(runConfig),
 	}
 
 	// Append additional markdown context if present
@@ -370,6 +376,9 @@ func processSingleRun(runConfig *models.RunConfig, additionalContext string) err
 
 	printRunSelection(createReq)
 	fmt.Println(stdoutStyle().Info("Creating run..."))
+	if err := reserveRunSubmission(createReq, forceRun); err != nil {
+		return err
+	}
 	run, err := runService.CreateRun(ctx, createReq)
 	if err != nil {
 		return fmt.Errorf("failed to create run: %s", errors.FormatUserError(err))
@@ -458,8 +467,29 @@ func newRunPresetCommand(presetName string) *cobra.Command {
 	cmd.Flags().BoolVar(&branchOnly, "branch-only", false, "push commits to a branch without creating a pull request")
 	cmd.Flags().BoolVar(&branchOnly, "no-pr", false, "alias for --branch-only")
 	cmd.Flags().BoolVar(&acknowledgePromptRisk, "acknowledge-prompt-risk", false, "acknowledge prompt-risk warning and create the run")
+	cmd.Flags().StringVar(&idempotencyKey, "idempotency-key", "", "stable key for safely retrying run creation")
+	cmd.Flags().BoolVar(&forceRun, "force", false, "bypass the local duplicate-submission guard")
 	cmd.Flags().StringVar(&contextFlag, "context", "", "additional context (use @file to read from file, - for stdin)")
 	return cmd
+}
+
+func selectedIdempotencyKey(runConfig *models.RunConfig) string {
+	if idempotencyKey != "" {
+		return strings.TrimSpace(idempotencyKey)
+	}
+	if runConfig.IdempotencyKey != "" {
+		return strings.TrimSpace(runConfig.IdempotencyKey)
+	}
+	return idempotency.BuildRunKey(idempotency.RunIdentity{
+		Repository: runConfig.Repository,
+		Prompt:     runConfig.Prompt,
+		RunType:    runConfig.RunType,
+	})
+}
+
+func reserveRunSubmission(req domain.CreateRunRequest, force bool) error {
+	guard := idempotency.NewRunGuard(idempotency.DefaultCacheDir(), 30*time.Second, time.Now)
+	return guard.Reserve(req.IdempotencyKey, force)
 }
 
 func resolveRunPreset(presetName string) (*runPreset, error) {

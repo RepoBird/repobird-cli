@@ -129,6 +129,9 @@ repobird run -r your-org/your-repo -p "Update generated docs" --output-branch au
 # Resend only after reviewing a prompt-risk acknowledgement error
 repobird run -r your-org/your-repo -p @reviewed-task.md --acknowledge-prompt-risk
 
+# Retry-safe creation uses an auto-derived key; pass your own key for scripted retries
+repobird run -r your-org/your-repo -p @task.txt --idempotency-key task-2026-06-10-auth
+
 # Inside a git repo with an origin remote, the repo can be auto-detected
 repobird pro "Fix the login bug where users get stuck on loading screen"
 
@@ -172,6 +175,9 @@ repobird basic "Fix a small bug"
 repobird pro "Implement OAuth"
 repobird run --basic -r myorg/webapp -p "Fix a small bug"
 repobird run --pro -r myorg/webapp -p "Implement OAuth"
+
+# If an identical run was submitted in the last 30 seconds, review first, then force if intentional
+repobird run -r myorg/webapp -p @task.txt --force
 
 # From different formats
 repobird run task.yaml          # YAML format

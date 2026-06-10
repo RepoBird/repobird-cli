@@ -61,10 +61,11 @@ func (r *apiRunRepository) Create(ctx context.Context, req domain.CreateRunReque
 		Files:                 req.Files,
 		BranchOnly:            req.BranchOnly,
 		AcknowledgePromptRisk: req.AcknowledgePromptRisk,
+		IdempotencyKey:        req.IdempotencyKey,
 	}
 
 	// Make API request
-	resp, err := r.doRequest(ctx, "POST", "/api/v1/runs", apiReq)
+	resp, err := r.doRequest(ctx, "POST", "/api/v1/runs", apiReq, req.IdempotencyKey)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +106,7 @@ func agentOrDefault(agent string) string {
 
 // Get retrieves a run by ID
 func (r *apiRunRepository) Get(ctx context.Context, id string) (*domain.Run, error) {
-	resp, err := r.doRequest(ctx, "GET", fmt.Sprintf("/api/v1/runs/%s", id), nil)
+	resp, err := r.doRequest(ctx, "GET", fmt.Sprintf("/api/v1/runs/%s", id), nil, "")
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +154,7 @@ func (r *apiRunRepository) Get(ctx context.Context, id string) (*domain.Run, err
 // List retrieves a list of runs
 func (r *apiRunRepository) List(ctx context.Context, opts domain.ListOptions) ([]*domain.Run, error) {
 	path := fmt.Sprintf("/api/v1/runs?limit=%d&page=%d", opts.Limit, pageFromListOptions(opts))
-	resp, err := r.doRequest(ctx, "GET", path, nil)
+	resp, err := r.doRequest(ctx, "GET", path, nil, "")
 	if err != nil {
 		return nil, err
 	}
@@ -204,7 +205,7 @@ func pageFromListOptions(opts domain.ListOptions) int {
 }
 
 // doRequest performs an HTTP request
-func (r *apiRunRepository) doRequest(ctx context.Context, method, path string, body interface{}) (*http.Response, error) {
+func (r *apiRunRepository) doRequest(ctx context.Context, method, path string, body interface{}, idempotencyKey string) (*http.Response, error) {
 	var bodyReader io.Reader
 	if body != nil {
 		bodyBytes, err := json.Marshal(body)
@@ -222,6 +223,9 @@ func (r *apiRunRepository) doRequest(ctx context.Context, method, path string, b
 	req.Header.Set("Authorization", "Bearer "+r.apiKey)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
+	if idempotencyKey != "" {
+		req.Header.Set("Idempotency-Key", idempotencyKey)
+	}
 
 	if r.debug {
 		fmt.Printf("Request: %s %s\n", method, req.URL.String())

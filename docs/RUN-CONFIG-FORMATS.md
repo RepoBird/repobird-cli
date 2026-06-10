@@ -38,6 +38,7 @@ The `repobird run` command supports multiple configuration file formats to defin
 | `files` | array | - | List of specific files to include in the context |
 | `branchOnly` | boolean | `false` | Legacy alias for `outputMode: branch` |
 | `acknowledgePromptRisk` | boolean | `false` | Explicitly acknowledge a `PROMPT_RISK_ACK_REQUIRED` response after reviewing the prompt |
+| `idempotencyKey` | string | auto-derived | Stable key for safely retrying run creation |
 
 ## Format Examples
 
@@ -68,6 +69,10 @@ echo "Fix the login bug" | repobird run -r myorg/webapp -p -
 
 # Push commits to an output branch without opening a PR
 repobird run -r myorg/webapp -p "Update generated docs" --output-branch automation/docs --branch-only
+
+# Retry safely with an explicit key, or bypass the local duplicate guard after review
+repobird run -r myorg/webapp -p @task.txt --idempotency-key task-2026-06-10-auth
+repobird run -r myorg/webapp -p @task.txt --force
 
 # With additional options
 repobird run --repo myorg/webapp \
@@ -108,9 +113,13 @@ repobird run -r myorg/webapp -p "Add unit tests for auth module" --follow
 - `--pro` - Use the Pro cloud-agent preset (Kimi K2.6)
 - `--branch-only`, `--no-pr` - Push commits to the output branch without creating a PR
 - `--acknowledge-prompt-risk` - Resend after reviewing a prompt-risk acknowledgement error
+- `--idempotency-key` - Stable key for safely retrying run creation; also sent as the `Idempotency-Key` header
+- `--force` - Bypass the local 30-second duplicate-submission guard after reviewing the duplicate
 - `--context` - Additional context (optional, also supports `@filename` and `-`)
 - `--follow` - Follow the run status after creation
 - `--dry-run` - Validate without creating the run
+
+For single-run creation, the CLI records a local submission key before the API request. If the same repository, prompt, and run type are submitted again within 30 seconds, the CLI stops before sending another POST. Use `--force` only when you intend to create another run.
 
 #### JSON Format
 
@@ -128,6 +137,7 @@ Create a file `task.json`:
   "title": "Fix authentication rate limiting issue",
   "runType": "run",
   "acknowledgePromptRisk": false,
+  "idempotencyKey": "task-2026-06-10-auth",
   "context": "Users report being permanently locked out after 5 failed login attempts. The rate limiting should reset after 15 minutes.",
   "files": [
     "src/auth/login.js",
@@ -159,6 +169,7 @@ outputBranchPolicy: create
 title: Fix authentication rate limiting issue
 runType: run
 acknowledgePromptRisk: false
+idempotencyKey: task-2026-06-10-auth
 context: |
   Users report being permanently locked out after 5 failed login attempts.
   The rate limiting should reset after 15 minutes.

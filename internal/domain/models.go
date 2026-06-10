@@ -61,6 +61,7 @@ type CreateRunRequest struct {
 	Files                 []string
 	BranchOnly            bool
 	AcknowledgePromptRisk bool
+	IdempotencyKey        string
 }
 
 // ListOptions represents options for listing runs

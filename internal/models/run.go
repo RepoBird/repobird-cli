@@ -51,6 +51,7 @@ type RunRequest struct {
 	Files                 []string `json:"files,omitempty"`
 	BranchOnly            bool     `json:"branchOnly,omitempty"`
 	AcknowledgePromptRisk bool     `json:"acknowledgePromptRisk,omitempty"`
+	IdempotencyKey        string   `json:"idempotencyKey,omitempty"`
 }
 
 // RunConfig is a unified configuration structure for both JSON and Markdown configs
@@ -70,6 +71,7 @@ type RunConfig struct {
 	Files                 []string `json:"files,omitempty" yaml:"files,omitempty"`
 	BranchOnly            bool     `json:"branchOnly,omitempty" yaml:"branchOnly,omitempty"`
 	AcknowledgePromptRisk bool     `json:"acknowledgePromptRisk,omitempty" yaml:"acknowledgePromptRisk,omitempty"`
+	IdempotencyKey        string   `json:"idempotencyKey,omitempty" yaml:"idempotencyKey,omitempty"`
 }
 
 // APIRunRequest is the structure that matches the actual API expectations
@@ -94,6 +96,7 @@ type APIRunRequest struct {
 	Force                 bool     `json:"force,omitempty"`
 	BranchOnly            bool     `json:"branchOnly,omitempty"`
 	AcknowledgePromptRisk bool     `json:"acknowledgePromptRisk,omitempty"`
+	IdempotencyKey        string   `json:"idempotencyKey,omitempty"`
 }
 
 // ToAPIRequest converts user-facing RunRequest to API-compatible structure
@@ -127,6 +130,7 @@ func (r *RunRequest) ToAPIRequest() *APIRunRequest {
 		Files:                 r.Files,
 		BranchOnly:            config.BranchOnly,
 		AcknowledgePromptRisk: r.AcknowledgePromptRisk,
+		IdempotencyKey:        r.IdempotencyKey,
 	}
 }
 
@@ -381,6 +385,7 @@ func parseJSONWithUnknownFieldsAndPrompts(file *os.File) (*RunConfig, *prompts.V
 		Files:                 runReq.Files,
 		BranchOnly:            runReq.BranchOnly,
 		AcknowledgePromptRisk: runReq.AcknowledgePromptRisk,
+		IdempotencyKey:        runReq.IdempotencyKey,
 	}
 
 	return runConfig, promptHandler, nil
@@ -410,12 +415,13 @@ func findUnsupportedJSONFieldsWithSuggestions(data map[string]interface{}) ([]st
 		"files":                 true,
 		"branchOnly":            true,
 		"acknowledgePromptRisk": true,
+		"idempotencyKey":        true,
 	}
 
 	supportedFieldsList := []string{
 		"prompt", "repository", "source", "target", "baseBranch",
 		"outputMode", "outputBranch", "prTargetBranch", "outputBranchPolicy",
-		"runType", "title", "context", "files", "branchOnly", "acknowledgePromptRisk",
+		"runType", "title", "context", "files", "branchOnly", "acknowledgePromptRisk", "idempotencyKey",
 	}
 
 	var unsupported []string
