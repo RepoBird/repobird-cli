@@ -274,3 +274,36 @@ func TestBulkRuns_PRURLInStatusDisplay(t *testing.T) {
 		"Should show completed count")
 	// Note: PR URLs won't show without a proper API client mock
 }
+
+func TestDisplayMultiLineBulkStatusOmitsSpinnerOutsideTTY(t *testing.T) {
+	status := dto.BulkStatusData{
+		Runs: []dto.RunStatusItem{
+			{ID: 1, Status: "PROCESSING"},
+			{ID: 2, Status: "QUEUED"},
+		},
+	}
+
+	old := os.Stdout
+	r, w, err := os.Pipe()
+	assert.NoError(t, err)
+	os.Stdout = w
+	t.Cleanup(func() {
+		os.Stdout = old
+		_ = r.Close()
+	})
+
+	displayMultiLineBulkStatus(status, "⠋", time.Now())
+
+	assert.NoError(t, w.Close())
+
+	var buf bytes.Buffer
+	_, err = io.Copy(&buf, r)
+	assert.NoError(t, err)
+
+	output := buf.String()
+	assert.NotContains(t, output, "⠋")
+	assert.NotContains(t, output, "\x1b[")
+	assert.Contains(t, output, "Following batch progress...")
+	assert.Contains(t, output, "[1]: PROCESSING")
+	assert.Contains(t, output, "[2]: QUEUED")
+}

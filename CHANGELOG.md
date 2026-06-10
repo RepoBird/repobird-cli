@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 
 - Isolate command tests from real XDG RepoBird configuration so config command tests cannot overwrite user settings.
+- Omit bulk follow spinner frames from piped output while preserving TTY animation.
 
 ### Changed
 

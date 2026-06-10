@@ -3,6 +3,7 @@ versions:
     unreleased:
         fixed:
             - Isolate command tests from real XDG RepoBird configuration so config command tests cannot overwrite user settings.
+            - Omit bulk follow spinner frames from piped output while preserving TTY animation.
         changed:
             - Show the selected repository in Basic/Pro run summaries before submission.
     0.7.0:

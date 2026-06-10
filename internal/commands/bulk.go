@@ -494,11 +494,13 @@ func followBulkProgress(ctx context.Context, client *api.Client, batchID string)
 
 func displayMultiLineBulkStatus(status dto.BulkStatusData, spinnerChar string, startTime time.Time) {
 	styler := stdoutStyle()
-	// Display elapsed time on first line with spinner
 	elapsed := time.Since(startTime)
-	fmt.Printf("%s %s [%s]\n", spinnerChar, styler.Info("Following batch progress..."), formatDuration(elapsed))
+	if stdoutIsTerminal() {
+		fmt.Printf("%s %s [%s]\n", spinnerChar, styler.Info("Following batch progress..."), formatDuration(elapsed))
+	} else {
+		fmt.Printf("%s [%s]\n", styler.Info("Following batch progress..."), formatDuration(elapsed))
+	}
 
-	// Display each run on its own line with ID: STATUS format (no spinner)
 	for _, run := range status.Runs {
 		fmt.Printf("  [%d]: %s\n", run.ID, styler.Status(normalizeBulkStatus(run.Status)))
 	}
