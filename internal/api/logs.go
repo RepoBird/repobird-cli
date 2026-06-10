@@ -16,6 +16,8 @@ import (
 	"github.com/repobird/repobird-cli/pkg/version"
 )
 
+const MaxRunLogMessageBytes = 10 * 1024 * 1024
+
 // OpenRunLogs opens the agent log NDJSON response for a run.
 func (c *Client) OpenRunLogs(ctx context.Context, id string, afterSeq int) (io.ReadCloser, error) {
 	if id == "" {
@@ -59,6 +61,7 @@ func (c *Client) GetRunLogs(ctx context.Context, id string, afterSeq int) ([]mod
 
 	var messages []models.RunLogMessage
 	scanner := bufio.NewScanner(body)
+	scanner.Buffer(make([]byte, 64*1024), MaxRunLogMessageBytes)
 	for scanner.Scan() {
 		line := scanner.Bytes()
 		if len(line) == 0 {

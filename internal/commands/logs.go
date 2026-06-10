@@ -151,6 +151,7 @@ func fetchAndWriteFollowLogs(
 
 	wrote := false
 	scanner := bufio.NewScanner(body)
+	scanner.Buffer(make([]byte, 64*1024), api.MaxRunLogMessageBytes)
 	for scanner.Scan() {
 		nextSeq, lineWrote, err := writeFollowLogLineWithSeen(out, scanner.Bytes(), afterSeq, seen)
 		if err != nil {

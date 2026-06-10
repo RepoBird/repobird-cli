@@ -5,7 +5,9 @@ package commands
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"io"
 	"strings"
 	"testing"
 
@@ -96,4 +98,37 @@ func TestWriteFollowLogLineAdvancesCursor(t *testing.T) {
 	if got := strings.TrimSpace(out.String()); got != `{"id":"live-000003.jsonl-0","type":"assistant","content":"new"}` {
 		t.Fatalf("unexpected output line: %q", got)
 	}
+}
+
+func TestFetchAndWriteFollowLogsHandlesLargeRecord(t *testing.T) {
+	largeContent := strings.Repeat("x", 128*1024)
+	line := `{"id":"live-000003.jsonl-0","type":"assistant","content":"` + largeContent + `"}`
+	client := &staticRunLogClient{body: line + "\n"}
+
+	var out bytes.Buffer
+	next, wrote, err := fetchAndWriteFollowLogs(context.Background(), client, "run_123", 2, map[string]struct{}{}, &out)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !wrote {
+		t.Fatal("expected large line to be written")
+	}
+	if next != 3 {
+		t.Fatalf("expected cursor 3, got %d", next)
+	}
+	if !strings.Contains(out.String(), largeContent) {
+		t.Fatal("expected output to include large content")
+	}
+}
+
+type staticRunLogClient struct {
+	body string
+}
+
+func (c *staticRunLogClient) OpenRunLogs(context.Context, string, int) (io.ReadCloser, error) {
+	return io.NopCloser(strings.NewReader(c.body)), nil
+}
+
+func (c *staticRunLogClient) GetRunWithRetry(context.Context, string) (*models.RunResponse, error) {
+	return &models.RunResponse{Status: "DONE"}, nil
 }

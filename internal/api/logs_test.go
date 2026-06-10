@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -43,6 +44,31 @@ func TestGetRunLogsDecodesNDJSON(t *testing.T) {
 	}
 	if messages[1].ToolName != "Bash" || messages[1].ToolResult != "ok" {
 		t.Fatalf("unexpected tool message: %#v", messages[1])
+	}
+}
+
+func TestGetRunLogsDecodesLargeNDJSONRecord(t *testing.T) {
+	largeContent := strings.Repeat("x", 128*1024)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/x-ndjson")
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"id":      "msg-large",
+			"type":    "assistant",
+			"content": largeContent,
+		})
+	}))
+	defer server.Close()
+
+	client := NewClient("test-key", server.URL, false)
+	messages, err := client.GetRunLogs(context.Background(), "run_123", 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(messages) != 1 {
+		t.Fatalf("expected 1 message, got %d", len(messages))
+	}
+	if messages[0].Content != largeContent {
+		t.Fatalf("large message content was not preserved")
 	}
 }
 
