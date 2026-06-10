@@ -19,6 +19,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Show the selected repository in Basic/Pro run summaries before submission.
 
+### Added
+
+- Add stable --json output for run creation, run dry-runs, and development-gated bulk submissions.
+
 ## [0.7.0] - 2026-06-06
 
 ### Added

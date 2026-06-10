@@ -206,6 +206,19 @@ repobird status --follow RUN_ID # Live updates
 repobird tui                    # Launch terminal UI
 ```
 
+### Machine-Readable Output
+
+Use `--json` for scripting. The flag is available globally and on run-related commands, so both `repobird --json run ...` and `repobird run ... --json` emit parseable JSON without human progress text.
+
+```bash
+repobird run -r your-org/your-repo -p "Fix auth" --json
+repobird run task.json --dry-run --json
+repobird status RUN_ID --json
+repobird repo list --json
+```
+
+Run creation emits `schema: "repobird.run.create.v1"` with `operation`, `success`, `run`, `url`, and `request` fields. Dry runs emit `schema: "repobird.run.dry_run.v1"` with `valid` and `request` fields. Development-gated bulk commands use `repobird.bulk.create.v1` and `repobird.bulk.dry_run.v1`.
+
 ### Repository Defaults
 
 When repository branch defaults are enabled on the API, the CLI can inspect and update persisted defaults. Per-run flags such as `--base-branch`, `--pr-target-branch`, `--output-branch`, and `--branch-only` still override repository defaults.
