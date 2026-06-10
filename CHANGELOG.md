@@ -19,6 +19,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Show the selected repository in Basic/Pro run summaries before submission.
 
+### Added
+
+- Add repobird logs RUN_ID for inspecting agent conversation logs, with JSON snapshot output and NDJSON follow polling.
+
 ## [0.7.0] - 2026-06-06
 
 ### Added

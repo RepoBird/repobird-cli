@@ -17,6 +17,7 @@ Available Commands:
   info        Display authentication information
   login       Configure your API key securely
   logout      Remove stored API key
+  logs        Inspect run agent logs
   pro         Create a Pro cloud agent run
   repo        Manage connected repositories
   run         Create a run from a JSON, YAML, or Markdown configuration file, or with flags

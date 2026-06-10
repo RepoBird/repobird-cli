@@ -145,7 +145,7 @@ export REPOBIRD_DEBUG_LOG=1
 # Run command
 repobird tui
 
-# View logs
+# View CLI debug logs
 tail -f /tmp/repobird_debug.log
 ```
 
@@ -156,6 +156,13 @@ export REPOBIRD_HTTP_DEBUG=1
 
 # See all API requests/responses
 repobird status --debug
+```
+
+### Inspect Run Agent Logs
+```bash
+repobird logs RUN_ID
+repobird logs RUN_ID --json
+repobird logs RUN_ID --follow
 ```
 
 ### Profile Performance

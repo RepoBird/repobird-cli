@@ -97,7 +97,7 @@ func (c *Client) ListRuns(ctx context.Context, opts ListOptions) (*RunList, erro
 
 ### Additional Endpoints
 - `DELETE /api/v1/runs/{id}` - Cancel active run
-- `GET /api/v1/runs/{id}/logs` - Stream run logs
+- `GET /api/issue-runs/{id}/agent-logs` - Stream agent logs as NDJSON. The public `/api/v1/runs/{id}/logs` contract is not available yet, so the CLI wraps this compatibility endpoint.
 - `GET /api/v1/user` - Get user info and credit balance
 - `GET /api/v1/repositories` - List accessible repositories
 - `GET /api/repos/{id}` - Get repository details, including branch defaults when enabled
