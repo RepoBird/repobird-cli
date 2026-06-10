@@ -50,6 +50,19 @@ type runDryRunJSONOutput struct {
 	Request   runRequest `json:"request"`
 }
 
+type runWaitJSONOutput struct {
+	Schema    string      `json:"schema"`
+	Operation string      `json:"operation"`
+	Success   bool        `json:"success"`
+	Run       runJSON     `json:"run,omitempty"`
+	URL       string      `json:"url,omitempty"`
+	Request   *runRequest `json:"request,omitempty"`
+	ExitCode  int         `json:"exitCode"`
+	Status    string      `json:"status,omitempty"`
+	TimedOut  bool        `json:"timedOut"`
+	Error     string      `json:"error,omitempty"`
+}
+
 type runJSON struct {
 	ID                 string  `json:"id"`
 	PublicID           string  `json:"publicId,omitempty"`
@@ -161,6 +174,28 @@ func printRunCreateJSON(out io.Writer, run *domain.Run, req domain.CreateRunRequ
 		Operation: "run.create",
 		Success:   true,
 		Run:       makeRunJSON(run),
+	}
+	if urlID != "" {
+		output.URL = utils.GenerateRepoBirdURL(urlID)
+	}
+	request := makeRunRequestJSON(req)
+	output.Request = &request
+	return printJSON(out, output)
+}
+
+func printRunWaitJSON(out io.Writer, run *domain.Run, req domain.CreateRunRequest, exitCode int, timedOut bool, message string) error {
+	urlID := createdRunURLID(run)
+	output := runWaitJSONOutput{
+		Schema:    "repobird.run.wait.v1",
+		Operation: "run.wait",
+		Success:   exitCode == ExitCodeSuccess,
+		Run:       makeRunJSON(run),
+		ExitCode:  exitCode,
+		TimedOut:  timedOut,
+		Error:     message,
+	}
+	if run != nil {
+		output.Status = run.Status
 	}
 	if urlID != "" {
 		output.URL = utils.GenerateRepoBirdURL(urlID)

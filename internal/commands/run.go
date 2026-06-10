@@ -31,6 +31,9 @@ import (
 var (
 	dryRun                bool
 	follow                bool
+	wait                  bool
+	waitTimeout           time.Duration
+	waitPollInterval      = 5 * time.Second
 	repo                  string
 	prompt                string
 	source                string
@@ -85,6 +88,7 @@ Examples:
   # Run from file
   repobird run task.json                    # Run from file
   repobird run tasks.yaml --follow           # Run and follow status
+  repobird run task.json --wait --json       # Wait and print one final JSON result
   repobird run task.md --dry-run            # Validate without running
   cat task.json | repobird run              # Pipe JSON from stdin
 
@@ -120,6 +124,8 @@ func init() {
 	runCmd.Flags().BoolVar(&dryRun, "dry-run", false, "validate input without creating a run")
 	runCmd.Flags().BoolVar(&follow, "follow", false, "follow the run status after creation")
 	runCmd.Flags().BoolVar(&jsonOutput, "json", false, "output in JSON format")
+	runCmd.Flags().BoolVar(&wait, "wait", false, "wait for the run to reach a terminal state")
+	runCmd.Flags().DurationVar(&waitTimeout, "timeout", 90*time.Minute, "maximum time to wait for --wait (for example: 45m, 1h30m)")
 
 	// Flags for direct run creation
 	runCmd.Flags().StringVarP(&repo, "repo", "r", "", "repository name (owner/repo or numeric ID)")
@@ -153,6 +159,12 @@ func runCommandWithPreset(cmd *cobra.Command, args []string, presetName string) 
 
 	if cfg.APIKey == "" {
 		return errors.NoAPIKeyError()
+	}
+	if follow && wait {
+		return fmt.Errorf("--follow and --wait cannot be used together")
+	}
+	if waitTimeout <= 0 {
+		return fmt.Errorf("--timeout must be greater than zero")
 	}
 
 	selectedPreset, err := resolveRunPreset(presetName)
@@ -316,6 +328,8 @@ func processSingleRun(runConfig *models.RunConfig, additionalContext string) err
 				runConfig.Repository = repoName
 				if !jsonOutput {
 					fmt.Printf("%s %s\n", stdoutStyle().Info("Auto-detected repository:"), repoName)
+				} else {
+					fmt.Fprintf(os.Stderr, "%s %s\n", stderrStyle().Info("Auto-detected repository:"), repoName)
 				}
 			}
 		}
@@ -393,7 +407,11 @@ func processSingleRun(runConfig *models.RunConfig, additionalContext string) err
 	}
 	run, err := runService.CreateRun(ctx, createReq)
 	if err != nil {
-		return fmt.Errorf("failed to create run: %s", errors.FormatUserError(err))
+		return wrapExitError(exitCodeForError(err), err)
+	}
+
+	if wait {
+		return waitForCreatedRun(ctx, runService, run, createReq)
 	}
 
 	if jsonOutput {
@@ -434,6 +452,114 @@ func printCreatedRunDetails(run *domain.Run) {
 	printCreatedField(styler.Label("URL:"), styler.URL(runURL))
 }
 
+func waitForCreatedRun(ctx context.Context, runService domain.RunService, createdRun *domain.Run, req domain.CreateRunRequest) error {
+	if !jsonOutput {
+		printCreatedRunDetails(createdRun)
+		fmt.Printf("\n%s\n", stdoutStyle().Info("Waiting for run to finish..."))
+	}
+
+	finalRun, timedOut, err := waitForRunTerminal(ctx, runService, createdRun.ID)
+	if err != nil {
+		exitCode := exitCodeForError(err)
+		timedOut := exitCode == ExitCodeTimeout
+		if jsonOutput {
+			_ = printRunWaitJSON(os.Stdout, finalRun, req, exitCode, timedOut, err.Error())
+		}
+		return wrapExitError(exitCode, err)
+	}
+	if finalRun == nil {
+		finalRun = createdRun
+	}
+
+	exitCode := exitCodeForFinalRun(finalRun)
+	message := finalRun.Error
+	if timedOut {
+		exitCode = ExitCodeTimeout
+		message = fmt.Sprintf("timed out waiting for run %s after %s", createdRun.ID, waitTimeout)
+	}
+
+	if jsonOutput {
+		_ = printRunWaitJSON(os.Stdout, finalRun, req, exitCode, timedOut, message)
+	} else {
+		printRunWaitHuman(finalRun, timedOut, message)
+	}
+
+	if exitCode == ExitCodeSuccess {
+		return nil
+	}
+	return wrapExitError(exitCode, netstderrors.New(messageOrDefault(message, "run did not complete successfully")))
+}
+
+func waitForRunTerminal(ctx context.Context, runService domain.RunService, runID string) (*domain.Run, bool, error) {
+	pollCtx, cancel := context.WithTimeout(ctx, waitTimeout)
+	defer cancel()
+
+	ticker := time.NewTicker(waitPollInterval)
+	defer ticker.Stop()
+
+	var lastRun *domain.Run
+
+	for {
+		run, err := runService.GetRun(pollCtx, runID)
+		if err != nil {
+			code := exitCodeForError(err)
+			if code == ExitCodeAuth || code == ExitCodeQuota {
+				return lastRun, false, wrapExitError(code, err)
+			}
+			if pollCtx.Err() != nil {
+				return lastRun, true, newExitError(ExitCodeTimeout, fmt.Sprintf("timed out waiting for run %s after %s", runID, waitTimeout))
+			}
+		} else {
+			lastRun = run
+			if run.IsTerminal() {
+				return run, false, nil
+			}
+		}
+
+		select {
+		case <-pollCtx.Done():
+			return lastRun, true, newExitError(ExitCodeTimeout, fmt.Sprintf("timed out waiting for run %s after %s", runID, waitTimeout))
+		case <-ticker.C:
+		}
+	}
+}
+
+func exitCodeForFinalRun(run *domain.Run) int {
+	if run == nil {
+		return ExitCodeGeneric
+	}
+	if run.IsSuccess() {
+		return ExitCodeSuccess
+	}
+	if run.IsTerminal() {
+		return ExitCodeRunFailed
+	}
+	return ExitCodeGeneric
+}
+
+func printRunWaitHuman(run *domain.Run, timedOut bool, message string) {
+	styler := stdoutStyle()
+	if timedOut {
+		fmt.Printf("%s %s\n", styler.Error("Timed out:"), message)
+		return
+	}
+	if run.Status == domain.StatusFailed && run.Error != "" {
+		fmt.Printf("%s %s\n", styler.Error("Run failed:"), run.Error)
+		return
+	}
+	fmt.Printf("%s %s\n", styler.Success("Run completed with status:"), styler.Status(formatStatusForDisplay(run.Status)))
+	if run.Status == domain.StatusCompleted && run.PullRequestURL != "" {
+		fmt.Printf("%s %s\n", styler.Label("Pull Request:"), styler.URL(run.PullRequestURL))
+	}
+}
+
+func messageOrDefault(message, fallback string) string {
+	if message != "" {
+		return message
+	}
+	return fallback
+}
+
 func printCreatedField(label, value string) {
 	if value == "" {
 		return
@@ -472,6 +598,8 @@ func newRunPresetCommand(presetName string) *cobra.Command {
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "validate input without creating a run")
 	cmd.Flags().BoolVar(&follow, "follow", false, "follow the run status after creation")
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "output in JSON format")
+	cmd.Flags().BoolVar(&wait, "wait", false, "wait for the run to reach a terminal state")
+	cmd.Flags().DurationVar(&waitTimeout, "timeout", 90*time.Minute, "maximum time to wait for --wait (for example: 45m, 1h30m)")
 	cmd.Flags().StringVarP(&repo, "repo", "r", "", "repository name (owner/repo or numeric ID)")
 	cmd.Flags().StringVar(&source, "source", "", "legacy alias for --base-branch")
 	cmd.Flags().StringVar(&target, "target", "", "legacy target branch alias")

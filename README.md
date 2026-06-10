@@ -147,6 +147,9 @@ echo '{
 
 repobird run fix.json --follow
 # That's it. PR will be created automatically. No further action needed.
+
+# Script-friendly wait mode: one JSON object on stdout, stable exit code
+repobird run fix.json --wait --json --timeout 45m
 ```
 
 ## 📖 Usage Guide
@@ -171,6 +174,7 @@ repobird config set color never
 ```bash
 # Single task
 repobird run task.json --follow
+repobird run task.json --wait --json --timeout 45m
 repobird basic "Fix a small bug"
 repobird pro "Implement OAuth"
 repobird run --basic -r myorg/webapp -p "Fix a small bug"
@@ -193,6 +197,27 @@ cat task.json | repobird run -  # From stdin
 | `repobird run --pro -r owner/repo -p "prompt"` | Pro preset with explicit repository | Kimi K2.6 |
 
 The `basic` and `pro` commands auto-detect the repository from the current git remote when `-r/--repo` is omitted. After submission, the CLI prints the selected run type and model before showing the run ID/status.
+
+### Scripted Run Waiting
+
+Use `--wait` when automation should block until the created run reaches a terminal state. Combine it with `--json` to keep stdout machine-readable:
+
+```bash
+repobird run task.json --wait --json --timeout 45m
+```
+
+With `--wait --json`, stdout contains one final JSON object with the final or last observed run, `exitCode`, `status`, `timedOut`, and `error`. Human progress and errors are written to stderr when needed.
+
+Exit-code contract:
+
+| Code | Meaning |
+|---:|---|
+| `0` | Run reached `completed` |
+| `1` | Generic CLI, validation, network, or unexpected error |
+| `2` | Authentication/API key error |
+| `3` | Quota or credits error |
+| `4` | Run reached a non-success terminal state such as `failed` or `cancelled` |
+| `5` | `--wait` timed out before a terminal state |
 
 ### Monitoring & Management
 

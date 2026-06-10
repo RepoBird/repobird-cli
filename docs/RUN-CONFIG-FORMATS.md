@@ -92,6 +92,9 @@ repobird run -r myorg/webapp -p "@@mentions are preserved"
 
 # Short form flags
 repobird run -r myorg/webapp -p "Add unit tests for auth module" --follow
+
+# Script-friendly wait mode
+repobird run -r myorg/webapp -p "Add unit tests for auth module" --wait --json --timeout 45m
 ```
 
 **Available flags:**
@@ -117,6 +120,9 @@ repobird run -r myorg/webapp -p "Add unit tests for auth module" --follow
 - `--force` - Bypass the local 30-second duplicate-submission guard after reviewing the duplicate
 - `--context` - Additional context (optional, also supports `@filename` and `-`)
 - `--follow` - Follow the run status after creation
+- `--wait` - Wait for the created run to reach a terminal state
+- `--timeout` - Maximum time to wait with `--wait` (default `1h30m`; examples: `45m`, `2h`)
+- `--json` - Output machine-readable JSON. With `--wait`, stdout contains one final JSON object.
 - `--dry-run` - Validate without creating the run
 - `--json` - Emit machine-readable JSON without human progress text
 
@@ -152,6 +158,7 @@ Run with:
 ```bash
 repobird run task.json
 repobird run task.json --follow  # Follow the run status
+repobird run task.json --wait --json --timeout 45m # Wait for scripts
 repobird run task.json --dry-run # Validate without creating
 repobird run task.json --json    # Create and print parseable JSON
 ```
@@ -348,6 +355,42 @@ Successful run creation emits `schema: "repobird.run.create.v1"` with:
    Error: validation failed: prompt cannot be empty
    ```
 
+### Wait Mode Exit Codes
+
+`--follow` is intended for humans. Use `--wait` for scripts that need to block until the created run is terminal.
+
+```bash
+repobird run task.json --wait --json --timeout 45m
+```
+
+With `--wait --json`, stdout contains exactly one final JSON object:
+
+```json
+{
+  "run": {
+    "ID": "123",
+    "PublicID": "run_abc",
+    "Status": "completed"
+  },
+  "exitCode": 0,
+  "status": "completed",
+  "timedOut": false
+}
+```
+
+If the wait times out, the JSON object includes the last observed run when available, `timedOut: true`, `exitCode: 5`, and an `error` message.
+
+Exit-code contract:
+
+| Code | Meaning |
+|---:|---|
+| `0` | Run reached `completed` |
+| `1` | Generic CLI, validation, network, or unexpected error |
+| `2` | Authentication/API key error |
+| `3` | Quota or credits error |
+| `4` | Run reached a non-success terminal state such as `failed` or `cancelled` |
+| `5` | `--wait` timed out before a terminal state |
+
 ## Best Practices
 
 1. **Use Descriptive Prompts**: Be specific about what you want the AI to do
@@ -355,7 +398,7 @@ Successful run creation emits `schema: "repobird.run.create.v1"` with:
 3. **Specify Files**: When working on specific files, list them to provide focus
 4. **Test with Dry Run**: Always validate complex configurations with `--dry-run`
 5. **Use Markdown for Documentation**: For complex tasks, use Markdown format to include detailed documentation
-6. **Follow Status**: Use `--follow` flag to monitor long-running tasks
+6. **Follow Status**: Use `--follow` for human monitoring and `--wait --json` for scripts
 
 ## Example Workflows
 
