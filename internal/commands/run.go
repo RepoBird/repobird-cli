@@ -519,6 +519,9 @@ func printRunSelection(req domain.CreateRunRequest) {
 		return
 	}
 	styler := stdoutStyle()
+	if req.RepositoryName != "" {
+		fmt.Printf("%s %s\n", styler.Label("Repository:"), req.RepositoryName)
+	}
 	fmt.Printf("%s %s\n", styler.Label("Run type:"), preset.Label)
 	fmt.Printf("%s %s (%s)\n", styler.Label("Model:"), modelDisplayName(preset.Model), preset.Model)
 }

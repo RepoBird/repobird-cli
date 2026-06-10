@@ -3,6 +3,8 @@ versions:
     unreleased:
         fixed:
             - Isolate command tests from real XDG RepoBird configuration so config command tests cannot overwrite user settings.
+        changed:
+            - Show the selected repository in Basic/Pro run summaries before submission.
     0.7.0:
         date: 2026-06-06
         added:
