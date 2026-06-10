@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
@@ -16,6 +17,35 @@ type roundTripFunc func(*http.Request) (*http.Response, error)
 
 func (f roundTripFunc) Do(req *http.Request) (*http.Response, error) {
 	return f(req)
+}
+
+func TestAPIRunRepositoryCreateSendsIdempotencyKey(t *testing.T) {
+	repo := NewAPIRunRepository(roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		require.Equal(t, "run-key-123", req.Header.Get("Idempotency-Key"))
+
+		var body map[string]any
+		require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
+		require.Equal(t, "run-key-123", body["idempotencyKey"])
+
+		return &http.Response{
+			StatusCode: http.StatusCreated,
+			Body: io.NopCloser(strings.NewReader(`{
+				"data": {
+					"id": 123,
+					"status": "QUEUED"
+				}
+			}`)),
+			Header: make(http.Header),
+		}, nil
+	}), "https://example.test", "test-key", false)
+
+	_, err := repo.Create(context.Background(), domain.CreateRunRequest{
+		Prompt:         "Fix auth",
+		RepositoryName: "acme/webapp",
+		RunType:        domain.RunTypeRun,
+		IdempotencyKey: "run-key-123",
+	})
+	require.NoError(t, err)
 }
 
 func TestAPIRunRepositoryListUsesPageBasedPagination(t *testing.T) {

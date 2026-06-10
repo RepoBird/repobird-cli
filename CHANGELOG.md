@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Single-run creation now supports retry-safe idempotency keys with a 30-second local duplicate-submission guard and --force override.
+
 ### Fixed
 
 - Isolate command tests from real XDG RepoBird configuration so config command tests cannot overwrite user settings.

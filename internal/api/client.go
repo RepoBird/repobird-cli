@@ -77,6 +77,9 @@ func (c *Client) doRequest(method, path string, body interface{}) (*http.Respons
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", fmt.Sprintf("repobird-cli/%s", version.GetVersion()))
+	if key := idempotencyKeyFromBody(body); key != "" {
+		req.Header.Set("Idempotency-Key", key)
+	}
 
 	// Always log URL when REPOBIRD_DEBUG_API_URL is set
 	if os.Getenv("REPOBIRD_DEBUG_API_URL") == "1" {
@@ -113,6 +116,21 @@ func (c *Client) doRequest(method, path string, body interface{}) (*http.Respons
 	}
 
 	return resp, nil
+}
+
+func idempotencyKeyFromBody(body interface{}) string {
+	switch req := body.(type) {
+	case *models.APIRunRequest:
+		return req.IdempotencyKey
+	case models.APIRunRequest:
+		return req.IdempotencyKey
+	case *models.RunRequest:
+		return req.IdempotencyKey
+	case models.RunRequest:
+		return req.IdempotencyKey
+	default:
+		return ""
+	}
 }
 
 func (c *Client) CreateRun(request *models.RunRequest) (*models.RunResponse, error) {
