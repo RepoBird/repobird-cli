@@ -5,6 +5,7 @@
 ```bash
 repobird tui                        # Launch interactive dashboard
 repobird run task.json              # Submit task
+repobird run task.json --wait --json --timeout 45m # Script wait
 repobird basic "Fix a bug"          # Basic run, repo auto-detected from git
 repobird pro "Implement OAuth"      # Pro run, repo auto-detected from git
 repobird status                     # View all runs
@@ -143,6 +144,7 @@ tui:
 ```bash
 # CLI
 repobird run task.json --follow
+repobird run task.json --wait --json --timeout 45m
 
 # TUI
 1. Press 'n' for new run

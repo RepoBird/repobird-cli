@@ -8,6 +8,8 @@ versions:
             - Omit bulk follow spinner frames from piped output while preserving TTY animation.
         changed:
             - Show the selected repository in Basic/Pro run summaries before submission.
+        added:
+            - Add repobird run --wait with --json final-result output, timeout handling, and documented script exit codes.
     0.7.0:
         date: 2026-06-06
         added:

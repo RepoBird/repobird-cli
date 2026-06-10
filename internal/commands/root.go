@@ -4,6 +4,7 @@
 package commands
 
 import (
+	stderrors "errors"
 	"fmt"
 	"os"
 	"runtime"
@@ -53,6 +54,12 @@ Get API Key: %s`, config.GetURLs().BaseURL, config.GetAPIKeysURL()),
 
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
+		exitCode := exitCodeForError(err)
+		var coded interface{ ExitCode() int }
+		if stderrors.As(err, &coded) {
+			err = stderrors.Unwrap(err)
+		}
+
 		styler := stderrStyle()
 		// Format error message for better user experience
 		errorMsg := errors.FormatUserError(err)
@@ -67,7 +74,7 @@ func Execute() {
 			fmt.Fprintf(os.Stderr, "\n%s Check your internet connection and try again\n", styler.Info("Hint:"))
 		}
 
-		os.Exit(1)
+		os.Exit(exitCode)
 	}
 }
 
