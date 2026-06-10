@@ -118,6 +118,7 @@ repobird run -r myorg/webapp -p "Add unit tests for auth module" --follow
 - `--context` - Additional context (optional, also supports `@filename` and `-`)
 - `--follow` - Follow the run status after creation
 - `--dry-run` - Validate without creating the run
+- `--json` - Emit machine-readable JSON without human progress text
 
 For single-run creation, the CLI records a local submission key before the API request. If the same repository, prompt, and run type are submitted again within 30 seconds, the CLI stops before sending another POST. Use `--force` only when you intend to create another run.
 
@@ -152,6 +153,7 @@ Run with:
 repobird run task.json
 repobird run task.json --follow  # Follow the run status
 repobird run task.json --dry-run # Validate without creating
+repobird run task.json --json    # Create and print parseable JSON
 ```
 
 #### YAML Format
@@ -298,6 +300,7 @@ Test your configuration without creating a run:
 
 ```bash
 repobird run task.json --dry-run
+repobird run task.json --dry-run --json
 ```
 
 This will:
@@ -305,6 +308,28 @@ This will:
 - Check field formats
 - Show the final configuration that would be sent
 - Report any errors without consuming API credits
+
+With `--json`, dry runs emit `schema: "repobird.run.dry_run.v1"` with `operation`, `valid`, and `request` fields.
+
+### Machine-Readable Output
+
+Use `--json` when another program or agent needs to parse command output:
+
+```bash
+repobird run -r myorg/webapp -p "Fix the login bug" --json
+repobird --json run task.json
+repobird status RUN_ID --json
+```
+
+Successful run creation emits `schema: "repobird.run.create.v1"` with:
+
+| Field | Description |
+|-------|-------------|
+| `operation` | Operation name, currently `run.create` |
+| `success` | Boolean success indicator |
+| `run` | Created run identifiers, status, repository, branch output fields, PR URL when available |
+| `url` | RepoBird dashboard URL for the created run |
+| `request` | Normalized request sent to the API |
 
 ### Common Validation Errors
 

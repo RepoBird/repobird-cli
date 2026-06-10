@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - Single-run creation now supports retry-safe idempotency keys with a 30-second local duplicate-submission guard and --force override.
+- Add repobird logs RUN_ID for inspecting agent conversation logs, with JSON snapshot output and NDJSON follow polling.
+- Add stable --json output for run creation, run dry-runs, and development-gated bulk submissions.
 
 ### Fixed
 
@@ -18,10 +20,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - Show the selected repository in Basic/Pro run summaries before submission.
-
-### Added
-
-- Add repobird logs RUN_ID for inspecting agent conversation logs, with JSON snapshot output and NDJSON follow polling.
 
 ## [0.7.0] - 2026-06-06
 

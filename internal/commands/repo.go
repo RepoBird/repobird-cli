@@ -46,7 +46,6 @@ func newRepoCommand() *cobra.Command {
 }
 
 func newRepoListCommand() *cobra.Command {
-	var jsonOutput bool
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List connected repositories",
@@ -72,7 +71,6 @@ func newRepoListCommand() *cobra.Command {
 }
 
 func newRepoShowCommand() *cobra.Command {
-	var jsonOutput bool
 	cmd := &cobra.Command{
 		Use:   "show <repo-id>",
 		Short: "Show repository details",

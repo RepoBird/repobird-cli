@@ -17,10 +17,11 @@ import (
 )
 
 var (
-	cfg       *config.SecureConfig
-	cfgFile   string
-	debug     bool
-	debugUser bool
+	cfg        *config.SecureConfig
+	cfgFile    string
+	debug      bool
+	debugUser  bool
+	jsonOutput bool
 )
 
 var rootCmd = &cobra.Command{
@@ -81,6 +82,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $XDG_CONFIG_HOME/repobird/config.yaml or $HOME/.config/repobird/config.yaml)")
 	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "enable debug output")
 	rootCmd.PersistentFlags().BoolVar(&debugUser, "debug-user", false, "enable debug user mode with mock data")
+	rootCmd.PersistentFlags().BoolVar(&jsonOutput, "json", false, "output in JSON format")
 
 	// Add -v as shorthand for --version
 	rootCmd.Flags().BoolP("version", "v", false, "version for repobird")

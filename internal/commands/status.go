@@ -73,7 +73,7 @@ func getRunStatus(client *api.Client, runID string) error {
 		return fmt.Errorf("failed to get run status: %s", errors.FormatUserError(err))
 	}
 
-	if statusJSON {
+	if statusJSON || jsonOutput {
 		b, _ := json.MarshalIndent(run, "", "  ")
 		fmt.Println(string(b))
 		return nil
@@ -162,7 +162,7 @@ func listRuns(client *api.Client) error {
 		return nil
 	}
 
-	if statusJSON {
+	if statusJSON || jsonOutput {
 		b, _ := json.MarshalIndent(runs, "", "  ")
 		fmt.Println(string(b))
 		return nil

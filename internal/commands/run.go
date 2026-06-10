@@ -119,6 +119,7 @@ For configuration examples and field descriptions:
 func init() {
 	runCmd.Flags().BoolVar(&dryRun, "dry-run", false, "validate input without creating a run")
 	runCmd.Flags().BoolVar(&follow, "follow", false, "follow the run status after creation")
+	runCmd.Flags().BoolVar(&jsonOutput, "json", false, "output in JSON format")
 
 	// Flags for direct run creation
 	runCmd.Flags().StringVarP(&repo, "repo", "r", "", "repository name (owner/repo or numeric ID)")
@@ -313,7 +314,9 @@ func processSingleRun(runConfig *models.RunConfig, additionalContext string) err
 				fmt.Fprintf(os.Stderr, "%s Could not auto-detect repository: %v\n", stderrStyle().Warning("Warning:"), err)
 			} else {
 				runConfig.Repository = repoName
-				fmt.Printf("%s %s\n", stdoutStyle().Info("Auto-detected repository:"), repoName)
+				if !jsonOutput {
+					fmt.Printf("%s %s\n", stdoutStyle().Info("Auto-detected repository:"), repoName)
+				}
 			}
 		}
 	}
@@ -362,6 +365,9 @@ func processSingleRun(runConfig *models.RunConfig, additionalContext string) err
 	}
 
 	if dryRun {
+		if jsonOutput {
+			return printRunDryRunJSON(os.Stdout, createReq)
+		}
 		fmt.Println(stdoutStyle().Success("Validation successful. Run would be created with:"))
 		printRunSelection(createReq)
 		b, _ := json.MarshalIndent(createReq, "", "  ")
@@ -369,19 +375,29 @@ func processSingleRun(runConfig *models.RunConfig, additionalContext string) err
 		return nil
 	}
 
+	if jsonOutput && follow {
+		return fmt.Errorf("--follow cannot be used with --json; use status --json to poll the created run")
+	}
+
 	// Use service layer to create run
 	container := getContainer()
 	runService := container.RunService()
 	ctx := context.Background()
 
-	printRunSelection(createReq)
-	fmt.Println(stdoutStyle().Info("Creating run..."))
+	if !jsonOutput {
+		printRunSelection(createReq)
+		fmt.Println(stdoutStyle().Info("Creating run..."))
+	}
 	if err := reserveRunSubmission(createReq, forceRun); err != nil {
 		return err
 	}
 	run, err := runService.CreateRun(ctx, createReq)
 	if err != nil {
 		return fmt.Errorf("failed to create run: %s", errors.FormatUserError(err))
+	}
+
+	if jsonOutput {
+		return printRunCreateJSON(os.Stdout, run, createReq)
 	}
 
 	printCreatedRunDetails(run)
@@ -455,6 +471,7 @@ func newRunPresetCommand(presetName string) *cobra.Command {
 
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "validate input without creating a run")
 	cmd.Flags().BoolVar(&follow, "follow", false, "follow the run status after creation")
+	cmd.Flags().BoolVar(&jsonOutput, "json", false, "output in JSON format")
 	cmd.Flags().StringVarP(&repo, "repo", "r", "", "repository name (owner/repo or numeric ID)")
 	cmd.Flags().StringVar(&source, "source", "", "legacy alias for --base-branch")
 	cmd.Flags().StringVar(&target, "target", "", "legacy target branch alias")
@@ -604,6 +621,9 @@ func processBulkRuns(filename string) error {
 	// }
 
 	if dryRun {
+		if jsonOutput {
+			return printBulkDryRunJSON(os.Stdout, bulkConfig)
+		}
 		styler := stdoutStyle()
 		fmt.Println(styler.Success("✓ Configuration valid"))
 		fmt.Printf("%s %s\n", styler.Label("Repository:"), bulkConfig.Repository)
@@ -801,14 +821,16 @@ func executeBulkRuns(bulkConfig *bulk.BulkConfig) error {
 
 	// Display submission info
 	styler := stdoutStyle()
-	fmt.Println(styler.Heading("Submitting bulk runs..."))
-	fmt.Printf("%s %s\n", styler.Label("Repository:"), bulkConfig.Repository)
-	fmt.Printf("%s %d\n", styler.Label("Total runs:"), len(bulkConfig.Runs))
-	fmt.Println("\nThis may take up to 5 minutes. Please wait...")
+	if !jsonOutput {
+		fmt.Println(styler.Heading("Submitting bulk runs..."))
+		fmt.Printf("%s %s\n", styler.Label("Repository:"), bulkConfig.Repository)
+		fmt.Printf("%s %d\n", styler.Label("Total runs:"), len(bulkConfig.Runs))
+		fmt.Println("\nThis may take up to 5 minutes. Please wait...")
+	}
 
 	done := make(chan bool, 1) // Buffered to prevent goroutine leak
 
-	if stdoutIsTerminal() {
+	if !jsonOutput && stdoutIsTerminal() {
 		// Show a progress indicator with elapsed time
 		startTime := time.Now()
 		spinner := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
@@ -858,6 +880,11 @@ func executeBulkRuns(bulkConfig *bulk.BulkConfig) error {
 			}
 		}
 		return fmt.Errorf("%s", errors.FormatUserError(err))
+	}
+
+	if jsonOutput {
+		_ = printBulkCreateJSON(os.Stdout, bulkResp)
+		return nil
 	}
 
 	// Handle different status codes
