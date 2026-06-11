@@ -51,7 +51,7 @@ repobird config set api-key <your-api-key>
 repobird config get api-url
 
 # Test connectivity
-curl -I https://repobird.ai/api/health
+curl -I https://api.repobird.ai/api/health
 
 # Use custom endpoint
 export REPOBIRD_API_URL=https://custom.api.url

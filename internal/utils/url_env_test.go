@@ -20,7 +20,7 @@ func TestGetAPIURL(t *testing.T) {
 		{
 			name:        "Default production URL",
 			envVars:     map[string]string{},
-			expectedURL: "https://repobird.ai",
+			expectedURL: "https://api.repobird.ai",
 			description: "Should return production URL when no env vars set",
 		},
 		{
@@ -117,7 +117,7 @@ func TestGetAPIURL(t *testing.T) {
 			envVars: map[string]string{
 				"REPOBIRD_ENV": "production",
 			},
-			expectedURL: "https://repobird.ai",
+			expectedURL: "https://api.repobird.ai",
 			description: "Production env should use default production URL",
 		},
 		{
@@ -125,7 +125,7 @@ func TestGetAPIURL(t *testing.T) {
 			envVars: map[string]string{
 				"REPOBIRD_ENV": "staging",
 			},
-			expectedURL: "https://repobird.ai",
+			expectedURL: "https://api.repobird.ai",
 			description: "Unknown environments should default to production",
 		},
 
@@ -150,7 +150,7 @@ func TestGetAPIURL(t *testing.T) {
 			name:           "Empty config fallback ignored",
 			envVars:        map[string]string{},
 			configFallback: "",
-			expectedURL:    "https://repobird.ai",
+			expectedURL:    "https://api.repobird.ai",
 			description:    "Empty config fallback should be ignored",
 		},
 		{

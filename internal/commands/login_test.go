@@ -31,7 +31,7 @@ func TestLoginAPIURLIgnoresPersistedCustomURLByDefault(t *testing.T) {
 	t.Setenv("REPOBIRD_ENV", "")
 
 	got := loginAPIURL("https://custom.api.com")
-	want := "https://repobird.ai"
+	want := "https://api.repobird.ai"
 
 	if got != want {
 		t.Fatalf("loginAPIURL() = %q, want %q", got, want)

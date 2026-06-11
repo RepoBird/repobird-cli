@@ -153,7 +153,7 @@ Large views split for maintainability:
   1. `REPOBIRD_API_URL` environment variable (highest priority)
   2. `REPOBIRD_ENV=dev` → `http://localhost:3000`
   3. Config file URL (from `~/.config/repobird/config.yaml`; legacy `~/.repobird/config.yaml` is still read)
-  4. Default production → `https://repobird.ai`
+4. Default production API → `https://api.repobird.ai`
 - Dev mode automatically uses `localhost:3000` unless overridden
 - Pricing URL shown for quota errors
 

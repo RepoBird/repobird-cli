@@ -32,7 +32,7 @@ func TestNewClient(t *testing.T) {
 			apiKey:      "test-key",
 			baseURL:     "",
 			debug:       false,
-			expectedURL: DefaultAPIURL,
+			expectedURL: "https://api.repobird.ai",
 		},
 		{
 			name:        "Custom URL",
