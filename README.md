@@ -350,7 +350,9 @@ For the live product documentation, start at [repobird.ai/docs](https://repobird
 
 ### Reference
 - [CLI Command Reference](docs/cli-reference.md) - Complete command documentation
-- [API Reference](docs/API-REFERENCE.md) - REST API integration
+- [REST API Reference](https://repobird.ai/docs/api-reference) - Live API reference for RepoBird integrations
+- [OpenAPI Specification](https://repobird.ai/api/v1/openapi.yaml) - Public OpenAPI YAML for `/api/v1`
+- [CLI API Notes](docs/API-REFERENCE.md) - CLI REST client implementation details
 - [Keyboard Shortcuts](docs/QUICK-REFERENCE.md) - TUI navigation cheat sheet
 
 ### Development

@@ -301,13 +301,14 @@ curl -X GET https://repobird.ai/api/v1/runs?page=1&limit=10 \
 ## Required Documentation
 
 ### API Documentation Needs
-1. **OpenAPI/Swagger Spec**: Complete API specification
-2. **Authentication Guide**: Simple Bearer token with API key from dashboard
-3. **Rate Limiting Details**: Based on user tier (free/pro/enterprise)
-4. **Status Codes**: Standard HTTP codes + custom error messages
-5. **Error Code Reference**: Matching issueRunSchema status values
-6. **Tier Information**: Limits per tier from tiersSchema
-7. **CLI Examples**: Go CLI tool examples
+1. **OpenAPI/Swagger Spec**: Public specification at `https://repobird.ai/api/v1/openapi.yaml`
+2. **REST API Reference**: Live reference at `https://repobird.ai/docs/api-reference`
+3. **Authentication Guide**: Simple Bearer token with API key from dashboard
+4. **Rate Limiting Details**: Based on user tier (free/pro/enterprise)
+5. **Status Codes**: Standard HTTP codes + custom error messages
+6. **Error Code Reference**: Matching issueRunSchema status values
+7. **Tier Information**: Limits per tier from tiersSchema
+8. **CLI Examples**: Go CLI tool examples
 
 ## Testing Requirements
 

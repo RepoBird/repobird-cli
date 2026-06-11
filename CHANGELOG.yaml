@@ -1,6 +1,9 @@
 project: RepoBird CLI
 versions:
-    unreleased: {}
+    unreleased:
+        internal:
+            changed:
+                - Linked CLI docs to the live REST API reference and public OpenAPI specification.
     0.8.0:
         date: 2026-06-10
         added:
