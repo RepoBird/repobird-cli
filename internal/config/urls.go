@@ -42,7 +42,7 @@ func getBaseURL() string {
 	// Check environment variable for API URL
 	apiURL := os.Getenv("REPOBIRD_API_URL")
 	if apiURL == "" {
-		apiURL = "https://repobird.ai"
+		apiURL = "https://api.repobird.ai"
 	}
 
 	// Handle localhost and development environments

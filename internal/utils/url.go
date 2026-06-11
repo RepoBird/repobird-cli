@@ -170,9 +170,9 @@ func GetAPIURL(configFallback ...string) string {
 
 	// Default to production
 	if os.Getenv("REPOBIRD_DEBUG_API_URL") == "1" {
-		fmt.Fprintf(os.Stderr, "[DEBUG GetAPIURL] Using default: https://repobird.ai\n")
+		fmt.Fprintf(os.Stderr, "[DEBUG GetAPIURL] Using default: https://api.repobird.ai\n")
 	}
-	return "https://repobird.ai"
+	return "https://api.repobird.ai"
 }
 
 // IsNonEmptyNumber checks if a string contains a non-empty number (digits only)

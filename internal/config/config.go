@@ -21,7 +21,7 @@ type Config struct {
 
 var (
 	defaultConfig = Config{
-		APIURL: "https://repobird.ai",
+		APIURL: "https://api.repobird.ai",
 		Debug:  false,
 		Color:  "auto",
 	}

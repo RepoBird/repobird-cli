@@ -4,6 +4,7 @@ versions:
         internal:
             changed:
                 - Linked CLI docs to the live REST API reference and public OpenAPI specification.
+                - Use api.repobird.ai as the production CLI API origin while keeping browser-facing RepoBird links on repobird.ai.
     0.8.0:
         date: 2026-06-10
         added:

@@ -58,7 +58,7 @@ Legacy `~/.repobird/config.yaml` files are still read for backward compatibility
 
 **Example:**
 ```yaml
-api_url: https://repobird.ai
+api_url: https://api.repobird.ai
 color: auto
 timeout: 45m
 debug: false
@@ -76,7 +76,7 @@ tui:
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `REPOBIRD_API_KEY` | API authentication key | - |
-| `REPOBIRD_API_URL` | API endpoint | `https://repobird.ai` |
+| `REPOBIRD_API_URL` | API endpoint | `https://api.repobird.ai` |
 | `REPOBIRD_COLOR` | Color output mode: `auto`, `always`, or `never` | `auto` |
 | `REPOBIRD_ENV` | Environment (prod/dev) | `prod` |
 | `REPOBIRD_DEBUG_LOG` | Debug logging (0/1) | `0` |
@@ -177,7 +177,7 @@ The CLI uses the following priority order to determine the API URL:
 1. `REPOBIRD_API_URL` environment variable (highest priority)
 2. `REPOBIRD_ENV=dev` → automatically uses `http://localhost:3000`
 3. Config file URL setting
-4. Default production → `https://repobird.ai`
+4. Default production API → `https://api.repobird.ai`
 
 `repobird login` is the exception: it ignores persisted custom API URLs and uses production by default unless `REPOBIRD_API_URL` or `REPOBIRD_ENV=dev` is set for that invocation.
 
@@ -213,7 +213,7 @@ repobird config set api-key test_key
 profiles:
   default:
     api_key: ${REPOBIRD_API_KEY}
-    api_url: https://repobird.ai
+    api_url: https://api.repobird.ai
   
   staging:
     api_key: ${STAGING_API_KEY}

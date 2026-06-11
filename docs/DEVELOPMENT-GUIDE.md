@@ -83,7 +83,7 @@ The CLI determines which API URL to use in the following order:
 1. `REPOBIRD_API_URL` environment variable (highest priority - always overrides)
 2. `REPOBIRD_ENV=dev` or `REPOBIRD_ENV=development` → `http://localhost:3000`
 3. Config file URL (from `~/.config/repobird/config.yaml`; legacy `~/.repobird/config.yaml` is still read)
-4. Default production → `https://repobird.ai`
+4. Default production API → `https://api.repobird.ai`
 
 `repobird login` ignores persisted config-file API URLs and uses production by default. Use `REPOBIRD_API_URL` or `REPOBIRD_ENV=dev` when intentionally logging in against a non-production endpoint.
 

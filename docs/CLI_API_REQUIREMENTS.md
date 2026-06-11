@@ -213,7 +213,7 @@ interface ListResponse<T> {
 
 #### System Configuration
 - **API Base URL**: 
-  - Production (default): https://repobird.ai
+  - Production (default): https://api.repobird.ai
   - Development: Set via .env file (e.g., REPOBIRD_API_URL=http://localhost:3000)
   - CLI should check .env for development override, otherwise use production URL
 - **API Version**: Version in path (/v1/)
@@ -256,15 +256,15 @@ interface ListResponse<T> {
 ## Example API Call Flow
 
 ```bash
-# CLI uses https://repobird.ai by default
+# CLI uses https://api.repobird.ai by default
 # For development, set REPOBIRD_API_URL in .env file
 
 # 1. Verify API key (obtained from https://repobird.ai/dashboard/user-profile)
-curl -X GET https://repobird.ai/api/v1/auth/verify \
+curl -X GET https://api.repobird.ai/api/v1/auth/verify \
   -H "Authorization: Bearer <your-api-key>"
 
 # 2. Create a run (minimal)
-curl -X POST https://repobird.ai/api/v1/runs \
+curl -X POST https://api.repobird.ai/api/v1/runs \
   -H "Authorization: Bearer <your-api-key>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -273,7 +273,7 @@ curl -X POST https://repobird.ai/api/v1/runs \
   }'
 
 # 2b. Create a run (with options)
-curl -X POST https://repobird.ai/api/v1/runs \
+curl -X POST https://api.repobird.ai/api/v1/runs \
   -H "Authorization: Bearer <your-api-key>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -286,22 +286,22 @@ curl -X POST https://repobird.ai/api/v1/runs \
   }'
 
 # 3. Check status
-curl -X GET https://repobird.ai/api/v1/runs/12345 \
+curl -X GET https://api.repobird.ai/api/v1/runs/12345 \
   -H "Authorization: Bearer <your-api-key>"
 
 # 4. Get logs
-curl -X GET https://repobird.ai/api/v1/runs/12345/agent-logs \
+curl -X GET https://api.repobird.ai/api/v1/runs/12345/agent-logs \
   -H "Authorization: Bearer <your-api-key>"
 
 # 5. List all runs
-curl -X GET https://repobird.ai/api/v1/runs?page=1&limit=10 \
+curl -X GET https://api.repobird.ai/api/v1/runs?page=1&limit=10 \
   -H "Authorization: Bearer <your-api-key>"
 ```
 
 ## Required Documentation
 
 ### API Documentation Needs
-1. **OpenAPI/Swagger Spec**: Public specification at `https://repobird.ai/api/v1/openapi.yaml`
+1. **OpenAPI/Swagger Spec**: Public specification at `https://api.repobird.ai/api/v1/openapi.yaml`
 2. **REST API Reference**: Live reference at `https://repobird.ai/docs/api-reference`
 3. **Authentication Guide**: Simple Bearer token with API key from dashboard
 4. **Rate Limiting Details**: Based on user tier (free/pro/enterprise)

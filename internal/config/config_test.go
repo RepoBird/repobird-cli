@@ -22,7 +22,7 @@ func TestLoadConfig_Default(t *testing.T) {
 	require.NotNil(t, config)
 
 	// Should have default values
-	assert.Equal(t, "https://repobird.ai", config.APIURL)
+	assert.Equal(t, "https://api.repobird.ai", config.APIURL)
 	assert.Empty(t, config.APIKey)
 	assert.False(t, config.Debug)
 	assert.Equal(t, "auto", config.Color)

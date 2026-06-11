@@ -34,7 +34,7 @@ var configCmd = &cobra.Command{
 
 Available configuration keys:
   api-key    API authentication key (stored securely)
-  api-url    API endpoint URL (default: https://repobird.ai)
+  api-url    API endpoint URL (default: https://api.repobird.ai)
   debug      Enable debug output (true/false)
   color      Color output mode: auto, always, or never
 
@@ -56,7 +56,7 @@ var configSetCmd = &cobra.Command{
 	Short: "Set a configuration value",
 	Long:  `Set a configuration value.` + availableKeysHelp,
 	Example: `  repobird config set api-key YOUR_KEY
-  repobird config set api-url https://repobird.ai
+  repobird config set api-url https://api.repobird.ai
   repobird config set debug true
   repobird config set color never`,
 	Args: func(cmd *cobra.Command, args []string) error {
