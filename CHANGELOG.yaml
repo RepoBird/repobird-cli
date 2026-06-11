@@ -1,6 +1,8 @@
 project: RepoBird CLI
 versions:
-    unreleased:
+    unreleased: {}
+    0.8.1:
+        date: 2026-06-11
         removed:
             - Remove personal/internal workflow scripts from public main/release visibility, including Kitty terminal setup, local-only release/build helpers, and debug workflow helpers.
         internal:
