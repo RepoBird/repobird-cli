@@ -1,6 +1,8 @@
 project: RepoBird CLI
 versions:
-    unreleased:
+    unreleased: {}
+    0.8.0:
+        date: 2026-06-10
         added:
             - Single-run creation now supports retry-safe idempotency keys with a 30-second local duplicate-submission guard and --force override.
             - Add repobird logs RUN_ID for inspecting agent conversation logs, with JSON snapshot output and NDJSON follow polling.
