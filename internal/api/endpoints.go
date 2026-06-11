@@ -37,9 +37,8 @@ const (
 	// EndpointBulkRuns is the endpoint for bulk run operations
 	EndpointBulkRuns = "/api/v1/runs/bulk"
 
-	// EndpointRunLogsTemplate is the currently available agent log endpoint.
-	// The public v1 runs API does not yet expose logs directly.
-	EndpointRunLogsTemplate = "/api/issue-runs/%s/agent-logs"
+	// EndpointRunLogsTemplate is the API-key-authenticated agent log endpoint.
+	EndpointRunLogsTemplate = "/api/v1/runs/%s/agent-logs"
 )
 
 // RunDetailsURL builds the URL for getting a specific run by ID

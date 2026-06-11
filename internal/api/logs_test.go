@@ -14,7 +14,7 @@ import (
 
 func TestGetRunLogsDecodesNDJSON(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/issue-runs/run_123/agent-logs" {
+		if r.URL.Path != "/api/v1/runs/run_123/agent-logs" {
 			t.Fatalf("expected logs path, got %s", r.URL.Path)
 		}
 		if r.URL.Query().Get("afterSeq") != "" {
@@ -74,7 +74,7 @@ func TestGetRunLogsDecodesLargeNDJSONRecord(t *testing.T) {
 
 func TestOpenRunLogsUsesAfterSeq(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/issue-runs/123/agent-logs" {
+		if r.URL.Path != "/api/v1/runs/123/agent-logs" {
 			t.Fatalf("expected logs path, got %s", r.URL.Path)
 		}
 		if r.URL.Query().Get("afterSeq") != "37" {

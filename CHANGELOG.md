@@ -18,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Omit bulk follow spinner frames from piped output while preserving TTY animation.
 - Handle large agent log NDJSON records without scanner token failures.
 - Keep status --json stdout parseable by suppressing human account output in JSON mode
+- Point repobird logs at the API-key-authenticated v1 agent-log endpoint.
 
 ### Changed
 
