@@ -40,14 +40,23 @@ Remote policy:
 Branch content policy:
 
 - `.agents/` and similar local agent workflow folders are allowed to be tracked on `dev`.
-- `.agents/` must not be present, staged, or tracked on `main`.
-- Do not add `.agents/` to a global repo ignore as the fix; this folder may be intentionally versioned on `dev`.
+- Personal/internal workflow scripts are also allowed to be tracked on `dev`, but must not be present, staged, tracked, or advertised on `main`.
+- Keep public install, uninstall, completion, changelog, and release artifact generation scripts on `main` when release workflows depend on them.
+- Treat these as dev-only unless the user explicitly promotes one to public release tooling:
+  - `.agents/`
+  - `scripts/kitty-dev*.sh`
+  - `scripts/local-*.sh`
+  - `scripts/LOCAL_*.md`
+  - `scripts/debug-*.sh`
+- Check for other personal workflow helpers before each release. Good candidates for dev-only status are scripts that mention local terminals, local machine setup, private paths, ad hoc debugging, local-only package publishing, or one-person release orchestration.
+- Do not add these dev-only paths to a global repo ignore as the fix; they may be intentionally versioned on `dev`.
 - Before committing or pushing `main`, verify:
   ```bash
-  git status --short -- .agents
-  git ls-tree -r --name-only HEAD -- .agents
+  DEV_ONLY_REGEX='^(\.agents/|scripts/(kitty-dev.*\.sh|local-.*\.sh|LOCAL_.*\.md|debug-.*\.sh)$)'
+  git status --short -- .agents scripts | rg '(\.agents/|scripts/(kitty-dev.*\.sh|local-.*\.sh|LOCAL_.*\.md|debug-.*\.sh))' || true
+  git ls-tree -r --name-only HEAD -- .agents scripts | rg "$DEV_ONLY_REGEX" || true
   ```
-  Both commands must produce no `.agents` paths on `main`.
+  Both commands must produce no dev-only paths on `main`.
 
 ## Preflight
 
@@ -138,11 +147,13 @@ git pull --ff-only glab dev
 git switch main
 git pull --ff-only glab main
 git merge --no-ff --no-commit dev
-if git diff --cached --name-only -- .agents | grep -q .; then
-  git rm -r --cached .agents
+DEV_ONLY_REGEX='^(\.agents/|scripts/(kitty-dev.*\.sh|local-.*\.sh|LOCAL_.*\.md|debug-.*\.sh)$)'
+if git diff --cached --name-only -- .agents scripts | rg "$DEV_ONLY_REGEX" >/tmp/repobird-dev-only-paths; then
+  xargs git rm -r --cached -- </tmp/repobird-dev-only-paths
   rm -rf .agents
+  find scripts -maxdepth 1 -type f \( -name 'kitty-dev*.sh' -o -name 'local-*.sh' -o -name 'LOCAL_*.md' -o -name 'debug-*.sh' \) -delete
 fi
-git diff --cached --name-only -- .agents
+git diff --cached --name-only -- .agents scripts | rg "$DEV_ONLY_REGEX" || true
 git commit -m "merge dev into main for vX.Y.Z"
 make fmt-check
 make vet
@@ -150,12 +161,12 @@ make lint
 make test
 make build
 chlog check
-git ls-tree -r --name-only HEAD -- .agents
+git ls-tree -r --name-only HEAD -- .agents scripts | rg "$DEV_ONLY_REGEX" || true
 git push glab main
 git push gh main
 ```
 
-Do not proceed if `.agents/` appears in the staged merge diff or in `HEAD` on `main` after the guard commands. Fix the merge before pushing.
+Do not proceed if any dev-only path appears in the staged merge diff or in `HEAD` on `main` after the guard commands. Fix the merge before pushing.
 
 If CI fails after pushing `main`, inspect logs and fix on `dev`, then merge forward again. Avoid direct `main` hotfixes unless explicitly requested.
 
@@ -218,9 +229,16 @@ git switch dev
 # fix workflow, commit, push dev
 git switch main
 git merge --no-ff --no-commit dev
-git status --short -- .agents
-git diff --cached --name-only -- .agents
-git ls-tree -r --name-only HEAD -- .agents
+DEV_ONLY_REGEX='^(\.agents/|scripts/(kitty-dev.*\.sh|local-.*\.sh|LOCAL_.*\.md|debug-.*\.sh)$)'
+git diff --cached --name-only -- .agents scripts | rg "$DEV_ONLY_REGEX" >/tmp/repobird-dev-only-paths || true
+if [ -s /tmp/repobird-dev-only-paths ]; then
+  xargs git rm -r --cached -- </tmp/repobird-dev-only-paths
+fi
+rm -rf .agents
+find scripts -maxdepth 1 -type f \( -name 'kitty-dev*.sh' -o -name 'local-*.sh' -o -name 'LOCAL_*.md' -o -name 'debug-*.sh' \) -delete
+git status --short -- .agents scripts | rg '(\.agents/|scripts/(kitty-dev.*\.sh|local-.*\.sh|LOCAL_.*\.md|debug-.*\.sh))' || true
+git diff --cached --name-only -- .agents scripts | rg "$DEV_ONLY_REGEX" || true
+git ls-tree -r --name-only HEAD -- .agents scripts | rg "$DEV_ONLY_REGEX" || true
 git commit -m "merge dev into main for vX.Y.Z release workflow fix"
 git push glab main
 git push git@github.com:RepoBird/repobird-cli.git main
@@ -268,9 +286,16 @@ git push glab dev
 After merging `main` back into `dev`, verify `.agents/` still exists on `dev`. Since `.agents/` is intentionally absent from `main`, a fast-forward merge can delete the dev-only skill files. If that happens, restore them from the pre-merge `dev` commit and commit the restoration before pushing `dev`:
 
 ```bash
-git restore --source=<pre-merge-dev-sha> -- .agents
+DEV_ONLY_REGEX='^(\.agents/|scripts/(kitty-dev.*\.sh|local-.*\.sh|LOCAL_.*\.md|debug-.*\.sh)$)'
+git ls-tree -r --name-only <pre-merge-dev-sha> -- .agents scripts | rg "$DEV_ONLY_REGEX" >/tmp/repobird-dev-only-paths || true
+if [ -s /tmp/repobird-dev-only-paths ]; then
+  xargs git restore --source=<pre-merge-dev-sha> -- </tmp/repobird-dev-only-paths
+fi
 git add .agents/skills/release/SKILL.md .agents/skills/repobird-next-sync/SKILL.md .agents/skills/repobird-next-sync/agents/openai.yaml
-git commit -m "chore: restore dev agent skills"
+if [ -s /tmp/repobird-dev-only-paths ]; then
+  xargs git add -- </tmp/repobird-dev-only-paths
+fi
+git commit -m "chore: restore dev-only workflow files"
 git push glab dev
 ```
 

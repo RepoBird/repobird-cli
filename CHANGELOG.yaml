@@ -1,10 +1,13 @@
 project: RepoBird CLI
 versions:
     unreleased:
+        removed:
+            - Remove personal/internal workflow scripts from public main/release visibility, including Kitty terminal setup, local-only release/build helpers, and debug workflow helpers.
         internal:
             changed:
                 - Linked CLI docs to the live REST API reference and public OpenAPI specification.
                 - Use api.repobird.ai as the production CLI API origin while keeping browser-facing RepoBird links on repobird.ai.
+                - Clarify release workflow handling for dev-only agent files, personal workflow scripts, local release helpers, and debug scripts.
     0.8.0:
         date: 2026-06-10
         added:

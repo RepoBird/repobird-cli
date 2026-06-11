@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Removed
+
+- Remove personal/internal workflow scripts from public main/release visibility, including Kitty terminal setup, local-only release/build helpers, and debug workflow helpers.
+
 ## [0.8.0] - 2026-06-10
 
 ### Added
