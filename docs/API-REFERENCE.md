@@ -4,6 +4,8 @@
 
 REST API client implementation for RepoBird AI platform with resilience patterns and enterprise features.
 
+For the live API contract, see the [REST API Reference](https://repobird.ai/docs/api-reference) or download the [public OpenAPI specification](https://repobird.ai/api/v1/openapi.yaml).
+
 ## Related Documentation
 - **[Architecture Overview](ARCHITECTURE.md)** - System design and patterns
 - **[Configuration Guide](CONFIGURATION-GUIDE.md)** - API key and environment setup
@@ -13,6 +15,8 @@ REST API client implementation for RepoBird AI platform with resilience patterns
 ## Configuration
 
 **Base URL:** `https://repobird.ai/api/v1`  
+**OpenAPI spec:** `https://repobird.ai/api/v1/openapi.yaml`  
+**REST API reference:** `https://repobird.ai/docs/api-reference`  
 **Authentication:** Bearer token via `Authorization: Bearer <API_KEY>`  
 **Timeout:** 45 minutes default  
 **User Agent:** `repobird-cli/{version}`
