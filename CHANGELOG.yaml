@@ -9,6 +9,7 @@ versions:
             - Isolate command tests from real XDG RepoBird configuration so config command tests cannot overwrite user settings.
             - Omit bulk follow spinner frames from piped output while preserving TTY animation.
             - Handle large agent log NDJSON records without scanner token failures.
+            - Keep status --json stdout parseable by suppressing human account output in JSON mode
         changed:
             - Show the selected repository in Basic/Pro run summaries before submission.
         added:

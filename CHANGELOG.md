@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Isolate command tests from real XDG RepoBird configuration so config command tests cannot overwrite user settings.
 - Omit bulk follow spinner frames from piped output while preserving TTY animation.
 - Handle large agent log NDJSON records without scanner token failures.
+- Keep status --json stdout parseable by suppressing human account output in JSON mode
 
 ### Changed
 

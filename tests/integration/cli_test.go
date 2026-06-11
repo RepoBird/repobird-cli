@@ -9,6 +9,7 @@ package integration
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -371,6 +372,18 @@ func TestStatusCommand(t *testing.T) {
 	t.Run("status with JSON output", func(t *testing.T) {
 		result := RunCommandWithEnv(t, env, "status", "--json")
 		AssertSuccess(t, result)
+		assertStdoutIsSingleJSONValue(t, result)
+		AssertContains(t, result.Stdout, `"id":`)
+		AssertContains(t, result.Stdout, `"status":`)
+	})
+
+	t.Run("root JSON flag with status output", func(t *testing.T) {
+		rootEnv, rootMockServer := SetupTestEnv(t)
+		defer rootMockServer.Close()
+
+		result := RunCommandWithEnv(t, rootEnv, "--json", "status")
+		AssertSuccess(t, result)
+		assertStdoutIsSingleJSONValue(t, result)
 		AssertContains(t, result.Stdout, `"id":`)
 		AssertContains(t, result.Stdout, `"status":`)
 	})
@@ -403,6 +416,19 @@ func TestStatusCommand(t *testing.T) {
 		}
 		t.Fatal("expected list-runs request")
 	})
+}
+
+func assertStdoutIsSingleJSONValue(t *testing.T, result *CommandResult) {
+	t.Helper()
+
+	decoder := json.NewDecoder(strings.NewReader(result.Stdout))
+	var value any
+	if err := decoder.Decode(&value); err != nil {
+		t.Fatalf("stdout is not valid JSON: %v\nstdout:\n%s\nstderr:\n%s", err, result.Stdout, result.Stderr)
+	}
+	if err := decoder.Decode(&value); err != io.EOF {
+		t.Fatalf("stdout contains trailing data after first JSON value: %v\nstdout:\n%s\nstderr:\n%s", err, result.Stdout, result.Stderr)
+	}
 }
 
 // TestBulkCommands tests that legacy bulk operations are disabled.
