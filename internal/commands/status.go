@@ -73,7 +73,7 @@ func getRunStatus(client *api.Client, runID string) error {
 		return fmt.Errorf("failed to get run status: %s", errors.FormatUserError(err))
 	}
 
-	if statusJSON {
+	if statusJSON || jsonOutput {
 		b, _ := json.MarshalIndent(run, "", "  ")
 		fmt.Println(string(b))
 		return nil
@@ -84,6 +84,7 @@ func getRunStatus(client *api.Client, runID string) error {
 }
 
 func listRuns(client *api.Client) error {
+	wantsJSON := statusJSON || jsonOutput
 	styler := stdoutStyle()
 	// Always show version info in dev/debug mode or when there's an error
 	env := os.Getenv("REPOBIRD_ENV")
@@ -94,17 +95,19 @@ func listRuns(client *api.Client) error {
 
 	// If API/auth error, show version info and error, then exit
 	if authErr != nil && (errors.IsAuthError(authErr) || errors.IsNetworkError(authErr)) {
-		// Always show version/debug info when there's an API error
-		fmt.Printf("%s %s", styler.Label("Build:"), version.GetVersion())
-		if version.GetVersion() == "dev" {
-			fmt.Printf(" (development)")
+		if !wantsJSON {
+			// Always show version/debug info when there's an API error
+			fmt.Printf("%s %s", styler.Label("Build:"), version.GetVersion())
+			if version.GetVersion() == "dev" {
+				fmt.Printf(" (development)")
+			}
+			fmt.Printf(" | %s %s", styler.Label("Commit:"), version.GitCommit)
+			if cfg.Debug {
+				fmt.Printf(" | %s %s", styler.Label("Debug:"), styler.Warning("ON"))
+			}
+			fmt.Println()
+			fmt.Println()
 		}
-		fmt.Printf(" | %s %s", styler.Label("Commit:"), version.GitCommit)
-		if cfg.Debug {
-			fmt.Printf(" | %s %s", styler.Label("Debug:"), styler.Warning("ON"))
-		}
-		fmt.Println()
-		fmt.Println()
 
 		// Show the error below version info
 		fmt.Fprintf(os.Stderr, "%s %s\n", stderrStyle().Error("Error:"), errors.FormatUserError(authErr))
@@ -112,7 +115,7 @@ func listRuns(client *api.Client) error {
 	}
 
 	// Show version info in dev/debug mode for successful requests
-	if showDebugInfo {
+	if showDebugInfo && !wantsJSON {
 		fmt.Printf("%s %s", styler.Label("Build:"), version.GetVersion())
 		if version.GetVersion() == "dev" {
 			fmt.Printf(" (development)")
@@ -132,14 +135,16 @@ func listRuns(client *api.Client) error {
 		// Set the current user for cache initialization and show user info
 		services.SetCurrentUser(userInfo)
 
-		printStatusAccountUsage(userInfo)
-		fmt.Println()
+		if !wantsJSON {
+			printStatusAccountUsage(userInfo)
+			fmt.Println()
+		}
 	}
 
 	runs, err := client.ListRunsLegacy(statusLimit, 0)
 	if err != nil {
 		// If this is also an API/auth error and we haven't shown version info yet, show it
-		if !showDebugInfo && (errors.IsAuthError(err) || errors.IsNetworkError(err)) {
+		if !wantsJSON && !showDebugInfo && (errors.IsAuthError(err) || errors.IsNetworkError(err)) {
 			fmt.Printf("%s %s", styler.Label("Build:"), version.GetVersion())
 			if version.GetVersion() == "dev" {
 				fmt.Printf(" (development)")
@@ -157,14 +162,14 @@ func listRuns(client *api.Client) error {
 		return fmt.Errorf("failed to list runs: %s", errors.FormatUserError(err))
 	}
 
-	if len(runs) == 0 {
-		fmt.Println(styler.Muted("No runs found"))
+	if wantsJSON {
+		b, _ := json.MarshalIndent(runs, "", "  ")
+		fmt.Println(string(b))
 		return nil
 	}
 
-	if statusJSON {
-		b, _ := json.MarshalIndent(runs, "", "  ")
-		fmt.Println(string(b))
+	if len(runs) == 0 {
+		fmt.Println(styler.Muted("No runs found"))
 		return nil
 	}
 

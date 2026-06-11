@@ -24,6 +24,11 @@ info:
     When submitting a run with a fileHash, the system logs if an identical hash was previously used
     but allows the new run to proceed. Duplicate file hashes are permitted and will not block execution.
     The `force` parameter is deprecated for file hash handling and has no effect on duplicate detection.
+
+    ## Run Creation Idempotency
+    CLI run creation may send an idempotencyKey body field and matching Idempotency-Key header.
+    Current CLI builds also keep a 30-second local duplicate-submission guard keyed by repository,
+    prompt, and run type. Passing --force bypasses only the local CLI guard.
   contact:
     name: RepoBird Support
     email: support@repobird.ai
@@ -411,6 +416,10 @@ components:
           default: false
           description: Explicitly acknowledges a PROMPT_RISK_ACK_REQUIRED response after the user reviews the prompt-risk warning.
           example: true
+        idempotencyKey:
+          type: string
+          description: Stable client-supplied key for safely retrying run creation. The CLI also sends this value as the Idempotency-Key header when present.
+          example: task-2026-06-10-auth
         fileHash:
           type: string
           description: SHA-256 hash of the task file for tracking purposes (duplicates allowed)
@@ -431,6 +440,7 @@ components:
         outputMode: pull_request
         prTargetBranch: main
         title: Add authentication system
+        idempotencyKey: task-2026-06-10-auth
         fileHash: a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3
 
     BulkRunRequest:

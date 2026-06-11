@@ -22,6 +22,7 @@ import (
 	"github.com/repobird/repobird-cli/internal/config"
 	"github.com/repobird/repobird-cli/internal/domain"
 	"github.com/repobird/repobird-cli/internal/errors"
+	"github.com/repobird/repobird-cli/internal/idempotency"
 	"github.com/repobird/repobird-cli/internal/models"
 	"github.com/repobird/repobird-cli/internal/prompts"
 	"github.com/repobird/repobird-cli/internal/utils"
@@ -30,6 +31,9 @@ import (
 var (
 	dryRun                bool
 	follow                bool
+	wait                  bool
+	waitTimeout           time.Duration
+	waitPollInterval      = 5 * time.Second
 	repo                  string
 	prompt                string
 	source                string
@@ -46,6 +50,8 @@ var (
 	proRun                bool
 	branchOnly            bool
 	acknowledgePromptRisk bool
+	idempotencyKey        string
+	forceRun              bool
 )
 
 type runPreset struct {
@@ -82,6 +88,7 @@ Examples:
   # Run from file
   repobird run task.json                    # Run from file
   repobird run tasks.yaml --follow           # Run and follow status
+  repobird run task.json --wait --json       # Wait and print one final JSON result
   repobird run task.md --dry-run            # Validate without running
   cat task.json | repobird run              # Pipe JSON from stdin
 
@@ -116,6 +123,9 @@ For configuration examples and field descriptions:
 func init() {
 	runCmd.Flags().BoolVar(&dryRun, "dry-run", false, "validate input without creating a run")
 	runCmd.Flags().BoolVar(&follow, "follow", false, "follow the run status after creation")
+	runCmd.Flags().BoolVar(&jsonOutput, "json", false, "output in JSON format")
+	runCmd.Flags().BoolVar(&wait, "wait", false, "wait for the run to reach a terminal state")
+	runCmd.Flags().DurationVar(&waitTimeout, "timeout", 90*time.Minute, "maximum time to wait for --wait (for example: 45m, 1h30m)")
 
 	// Flags for direct run creation
 	runCmd.Flags().StringVarP(&repo, "repo", "r", "", "repository name (owner/repo or numeric ID)")
@@ -134,6 +144,8 @@ func init() {
 	runCmd.Flags().BoolVar(&branchOnly, "branch-only", false, "push commits to a branch without creating a pull request")
 	runCmd.Flags().BoolVar(&branchOnly, "no-pr", false, "alias for --branch-only")
 	runCmd.Flags().BoolVar(&acknowledgePromptRisk, "acknowledge-prompt-risk", false, "acknowledge prompt-risk warning and create the run")
+	runCmd.Flags().StringVar(&idempotencyKey, "idempotency-key", "", "stable key for safely retrying run creation")
+	runCmd.Flags().BoolVar(&forceRun, "force", false, "bypass the local duplicate-submission guard")
 	runCmd.Flags().StringVar(&contextFlag, "context", "", "additional context (use @file to read from file, - for stdin)")
 }
 
@@ -147,6 +159,12 @@ func runCommandWithPreset(cmd *cobra.Command, args []string, presetName string) 
 
 	if cfg.APIKey == "" {
 		return errors.NoAPIKeyError()
+	}
+	if follow && wait {
+		return fmt.Errorf("--follow and --wait cannot be used together")
+	}
+	if waitTimeout <= 0 {
+		return fmt.Errorf("--timeout must be greater than zero")
 	}
 
 	selectedPreset, err := resolveRunPreset(presetName)
@@ -308,7 +326,11 @@ func processSingleRun(runConfig *models.RunConfig, additionalContext string) err
 				fmt.Fprintf(os.Stderr, "%s Could not auto-detect repository: %v\n", stderrStyle().Warning("Warning:"), err)
 			} else {
 				runConfig.Repository = repoName
-				fmt.Printf("%s %s\n", stdoutStyle().Info("Auto-detected repository:"), repoName)
+				if !jsonOutput {
+					fmt.Printf("%s %s\n", stdoutStyle().Info("Auto-detected repository:"), repoName)
+				} else {
+					fmt.Fprintf(os.Stderr, "%s %s\n", stderrStyle().Info("Auto-detected repository:"), repoName)
+				}
 			}
 		}
 	}
@@ -344,6 +366,7 @@ func processSingleRun(runConfig *models.RunConfig, additionalContext string) err
 		Files:                 runConfig.Files,
 		BranchOnly:            runConfig.BranchOnly,
 		AcknowledgePromptRisk: runConfig.AcknowledgePromptRisk,
+		IdempotencyKey:        selectedIdempotencyKey(runConfig),
 	}
 
 	// Append additional markdown context if present
@@ -356,6 +379,9 @@ func processSingleRun(runConfig *models.RunConfig, additionalContext string) err
 	}
 
 	if dryRun {
+		if jsonOutput {
+			return printRunDryRunJSON(os.Stdout, createReq)
+		}
 		fmt.Println(stdoutStyle().Success("Validation successful. Run would be created with:"))
 		printRunSelection(createReq)
 		b, _ := json.MarshalIndent(createReq, "", "  ")
@@ -363,16 +389,33 @@ func processSingleRun(runConfig *models.RunConfig, additionalContext string) err
 		return nil
 	}
 
+	if jsonOutput && follow {
+		return fmt.Errorf("--follow cannot be used with --json; use status --json to poll the created run")
+	}
+
 	// Use service layer to create run
 	container := getContainer()
 	runService := container.RunService()
 	ctx := context.Background()
 
-	printRunSelection(createReq)
-	fmt.Println(stdoutStyle().Info("Creating run..."))
+	if !jsonOutput {
+		printRunSelection(createReq)
+		fmt.Println(stdoutStyle().Info("Creating run..."))
+	}
+	if err := reserveRunSubmission(createReq, forceRun); err != nil {
+		return err
+	}
 	run, err := runService.CreateRun(ctx, createReq)
 	if err != nil {
-		return fmt.Errorf("failed to create run: %s", errors.FormatUserError(err))
+		return wrapExitError(exitCodeForError(err), err)
+	}
+
+	if wait {
+		return waitForCreatedRun(ctx, runService, run, createReq)
+	}
+
+	if jsonOutput {
+		return printRunCreateJSON(os.Stdout, run, createReq)
 	}
 
 	printCreatedRunDetails(run)
@@ -407,6 +450,114 @@ func printCreatedRunDetails(run *domain.Run) {
 
 	runURL := utils.GenerateRepoBirdURL(createdRunURLID(run))
 	printCreatedField(styler.Label("URL:"), styler.URL(runURL))
+}
+
+func waitForCreatedRun(ctx context.Context, runService domain.RunService, createdRun *domain.Run, req domain.CreateRunRequest) error {
+	if !jsonOutput {
+		printCreatedRunDetails(createdRun)
+		fmt.Printf("\n%s\n", stdoutStyle().Info("Waiting for run to finish..."))
+	}
+
+	finalRun, timedOut, err := waitForRunTerminal(ctx, runService, createdRun.ID)
+	if err != nil {
+		exitCode := exitCodeForError(err)
+		timedOut := exitCode == ExitCodeTimeout
+		if jsonOutput {
+			_ = printRunWaitJSON(os.Stdout, finalRun, req, exitCode, timedOut, err.Error())
+		}
+		return wrapExitError(exitCode, err)
+	}
+	if finalRun == nil {
+		finalRun = createdRun
+	}
+
+	exitCode := exitCodeForFinalRun(finalRun)
+	message := finalRun.Error
+	if timedOut {
+		exitCode = ExitCodeTimeout
+		message = fmt.Sprintf("timed out waiting for run %s after %s", createdRun.ID, waitTimeout)
+	}
+
+	if jsonOutput {
+		_ = printRunWaitJSON(os.Stdout, finalRun, req, exitCode, timedOut, message)
+	} else {
+		printRunWaitHuman(finalRun, timedOut, message)
+	}
+
+	if exitCode == ExitCodeSuccess {
+		return nil
+	}
+	return wrapExitError(exitCode, netstderrors.New(messageOrDefault(message, "run did not complete successfully")))
+}
+
+func waitForRunTerminal(ctx context.Context, runService domain.RunService, runID string) (*domain.Run, bool, error) {
+	pollCtx, cancel := context.WithTimeout(ctx, waitTimeout)
+	defer cancel()
+
+	ticker := time.NewTicker(waitPollInterval)
+	defer ticker.Stop()
+
+	var lastRun *domain.Run
+
+	for {
+		run, err := runService.GetRun(pollCtx, runID)
+		if err != nil {
+			code := exitCodeForError(err)
+			if code == ExitCodeAuth || code == ExitCodeQuota {
+				return lastRun, false, wrapExitError(code, err)
+			}
+			if pollCtx.Err() != nil {
+				return lastRun, true, newExitError(ExitCodeTimeout, fmt.Sprintf("timed out waiting for run %s after %s", runID, waitTimeout))
+			}
+		} else {
+			lastRun = run
+			if run.IsTerminal() {
+				return run, false, nil
+			}
+		}
+
+		select {
+		case <-pollCtx.Done():
+			return lastRun, true, newExitError(ExitCodeTimeout, fmt.Sprintf("timed out waiting for run %s after %s", runID, waitTimeout))
+		case <-ticker.C:
+		}
+	}
+}
+
+func exitCodeForFinalRun(run *domain.Run) int {
+	if run == nil {
+		return ExitCodeGeneric
+	}
+	if run.IsSuccess() {
+		return ExitCodeSuccess
+	}
+	if run.IsTerminal() {
+		return ExitCodeRunFailed
+	}
+	return ExitCodeGeneric
+}
+
+func printRunWaitHuman(run *domain.Run, timedOut bool, message string) {
+	styler := stdoutStyle()
+	if timedOut {
+		fmt.Printf("%s %s\n", styler.Error("Timed out:"), message)
+		return
+	}
+	if run.Status == domain.StatusFailed && run.Error != "" {
+		fmt.Printf("%s %s\n", styler.Error("Run failed:"), run.Error)
+		return
+	}
+	fmt.Printf("%s %s\n", styler.Success("Run completed with status:"), styler.Status(formatStatusForDisplay(run.Status)))
+	if run.Status == domain.StatusCompleted && run.PullRequestURL != "" {
+		fmt.Printf("%s %s\n", styler.Label("Pull Request:"), styler.URL(run.PullRequestURL))
+	}
+}
+
+func messageOrDefault(message, fallback string) string {
+	if message != "" {
+		return message
+	}
+	return fallback
 }
 
 func printCreatedField(label, value string) {
@@ -446,6 +597,9 @@ func newRunPresetCommand(presetName string) *cobra.Command {
 
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "validate input without creating a run")
 	cmd.Flags().BoolVar(&follow, "follow", false, "follow the run status after creation")
+	cmd.Flags().BoolVar(&jsonOutput, "json", false, "output in JSON format")
+	cmd.Flags().BoolVar(&wait, "wait", false, "wait for the run to reach a terminal state")
+	cmd.Flags().DurationVar(&waitTimeout, "timeout", 90*time.Minute, "maximum time to wait for --wait (for example: 45m, 1h30m)")
 	cmd.Flags().StringVarP(&repo, "repo", "r", "", "repository name (owner/repo or numeric ID)")
 	cmd.Flags().StringVar(&source, "source", "", "legacy alias for --base-branch")
 	cmd.Flags().StringVar(&target, "target", "", "legacy target branch alias")
@@ -458,8 +612,29 @@ func newRunPresetCommand(presetName string) *cobra.Command {
 	cmd.Flags().BoolVar(&branchOnly, "branch-only", false, "push commits to a branch without creating a pull request")
 	cmd.Flags().BoolVar(&branchOnly, "no-pr", false, "alias for --branch-only")
 	cmd.Flags().BoolVar(&acknowledgePromptRisk, "acknowledge-prompt-risk", false, "acknowledge prompt-risk warning and create the run")
+	cmd.Flags().StringVar(&idempotencyKey, "idempotency-key", "", "stable key for safely retrying run creation")
+	cmd.Flags().BoolVar(&forceRun, "force", false, "bypass the local duplicate-submission guard")
 	cmd.Flags().StringVar(&contextFlag, "context", "", "additional context (use @file to read from file, - for stdin)")
 	return cmd
+}
+
+func selectedIdempotencyKey(runConfig *models.RunConfig) string {
+	if idempotencyKey != "" {
+		return strings.TrimSpace(idempotencyKey)
+	}
+	if runConfig.IdempotencyKey != "" {
+		return strings.TrimSpace(runConfig.IdempotencyKey)
+	}
+	return idempotency.BuildRunKey(idempotency.RunIdentity{
+		Repository: runConfig.Repository,
+		Prompt:     runConfig.Prompt,
+		RunType:    runConfig.RunType,
+	})
+}
+
+func reserveRunSubmission(req domain.CreateRunRequest, force bool) error {
+	guard := idempotency.NewRunGuard(idempotency.DefaultCacheDir(), 30*time.Second, time.Now)
+	return guard.Reserve(req.IdempotencyKey, force)
 }
 
 func resolveRunPreset(presetName string) (*runPreset, error) {
@@ -519,6 +694,9 @@ func printRunSelection(req domain.CreateRunRequest) {
 		return
 	}
 	styler := stdoutStyle()
+	if req.RepositoryName != "" {
+		fmt.Printf("%s %s\n", styler.Label("Repository:"), req.RepositoryName)
+	}
 	fmt.Printf("%s %s\n", styler.Label("Run type:"), preset.Label)
 	fmt.Printf("%s %s (%s)\n", styler.Label("Model:"), modelDisplayName(preset.Model), preset.Model)
 }
@@ -571,6 +749,9 @@ func processBulkRuns(filename string) error {
 	// }
 
 	if dryRun {
+		if jsonOutput {
+			return printBulkDryRunJSON(os.Stdout, bulkConfig)
+		}
 		styler := stdoutStyle()
 		fmt.Println(styler.Success("✓ Configuration valid"))
 		fmt.Printf("%s %s\n", styler.Label("Repository:"), bulkConfig.Repository)
@@ -768,14 +949,16 @@ func executeBulkRuns(bulkConfig *bulk.BulkConfig) error {
 
 	// Display submission info
 	styler := stdoutStyle()
-	fmt.Println(styler.Heading("Submitting bulk runs..."))
-	fmt.Printf("%s %s\n", styler.Label("Repository:"), bulkConfig.Repository)
-	fmt.Printf("%s %d\n", styler.Label("Total runs:"), len(bulkConfig.Runs))
-	fmt.Println("\nThis may take up to 5 minutes. Please wait...")
+	if !jsonOutput {
+		fmt.Println(styler.Heading("Submitting bulk runs..."))
+		fmt.Printf("%s %s\n", styler.Label("Repository:"), bulkConfig.Repository)
+		fmt.Printf("%s %d\n", styler.Label("Total runs:"), len(bulkConfig.Runs))
+		fmt.Println("\nThis may take up to 5 minutes. Please wait...")
+	}
 
 	done := make(chan bool, 1) // Buffered to prevent goroutine leak
 
-	if stdoutIsTerminal() {
+	if !jsonOutput && stdoutIsTerminal() {
 		// Show a progress indicator with elapsed time
 		startTime := time.Now()
 		spinner := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
@@ -825,6 +1008,11 @@ func executeBulkRuns(bulkConfig *bulk.BulkConfig) error {
 			}
 		}
 		return fmt.Errorf("%s", errors.FormatUserError(err))
+	}
+
+	if jsonOutput {
+		_ = printBulkCreateJSON(os.Stdout, bulkResp)
+		return nil
 	}
 
 	// Handle different status codes

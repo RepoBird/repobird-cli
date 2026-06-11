@@ -1,6 +1,25 @@
 project: RepoBird CLI
 versions:
     unreleased: {}
+    0.8.0:
+        date: 2026-06-10
+        added:
+            - Single-run creation now supports retry-safe idempotency keys with a 30-second local duplicate-submission guard and --force override.
+            - Add repobird logs RUN_ID for inspecting agent conversation logs, with JSON snapshot output and NDJSON follow polling.
+            - Add stable --json output for run creation, run dry-runs, and development-gated bulk submissions.
+        fixed:
+            - Isolate command tests from real XDG RepoBird configuration so config command tests cannot overwrite user settings.
+            - Omit bulk follow spinner frames from piped output while preserving TTY animation.
+            - Handle large agent log NDJSON records without scanner token failures.
+            - Keep status --json stdout parseable by suppressing human account output in JSON mode
+            - Point repobird logs at the API-key-authenticated v1 agent-log endpoint.
+        changed:
+            - Show the selected repository in Basic/Pro run summaries before submission.
+        added:
+            - Add repobird run --wait with --json final-result output, timeout handling, and documented script exit codes.
+        internal:
+            fixed:
+                - Add shell-level integration smoke coverage for run --wait exit-code behavior.
     0.7.0:
         date: 2026-06-06
         added:

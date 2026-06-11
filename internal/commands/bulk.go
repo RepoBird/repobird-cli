@@ -63,6 +63,7 @@ legacy workflow against a development server.`,
 	cmd.Flags().BoolVar(&bulkDryRun, "dry-run", false, "Validate without submitting")
 	cmd.Flags().BoolVar(&bulkForce, "force", false, "Deprecated - has no effect (kept for backwards compatibility)")
 	cmd.Flags().BoolVarP(&bulkInteractive, "interactive", "i", false, "Interactive bulk mode")
+	cmd.Flags().BoolVar(&jsonOutput, "json", false, "output in JSON format")
 
 	// Mark force flag as deprecated
 	_ = cmd.Flags().MarkDeprecated("force", "file hashes are now for tracking only and won't block runs")
@@ -172,6 +173,10 @@ func expandFilePaths(args []string) ([]string, error) {
 }
 
 func printDryRunSummary(bulkConfig *bulk.BulkConfig) error {
+	if jsonOutput {
+		return printBulkDryRunJSON(os.Stdout, bulkConfig)
+	}
+
 	styler := stdoutStyle()
 	fmt.Println(styler.Success("✓ Configuration valid"))
 	fmt.Printf("%s %s\n", styler.Label("Repository:"), bulkConfig.Repository)
@@ -244,11 +249,13 @@ func submitBulkRunsWithProgress(client *api.Client, bulkRequest *dto.BulkRunRequ
 	ctx := context.Background()
 
 	// Display submission info
-	styler := stdoutStyle()
-	fmt.Println(styler.Heading("Submitting bulk runs..."))
-	fmt.Printf("%s %s\n", styler.Label("Repository:"), bulkConfig.Repository)
-	fmt.Printf("%s %d\n", styler.Label("Total runs:"), len(bulkConfig.Runs))
-	fmt.Println("\nThis may take up to 5 minutes. Please wait...")
+	if !jsonOutput {
+		styler := stdoutStyle()
+		fmt.Println(styler.Heading("Submitting bulk runs..."))
+		fmt.Printf("%s %s\n", styler.Label("Repository:"), bulkConfig.Repository)
+		fmt.Printf("%s %d\n", styler.Label("Total runs:"), len(bulkConfig.Runs))
+		fmt.Println("\nThis may take up to 5 minutes. Please wait...")
+	}
 
 	// Show progress spinner
 	done := showProgressSpinner()
@@ -270,7 +277,7 @@ func showProgressSpinner() chan bool {
 	spinnerIdx := 0
 	done := make(chan bool, 1) // Buffered to prevent goroutine leak
 
-	if !stdoutIsTerminal() {
+	if jsonOutput || !stdoutIsTerminal() {
 		return done
 	}
 
@@ -319,6 +326,11 @@ func handleBulkSubmissionError(err error, ctx context.Context, bulkConfig *bulk.
 }
 
 func displayBulkSubmissionResults(bulkResp *dto.BulkRunResponse) {
+	if jsonOutput {
+		_ = printBulkCreateJSON(os.Stdout, bulkResp)
+		return
+	}
+
 	if bulkResp.StatusCode == http.StatusMultiStatus {
 		displayMultiStatusResult(bulkResp)
 	} else if len(bulkResp.Data.Failed) > 0 {
@@ -494,11 +506,13 @@ func followBulkProgress(ctx context.Context, client *api.Client, batchID string)
 
 func displayMultiLineBulkStatus(status dto.BulkStatusData, spinnerChar string, startTime time.Time) {
 	styler := stdoutStyle()
-	// Display elapsed time on first line with spinner
 	elapsed := time.Since(startTime)
-	fmt.Printf("%s %s [%s]\n", spinnerChar, styler.Info("Following batch progress..."), formatDuration(elapsed))
+	if stdoutIsTerminal() {
+		fmt.Printf("%s %s [%s]\n", spinnerChar, styler.Info("Following batch progress..."), formatDuration(elapsed))
+	} else {
+		fmt.Printf("%s [%s]\n", styler.Info("Following batch progress..."), formatDuration(elapsed))
+	}
 
-	// Display each run on its own line with ID: STATUS format (no spinner)
 	for _, run := range status.Runs {
 		fmt.Printf("  [%d]: %s\n", run.ID, styler.Status(normalizeBulkStatus(run.Status)))
 	}

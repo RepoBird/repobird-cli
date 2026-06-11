@@ -3,7 +3,10 @@
 
 package api
 
-import "fmt"
+import (
+	"fmt"
+	"net/url"
+)
 
 // API endpoints constants
 const (
@@ -33,6 +36,9 @@ const (
 
 	// EndpointBulkRuns is the endpoint for bulk run operations
 	EndpointBulkRuns = "/api/v1/runs/bulk"
+
+	// EndpointRunLogsTemplate is the API-key-authenticated agent log endpoint.
+	EndpointRunLogsTemplate = "/api/v1/runs/%s/agent-logs"
 )
 
 // RunDetailsURL builds the URL for getting a specific run by ID
@@ -61,4 +67,13 @@ func RunsPageURL(page, limit int) string {
 // RepositoryDetailsURL builds the URL for repository details and updates.
 func RepositoryDetailsURL(id string) string {
 	return fmt.Sprintf(EndpointRepoDetailsTemplate, id)
+}
+
+// RunLogsURL builds the URL for run agent logs.
+func RunLogsURL(id string, afterSeq int) string {
+	path := fmt.Sprintf(EndpointRunLogsTemplate, url.PathEscape(id))
+	if afterSeq > 0 {
+		return fmt.Sprintf("%s?afterSeq=%d", path, afterSeq)
+	}
+	return path
 }

@@ -38,6 +38,7 @@ The `repobird run` command supports multiple configuration file formats to defin
 | `files` | array | - | List of specific files to include in the context |
 | `branchOnly` | boolean | `false` | Legacy alias for `outputMode: branch` |
 | `acknowledgePromptRisk` | boolean | `false` | Explicitly acknowledge a `PROMPT_RISK_ACK_REQUIRED` response after reviewing the prompt |
+| `idempotencyKey` | string | auto-derived | Stable key for safely retrying run creation |
 
 ## Format Examples
 
@@ -69,6 +70,10 @@ echo "Fix the login bug" | repobird run -r myorg/webapp -p -
 # Push commits to an output branch without opening a PR
 repobird run -r myorg/webapp -p "Update generated docs" --output-branch automation/docs --branch-only
 
+# Retry safely with an explicit key, or bypass the local duplicate guard after review
+repobird run -r myorg/webapp -p @task.txt --idempotency-key task-2026-06-10-auth
+repobird run -r myorg/webapp -p @task.txt --force
+
 # With additional options
 repobird run --repo myorg/webapp \
   --prompt "Fix the login bug where users cannot authenticate after 5 failed attempts" \
@@ -87,6 +92,9 @@ repobird run -r myorg/webapp -p "@@mentions are preserved"
 
 # Short form flags
 repobird run -r myorg/webapp -p "Add unit tests for auth module" --follow
+
+# Script-friendly wait mode
+repobird run -r myorg/webapp -p "Add unit tests for auth module" --wait --json --timeout 45m
 ```
 
 **Available flags:**
@@ -108,9 +116,17 @@ repobird run -r myorg/webapp -p "Add unit tests for auth module" --follow
 - `--pro` - Use the Pro cloud-agent preset (Kimi K2.6)
 - `--branch-only`, `--no-pr` - Push commits to the output branch without creating a PR
 - `--acknowledge-prompt-risk` - Resend after reviewing a prompt-risk acknowledgement error
+- `--idempotency-key` - Stable key for safely retrying run creation; also sent as the `Idempotency-Key` header
+- `--force` - Bypass the local 30-second duplicate-submission guard after reviewing the duplicate
 - `--context` - Additional context (optional, also supports `@filename` and `-`)
 - `--follow` - Follow the run status after creation
+- `--wait` - Wait for the created run to reach a terminal state
+- `--timeout` - Maximum time to wait with `--wait` (default `1h30m`; examples: `45m`, `2h`)
+- `--json` - Output machine-readable JSON. With `--wait`, stdout contains one final JSON object.
 - `--dry-run` - Validate without creating the run
+- `--json` - Emit machine-readable JSON without human progress text
+
+For single-run creation, the CLI records a local submission key before the API request. If the same repository, prompt, and run type are submitted again within 30 seconds, the CLI stops before sending another POST. Use `--force` only when you intend to create another run.
 
 #### JSON Format
 
@@ -128,6 +144,7 @@ Create a file `task.json`:
   "title": "Fix authentication rate limiting issue",
   "runType": "run",
   "acknowledgePromptRisk": false,
+  "idempotencyKey": "task-2026-06-10-auth",
   "context": "Users report being permanently locked out after 5 failed login attempts. The rate limiting should reset after 15 minutes.",
   "files": [
     "src/auth/login.js",
@@ -141,7 +158,9 @@ Run with:
 ```bash
 repobird run task.json
 repobird run task.json --follow  # Follow the run status
+repobird run task.json --wait --json --timeout 45m # Wait for scripts
 repobird run task.json --dry-run # Validate without creating
+repobird run task.json --json    # Create and print parseable JSON
 ```
 
 #### YAML Format
@@ -159,6 +178,7 @@ outputBranchPolicy: create
 title: Fix authentication rate limiting issue
 runType: run
 acknowledgePromptRisk: false
+idempotencyKey: task-2026-06-10-auth
 context: |
   Users report being permanently locked out after 5 failed login attempts.
   The rate limiting should reset after 15 minutes.
@@ -287,6 +307,7 @@ Test your configuration without creating a run:
 
 ```bash
 repobird run task.json --dry-run
+repobird run task.json --dry-run --json
 ```
 
 This will:
@@ -294,6 +315,28 @@ This will:
 - Check field formats
 - Show the final configuration that would be sent
 - Report any errors without consuming API credits
+
+With `--json`, dry runs emit `schema: "repobird.run.dry_run.v1"` with `operation`, `valid`, and `request` fields.
+
+### Machine-Readable Output
+
+Use `--json` when another program or agent needs to parse command output:
+
+```bash
+repobird run -r myorg/webapp -p "Fix the login bug" --json
+repobird --json run task.json
+repobird status RUN_ID --json
+```
+
+Successful run creation emits `schema: "repobird.run.create.v1"` with:
+
+| Field | Description |
+|-------|-------------|
+| `operation` | Operation name, currently `run.create` |
+| `success` | Boolean success indicator |
+| `run` | Created run identifiers, status, repository, branch output fields, PR URL when available |
+| `url` | RepoBird dashboard URL for the created run |
+| `request` | Normalized request sent to the API |
 
 ### Common Validation Errors
 
@@ -312,6 +355,42 @@ This will:
    Error: validation failed: prompt cannot be empty
    ```
 
+### Wait Mode Exit Codes
+
+`--follow` is intended for humans. Use `--wait` for scripts that need to block until the created run is terminal.
+
+```bash
+repobird run task.json --wait --json --timeout 45m
+```
+
+With `--wait --json`, stdout contains exactly one final JSON object:
+
+```json
+{
+  "run": {
+    "ID": "123",
+    "PublicID": "run_abc",
+    "Status": "completed"
+  },
+  "exitCode": 0,
+  "status": "completed",
+  "timedOut": false
+}
+```
+
+If the wait times out, the JSON object includes the last observed run when available, `timedOut: true`, `exitCode: 5`, and an `error` message.
+
+Exit-code contract:
+
+| Code | Meaning |
+|---:|---|
+| `0` | Run reached `completed` |
+| `1` | Generic CLI, validation, network, or unexpected error |
+| `2` | Authentication/API key error |
+| `3` | Quota or credits error |
+| `4` | Run reached a non-success terminal state such as `failed` or `cancelled` |
+| `5` | `--wait` timed out before a terminal state |
+
 ## Best Practices
 
 1. **Use Descriptive Prompts**: Be specific about what you want the AI to do
@@ -319,7 +398,7 @@ This will:
 3. **Specify Files**: When working on specific files, list them to provide focus
 4. **Test with Dry Run**: Always validate complex configurations with `--dry-run`
 5. **Use Markdown for Documentation**: For complex tasks, use Markdown format to include detailed documentation
-6. **Follow Status**: Use `--follow` flag to monitor long-running tasks
+6. **Follow Status**: Use `--follow` for human monitoring and `--wait --json` for scripts
 
 ## Example Workflows
 

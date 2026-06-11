@@ -129,6 +129,9 @@ repobird run -r your-org/your-repo -p "Update generated docs" --output-branch au
 # Resend only after reviewing a prompt-risk acknowledgement error
 repobird run -r your-org/your-repo -p @reviewed-task.md --acknowledge-prompt-risk
 
+# Retry-safe creation uses an auto-derived key; pass your own key for scripted retries
+repobird run -r your-org/your-repo -p @task.txt --idempotency-key task-2026-06-10-auth
+
 # Inside a git repo with an origin remote, the repo can be auto-detected
 repobird pro "Fix the login bug where users get stuck on loading screen"
 
@@ -144,6 +147,9 @@ echo '{
 
 repobird run fix.json --follow
 # That's it. PR will be created automatically. No further action needed.
+
+# Script-friendly wait mode: one JSON object on stdout, stable exit code
+repobird run fix.json --wait --json --timeout 45m
 ```
 
 ## 📖 Usage Guide
@@ -168,10 +174,14 @@ repobird config set color never
 ```bash
 # Single task
 repobird run task.json --follow
+repobird run task.json --wait --json --timeout 45m
 repobird basic "Fix a small bug"
 repobird pro "Implement OAuth"
 repobird run --basic -r myorg/webapp -p "Fix a small bug"
 repobird run --pro -r myorg/webapp -p "Implement OAuth"
+
+# If an identical run was submitted in the last 30 seconds, review first, then force if intentional
+repobird run -r myorg/webapp -p @task.txt --force
 
 # From different formats
 repobird run task.yaml          # YAML format
@@ -188,6 +198,27 @@ cat task.json | repobird run -  # From stdin
 
 The `basic` and `pro` commands auto-detect the repository from the current git remote when `-r/--repo` is omitted. After submission, the CLI prints the selected run type and model before showing the run ID/status.
 
+### Scripted Run Waiting
+
+Use `--wait` when automation should block until the created run reaches a terminal state. Combine it with `--json` to keep stdout machine-readable:
+
+```bash
+repobird run task.json --wait --json --timeout 45m
+```
+
+With `--wait --json`, stdout contains one final JSON object with the final or last observed run, `exitCode`, `status`, `timedOut`, and `error`. Human progress and errors are written to stderr when needed.
+
+Exit-code contract:
+
+| Code | Meaning |
+|---:|---|
+| `0` | Run reached `completed` |
+| `1` | Generic CLI, validation, network, or unexpected error |
+| `2` | Authentication/API key error |
+| `3` | Quota or credits error |
+| `4` | Run reached a non-success terminal state such as `failed` or `cancelled` |
+| `5` | `--wait` timed out before a terminal state |
+
 ### Monitoring & Management
 
 ```bash
@@ -195,10 +226,26 @@ The `basic` and `pro` commands auto-detect the repository from the current git r
 repobird status                 # List all runs
 repobird status RUN_ID          # Check specific run
 repobird status --follow RUN_ID # Live updates
+repobird logs RUN_ID            # Inspect agent conversation logs
+repobird logs RUN_ID --json     # Current log snapshot as JSON
+repobird logs RUN_ID --follow   # Poll for new log messages as NDJSON
 
 # Interactive dashboard
 repobird tui                    # Launch terminal UI
 ```
+
+### Machine-Readable Output
+
+Use `--json` for scripting. The flag is available globally and on run-related commands, so both `repobird --json run ...` and `repobird run ... --json` emit parseable JSON without human progress text.
+
+```bash
+repobird run -r your-org/your-repo -p "Fix auth" --json
+repobird run task.json --dry-run --json
+repobird status RUN_ID --json
+repobird repo list --json
+```
+
+Run creation emits `schema: "repobird.run.create.v1"` with `operation`, `success`, `run`, `url`, and `request` fields. Dry runs emit `schema: "repobird.run.dry_run.v1"` with `valid` and `request` fields. Development-gated bulk commands use `repobird.bulk.create.v1` and `repobird.bulk.dry_run.v1`.
 
 ### Repository Defaults
 

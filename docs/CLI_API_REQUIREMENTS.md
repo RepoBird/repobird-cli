@@ -123,7 +123,7 @@ POST   /api/v1/runs                    // Create new run
 GET    /api/v1/runs                    // List user's runs with pagination
 GET    /api/v1/runs/{id}               // Get run details
 DELETE /api/v1/runs/{id}               // Cancel run (if QUEUED/INITIALIZING)
-GET    /api/v1/runs/{id}/logs          // Get command logs (via commandLogUrl)
+GET    /api/v1/runs/{id}/agent-logs    // Get agent logs as API-key-authenticated NDJSON
 GET    /api/v1/runs/{id}/diff          // Get diff of changes
 
 // Repositories (repoSchema)
@@ -290,7 +290,7 @@ curl -X GET https://repobird.ai/api/v1/runs/12345 \
   -H "Authorization: Bearer <your-api-key>"
 
 # 4. Get logs
-curl -X GET https://repobird.ai/api/v1/runs/12345/logs \
+curl -X GET https://repobird.ai/api/v1/runs/12345/agent-logs \
   -H "Authorization: Bearer <your-api-key>"
 
 # 5. List all runs

@@ -62,6 +62,7 @@ type CreateRunRequest struct {
 	Files                 []string `json:"files,omitempty"`
 	BranchOnly            bool     `json:"branchOnly,omitempty"`
 	AcknowledgePromptRisk bool     `json:"acknowledgePromptRisk,omitempty"`
+	IdempotencyKey        string   `json:"idempotencyKey,omitempty"`
 }
 
 // RunResponse represents the API response for a run

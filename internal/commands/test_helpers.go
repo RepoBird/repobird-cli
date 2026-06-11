@@ -22,6 +22,11 @@ func NewStatusCommand() *cobra.Command {
 	return statusCmd
 }
 
+// NewLogsCommand creates a new logs command for testing
+func NewLogsCommand() *cobra.Command {
+	return logsCmd
+}
+
 // NewConfigCommand creates a new config command for testing
 func NewConfigCommand() *cobra.Command {
 	return configCmd

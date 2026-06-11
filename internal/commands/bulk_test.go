@@ -5,6 +5,7 @@ package commands
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"os"
 	"testing"
@@ -13,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/repobird/repobird-cli/internal/api/dto"
+	"github.com/repobird/repobird-cli/internal/bulk"
 	"github.com/repobird/repobird-cli/internal/config"
 )
 
@@ -33,6 +35,102 @@ func TestNewBulkCommandDevelopmentGate(t *testing.T) {
 		cmd := NewBulkCommand()
 		assert.False(t, cmd.Hidden)
 	})
+}
+
+func TestPrintBulkDryRunSummaryJSONIsMachineReadable(t *testing.T) {
+	originalJSONOutput := jsonOutput
+	jsonOutput = true
+	defer func() {
+		jsonOutput = originalJSONOutput
+	}()
+
+	output := captureBulkStdout(t, func() {
+		err := printDryRunSummary(&bulk.BulkConfig{
+			Repository: "acme/webapp",
+			Source:     "main",
+			RunType:    "run",
+			Runs: []bulk.BulkRunConfig{
+				{Title: "Fix auth", Prompt: "Fix auth bug", Target: "fix/auth"},
+				{Prompt: "Add tests", Target: "test/auth"},
+			},
+		})
+		assert.NoError(t, err)
+	})
+
+	assert.NotContains(t, output, "Configuration valid")
+
+	var result map[string]any
+	assert.NoError(t, json.Unmarshal([]byte(output), &result))
+	assert.Equal(t, "repobird.bulk.dry_run.v1", result["schema"])
+	assert.Equal(t, "bulk.dry_run", result["operation"])
+	assert.Equal(t, true, result["valid"])
+	assert.Equal(t, "acme/webapp", result["repositoryName"])
+	assert.Equal(t, "main", result["sourceBranch"])
+	assert.Equal(t, "run", result["runType"])
+	assert.Equal(t, float64(2), result["totalRuns"])
+
+	runs, ok := result["runs"].([]any)
+	assert.True(t, ok)
+	assert.Len(t, runs, 2)
+	first := runs[0].(map[string]any)
+	assert.Equal(t, float64(1), first["index"])
+	assert.Equal(t, "Fix auth", first["title"])
+	assert.Equal(t, "fix/auth", first["targetBranch"])
+	second := runs[1].(map[string]any)
+	assert.Equal(t, "Run 2", second["title"])
+}
+
+func TestDisplayBulkSubmissionResultsJSONIsMachineReadable(t *testing.T) {
+	originalJSONOutput := jsonOutput
+	jsonOutput = true
+	defer func() {
+		jsonOutput = originalJSONOutput
+	}()
+
+	output := captureBulkStdout(t, func() {
+		displayBulkSubmissionResults(&dto.BulkRunResponse{
+			Data: dto.BulkRunData{
+				BatchID:    "batch-123",
+				BatchTitle: "Nightly fixes",
+				Successful: []dto.RunCreatedItem{
+					{ID: 101, Status: "QUEUED", RepositoryName: "acme/webapp", Title: "Fix auth", RequestIndex: 0},
+				},
+				Failed: []dto.RunError{
+					{RequestIndex: 1, Prompt: "Add tests", Message: "invalid target"},
+				},
+				Metadata: dto.BulkResponseMetadata{
+					TotalRequested:  2,
+					TotalSuccessful: 1,
+					TotalFailed:     1,
+				},
+			},
+		})
+	})
+
+	assert.NotContains(t, output, "Partial success")
+	assert.NotContains(t, output, "Created runs")
+
+	var result map[string]any
+	assert.NoError(t, json.Unmarshal([]byte(output), &result))
+	assert.Equal(t, "repobird.bulk.create.v1", result["schema"])
+	assert.Equal(t, "bulk.create", result["operation"])
+	assert.Equal(t, false, result["success"])
+	assert.Equal(t, "batch-123", result["batchId"])
+
+	runs, ok := result["runs"].([]any)
+	assert.True(t, ok)
+	assert.Len(t, runs, 1)
+	run := runs[0].(map[string]any)
+	assert.Equal(t, "101", run["id"])
+	assert.Equal(t, "QUEUED", run["status"])
+	assert.Equal(t, "acme/webapp", run["repositoryName"])
+
+	failed, ok := result["failed"].([]any)
+	assert.True(t, ok)
+	assert.Len(t, failed, 1)
+	failure := failed[0].(map[string]any)
+	assert.Equal(t, float64(2), failure["index"])
+	assert.Equal(t, "invalid target", failure["message"])
 }
 
 // TestDisplayBulkResults_PRURLDisplay tests that PR URLs are displayed for completed bulk runs
@@ -207,6 +305,25 @@ func TestDisplayBulkResults_PRURLDisplay(t *testing.T) {
 	}
 }
 
+func captureBulkStdout(t *testing.T, fn func()) string {
+	t.Helper()
+
+	old := os.Stdout
+	r, w, err := os.Pipe()
+	assert.NoError(t, err)
+	os.Stdout = w
+
+	fn()
+
+	assert.NoError(t, w.Close())
+	os.Stdout = old
+
+	var buf bytes.Buffer
+	_, err = io.Copy(&buf, r)
+	assert.NoError(t, err)
+	return buf.String()
+}
+
 func TestBulkRuns_PRURLInStatusDisplay(t *testing.T) {
 	// Test that the batch status display properly shows PR URLs
 	now := time.Now()
@@ -273,4 +390,37 @@ func TestBulkRuns_PRURLInStatusDisplay(t *testing.T) {
 	assert.Contains(t, output, "Completed: 2",
 		"Should show completed count")
 	// Note: PR URLs won't show without a proper API client mock
+}
+
+func TestDisplayMultiLineBulkStatusOmitsSpinnerOutsideTTY(t *testing.T) {
+	status := dto.BulkStatusData{
+		Runs: []dto.RunStatusItem{
+			{ID: 1, Status: "PROCESSING"},
+			{ID: 2, Status: "QUEUED"},
+		},
+	}
+
+	old := os.Stdout
+	r, w, err := os.Pipe()
+	assert.NoError(t, err)
+	os.Stdout = w
+	t.Cleanup(func() {
+		os.Stdout = old
+		_ = r.Close()
+	})
+
+	displayMultiLineBulkStatus(status, "⠋", time.Now())
+
+	assert.NoError(t, w.Close())
+
+	var buf bytes.Buffer
+	_, err = io.Copy(&buf, r)
+	assert.NoError(t, err)
+
+	output := buf.String()
+	assert.NotContains(t, output, "⠋")
+	assert.NotContains(t, output, "\x1b[")
+	assert.Contains(t, output, "Following batch progress...")
+	assert.Contains(t, output, "[1]: PROCESSING")
+	assert.Contains(t, output, "[2]: QUEUED")
 }

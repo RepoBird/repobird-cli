@@ -5,10 +5,13 @@
 ```bash
 repobird tui                        # Launch interactive dashboard
 repobird run task.json              # Submit task
+repobird run task.json --wait --json --timeout 45m # Script wait
 repobird basic "Fix a bug"          # Basic run, repo auto-detected from git
 repobird pro "Implement OAuth"      # Pro run, repo auto-detected from git
 repobird status                     # View all runs
 repobird status RUN_ID --follow     # Follow specific run
+repobird logs RUN_ID                # Inspect run logs
+repobird logs RUN_ID --follow       # Follow run logs as NDJSON
 repobird repo show repo_123         # Inspect repository defaults
 repobird config set api-key KEY     # Set API key
 ```
@@ -143,6 +146,7 @@ tui:
 ```bash
 # CLI
 repobird run task.json --follow
+repobird run task.json --wait --json --timeout 45m
 
 # TUI
 1. Press 'n' for new run
@@ -155,12 +159,20 @@ repobird run task.json --follow
 ```bash
 # CLI
 repobird status RUN_ID
+repobird logs RUN_ID
 
 # TUI
 1. Press 'f' to search repositories
 2. Enter to see runs
 3. Press 'f' to search runs
 4. Enter to see details
+```
+
+### Inspect Failed Run Logs
+```bash
+repobird logs RUN_ID
+repobird logs RUN_ID --json
+repobird logs RUN_ID --follow
 ```
 
 ### Quick Copy Run Info

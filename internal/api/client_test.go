@@ -273,6 +273,42 @@ func TestCreateRunAPIPreservesCanonicalBranchFields(t *testing.T) {
 	}
 }
 
+func TestCreateRunAPISendsIdempotencyKeyHeader(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Idempotency-Key"); got != "run-key-123" {
+			t.Fatalf("expected Idempotency-Key header run-key-123, got %q", got)
+		}
+
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("failed to decode request body: %v", err)
+		}
+		if got := body["idempotencyKey"]; got != "run-key-123" {
+			t.Fatalf("expected idempotencyKey body run-key-123, got %#v", got)
+		}
+
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"data": map[string]any{
+				"id":     123,
+				"status": "QUEUED",
+			},
+		})
+	}))
+	defer server.Close()
+
+	client := NewClient("test-key", server.URL, false)
+	_, err := client.CreateRunAPI(&models.APIRunRequest{
+		Prompt:         "Fix auth",
+		RepositoryName: "acme/webapp",
+		RunType:        models.RunTypeRun,
+		IdempotencyKey: "run-key-123",
+	})
+	if err != nil {
+		t.Fatalf("CreateRunAPI returned error: %v", err)
+	}
+}
+
 func TestGetRun(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != RunDetailsURL(testRunID) {

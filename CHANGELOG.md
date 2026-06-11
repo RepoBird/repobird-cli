@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-06-10
+
+### Added
+
+- Single-run creation now supports retry-safe idempotency keys with a 30-second local duplicate-submission guard and --force override.
+- Add repobird logs RUN_ID for inspecting agent conversation logs, with JSON snapshot output and NDJSON follow polling.
+- Add stable --json output for run creation, run dry-runs, and development-gated bulk submissions.
+
+### Fixed
+
+- Isolate command tests from real XDG RepoBird configuration so config command tests cannot overwrite user settings.
+- Omit bulk follow spinner frames from piped output while preserving TTY animation.
+- Handle large agent log NDJSON records without scanner token failures.
+- Keep status --json stdout parseable by suppressing human account output in JSON mode
+- Point repobird logs at the API-key-authenticated v1 agent-log endpoint.
+
+### Changed
+
+- Show the selected repository in Basic/Pro run summaries before submission.
+
+### Added
+
+- Add repobird run --wait with --json final-result output, timeout handling, and documented script exit codes.
+
 ## [0.7.0] - 2026-06-06
 
 ### Added
@@ -116,7 +140,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Configuration management
 - API integration with RepoBird platform
 
-[Unreleased]: https://github.com/RepoBird/repobird-cli/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/RepoBird/repobird-cli/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/RepoBird/repobird-cli/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/RepoBird/repobird-cli/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/RepoBird/repobird-cli/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/RepoBird/repobird-cli/compare/v0.5.0...v0.6.0

@@ -143,7 +143,7 @@ repobird run [flags] <input-file>
   --branch string        Target branch
   --branch-only          Push commits to an output branch without creating a pull request
   --output-branch string Branch to push generated commits to
-  --output-mode string   Output mode: pr or branch
+  --output-mode string   Output mode: pull_request or branch (pr is accepted as an alias)
   --output-branch-policy string
                          Output branch policy: create or reuse
   --base-branch string   Base branch to start work from

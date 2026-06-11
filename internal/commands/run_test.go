@@ -670,6 +670,7 @@ func TestRunPresetCommand_UsesPromptArgument(t *testing.T) {
 
 	require.NoError(t, cmdErr)
 	assert.Contains(t, output, "Validation successful")
+	assert.Contains(t, output, "Repository: test/repo")
 	assert.Contains(t, output, `"RunType": "pro"`)
 	assert.Contains(t, output, `"OpenCodeModel": "openrouter/moonshotai/kimi-k2.6"`)
 	assert.Contains(t, output, "Model: Kimi K2.6")
