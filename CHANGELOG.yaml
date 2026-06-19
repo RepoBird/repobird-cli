@@ -1,9 +1,10 @@
 project: RepoBird CLI
 versions:
-    unreleased:
-        internal:
-            changed:
-                - Sync CLI Basic/Pro preset docs and Pro OpenCode model default with the current RepoBird Next GLM 5.2 policy.
+    unreleased: {}
+    0.8.2:
+        date: 2026-06-19
+        changed:
+            - Sync the Pro cloud-agent preset and documentation with the current GLM 5.2 OpenCode model default.
     0.8.1:
         date: 2026-06-11
         removed:
