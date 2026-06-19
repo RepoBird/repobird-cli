@@ -69,7 +69,7 @@ For more detailed information about RepoBird's features, architecture, and imple
 
 | Requirement     | Details                                                                 |
 | --------------- | ----------------------------------------------------------------------- |
-| **Plans**       | Free: 3 runs/month   ·  Pro: 30 runs/month                              |
+| **Usage**       | Credit-based cloud-agent runs with Basic/Pro model preset language       |
 | **Permissions** | Issues, Pull Requests, Contents (Read/Write), Comments (Read/Write)     |
 | **Availability**| Public **Beta**                                                         |
 | **Environment** | Full development ecosystem with 59,000+ packages available              |

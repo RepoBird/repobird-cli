@@ -54,7 +54,7 @@ repobird run -r myorg/webapp -p "Fix the login bug"
 
 # Basic and Pro cloud-agent presets
 repobird run --basic -r myorg/webapp -p "Fix a small bug"     # DeepSeek V4 Flash
-repobird run --pro -r myorg/webapp -p "Implement OAuth"       # Kimi K2.6
+repobird run --pro -r myorg/webapp -p "Implement OAuth"       # GLM 5.2
 repobird basic -r myorg/webapp "Fix a small bug"
 repobird pro -r myorg/webapp "Implement OAuth"
 
@@ -113,7 +113,7 @@ repobird run -r myorg/webapp -p "Add unit tests for auth module" --wait --json -
 - `--title` - Human-readable title (optional, auto-generated if not specified)
 - `--run-type` - Type of run: `run` (optional, defaults to `run`); `plan` is development-only during the OpenCode migration
 - `--basic` - Use the Basic cloud-agent preset (DeepSeek V4 Flash)
-- `--pro` - Use the Pro cloud-agent preset (Kimi K2.6)
+- `--pro` - Use the Pro cloud-agent preset (GLM 5.2)
 - `--branch-only`, `--no-pr` - Push commits to the output branch without creating a PR
 - `--acknowledge-prompt-risk` - Resend after reviewing a prompt-risk acknowledgement error
 - `--idempotency-key` - Stable key for safely retrying run creation; also sent as the `Idempotency-Key` header

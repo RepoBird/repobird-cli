@@ -85,7 +85,7 @@ Prefer current server behavior over stale docs. If server source, contracts, and
 - Treat OpenCode as the forward-looking run workflow unless existing API compatibility requires Claude-era naming.
 - Product behavior is credits-based. Do not add Basic/Pro run-count assumptions unless the server endpoint still returns those fields for compatibility.
 - Treat Basic and Pro in CLI run creation as cloud-agent/model presets, not fixed run-count plan limits. Current CLI shortcuts are `repobird basic "prompt"`, `repobird pro "prompt"`, `repobird run --basic ...`, and `repobird run --pro ...`.
-- Keep Basic/Pro preset defaults synced with `../repobird-next/src/services/opencodeModelPolicy.ts`: Basic uses `openrouter/deepseek/deepseek-v4-flash`; Pro uses `openrouter/moonshotai/kimi-k2.6`.
+- Keep Basic/Pro preset defaults synced with `../repobird-next/src/services/opencodeModelPolicy.ts`: Basic uses `openrouter/deepseek/deepseek-v4-flash`; Pro uses `openrouter/z-ai/glm-5.2`.
 - For Basic/Pro preset requests, preserve the OpenCode wire contract by sending `agent: "opencode"`, `opencodeModel`, and `opencodeProvider` when the CLI chooses the preset model.
 - Match JSON field names exactly; Go struct names can differ, JSON tags cannot.
 - Preserve unknown response fields where compatibility matters; avoid narrowing DTOs if the CLI only needs a subset.

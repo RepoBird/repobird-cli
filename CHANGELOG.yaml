@@ -1,6 +1,9 @@
 project: RepoBird CLI
 versions:
-    unreleased: {}
+    unreleased:
+        internal:
+            changed:
+                - Sync CLI Basic/Pro preset docs and Pro OpenCode model default with the current RepoBird Next GLM 5.2 policy.
     0.8.1:
         date: 2026-06-11
         removed:

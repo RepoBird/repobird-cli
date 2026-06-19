@@ -49,7 +49,7 @@ interface CreateRunRequest {
   // Agent configuration
   runType?: 'run' | 'plan' | 'basic' | 'pro'; // CLI presets use 'basic'/'pro'; legacy plan is development-only during the OpenCode migration
   agent?: 'opencode';          // CLI sends OpenCode for cloud-agent runs
-  opencodeModel?: string;      // Basic default: openrouter/deepseek/deepseek-v4-flash; Pro default: openrouter/moonshotai/kimi-k2.6
+  opencodeModel?: string;      // Basic default: openrouter/deepseek/deepseek-v4-flash; Pro default: openrouter/z-ai/glm-5.2
   opencodeProvider?: 'openrouter';
   context?: string;            // Additional context for the agent
   
@@ -220,8 +220,8 @@ interface ListResponse<T> {
 - **Max Request Size**: 10MB for prompts/context
 - **Timeout Limits**: Default 45 minutes, max 60 minutes
 - **Rate Limits**: Based on tier (tiersSchema):
-  - Free: 3 runs/month (basicRunsPerPeriod)
-  - Pro: 30 runs/month (proRunsPerPeriod)
+  - Credit wallet balance is the run admission source of truth
+  - Legacy run-count fields may still appear for compatibility, but CLI availability must not depend on Basic/Pro monthly run counts
   - Additional runs: $10 each (pricePerAdditionalRun)
 - **Concurrent Run Limits**: Unlimited (isolated cloud environments)
 
@@ -338,7 +338,7 @@ curl -X GET https://api.repobird.ai/api/v1/runs?page=1&limit=10 \
    - Repository resolution: name → repoId via API
    - Auto-detect repo from git config if not specified
    - Preserve legacy CLI runType values for compatibility, but keep plan submissions development-only during the OpenCode migration while exposing Basic/Pro presets
-   - Basic preset uses DeepSeek V4 Flash; Pro preset uses Kimi K2.6
+   - Basic preset uses DeepSeek V4 Flash; Pro preset uses GLM 5.2
    - Handle status enum values correctly
 
 2. **Core Features**:

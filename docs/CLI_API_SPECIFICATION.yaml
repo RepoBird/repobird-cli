@@ -342,8 +342,8 @@ components:
           example: opencode
         opencodeModel:
           type: string
-          description: Optional OpenCode model override. CLI Basic uses openrouter/deepseek/deepseek-v4-flash; CLI Pro uses openrouter/moonshotai/kimi-k2.6.
-          example: openrouter/moonshotai/kimi-k2.6
+          description: Optional OpenCode model override. CLI Basic uses openrouter/deepseek/deepseek-v4-flash; CLI Pro uses openrouter/z-ai/glm-5.2.
+          example: openrouter/z-ai/glm-5.2
         opencodeProvider:
           type: string
           enum: [openrouter]
