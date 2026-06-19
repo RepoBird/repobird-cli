@@ -71,7 +71,7 @@ var runPresets = map[string]runPreset{
 	"pro": {
 		RunType:  "pro",
 		Label:    "Pro",
-		Model:    "openrouter/moonshotai/kimi-k2.6",
+		Model:    "openrouter/z-ai/glm-5.2",
 		Provider: "openrouter",
 	},
 }
@@ -707,6 +707,8 @@ func modelDisplayName(model string) string {
 		return "DeepSeek V4 Flash"
 	case "openrouter/moonshotai/kimi-k2.6":
 		return "Kimi K2.6"
+	case "openrouter/z-ai/glm-5.2":
+		return "GLM 5.2"
 	default:
 		return model
 	}

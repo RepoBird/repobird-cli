@@ -206,13 +206,13 @@ func TestRunCommand_ValidationWithFlags(t *testing.T) {
 			},
 		},
 		{
-			name: "Pro preset selects Kimi model",
+			name: "Pro preset selects GLM model",
 			args: []string{"-r", "test/repo", "-p", "Fix bug", "--pro", "--dry-run"},
 			expectInJSON: map[string]string{
 				"RunType":        "pro",
 				"RepositoryName": "test/repo",
 				"Prompt":         "Fix bug",
-				"OpenCodeModel":  "openrouter/moonshotai/kimi-k2.6",
+				"OpenCodeModel":  "openrouter/z-ai/glm-5.2",
 			},
 		},
 		{
@@ -672,8 +672,8 @@ func TestRunPresetCommand_UsesPromptArgument(t *testing.T) {
 	assert.Contains(t, output, "Validation successful")
 	assert.Contains(t, output, "Repository: test/repo")
 	assert.Contains(t, output, `"RunType": "pro"`)
-	assert.Contains(t, output, `"OpenCodeModel": "openrouter/moonshotai/kimi-k2.6"`)
-	assert.Contains(t, output, "Model: Kimi K2.6")
+	assert.Contains(t, output, `"OpenCodeModel": "openrouter/z-ai/glm-5.2"`)
+	assert.Contains(t, output, "Model: GLM 5.2")
 }
 
 func TestRunPresetCommand_AutoDetectsRepository(t *testing.T) {

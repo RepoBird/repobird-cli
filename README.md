@@ -121,7 +121,7 @@ repobird run -r your-org/your-repo -p "Fix the login bug where users get stuck o
 
 # Simple cloud-agent presets
 repobird basic -r your-org/your-repo "Fix a small bug"  # DeepSeek V4 Flash
-repobird pro -r your-org/your-repo "Implement OAuth"    # Kimi K2.6
+repobird pro -r your-org/your-repo "Implement OAuth"    # GLM 5.2
 
 # Push commits to an output branch without opening a PR
 repobird run -r your-org/your-repo -p "Update generated docs" --output-branch automation/docs --branch-only
@@ -192,9 +192,9 @@ cat task.json | repobird run -  # From stdin
 | Command | Use When | Default Model |
 |---|---|---|
 | `repobird basic "prompt"` | Quick Basic preset from inside a git repo | DeepSeek V4 Flash |
-| `repobird pro "prompt"` | Quick Pro preset from inside a git repo | Kimi K2.6 |
+| `repobird pro "prompt"` | Quick Pro preset from inside a git repo | GLM 5.2 |
 | `repobird run --basic -r owner/repo -p "prompt"` | Basic preset with explicit repository | DeepSeek V4 Flash |
-| `repobird run --pro -r owner/repo -p "prompt"` | Pro preset with explicit repository | Kimi K2.6 |
+| `repobird run --pro -r owner/repo -p "prompt"` | Pro preset with explicit repository | GLM 5.2 |
 
 The `basic` and `pro` commands auto-detect the repository from the current git remote when `-r/--repo` is omitted. After submission, the CLI prints the selected run type and model before showing the run ID/status.
 
