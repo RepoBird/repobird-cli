@@ -106,6 +106,27 @@ branchOnly: true
 	assert.Equal(t, "automation/docs", config.OutputBranch)
 }
 
+func TestParseYAMLConfig_GitLabCredentialFields(t *testing.T) {
+	input := bytes.NewBufferString(`
+prompt: "Fix GitLab CI"
+repository: "group/project"
+providerMode: "byok-user"
+providerCredentialId: "cred_123"
+gitlabCredential:
+  mode: "stored_token_reference"
+  tokenReferenceId: "glref_123"
+`)
+
+	config, err := ParseYAMLConfigFromReader(input)
+	require.NoError(t, err)
+
+	assert.Equal(t, "byok-user", config.ProviderMode)
+	assert.Equal(t, "cred_123", config.ProviderCredentialID)
+	require.NotNil(t, config.GitLabCredential)
+	assert.Equal(t, "stored_token_reference", config.GitLabCredential.Mode)
+	assert.Equal(t, "glref_123", config.GitLabCredential.TokenReferenceID)
+}
+
 func TestLoadConfigFromFile(t *testing.T) {
 	tests := []struct {
 		name              string

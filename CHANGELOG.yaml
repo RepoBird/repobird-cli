@@ -1,6 +1,14 @@
 project: RepoBird CLI
 versions:
     unreleased: {}
+    0.9.0:
+        date: 2026-06-25
+        added:
+            - Add CLI support and docs for GitLab stored credential references and provider routing fields in run requests.
+        internal:
+            changed:
+                - Updated GitHub Actions workflow pins to Node 24-compatible action releases.
+                - Refreshed the packaged RepoBird CLI agent skill for current OpenCode, credits, logs, and GitLab run guidance.
     0.8.2:
         date: 2026-06-19
         changed:

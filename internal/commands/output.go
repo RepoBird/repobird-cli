@@ -87,25 +87,33 @@ type runJSON struct {
 }
 
 type runRequest struct {
-	Prompt                string   `json:"prompt"`
-	RepositoryName        string   `json:"repositoryName"`
-	SourceBranch          string   `json:"sourceBranch,omitempty"`
-	TargetBranch          string   `json:"targetBranch,omitempty"`
-	BaseBranch            string   `json:"baseBranch,omitempty"`
-	OutputMode            string   `json:"outputMode,omitempty"`
-	OutputBranch          string   `json:"outputBranch,omitempty"`
-	PRTargetBranch        string   `json:"prTargetBranch,omitempty"`
-	OutputBranchPolicy    string   `json:"outputBranchPolicy,omitempty"`
-	RunType               string   `json:"runType"`
-	Agent                 string   `json:"agent,omitempty"`
-	OpenCodeModel         string   `json:"opencodeModel,omitempty"`
-	OpenCodeProvider      string   `json:"opencodeProvider,omitempty"`
-	Title                 string   `json:"title,omitempty"`
-	Context               string   `json:"context,omitempty"`
-	Files                 []string `json:"files,omitempty"`
-	BranchOnly            bool     `json:"branchOnly,omitempty"`
-	AcknowledgePromptRisk bool     `json:"acknowledgePromptRisk,omitempty"`
-	IdempotencyKey        string   `json:"idempotencyKey,omitempty"`
+	Prompt                string                   `json:"prompt"`
+	RepositoryName        string                   `json:"repositoryName"`
+	SourceBranch          string                   `json:"sourceBranch,omitempty"`
+	TargetBranch          string                   `json:"targetBranch,omitempty"`
+	BaseBranch            string                   `json:"baseBranch,omitempty"`
+	OutputMode            string                   `json:"outputMode,omitempty"`
+	OutputBranch          string                   `json:"outputBranch,omitempty"`
+	PRTargetBranch        string                   `json:"prTargetBranch,omitempty"`
+	OutputBranchPolicy    string                   `json:"outputBranchPolicy,omitempty"`
+	RunType               string                   `json:"runType"`
+	Agent                 string                   `json:"agent,omitempty"`
+	OpenCodeModel         string                   `json:"opencodeModel,omitempty"`
+	OpenCodeProvider      string                   `json:"opencodeProvider,omitempty"`
+	Title                 string                   `json:"title,omitempty"`
+	Context               string                   `json:"context,omitempty"`
+	Files                 []string                 `json:"files,omitempty"`
+	ProviderCredentialID  string                   `json:"providerCredentialId,omitempty"`
+	ProviderMode          string                   `json:"providerMode,omitempty"`
+	GitLabCredential      *gitLabCredentialRequest `json:"gitlabCredential,omitempty"`
+	BranchOnly            bool                     `json:"branchOnly,omitempty"`
+	AcknowledgePromptRisk bool                     `json:"acknowledgePromptRisk,omitempty"`
+	IdempotencyKey        string                   `json:"idempotencyKey,omitempty"`
+}
+
+type gitLabCredentialRequest struct {
+	Mode             string `json:"mode"`
+	TokenReferenceID string `json:"tokenReferenceId"`
 }
 
 type bulkDryRunJSONOutput struct {
@@ -251,9 +259,22 @@ func makeRunRequestJSON(req domain.CreateRunRequest) runRequest {
 		Title:                 req.Title,
 		Context:               req.Context,
 		Files:                 req.Files,
+		ProviderCredentialID:  req.ProviderCredentialID,
+		ProviderMode:          req.ProviderMode,
+		GitLabCredential:      runRequestGitLabCredential(req.GitLabCredential),
 		BranchOnly:            req.BranchOnly,
 		AcknowledgePromptRisk: req.AcknowledgePromptRisk,
 		IdempotencyKey:        req.IdempotencyKey,
+	}
+}
+
+func runRequestGitLabCredential(credential *domain.GitLabCredentialRequest) *gitLabCredentialRequest {
+	if credential == nil {
+		return nil
+	}
+	return &gitLabCredentialRequest{
+		Mode:             credential.Mode,
+		TokenReferenceID: credential.TokenReferenceID,
 	}
 }
 

@@ -45,6 +45,12 @@ interface CreateRunRequest {
   pullRequestNumber?: number;  // Existing PR to modify
   branchOnly?: boolean;        // Legacy alias for outputMode='branch'
   acknowledgePromptRisk?: boolean; // Resend only after reviewing PROMPT_RISK_ACK_REQUIRED
+  providerCredentialId?: string; // Provider credential reference for BYOK/enterprise routing
+  providerMode?: 'bundled' | 'byok-user' | 'enterprise-gateway';
+  gitlabCredential?: {
+    mode: 'stored_token_reference';
+    tokenReferenceId: string; // Stored GitLab token reference ID, never a raw token
+  };
   
   // Agent configuration
   runType?: 'run' | 'plan' | 'basic' | 'pro'; // CLI presets use 'basic'/'pro'; legacy plan is development-only during the OpenCode migration

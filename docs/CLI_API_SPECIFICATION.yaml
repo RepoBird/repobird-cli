@@ -405,6 +405,30 @@ components:
           default: create
           description: Whether to create a fresh output branch or reuse an existing output branch.
           example: create
+        providerCredentialId:
+          type: string
+          description: Optional provider credential reference for BYOK or enterprise provider routing.
+          example: cred_123
+        providerMode:
+          type: string
+          enum: [bundled, byok-user, enterprise-gateway]
+          description: Optional provider routing mode.
+          example: byok-user
+        gitlabCredential:
+          type: object
+          description: Stored GitLab credential reference for self-managed GitLab repositories. Raw GitLab tokens are not accepted.
+          properties:
+            mode:
+              type: string
+              enum: [stored_token_reference]
+              example: stored_token_reference
+            tokenReferenceId:
+              type: string
+              description: Public stored GitLab token reference ID.
+              example: glref_123
+          required:
+            - mode
+            - tokenReferenceId
         branchOnly:
           type: boolean
           default: false
@@ -439,6 +463,9 @@ components:
         baseBranch: main
         outputMode: pull_request
         prTargetBranch: main
+        gitlabCredential:
+          mode: stored_token_reference
+          tokenReferenceId: glref_123
         title: Add authentication system
         idempotencyKey: task-2026-06-10-auth
         fileHash: a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3

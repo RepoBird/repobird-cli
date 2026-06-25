@@ -59,6 +59,9 @@ func (r *apiRunRepository) Create(ctx context.Context, req domain.CreateRunReque
 		Title:                 req.Title,
 		Context:               req.Context,
 		Files:                 req.Files,
+		ProviderCredentialID:  req.ProviderCredentialID,
+		ProviderMode:          req.ProviderMode,
+		GitLabCredential:      dtoGitLabCredential(req.GitLabCredential),
 		BranchOnly:            req.BranchOnly,
 		AcknowledgePromptRisk: req.AcknowledgePromptRisk,
 		IdempotencyKey:        req.IdempotencyKey,
@@ -95,6 +98,16 @@ func (r *apiRunRepository) Create(ctx context.Context, req domain.CreateRunReque
 	}
 
 	return r.toDomainRun(&runResp), nil
+}
+
+func dtoGitLabCredential(credential *domain.GitLabCredentialRequest) *dto.GitLabCredentialRequest {
+	if credential == nil {
+		return nil
+	}
+	return &dto.GitLabCredentialRequest{
+		Mode:             credential.Mode,
+		TokenReferenceID: credential.TokenReferenceID,
+	}
 }
 
 func agentOrDefault(agent string) string {

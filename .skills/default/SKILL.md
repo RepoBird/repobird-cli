@@ -129,6 +129,10 @@ Run creation flags:
 --pr-target-branch branch             Pull request target branch
 --output-branch-policy create|reuse   Output branch policy
 --branch-only, --no-pr                Push commits without opening a PR
+--provider-mode bundled|byok-user|enterprise-gateway
+                                      Optional provider routing mode
+--provider-credential-id id           Optional provider credential reference
+--gitlab-token-reference-id id        Stored GitLab token reference for self-managed GitLab
 --source branch                       Legacy alias for --base-branch
 --target branch                       Legacy target/output branch alias
 --run-type run                        Default public run type
@@ -164,7 +168,7 @@ Current presets:
 
 ```text
 Basic: DeepSeek V4 Flash
-Pro:   Kimi K2.6
+Pro:   GLM 5.2
 ```
 
 RepoBird uses credits as the customer-facing unit for cloud agent work. Do not
@@ -201,6 +205,30 @@ Common fields:
   "acknowledgePromptRisk": false
 }
 ```
+
+GitLab repositories use the same run command and task file shape. Managed
+GitLab.com repositories may not need an explicit credential reference. For
+self-managed GitLab, pass a stored token reference ID, never a raw token:
+
+```bash
+repobird run -r group/project -p @task.md --gitlab-token-reference-id glref_123
+```
+
+Equivalent task-file fields:
+
+```json
+{
+  "repository": "group/project",
+  "prompt": "Fix the GitLab CI failure",
+  "gitlabCredential": {
+    "mode": "stored_token_reference",
+    "tokenReferenceId": "glref_123"
+  }
+}
+```
+
+Do not put raw GitLab PATs, project tokens, deploy tokens, API keys, or provider
+secrets in task files, command arguments, logs, or prompts.
 
 Markdown files use YAML frontmatter for fields; Markdown body content is
 appended to `context`.
@@ -250,9 +278,15 @@ repobird status RUN_ID
 repobird status RUN_ID --json
 repobird status RUN_ID --follow
 repobird st RUN_ID
+repobird logs RUN_ID
+repobird logs RUN_ID --json
+repobird logs RUN_ID --follow
 ```
 
 Use `--follow` on `run` or `status` when the user wants live polling.
+Use `logs --follow` for NDJSON log polling in automation. The public API
+documents a run diff endpoint when a diff is available, but this CLI build does
+not expose a dedicated `diff` command.
 
 ## Human-Only TUI
 

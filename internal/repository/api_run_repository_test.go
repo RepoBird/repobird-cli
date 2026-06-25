@@ -48,6 +48,44 @@ func TestAPIRunRepositoryCreateSendsIdempotencyKey(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestAPIRunRepositoryCreateSendsGitLabFields(t *testing.T) {
+	repo := NewAPIRunRepository(roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		var body map[string]any
+		require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
+		require.Equal(t, "cred_123", body["providerCredentialId"])
+		require.Equal(t, "byok-user", body["providerMode"])
+
+		gitlabCredential, ok := body["gitlabCredential"].(map[string]any)
+		require.True(t, ok)
+		require.Equal(t, "stored_token_reference", gitlabCredential["mode"])
+		require.Equal(t, "glref_123", gitlabCredential["tokenReferenceId"])
+
+		return &http.Response{
+			StatusCode: http.StatusCreated,
+			Body: io.NopCloser(strings.NewReader(`{
+				"data": {
+					"id": 123,
+					"status": "QUEUED"
+				}
+			}`)),
+			Header: make(http.Header),
+		}, nil
+	}), "https://example.test", "test-key", false)
+
+	_, err := repo.Create(context.Background(), domain.CreateRunRequest{
+		Prompt:               "Fix GitLab task",
+		RepositoryName:       "acme/webapp",
+		RunType:              domain.RunTypeRun,
+		ProviderCredentialID: "cred_123",
+		ProviderMode:         "byok-user",
+		GitLabCredential: &domain.GitLabCredentialRequest{
+			Mode:             "stored_token_reference",
+			TokenReferenceID: "glref_123",
+		},
+	})
+	require.NoError(t, err)
+}
+
 func TestAPIRunRepositoryListUsesPageBasedPagination(t *testing.T) {
 	var requestedURL string
 	repo := NewAPIRunRepository(roundTripFunc(func(req *http.Request) (*http.Response, error) {

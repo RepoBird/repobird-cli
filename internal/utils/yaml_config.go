@@ -15,23 +15,26 @@ import (
 
 // YAMLConfig represents the structure of a YAML configuration file
 type YAMLConfig struct {
-	Prompt                string                 `yaml:"prompt" json:"prompt"`
-	Repository            string                 `yaml:"repository" json:"repository"`
-	Source                string                 `yaml:"source" json:"source"`
-	Target                string                 `yaml:"target" json:"target"`
-	BaseBranch            string                 `yaml:"baseBranch" json:"baseBranch"`
-	OutputMode            string                 `yaml:"outputMode" json:"outputMode"`
-	OutputBranch          string                 `yaml:"outputBranch" json:"outputBranch"`
-	PRTargetBranch        string                 `yaml:"prTargetBranch" json:"prTargetBranch"`
-	OutputBranchPolicy    string                 `yaml:"outputBranchPolicy" json:"outputBranchPolicy"`
-	RunType               string                 `yaml:"runType" json:"runType"`
-	Title                 string                 `yaml:"title" json:"title"`
-	Context               string                 `yaml:"context" json:"context"`
-	Files                 []string               `yaml:"files" json:"files"`
-	BranchOnly            bool                   `yaml:"branchOnly" json:"branchOnly"`
-	AcknowledgePromptRisk bool                   `yaml:"acknowledgePromptRisk" json:"acknowledgePromptRisk"`
-	PullRequest           *PullRequestConfig     `yaml:"pullRequest,omitempty" json:"pullRequest,omitempty"`
-	Metadata              map[string]interface{} `yaml:"metadata,omitempty" json:"metadata,omitempty"`
+	Prompt                string                          `yaml:"prompt" json:"prompt"`
+	Repository            string                          `yaml:"repository" json:"repository"`
+	Source                string                          `yaml:"source" json:"source"`
+	Target                string                          `yaml:"target" json:"target"`
+	BaseBranch            string                          `yaml:"baseBranch" json:"baseBranch"`
+	OutputMode            string                          `yaml:"outputMode" json:"outputMode"`
+	OutputBranch          string                          `yaml:"outputBranch" json:"outputBranch"`
+	PRTargetBranch        string                          `yaml:"prTargetBranch" json:"prTargetBranch"`
+	OutputBranchPolicy    string                          `yaml:"outputBranchPolicy" json:"outputBranchPolicy"`
+	RunType               string                          `yaml:"runType" json:"runType"`
+	Title                 string                          `yaml:"title" json:"title"`
+	Context               string                          `yaml:"context" json:"context"`
+	Files                 []string                        `yaml:"files" json:"files"`
+	ProviderCredentialID  string                          `yaml:"providerCredentialId" json:"providerCredentialId"`
+	ProviderMode          string                          `yaml:"providerMode" json:"providerMode"`
+	GitLabCredential      *models.GitLabCredentialRequest `yaml:"gitlabCredential,omitempty" json:"gitlabCredential,omitempty"`
+	BranchOnly            bool                            `yaml:"branchOnly" json:"branchOnly"`
+	AcknowledgePromptRisk bool                            `yaml:"acknowledgePromptRisk" json:"acknowledgePromptRisk"`
+	PullRequest           *PullRequestConfig              `yaml:"pullRequest,omitempty" json:"pullRequest,omitempty"`
+	Metadata              map[string]interface{}          `yaml:"metadata,omitempty" json:"metadata,omitempty"`
 }
 
 // ParseYAMLConfig reads and parses a YAML configuration file
@@ -123,6 +126,15 @@ func parseYAMLWithUnknownFieldsAndPrompts(data []byte) (*models.RunConfig, *prom
 	if context, ok := genericMap["context"].(string); ok {
 		config.Context = context
 	}
+	if providerCredentialID, ok := genericMap["providerCredentialId"].(string); ok {
+		config.ProviderCredentialID = providerCredentialID
+	}
+	if providerMode, ok := genericMap["providerMode"].(string); ok {
+		config.ProviderMode = providerMode
+	}
+	if gitlabCredential, ok := parseGitLabCredential(genericMap["gitlabCredential"]); ok {
+		config.GitLabCredential = gitlabCredential
+	}
 	if branchOnly, ok := genericMap["branchOnly"].(bool); ok {
 		config.BranchOnly = branchOnly
 	}
@@ -186,6 +198,9 @@ func parseYAMLWithUnknownFieldsAndPrompts(data []byte) (*models.RunConfig, *prom
 		Title:                 config.Title,
 		Context:               config.Context,
 		Files:                 config.Files,
+		ProviderCredentialID:  config.ProviderCredentialID,
+		ProviderMode:          config.ProviderMode,
+		GitLabCredential:      config.GitLabCredential,
 		BranchOnly:            config.BranchOnly,
 		AcknowledgePromptRisk: config.AcknowledgePromptRisk,
 	}
@@ -217,6 +232,9 @@ func findUnsupportedYAMLFieldsWithSuggestions(data map[string]interface{}) ([]st
 		"title":                 true,
 		"context":               true,
 		"files":                 true,
+		"providerCredentialId":  true,
+		"providerMode":          true,
+		"gitlabCredential":      true,
 		"branchOnly":            true,
 		"acknowledgePromptRisk": true,
 		"pullRequest":           true,
@@ -226,7 +244,8 @@ func findUnsupportedYAMLFieldsWithSuggestions(data map[string]interface{}) ([]st
 	supportedFieldsList := []string{
 		"prompt", "repository", "source", "target", "baseBranch",
 		"outputMode", "outputBranch", "prTargetBranch", "outputBranchPolicy",
-		"runType", "title", "context", "files", "branchOnly", "acknowledgePromptRisk", "pullRequest", "metadata",
+		"runType", "title", "context", "files", "providerCredentialId", "providerMode",
+		"gitlabCredential", "branchOnly", "acknowledgePromptRisk", "pullRequest", "metadata",
 	}
 
 	var unsupported []string
@@ -250,20 +269,23 @@ func findUnsupportedYAMLFieldsWithSuggestions(data map[string]interface{}) ([]st
 func validateYAMLConfigForPrompts(config *YAMLConfig) error {
 	// Convert to RunConfig for validation
 	runConfig := &models.RunConfig{
-		Prompt:             config.Prompt,
-		Repository:         config.Repository,
-		Source:             config.Source,
-		Target:             config.Target,
-		BaseBranch:         config.BaseBranch,
-		OutputMode:         config.OutputMode,
-		OutputBranch:       config.OutputBranch,
-		PRTargetBranch:     config.PRTargetBranch,
-		OutputBranchPolicy: config.OutputBranchPolicy,
-		RunType:            config.RunType,
-		Title:              config.Title,
-		Context:            config.Context,
-		Files:              config.Files,
-		BranchOnly:         config.BranchOnly,
+		Prompt:               config.Prompt,
+		Repository:           config.Repository,
+		Source:               config.Source,
+		Target:               config.Target,
+		BaseBranch:           config.BaseBranch,
+		OutputMode:           config.OutputMode,
+		OutputBranch:         config.OutputBranch,
+		PRTargetBranch:       config.PRTargetBranch,
+		OutputBranchPolicy:   config.OutputBranchPolicy,
+		RunType:              config.RunType,
+		Title:                config.Title,
+		Context:              config.Context,
+		Files:                config.Files,
+		ProviderCredentialID: config.ProviderCredentialID,
+		ProviderMode:         config.ProviderMode,
+		GitLabCredential:     config.GitLabCredential,
+		BranchOnly:           config.BranchOnly,
 	}
 
 	// Apply defaults first
@@ -280,6 +302,21 @@ func validateYAMLConfigForPrompts(config *YAMLConfig) error {
 	config.RunType = runConfig.RunType
 
 	return validationErr
+}
+
+func parseGitLabCredential(value interface{}) (*models.GitLabCredentialRequest, bool) {
+	fields, ok := value.(map[string]interface{})
+	if !ok {
+		return nil, false
+	}
+	credential := &models.GitLabCredentialRequest{}
+	if mode, ok := fields["mode"].(string); ok {
+		credential.Mode = mode
+	}
+	if tokenReferenceID, ok := fields["tokenReferenceId"].(string); ok {
+		credential.TokenReferenceID = tokenReferenceID
+	}
+	return credential, true
 }
 
 // LoadConfigFromFile loads configuration from JSON, YAML, or Markdown files
@@ -460,6 +497,9 @@ func ParseJSONFromStdinWithPrompts() (*models.RunConfig, *prompts.ValidationProm
 		Title:                 runReq.Title,
 		Context:               runReq.Context,
 		Files:                 runReq.Files,
+		ProviderCredentialID:  runReq.ProviderCredentialID,
+		ProviderMode:          runReq.ProviderMode,
+		GitLabCredential:      runReq.GitLabCredential,
 		BranchOnly:            runReq.BranchOnly,
 		AcknowledgePromptRisk: runReq.AcknowledgePromptRisk,
 	}
@@ -478,12 +518,16 @@ func findUnsupportedJSONFieldsForStdinWithSuggestions(data map[string]interface{
 		"title":                 true,
 		"context":               true,
 		"files":                 true,
+		"providerCredentialId":  true,
+		"providerMode":          true,
+		"gitlabCredential":      true,
 		"acknowledgePromptRisk": true,
 	}
 
 	supportedFieldsList := []string{
 		"prompt", "repository", "source", "target", "runType",
-		"title", "context", "files", "acknowledgePromptRisk",
+		"title", "context", "files", "providerCredentialId", "providerMode",
+		"gitlabCredential", "acknowledgePromptRisk",
 	}
 
 	var unsupported []string
