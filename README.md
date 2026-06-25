@@ -126,6 +126,9 @@ repobird pro -r your-org/your-repo "Implement OAuth"    # GLM 5.2
 # Push commits to an output branch without opening a PR
 repobird run -r your-org/your-repo -p "Update generated docs" --output-branch automation/docs --branch-only
 
+# Self-managed GitLab projects use stored token references, not raw tokens
+repobird run -r your-group/your-project -p @task.txt --gitlab-token-reference-id glref_123
+
 # Resend only after reviewing a prompt-risk acknowledgement error
 repobird run -r your-org/your-repo -p @reviewed-task.md --acknowledge-prompt-risk
 
@@ -310,9 +313,17 @@ Tasks are defined in JSON, YAML, or Markdown files with two required fields:
   "target": "feature/oauth",
   "title": "Add OAuth2 support",
   "context": "Use Google and GitHub as providers",
-  "files": ["src/auth/", "config/oauth.json"]
+  "files": ["src/auth/", "config/oauth.json"],
+  "gitlabCredential": {
+    "mode": "stored_token_reference",
+    "tokenReferenceId": "glref_123"
+  }
 }
 ```
+
+Managed GitLab.com repositories may not require `gitlabCredential`. Self-managed
+GitLab repositories require a stored token reference; never put raw provider
+tokens in task files, prompts, shell history, or logs.
 
 For complete configuration options and examples, see the [Run Configuration Guide](docs/RUN-CONFIG-FORMATS.md).
 

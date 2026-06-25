@@ -59,9 +59,17 @@ type CreateRunRequest struct {
 	Title                 string
 	Context               string
 	Files                 []string
+	ProviderCredentialID  string
+	ProviderMode          string
+	GitLabCredential      *GitLabCredentialRequest
 	BranchOnly            bool
 	AcknowledgePromptRisk bool
 	IdempotencyKey        string
+}
+
+type GitLabCredentialRequest struct {
+	Mode             string
+	TokenReferenceID string
 }
 
 // ListOptions represents options for listing runs

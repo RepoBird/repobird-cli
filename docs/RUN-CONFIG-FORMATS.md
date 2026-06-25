@@ -36,6 +36,9 @@ The `repobird run` command supports multiple configuration file formats to defin
 | `runType` | string | `run` | Type of run: `run`; `plan` is development-only during the OpenCode migration |
 | `context` | string | - | Additional context or instructions for the AI |
 | `files` | array | - | List of specific files to include in the context |
+| `providerCredentialId` | string | - | Optional provider credential reference for BYOK or enterprise provider routing |
+| `providerMode` | string | - | Optional provider mode: `bundled`, `byok-user`, or `enterprise-gateway` |
+| `gitlabCredential` | object | - | Stored GitLab credential reference. Use `mode: stored_token_reference` and `tokenReferenceId`; never put raw tokens in task files |
 | `branchOnly` | boolean | `false` | Legacy alias for `outputMode: branch` |
 | `acknowledgePromptRisk` | boolean | `false` | Explicitly acknowledge a `PROMPT_RISK_ACK_REQUIRED` response after reviewing the prompt |
 | `idempotencyKey` | string | auto-derived | Stable key for safely retrying run creation |
@@ -69,6 +72,9 @@ echo "Fix the login bug" | repobird run -r myorg/webapp -p -
 
 # Push commits to an output branch without opening a PR
 repobird run -r myorg/webapp -p "Update generated docs" --output-branch automation/docs --branch-only
+
+# Self-managed GitLab projects use stored token references, not raw tokens
+repobird run -r mygroup/myproject -p @task.txt --gitlab-token-reference-id glref_123
 
 # Retry safely with an explicit key, or bypass the local duplicate guard after review
 repobird run -r myorg/webapp -p @task.txt --idempotency-key task-2026-06-10-auth
@@ -115,6 +121,9 @@ repobird run -r myorg/webapp -p "Add unit tests for auth module" --wait --json -
 - `--basic` - Use the Basic cloud-agent preset (DeepSeek V4 Flash)
 - `--pro` - Use the Pro cloud-agent preset (GLM 5.2)
 - `--branch-only`, `--no-pr` - Push commits to the output branch without creating a PR
+- `--provider-mode` - Provider routing mode: `bundled`, `byok-user`, or `enterprise-gateway`
+- `--provider-credential-id` - Provider credential reference for BYOK or enterprise provider routing
+- `--gitlab-token-reference-id` - Stored GitLab token reference ID for self-managed GitLab repositories
 - `--acknowledge-prompt-risk` - Resend after reviewing a prompt-risk acknowledgement error
 - `--idempotency-key` - Stable key for safely retrying run creation; also sent as the `Idempotency-Key` header
 - `--force` - Bypass the local 30-second duplicate-submission guard after reviewing the duplicate
@@ -127,6 +136,11 @@ repobird run -r myorg/webapp -p "Add unit tests for auth module" --wait --json -
 - `--json` - Emit machine-readable JSON without human progress text
 
 For single-run creation, the CLI records a local submission key before the API request. If the same repository, prompt, and run type are submitted again within 30 seconds, the CLI stops before sending another POST. Use `--force` only when you intend to create another run.
+
+Managed GitLab.com repositories may not require `gitlabCredential`. Self-managed
+GitLab repositories require a stored token reference. Do not place raw GitLab
+PATs, project tokens, deploy tokens, API keys, or provider secrets in task
+files, prompts, shell history, or logs.
 
 #### JSON Format
 
@@ -146,6 +160,10 @@ Create a file `task.json`:
   "acknowledgePromptRisk": false,
   "idempotencyKey": "task-2026-06-10-auth",
   "context": "Users report being permanently locked out after 5 failed login attempts. The rate limiting should reset after 15 minutes.",
+  "gitlabCredential": {
+    "mode": "stored_token_reference",
+    "tokenReferenceId": "glref_123"
+  },
   "files": [
     "src/auth/login.js",
     "src/auth/rateLimit.js",
@@ -186,6 +204,9 @@ files:
   - src/auth/login.js
   - src/auth/rateLimit.js
   - src/utils/validation.js
+gitlabCredential:
+  mode: stored_token_reference
+  tokenReferenceId: glref_123
 ```
 
 Run with:
@@ -210,6 +231,9 @@ runType: run
 files:
   - src/auth/login.js
   - src/auth/rateLimit.js
+gitlabCredential:
+  mode: stored_token_reference
+  tokenReferenceId: glref_123
 ---
 
 # Additional Context

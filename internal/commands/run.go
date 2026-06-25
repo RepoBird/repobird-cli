@@ -29,29 +29,32 @@ import (
 )
 
 var (
-	dryRun                bool
-	follow                bool
-	wait                  bool
-	waitTimeout           time.Duration
-	waitPollInterval      = 5 * time.Second
-	repo                  string
-	prompt                string
-	source                string
-	target                string
-	baseBranch            string
-	outputMode            string
-	outputBranch          string
-	prTargetBranch        string
-	outputBranchPolicy    string
-	title                 string
-	runType               string
-	contextFlag           string
-	basicRun              bool
-	proRun                bool
-	branchOnly            bool
-	acknowledgePromptRisk bool
-	idempotencyKey        string
-	forceRun              bool
+	dryRun                 bool
+	follow                 bool
+	wait                   bool
+	waitTimeout            time.Duration
+	waitPollInterval       = 5 * time.Second
+	repo                   string
+	prompt                 string
+	source                 string
+	target                 string
+	baseBranch             string
+	outputMode             string
+	outputBranch           string
+	prTargetBranch         string
+	outputBranchPolicy     string
+	title                  string
+	runType                string
+	contextFlag            string
+	providerCredentialID   string
+	providerMode           string
+	gitlabTokenReferenceID string
+	basicRun               bool
+	proRun                 bool
+	branchOnly             bool
+	acknowledgePromptRisk  bool
+	idempotencyKey         string
+	forceRun               bool
 )
 
 type runPreset struct {
@@ -147,6 +150,9 @@ func init() {
 	runCmd.Flags().StringVar(&idempotencyKey, "idempotency-key", "", "stable key for safely retrying run creation")
 	runCmd.Flags().BoolVar(&forceRun, "force", false, "bypass the local duplicate-submission guard")
 	runCmd.Flags().StringVar(&contextFlag, "context", "", "additional context (use @file to read from file, - for stdin)")
+	runCmd.Flags().StringVar(&providerCredentialID, "provider-credential-id", "", "provider credential ID for BYOK or enterprise provider routing")
+	runCmd.Flags().StringVar(&providerMode, "provider-mode", "", "provider mode: bundled, byok-user, or enterprise-gateway")
+	runCmd.Flags().StringVar(&gitlabTokenReferenceID, "gitlab-token-reference-id", "", "stored GitLab token reference ID for self-managed GitLab repositories")
 }
 
 func runCommand(cmd *cobra.Command, args []string) error {
@@ -212,6 +218,9 @@ func runCommandWithPreset(cmd *cobra.Command, args []string, presetName string) 
 			Title:                 title,
 			RunType:               selectedRunType(selectedPreset),
 			Context:               processedContext,
+			ProviderCredentialID:  providerCredentialID,
+			ProviderMode:          providerMode,
+			GitLabCredential:      gitLabCredentialFromFlag(gitlabTokenReferenceID),
 			BranchOnly:            branchOnly,
 			AcknowledgePromptRisk: acknowledgePromptRisk,
 		}
@@ -364,6 +373,9 @@ func processSingleRun(runConfig *models.RunConfig, additionalContext string) err
 		Title:                 runConfig.Title,
 		Context:               runConfig.Context,
 		Files:                 runConfig.Files,
+		ProviderCredentialID:  runConfig.ProviderCredentialID,
+		ProviderMode:          runConfig.ProviderMode,
+		GitLabCredential:      domainGitLabCredential(runConfig.GitLabCredential),
 		BranchOnly:            runConfig.BranchOnly,
 		AcknowledgePromptRisk: runConfig.AcknowledgePromptRisk,
 		IdempotencyKey:        selectedIdempotencyKey(runConfig),
@@ -615,6 +627,9 @@ func newRunPresetCommand(presetName string) *cobra.Command {
 	cmd.Flags().StringVar(&idempotencyKey, "idempotency-key", "", "stable key for safely retrying run creation")
 	cmd.Flags().BoolVar(&forceRun, "force", false, "bypass the local duplicate-submission guard")
 	cmd.Flags().StringVar(&contextFlag, "context", "", "additional context (use @file to read from file, - for stdin)")
+	cmd.Flags().StringVar(&providerCredentialID, "provider-credential-id", "", "provider credential ID for BYOK or enterprise provider routing")
+	cmd.Flags().StringVar(&providerMode, "provider-mode", "", "provider mode: bundled, byok-user, or enterprise-gateway")
+	cmd.Flags().StringVar(&gitlabTokenReferenceID, "gitlab-token-reference-id", "", "stored GitLab token reference ID for self-managed GitLab repositories")
 	return cmd
 }
 
@@ -669,6 +684,27 @@ func selectedRunType(preset *runPreset) string {
 func applyRunPreset(runConfig *models.RunConfig, preset *runPreset) {
 	if preset != nil {
 		runConfig.RunType = preset.RunType
+	}
+}
+
+func gitLabCredentialFromFlag(tokenReferenceID string) *models.GitLabCredentialRequest {
+	tokenReferenceID = strings.TrimSpace(tokenReferenceID)
+	if tokenReferenceID == "" {
+		return nil
+	}
+	return &models.GitLabCredentialRequest{
+		Mode:             "stored_token_reference",
+		TokenReferenceID: tokenReferenceID,
+	}
+}
+
+func domainGitLabCredential(credential *models.GitLabCredentialRequest) *domain.GitLabCredentialRequest {
+	if credential == nil {
+		return nil
+	}
+	return &domain.GitLabCredentialRequest{
+		Mode:             credential.Mode,
+		TokenReferenceID: credential.TokenReferenceID,
 	}
 }
 

@@ -44,25 +44,33 @@ func (r RunID) String() string {
 
 // CreateRunRequest represents the API request to create a run
 type CreateRunRequest struct {
-	Prompt                string   `json:"prompt"`
-	RepositoryName        string   `json:"repositoryName"`
-	SourceBranch          string   `json:"sourceBranch,omitempty"`
-	TargetBranch          string   `json:"targetBranch,omitempty"`
-	BaseBranch            string   `json:"baseBranch,omitempty"`
-	OutputMode            string   `json:"outputMode,omitempty"`
-	OutputBranch          string   `json:"outputBranch,omitempty"`
-	PRTargetBranch        string   `json:"prTargetBranch,omitempty"`
-	OutputBranchPolicy    string   `json:"outputBranchPolicy,omitempty"`
-	RunType               string   `json:"runType"`
-	Agent                 string   `json:"agent,omitempty"`
-	OpenCodeModel         string   `json:"opencodeModel,omitempty"`
-	OpenCodeProvider      string   `json:"opencodeProvider,omitempty"`
-	Title                 string   `json:"title,omitempty"`
-	Context               string   `json:"context,omitempty"`
-	Files                 []string `json:"files,omitempty"`
-	BranchOnly            bool     `json:"branchOnly,omitempty"`
-	AcknowledgePromptRisk bool     `json:"acknowledgePromptRisk,omitempty"`
-	IdempotencyKey        string   `json:"idempotencyKey,omitempty"`
+	Prompt                string                   `json:"prompt"`
+	RepositoryName        string                   `json:"repositoryName"`
+	SourceBranch          string                   `json:"sourceBranch,omitempty"`
+	TargetBranch          string                   `json:"targetBranch,omitempty"`
+	BaseBranch            string                   `json:"baseBranch,omitempty"`
+	OutputMode            string                   `json:"outputMode,omitempty"`
+	OutputBranch          string                   `json:"outputBranch,omitempty"`
+	PRTargetBranch        string                   `json:"prTargetBranch,omitempty"`
+	OutputBranchPolicy    string                   `json:"outputBranchPolicy,omitempty"`
+	RunType               string                   `json:"runType"`
+	Agent                 string                   `json:"agent,omitempty"`
+	OpenCodeModel         string                   `json:"opencodeModel,omitempty"`
+	OpenCodeProvider      string                   `json:"opencodeProvider,omitempty"`
+	Title                 string                   `json:"title,omitempty"`
+	Context               string                   `json:"context,omitempty"`
+	Files                 []string                 `json:"files,omitempty"`
+	ProviderCredentialID  string                   `json:"providerCredentialId,omitempty"`
+	ProviderMode          string                   `json:"providerMode,omitempty"`
+	GitLabCredential      *GitLabCredentialRequest `json:"gitlabCredential,omitempty"`
+	BranchOnly            bool                     `json:"branchOnly,omitempty"`
+	AcknowledgePromptRisk bool                     `json:"acknowledgePromptRisk,omitempty"`
+	IdempotencyKey        string                   `json:"idempotencyKey,omitempty"`
+}
+
+type GitLabCredentialRequest struct {
+	Mode             string `json:"mode"`
+	TokenReferenceID string `json:"tokenReferenceId"`
 }
 
 // RunResponse represents the API response for a run

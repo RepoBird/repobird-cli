@@ -39,11 +39,16 @@ For the live API contract, see the [REST API Reference](https://repobird.ai/docs
   "runType": "run",
   "agent": "opencode",
   "idempotencyKey": "task-2026-06-10-auth",
+  "gitlabCredential": {
+    "mode": "stored_token_reference",
+    "tokenReferenceId": "glref_123"
+  },
   "files": ["path/to/file"]
 }
 ```
 
 `sourceBranch`/`targetBranch`, `source`/`target`, and `branchOnly` remain legacy compatibility aliases. New create-run responses return canonical branch fields.
+For self-managed GitLab repositories, send a stored `gitlabCredential` reference as shown above. Managed GitLab.com repositories may omit it. Raw GitLab tokens and provider secrets are not accepted in CLI/API run creation payloads.
 
 The CLI also sends a non-empty `idempotencyKey` as the `Idempotency-Key` header. Current CLI builds protect retries locally by blocking identical repository, prompt, and run type submissions for 30 seconds unless `--force` is passed.
 

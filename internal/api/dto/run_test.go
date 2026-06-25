@@ -138,16 +138,22 @@ func TestRunID_UnmarshalJSON(t *testing.T) {
 
 func TestCreateRunRequest_JSONFields(t *testing.T) {
 	req := CreateRunRequest{
-		Prompt:                "Fix the bug",
-		RepositoryName:        "test/repo",
-		SourceBranch:          "main",
-		TargetBranch:          "fix/bug",
-		BaseBranch:            "main",
-		OutputMode:            "branch",
-		OutputBranch:          "fix/bug",
-		OutputBranchPolicy:    "reuse",
-		RunType:               "run",
-		Agent:                 "opencode",
+		Prompt:               "Fix the bug",
+		RepositoryName:       "test/repo",
+		SourceBranch:         "main",
+		TargetBranch:         "fix/bug",
+		BaseBranch:           "main",
+		OutputMode:           "branch",
+		OutputBranch:         "fix/bug",
+		OutputBranchPolicy:   "reuse",
+		RunType:              "run",
+		Agent:                "opencode",
+		ProviderCredentialID: "cred_123",
+		ProviderMode:         "byok-user",
+		GitLabCredential: &GitLabCredentialRequest{
+			Mode:             "stored_token_reference",
+			TokenReferenceID: "glref_123",
+		},
 		BranchOnly:            true,
 		AcknowledgePromptRisk: true,
 		Title:                 "Bug Fix",
@@ -175,6 +181,8 @@ func TestCreateRunRequest_JSONFields(t *testing.T) {
 	assert.Equal(t, "reuse", result["outputBranchPolicy"])
 	assert.Equal(t, "run", result["runType"])
 	assert.Equal(t, "opencode", result["agent"])
+	assert.Equal(t, "cred_123", result["providerCredentialId"])
+	assert.Equal(t, "byok-user", result["providerMode"])
 	assert.Equal(t, true, result["branchOnly"])
 	assert.Equal(t, true, result["acknowledgePromptRisk"])
 	assert.Equal(t, "Bug Fix", result["title"])
@@ -183,6 +191,11 @@ func TestCreateRunRequest_JSONFields(t *testing.T) {
 	files, ok := result["files"].([]interface{})
 	assert.True(t, ok)
 	assert.Len(t, files, 2)
+
+	gitlabCredential, ok := result["gitlabCredential"].(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "stored_token_reference", gitlabCredential["mode"])
+	assert.Equal(t, "glref_123", gitlabCredential["tokenReferenceId"])
 }
 
 func TestCreateRunRequest_OmitsPromptRiskAcknowledgementByDefault(t *testing.T) {

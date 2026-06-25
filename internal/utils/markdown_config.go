@@ -12,23 +12,26 @@ import (
 
 // MarkdownConfig represents the frontmatter structure in markdown task files
 type MarkdownConfig struct {
-	Prompt                string                 `yaml:"prompt" json:"prompt"`
-	Repository            string                 `yaml:"repository" json:"repository"`
-	Source                string                 `yaml:"source" json:"source"`
-	Target                string                 `yaml:"target" json:"target"`
-	BaseBranch            string                 `yaml:"baseBranch" json:"baseBranch"`
-	OutputMode            string                 `yaml:"outputMode" json:"outputMode"`
-	OutputBranch          string                 `yaml:"outputBranch" json:"outputBranch"`
-	PRTargetBranch        string                 `yaml:"prTargetBranch" json:"prTargetBranch"`
-	OutputBranchPolicy    string                 `yaml:"outputBranchPolicy" json:"outputBranchPolicy"`
-	RunType               string                 `yaml:"runType" json:"runType"`
-	Title                 string                 `yaml:"title" json:"title"`
-	Context               string                 `yaml:"context" json:"context"`
-	Files                 []string               `yaml:"files" json:"files"`
-	BranchOnly            bool                   `yaml:"branchOnly" json:"branchOnly"`
-	AcknowledgePromptRisk bool                   `yaml:"acknowledgePromptRisk" json:"acknowledgePromptRisk"`
-	PullRequest           *PullRequestConfig     `yaml:"pullRequest,omitempty" json:"pullRequest,omitempty"`
-	Metadata              map[string]interface{} `yaml:"metadata,omitempty" json:"metadata,omitempty"`
+	Prompt                string                          `yaml:"prompt" json:"prompt"`
+	Repository            string                          `yaml:"repository" json:"repository"`
+	Source                string                          `yaml:"source" json:"source"`
+	Target                string                          `yaml:"target" json:"target"`
+	BaseBranch            string                          `yaml:"baseBranch" json:"baseBranch"`
+	OutputMode            string                          `yaml:"outputMode" json:"outputMode"`
+	OutputBranch          string                          `yaml:"outputBranch" json:"outputBranch"`
+	PRTargetBranch        string                          `yaml:"prTargetBranch" json:"prTargetBranch"`
+	OutputBranchPolicy    string                          `yaml:"outputBranchPolicy" json:"outputBranchPolicy"`
+	RunType               string                          `yaml:"runType" json:"runType"`
+	Title                 string                          `yaml:"title" json:"title"`
+	Context               string                          `yaml:"context" json:"context"`
+	Files                 []string                        `yaml:"files" json:"files"`
+	ProviderCredentialID  string                          `yaml:"providerCredentialId" json:"providerCredentialId"`
+	ProviderMode          string                          `yaml:"providerMode" json:"providerMode"`
+	GitLabCredential      *models.GitLabCredentialRequest `yaml:"gitlabCredential,omitempty" json:"gitlabCredential,omitempty"`
+	BranchOnly            bool                            `yaml:"branchOnly" json:"branchOnly"`
+	AcknowledgePromptRisk bool                            `yaml:"acknowledgePromptRisk" json:"acknowledgePromptRisk"`
+	PullRequest           *PullRequestConfig              `yaml:"pullRequest,omitempty" json:"pullRequest,omitempty"`
+	Metadata              map[string]interface{}          `yaml:"metadata,omitempty" json:"metadata,omitempty"`
 }
 
 // PullRequestConfig represents pull request configuration
@@ -76,6 +79,9 @@ func ParseMarkdownConfigFromReader(r io.Reader) (*models.RunConfig, string, erro
 		Title:                 config.Title,
 		Context:               config.Context,
 		Files:                 config.Files,
+		ProviderCredentialID:  config.ProviderCredentialID,
+		ProviderMode:          config.ProviderMode,
+		GitLabCredential:      config.GitLabCredential,
 		BranchOnly:            config.BranchOnly,
 		AcknowledgePromptRisk: config.AcknowledgePromptRisk,
 	}
@@ -103,6 +109,9 @@ func validateMarkdownConfig(config *MarkdownConfig) error {
 		Title:                 config.Title,
 		Context:               config.Context,
 		Files:                 config.Files,
+		ProviderCredentialID:  config.ProviderCredentialID,
+		ProviderMode:          config.ProviderMode,
+		GitLabCredential:      config.GitLabCredential,
 		BranchOnly:            config.BranchOnly,
 		AcknowledgePromptRisk: config.AcknowledgePromptRisk,
 	}
@@ -176,6 +185,22 @@ func ValidateRunConfig(config *models.RunConfig) error {
 
 	if config.OutputBranchPolicy != "" && config.OutputBranchPolicy != "create" && config.OutputBranchPolicy != "reuse" {
 		errors = append(errors, fmt.Sprintf("invalid outputBranchPolicy '%s', must be 'create' or 'reuse'", config.OutputBranchPolicy))
+	}
+
+	if config.ProviderMode != "" &&
+		config.ProviderMode != "bundled" &&
+		config.ProviderMode != "byok-user" &&
+		config.ProviderMode != "enterprise-gateway" {
+		errors = append(errors, fmt.Sprintf("invalid providerMode '%s', must be 'bundled', 'byok-user', or 'enterprise-gateway'", config.ProviderMode))
+	}
+
+	if config.GitLabCredential != nil {
+		if config.GitLabCredential.Mode != "stored_token_reference" {
+			errors = append(errors, "gitlabCredential.mode must be 'stored_token_reference'")
+		}
+		if strings.TrimSpace(config.GitLabCredential.TokenReferenceID) == "" {
+			errors = append(errors, "gitlabCredential.tokenReferenceId is required")
+		}
 	}
 
 	// Title is optional - server will generate if not provided

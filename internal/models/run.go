@@ -36,67 +36,81 @@ const (
 )
 
 type RunRequest struct {
-	Prompt                string   `json:"prompt"`
-	Repository            string   `json:"repository"` // User-facing field name
-	Source                string   `json:"source"`     // Legacy alias for baseBranch
-	Target                string   `json:"target"`     // Legacy alias; branch-only maps to outputBranch
-	BaseBranch            string   `json:"baseBranch,omitempty"`
-	OutputMode            string   `json:"outputMode,omitempty"`
-	OutputBranch          string   `json:"outputBranch,omitempty"`
-	PRTargetBranch        string   `json:"prTargetBranch,omitempty"`
-	OutputBranchPolicy    string   `json:"outputBranchPolicy,omitempty"`
-	RunType               RunType  `json:"runType"`
-	Title                 string   `json:"title,omitempty"`
-	Context               string   `json:"context,omitempty"`
-	Files                 []string `json:"files,omitempty"`
-	BranchOnly            bool     `json:"branchOnly,omitempty"`
-	AcknowledgePromptRisk bool     `json:"acknowledgePromptRisk,omitempty"`
-	IdempotencyKey        string   `json:"idempotencyKey,omitempty"`
+	Prompt                string                   `json:"prompt"`
+	Repository            string                   `json:"repository"` // User-facing field name
+	Source                string                   `json:"source"`     // Legacy alias for baseBranch
+	Target                string                   `json:"target"`     // Legacy alias; branch-only maps to outputBranch
+	BaseBranch            string                   `json:"baseBranch,omitempty"`
+	OutputMode            string                   `json:"outputMode,omitempty"`
+	OutputBranch          string                   `json:"outputBranch,omitempty"`
+	PRTargetBranch        string                   `json:"prTargetBranch,omitempty"`
+	OutputBranchPolicy    string                   `json:"outputBranchPolicy,omitempty"`
+	RunType               RunType                  `json:"runType"`
+	Title                 string                   `json:"title,omitempty"`
+	Context               string                   `json:"context,omitempty"`
+	Files                 []string                 `json:"files,omitempty"`
+	ProviderCredentialID  string                   `json:"providerCredentialId,omitempty"`
+	ProviderMode          string                   `json:"providerMode,omitempty"`
+	GitLabCredential      *GitLabCredentialRequest `json:"gitlabCredential,omitempty"`
+	BranchOnly            bool                     `json:"branchOnly,omitempty"`
+	AcknowledgePromptRisk bool                     `json:"acknowledgePromptRisk,omitempty"`
+	IdempotencyKey        string                   `json:"idempotencyKey,omitempty"`
+}
+
+type GitLabCredentialRequest struct {
+	Mode             string `json:"mode" yaml:"mode"`
+	TokenReferenceID string `json:"tokenReferenceId" yaml:"tokenReferenceId"`
 }
 
 // RunConfig is a unified configuration structure for both JSON and Markdown configs
 type RunConfig struct {
-	Prompt                string   `json:"prompt" yaml:"prompt"`
-	Repository            string   `json:"repository" yaml:"repository"`
-	Source                string   `json:"source" yaml:"source"`
-	Target                string   `json:"target" yaml:"target"`
-	BaseBranch            string   `json:"baseBranch,omitempty" yaml:"baseBranch,omitempty"`
-	OutputMode            string   `json:"outputMode,omitempty" yaml:"outputMode,omitempty"`
-	OutputBranch          string   `json:"outputBranch,omitempty" yaml:"outputBranch,omitempty"`
-	PRTargetBranch        string   `json:"prTargetBranch,omitempty" yaml:"prTargetBranch,omitempty"`
-	OutputBranchPolicy    string   `json:"outputBranchPolicy,omitempty" yaml:"outputBranchPolicy,omitempty"`
-	RunType               string   `json:"runType" yaml:"runType"`
-	Title                 string   `json:"title,omitempty" yaml:"title,omitempty"`
-	Context               string   `json:"context,omitempty" yaml:"context,omitempty"`
-	Files                 []string `json:"files,omitempty" yaml:"files,omitempty"`
-	BranchOnly            bool     `json:"branchOnly,omitempty" yaml:"branchOnly,omitempty"`
-	AcknowledgePromptRisk bool     `json:"acknowledgePromptRisk,omitempty" yaml:"acknowledgePromptRisk,omitempty"`
-	IdempotencyKey        string   `json:"idempotencyKey,omitempty" yaml:"idempotencyKey,omitempty"`
+	Prompt                string                   `json:"prompt" yaml:"prompt"`
+	Repository            string                   `json:"repository" yaml:"repository"`
+	Source                string                   `json:"source" yaml:"source"`
+	Target                string                   `json:"target" yaml:"target"`
+	BaseBranch            string                   `json:"baseBranch,omitempty" yaml:"baseBranch,omitempty"`
+	OutputMode            string                   `json:"outputMode,omitempty" yaml:"outputMode,omitempty"`
+	OutputBranch          string                   `json:"outputBranch,omitempty" yaml:"outputBranch,omitempty"`
+	PRTargetBranch        string                   `json:"prTargetBranch,omitempty" yaml:"prTargetBranch,omitempty"`
+	OutputBranchPolicy    string                   `json:"outputBranchPolicy,omitempty" yaml:"outputBranchPolicy,omitempty"`
+	RunType               string                   `json:"runType" yaml:"runType"`
+	Title                 string                   `json:"title,omitempty" yaml:"title,omitempty"`
+	Context               string                   `json:"context,omitempty" yaml:"context,omitempty"`
+	Files                 []string                 `json:"files,omitempty" yaml:"files,omitempty"`
+	ProviderCredentialID  string                   `json:"providerCredentialId,omitempty" yaml:"providerCredentialId,omitempty"`
+	ProviderMode          string                   `json:"providerMode,omitempty" yaml:"providerMode,omitempty"`
+	GitLabCredential      *GitLabCredentialRequest `json:"gitlabCredential,omitempty" yaml:"gitlabCredential,omitempty"`
+	BranchOnly            bool                     `json:"branchOnly,omitempty" yaml:"branchOnly,omitempty"`
+	AcknowledgePromptRisk bool                     `json:"acknowledgePromptRisk,omitempty" yaml:"acknowledgePromptRisk,omitempty"`
+	IdempotencyKey        string                   `json:"idempotencyKey,omitempty" yaml:"idempotencyKey,omitempty"`
 }
 
 // APIRunRequest is the structure that matches the actual API expectations
 type APIRunRequest struct {
-	Prompt                string   `json:"prompt"`
-	RepositoryName        string   `json:"repositoryName"`
-	SourceBranch          string   `json:"sourceBranch,omitempty"`
-	TargetBranch          string   `json:"targetBranch,omitempty"`
-	BaseBranch            string   `json:"baseBranch,omitempty"`
-	OutputMode            string   `json:"outputMode,omitempty"`
-	OutputBranch          string   `json:"outputBranch,omitempty"`
-	PRTargetBranch        string   `json:"prTargetBranch,omitempty"`
-	OutputBranchPolicy    string   `json:"outputBranchPolicy,omitempty"`
-	RunType               RunType  `json:"runType"`
-	Agent                 string   `json:"agent,omitempty"`
-	OpenCodeModel         string   `json:"opencodeModel,omitempty"`
-	OpenCodeProvider      string   `json:"opencodeProvider,omitempty"`
-	Title                 string   `json:"title,omitempty"`
-	Context               string   `json:"context,omitempty"`
-	Files                 []string `json:"files,omitempty"`
-	FileHash              string   `json:"fileHash,omitempty"`
-	Force                 bool     `json:"force,omitempty"`
-	BranchOnly            bool     `json:"branchOnly,omitempty"`
-	AcknowledgePromptRisk bool     `json:"acknowledgePromptRisk,omitempty"`
-	IdempotencyKey        string   `json:"idempotencyKey,omitempty"`
+	Prompt                string                   `json:"prompt"`
+	RepositoryName        string                   `json:"repositoryName"`
+	SourceBranch          string                   `json:"sourceBranch,omitempty"`
+	TargetBranch          string                   `json:"targetBranch,omitempty"`
+	BaseBranch            string                   `json:"baseBranch,omitempty"`
+	OutputMode            string                   `json:"outputMode,omitempty"`
+	OutputBranch          string                   `json:"outputBranch,omitempty"`
+	PRTargetBranch        string                   `json:"prTargetBranch,omitempty"`
+	OutputBranchPolicy    string                   `json:"outputBranchPolicy,omitempty"`
+	RunType               RunType                  `json:"runType"`
+	Agent                 string                   `json:"agent,omitempty"`
+	OpenCodeModel         string                   `json:"opencodeModel,omitempty"`
+	OpenCodeProvider      string                   `json:"opencodeProvider,omitempty"`
+	Title                 string                   `json:"title,omitempty"`
+	Context               string                   `json:"context,omitempty"`
+	Files                 []string                 `json:"files,omitempty"`
+	FileHash              string                   `json:"fileHash,omitempty"`
+	Force                 bool                     `json:"force,omitempty"`
+	ProviderCredentialID  string                   `json:"providerCredentialId,omitempty"`
+	ProviderMode          string                   `json:"providerMode,omitempty"`
+	GitLabCredential      *GitLabCredentialRequest `json:"gitlabCredential,omitempty"`
+	BranchOnly            bool                     `json:"branchOnly,omitempty"`
+	AcknowledgePromptRisk bool                     `json:"acknowledgePromptRisk,omitempty"`
+	IdempotencyKey        string                   `json:"idempotencyKey,omitempty"`
 }
 
 // ToAPIRequest converts user-facing RunRequest to API-compatible structure
@@ -128,6 +142,9 @@ func (r *RunRequest) ToAPIRequest() *APIRunRequest {
 		Title:                 r.Title,
 		Context:               r.Context,
 		Files:                 r.Files,
+		ProviderCredentialID:  r.ProviderCredentialID,
+		ProviderMode:          r.ProviderMode,
+		GitLabCredential:      r.GitLabCredential,
 		BranchOnly:            config.BranchOnly,
 		AcknowledgePromptRisk: r.AcknowledgePromptRisk,
 		IdempotencyKey:        r.IdempotencyKey,
@@ -383,6 +400,9 @@ func parseJSONWithUnknownFieldsAndPrompts(file *os.File) (*RunConfig, *prompts.V
 		Title:                 runReq.Title,
 		Context:               runReq.Context,
 		Files:                 runReq.Files,
+		ProviderCredentialID:  runReq.ProviderCredentialID,
+		ProviderMode:          runReq.ProviderMode,
+		GitLabCredential:      runReq.GitLabCredential,
 		BranchOnly:            runReq.BranchOnly,
 		AcknowledgePromptRisk: runReq.AcknowledgePromptRisk,
 		IdempotencyKey:        runReq.IdempotencyKey,
@@ -413,6 +433,9 @@ func findUnsupportedJSONFieldsWithSuggestions(data map[string]interface{}) ([]st
 		"title":                 true,
 		"context":               true,
 		"files":                 true,
+		"providerCredentialId":  true,
+		"providerMode":          true,
+		"gitlabCredential":      true,
 		"branchOnly":            true,
 		"acknowledgePromptRisk": true,
 		"idempotencyKey":        true,
@@ -421,7 +444,8 @@ func findUnsupportedJSONFieldsWithSuggestions(data map[string]interface{}) ([]st
 	supportedFieldsList := []string{
 		"prompt", "repository", "source", "target", "baseBranch",
 		"outputMode", "outputBranch", "prTargetBranch", "outputBranchPolicy",
-		"runType", "title", "context", "files", "branchOnly", "acknowledgePromptRisk", "idempotencyKey",
+		"runType", "title", "context", "files", "providerCredentialId", "providerMode",
+		"gitlabCredential", "branchOnly", "acknowledgePromptRisk", "idempotencyKey",
 	}
 
 	var unsupported []string
