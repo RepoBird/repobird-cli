@@ -36,7 +36,7 @@ For the live API contract, see the [REST API Reference](https://repobird.ai/docs
   "outputBranch": "repobird/fix-authentication",
   "prTargetBranch": "release",
   "outputBranchPolicy": "create",
-  "runType": "run",
+  "runType": "pro",
   "agent": "opencode",
   "idempotencyKey": "task-2026-06-10-auth",
   "gitlabCredential": {
@@ -48,6 +48,7 @@ For the live API contract, see the [REST API Reference](https://repobird.ai/docs
 ```
 
 `sourceBranch`/`targetBranch`, `source`/`target`, and `branchOnly` remain legacy compatibility aliases. New create-run responses return canonical branch fields.
+For direct API integrations, send `runType: "basic"` or `runType: "pro"` explicitly. CLI task files may still use `runType: "run"` for compatibility; the API currently normalizes unknown or CLI-style run types to Pro semantics.
 For self-managed GitLab repositories, send a stored `gitlabCredential` reference as shown above. Managed GitLab.com repositories may omit it. Raw GitLab tokens and provider secrets are not accepted in CLI/API run creation payloads.
 
 The CLI also sends a non-empty `idempotencyKey` as the `Idempotency-Key` header. Current CLI builds protect retries locally by blocking identical repository, prompt, and run type submissions for 30 seconds unless `--force` is passed.
@@ -225,7 +226,7 @@ run, err := client.CreateRunWithRetry(ctx, &api.RunRequest{
     Repository:   "org/repo",
     BaseBranch:   "main",
     OutputMode:   "pull_request",
-    RunType:      "run",
+    RunType:      "pro",
 })
 
 // Poll for completion

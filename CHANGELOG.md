@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Add common use-case guides and default skill references for RepoBird CI automation, agent hooks, language/framework recipes, and API integration.
+
 ## [0.10.0] - 2026-06-26
 
 ### Added
