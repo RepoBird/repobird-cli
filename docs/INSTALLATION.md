@@ -1,133 +1,65 @@
 # RepoBird CLI Installation Guide
 
-Multiple installation methods are available for RepoBird CLI across all major platforms. Choose the method that works best for your setup.
+GitHub Releases are the canonical artifact host for RepoBird CLI. The repobird.ai install URLs are thin web entrypoints that should serve or redirect to the scripts in this repository.
 
-## Quick Install (Recommended)
+## Quick Install
 
-### One-liner Install Script
+### Linux/macOS
+
 ```bash
-curl -fsSL https://get.repobird.ai | sh
+curl -fsSL https://repobird.ai/install.sh | sh
 ```
 
-This script automatically detects your OS and architecture, downloads the appropriate binary, and installs it with proper permissions.
+Equivalent install page:
 
-## Package Manager Installation
-
-### macOS
-
-#### Homebrew
-```bash
-brew install repobird/tap/repobird
+```text
+https://repobird.ai/install
 ```
 
-#### MacPorts
+The script detects your OS and architecture, downloads the matching GitHub Release archive, verifies it against `checksums.txt`, installs `repobird` to `~/.local/bin`, and creates the `rb` alias.
+
+Pin a specific release by setting `REPOBIRD_VERSION` to the tag:
+
 ```bash
-sudo port install repobird
+curl -fsSL https://repobird.ai/install.sh | REPOBIRD_VERSION=v1.2.3 sh
 ```
 
-### Linux
+Install somewhere else with `REPOBIRD_INSTALL_DIR`:
 
-#### Ubuntu/Debian (APT)
 ```bash
-# Add repository
-curl -fsSL https://apt.repobird.ai/gpg | sudo apt-key add -
-echo "deb https://apt.repobird.ai stable main" | sudo tee /etc/apt/sources.list.d/repobird.list
-
-# Install
-sudo apt update
-sudo apt install repobird
+curl -fsSL https://repobird.ai/install.sh | REPOBIRD_INSTALL_DIR=/usr/local/bin sh
 ```
 
-#### Fedora/RHEL/CentOS (YUM/DNF)
-```bash
-# Add repository
-sudo tee /etc/yum.repos.d/repobird.repo << EOF
-[repobird]
-name=RepoBird CLI Repository
-baseurl=https://yum.repobird.ai
-enabled=1
-gpgcheck=1
-gpgkey=https://yum.repobird.ai/gpg
-EOF
+### Windows PowerShell
 
-# Install
-sudo dnf install repobird
-# or: sudo yum install repobird
-```
-
-#### Arch Linux (AUR)
-```bash
-# Using yay
-yay -S repobird-bin
-
-# Using paru
-paru -S repobird-bin
-
-# Manual installation
-git clone https://aur.archlinux.org/repobird-bin.git
-cd repobird-bin
-makepkg -si
-```
-
-#### Universal Linux (Snap)
-```bash
-sudo snap install repobird
-```
-
-#### openSUSE (Zypper)
-```bash
-sudo zypper addrepo https://download.opensuse.org/repositories/home:repobird/openSUSE_Tumbleweed/home:repobird.repo
-sudo zypper refresh
-sudo zypper install repobird
-```
-
-### Windows
-
-#### Chocolatey
 ```powershell
-choco install repobird
+iwr -useb https://repobird.ai/install.ps1 | iex
 ```
 
-#### Scoop
+Install a specific release:
+
 ```powershell
-scoop bucket add repobird https://github.com/repobird/scoop-bucket
-scoop install repobird
+& ([scriptblock]::Create((iwr -useb https://repobird.ai/install.ps1).Content)) -Version v1.2.3
 ```
 
-#### Winget
-```powershell
-winget install repobird.cli
-```
-
-### Container Images
-
-#### Docker
-```bash
-docker run --rm -it ghcr.io/repobird/repobird-cli:latest
-```
-
-#### Podman
-```bash
-podman run --rm -it ghcr.io/repobird/repobird-cli:latest
-```
-
-## Manual Installation
+## Release Artifacts
 
 ### Download Binary
 
 1. Visit the [releases page](https://github.com/repobird/repobird-cli/releases)
 2. Download the appropriate binary for your OS and architecture:
-   - `repobird_linux_amd64.tar.gz` - Linux 64-bit
-   - `repobird_linux_arm64.tar.gz` - Linux ARM64
-   - `repobird_darwin_amd64.tar.gz` - macOS Intel
-   - `repobird_darwin_arm64.tar.gz` - macOS Apple Silicon
-   - `repobird_windows_amd64.zip` - Windows 64-bit
+   - `repobird-cli_linux_amd64.tar.gz` - Linux 64-bit
+   - `repobird-cli_linux_arm64.tar.gz` - Linux ARM64
+   - `repobird-cli_darwin_amd64.tar.gz` - macOS Intel
+   - `repobird-cli_darwin_arm64.tar.gz` - macOS Apple Silicon
+   - `repobird-cli_windows_amd64.zip` - Windows 64-bit
+   - `repobird-cli_windows_386.zip` - Windows 32-bit
 
 ### Linux/macOS Installation
 
 ```bash
 # Download and extract
-curl -L -o repobird.tar.gz "https://github.com/repobird/repobird-cli/releases/latest/download/repobird_linux_amd64.tar.gz"
+curl -L -o repobird.tar.gz "https://github.com/RepoBird/repobird-cli/releases/latest/download/repobird-cli_linux_amd64.tar.gz"
 tar -xzf repobird.tar.gz
 
 # Install to local bin
@@ -144,6 +76,15 @@ export PATH="$HOME/.local/bin:$PATH"
 1. Download the Windows ZIP file
 2. Extract `repobird.exe` to a directory like `C:\Program Files\RepoBird\`
 3. Add the directory to your PATH environment variable
+
+## Package manager follow-ups
+
+Package manager distribution is not the canonical first-party path yet. Track these as follow-up work after GitHub Release installers are stable:
+
+- Homebrew tap for macOS/Linux.
+- Scoop or Winget distribution for Windows.
+- Optional Chocolatey support if a Windows packaging workflow is maintained.
+- Optional APT/RPM repositories if custom repository hosting becomes worth the operational cost.
 
 ## Development Installation
 

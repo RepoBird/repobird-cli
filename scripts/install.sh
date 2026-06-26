@@ -1,14 +1,16 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 # RepoBird CLI One-Line Installer
-# Usage: curl -fsSL https://get.repobird.ai | sh
-# Or: wget -qO- https://get.repobird.ai | sh
+# Usage: curl -fsSL https://repobird.ai/install.sh | sh
+# Or: wget -qO- https://repobird.ai/install.sh | sh
 
 # Constants
 GITHUB_REPO="RepoBird/repobird-cli"
+PROJECT_NAME="repobird-cli"
 BINARY_NAME="repobird"
-INSTALL_DIR="$HOME/.local/bin"
+INSTALL_DIR="${REPOBIRD_INSTALL_DIR:-$HOME/.local/bin}"
+REPOBIRD_VERSION="${REPOBIRD_VERSION:-latest}"
 ALIAS_NAME="rb"
 
 # Colors for output
@@ -69,20 +71,30 @@ detect_platform() {
     echo "${os}_${arch}"
 }
 
-# Get latest version from GitHub API
-get_latest_version() {
-    local api_url="https://api.github.com/repos/${GITHUB_REPO}/releases/latest"
-    
-    # Try with curl first
+download_file() {
+    local url=$1
+    local output=$2
+
     if command -v curl >/dev/null 2>&1; then
-        curl -s "$api_url" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/'
-    # Fall back to wget
+        curl -fsSL -o "$output" "$url"
     elif command -v wget >/dev/null 2>&1; then
-        wget -qO- "$api_url" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/'
+        wget -qO "$output" "$url"
     else
         error "Neither curl nor wget found. Cannot download."
         exit 1
     fi
+}
+
+release_download_url() {
+    local version=$1
+    local filename=$2
+
+    if [ "$version" = "latest" ]; then
+        echo "https://github.com/${GITHUB_REPO}/releases/latest/download/${filename}"
+        return
+    fi
+
+    echo "https://github.com/${GITHUB_REPO}/releases/download/${version}/${filename}"
 }
 
 # Check if we have required tools
@@ -118,7 +130,7 @@ install_binary() {
     local extract_cmd=""
     
     if [[ $platform == *"windows"* ]]; then
-        filename="${BINARY_NAME}-cli_${platform}.zip"
+        filename="${PROJECT_NAME}_${platform}.zip"
         extract_cmd="unzip -q"
         
         if ! command -v unzip >/dev/null 2>&1; then
@@ -126,30 +138,25 @@ install_binary() {
             exit 1
         fi
     else
-        filename="${BINARY_NAME}-cli_${platform}.tar.gz"
+        filename="${PROJECT_NAME}_${platform}.tar.gz"
         extract_cmd="tar -xzf"
     fi
     
-    local download_url="https://github.com/${GITHUB_REPO}/releases/download/${version}/${filename}"
+    local download_url
+    download_url=$(release_download_url "$version" "$filename")
     local archive_path="${temp_dir}/${filename}"
     
     log "Downloading from: $download_url"
     
-    # Download
-    if command -v curl >/dev/null 2>&1; then
-        curl -L -o "$archive_path" "$download_url"
-    elif command -v wget >/dev/null 2>&1; then
-        wget -O "$archive_path" "$download_url"
-    else
-        error "Neither curl nor wget found. Cannot download."
-        exit 1
-    fi
+    download_file "$download_url" "$archive_path"
     
     # Verify download
     if [ ! -f "$archive_path" ]; then
         error "Download failed: $archive_path not found"
         exit 1
     fi
+
+    verify_checksum "$temp_dir" "$filename" "$archive_path" "$version"
     
     log "Download complete, extracting..."
     
@@ -194,6 +201,45 @@ install_binary() {
     if [[ ! $platform == *"windows"* ]]; then
         log "✓ Created alias 'rb' -> 'repobird'"
     fi
+}
+
+verify_checksum() {
+    local temp_dir=$1
+    local filename=$2
+    local archive_path=$3
+    local version=$4
+    local checksums_path="${temp_dir}/checksums.txt"
+    local checksums_url
+    local expected
+    local actual
+
+    checksums_url=$(release_download_url "$version" "checksums.txt")
+    log "Downloading checksums from: $checksums_url"
+    download_file "$checksums_url" "$checksums_path"
+
+    expected=$(awk -v file="$filename" '$2 == file { print $1 }' "$checksums_path" | head -1)
+    if [ -z "$expected" ]; then
+        error "Checksum for $filename not found in checksums.txt"
+        exit 1
+    fi
+
+    if command -v sha256sum >/dev/null 2>&1; then
+        actual=$(sha256sum "$archive_path" | awk '{ print $1 }')
+    elif command -v shasum >/dev/null 2>&1; then
+        actual=$(shasum -a 256 "$archive_path" | awk '{ print $1 }')
+    else
+        error "Neither sha256sum nor shasum found. Cannot verify checksum."
+        exit 1
+    fi
+
+    if [ "$actual" != "$expected" ]; then
+        error "Checksum verification failed for $filename"
+        error "Expected: $expected"
+        error "Actual:   $actual"
+        exit 1
+    fi
+
+    log "Checksum verified for $filename"
 }
 
 # Setup shell completions
@@ -307,13 +353,10 @@ EOF
     
     check_dependencies
     
-    local platform=$(detect_platform)
-    local version=$(get_latest_version)
-    
-    if [ -z "$version" ]; then
-        error "Could not determine latest version"
-        exit 1
-    fi
+    local platform
+    local version
+    platform=$(detect_platform)
+    version="$REPOBIRD_VERSION"
     
     install_binary "$platform" "$version"
     check_path
