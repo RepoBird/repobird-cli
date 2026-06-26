@@ -1,6 +1,8 @@
 project: RepoBird CLI
 versions:
-    unreleased: {}
+    unreleased:
+        added:
+            - Add first-party GitHub Release installer distribution with stable repobird.ai entrypoints and checksum verification.
     0.9.0:
         date: 2026-06-25
         added:

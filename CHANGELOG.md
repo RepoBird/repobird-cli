@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Add first-party GitHub Release installer distribution with stable repobird.ai entrypoints and checksum verification.
+
 ## [0.9.0] - 2026-06-25
 
 ### Added
