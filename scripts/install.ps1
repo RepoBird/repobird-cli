@@ -1,6 +1,6 @@
 # RepoBird CLI Windows Installer
-# Usage: iwr -useb https://get.repobird.ai/windows | iex
-# Or: Invoke-WebRequest -Uri https://get.repobird.ai/windows -UseBasicParsing | Invoke-Expression
+# Usage: iwr -useb https://repobird.ai/install.ps1 | iex
+# Or: Invoke-WebRequest -Uri https://repobird.ai/install.ps1 -UseBasicParsing | Invoke-Expression
 
 param(
     [string]$InstallDir = "$env:USERPROFILE\.local\bin",
@@ -9,7 +9,8 @@ param(
 )
 
 # Constants
-$GITHUB_REPO = "repobird/repobird-cli"
+$GITHUB_REPO = "RepoBird/repobird-cli"
+$PROJECT_NAME = "repobird-cli"
 $BINARY_NAME = "repobird"
 
 # Colors
@@ -51,14 +52,20 @@ function Get-Architecture {
 }
 
 function Get-LatestVersion {
-    try {
-        $apiUrl = "https://api.github.com/repos/$GITHUB_REPO/releases/latest"
-        $response = Invoke-RestMethod -Uri $apiUrl -UseBasicParsing
-        return $response.tag_name
-    } catch {
-        Write-Error "Failed to get latest version: $($_.Exception.Message)"
-        return $null
+    return "latest"
+}
+
+function Get-ReleaseDownloadUrl {
+    param(
+        [string]$Version,
+        [string]$Filename
+    )
+
+    if ($Version -eq "latest") {
+        return "https://github.com/$GITHUB_REPO/releases/latest/download/$filename"
     }
+
+    return "https://github.com/$GITHUB_REPO/releases/download/$Version/$Filename"
 }
 
 function Test-AdminRights {
@@ -85,8 +92,8 @@ function Install-Binary {
     
     try {
         # Construct download URL
-        $filename = "${BINARY_NAME}_${platform}.zip"
-        $downloadUrl = "https://github.com/$GITHUB_REPO/releases/download/$Version/$filename"
+        $filename = "${PROJECT_NAME}_${platform}.zip"
+        $downloadUrl = Get-ReleaseDownloadUrl -Version $Version -Filename $filename
         $archivePath = Join-Path $tempDir.FullName $filename
         
         Write-Log "Downloading from: $downloadUrl" -Color $Green
@@ -102,6 +109,10 @@ function Install-Binary {
         # Verify download
         if (-not (Test-Path $archivePath)) {
             Write-Error "Download failed: $archivePath not found"
+            return $false
+        }
+
+        if (-not (Test-Checksum -Version $Version -Filename $filename -ArchivePath $archivePath -TempDir $tempDir.FullName)) {
             return $false
         }
         
@@ -162,6 +173,50 @@ function Install-Binary {
         # Cleanup
         Remove-Item $tempDir.FullName -Recurse -Force -ErrorAction SilentlyContinue
     }
+}
+
+function Test-Checksum {
+    param(
+        [string]$Version,
+        [string]$Filename,
+        [string]$ArchivePath,
+        [string]$TempDir
+    )
+
+    $checksumsUrl = Get-ReleaseDownloadUrl -Version $Version -Filename "checksums.txt"
+    $checksumsPath = Join-Path $TempDir "checksums.txt"
+
+    Write-Log "Downloading checksums from: $checksumsUrl" -Color $Green
+
+    try {
+        Invoke-WebRequest -Uri $checksumsUrl -OutFile $checksumsPath -UseBasicParsing
+    } catch {
+        Write-Error "Checksum download failed: $($_.Exception.Message)"
+        return $false
+    }
+
+    $checksumLine = Get-Content $checksumsPath | Where-Object {
+        $parts = $_ -split '\s+'
+        $parts.Count -ge 2 -and $parts[1] -eq $Filename
+    } | Select-Object -First 1
+
+    if (-not $checksumLine) {
+        Write-Error "Checksum for $Filename not found in checksums.txt"
+        return $false
+    }
+
+    $expected = ($checksumLine -split '\s+')[0].ToLowerInvariant()
+    $actual = (Get-FileHash -Algorithm SHA256 -Path $ArchivePath).Hash.ToLowerInvariant()
+
+    if ($actual -ne $expected) {
+        Write-Error "Checksum verification failed for $Filename"
+        Write-Error "Expected: $expected"
+        Write-Error "Actual:   $actual"
+        return $false
+    }
+
+    Write-Log "Checksum verified for $Filename" -Color $Green
+    return $true
 }
 
 function Update-Path {

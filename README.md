@@ -54,7 +54,13 @@ Write your issue description once, and autonomous OpenCode-based agents handle t
 ### Quick Install (Linux/macOS)
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/RepoBird/repobird-cli/main/scripts/install.sh | bash
+curl -fsSL https://repobird.ai/install.sh | sh
+```
+
+Windows PowerShell:
+
+```powershell
+iwr -useb https://repobird.ai/install.ps1 | iex
 ```
 
 ### Direct Download
@@ -77,7 +83,7 @@ sudo mv repobird /usr/local/bin/
 ```
 
 #### Windows
-Download the latest ZIP from the [releases page](https://github.com/RepoBird/repobird-cli/releases) and extract `repobird.exe`.
+Download `repobird-cli_windows_amd64.zip` from the [latest release](https://github.com/RepoBird/repobird-cli/releases/latest) and extract `repobird.exe`.
 
 ### Build from Source
 

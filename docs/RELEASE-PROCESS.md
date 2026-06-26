@@ -133,6 +133,22 @@ During the release process, these artifacts are generated:
 
 These are automatically cleaned up and not committed to git.
 
+### Installer Distribution Contract
+
+GitHub Releases are the canonical host for CLI installers and binary archives. The web app should expose `https://repobird.ai/install`, `https://repobird.ai/install.sh`, and `https://repobird.ai/install.ps1` as thin install pages, script responses, or redirects to this repository's installer scripts.
+
+GoReleaser archive names must remain stable because the installers and web entrypoints depend on `releases/latest/download/<asset>` URLs:
+
+- `repobird-cli_darwin_amd64.tar.gz`
+- `repobird-cli_darwin_arm64.tar.gz`
+- `repobird-cli_linux_amd64.tar.gz`
+- `repobird-cli_linux_arm64.tar.gz`
+- `repobird-cli_windows_amd64.zip`
+- `repobird-cli_windows_386.zip`
+- `checksums.txt`
+
+The shell and PowerShell installers verify downloaded archives against `checksums.txt` before installing. Do not change `.goreleaser.yml` `archives.name_template` or `checksum.name_template` without updating both installers and `docs/INSTALLATION.md`.
+
 ## Common Operations
 
 ### Reset a Failed Release
