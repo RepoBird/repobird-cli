@@ -1,6 +1,8 @@
 project: RepoBird CLI
 versions:
-    unreleased: {}
+    unreleased:
+        added:
+            - Add common use-case guides and default skill references for RepoBird CI automation, agent hooks, language/framework recipes, and API integration.
     0.10.0:
         date: 2026-06-26
         added:

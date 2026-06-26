@@ -4,8 +4,11 @@ description: >
   Use when installing, configuring, using, troubleshooting, or developing with
   the RepoBird CLI. Covers authentication, run submission, Basic/Pro cloud agent
   presets, branch-only and PR workflows, repository defaults, status monitoring,
-  config files, examples, completions, and local development commands. Agents
-  should avoid the experimental human-only TUI and use non-interactive commands.
+  config files, examples, completions, local development commands, CI
+  automation, Claude/Codex hooks, direct API integrations, documentation
+  updates, lint/format fixes, unit-test workflows, and framework-specific
+  maintenance. Agents should avoid the experimental human-only TUI and use
+  non-interactive commands.
 ---
 
 # RepoBird CLI
@@ -267,6 +270,21 @@ repobird repo defaults repo_123 --clear-base
 repobird repo defaults repo_123 --clear-pr-target
 repobird repo defaults repo_123 --clear-output
 ```
+
+## Integration Workflows
+
+For CI jobs, Claude Code hooks, Codex hooks, scheduled maintenance, framework
+recipes, documentation-update automation, lint/format repair, unit-test repair,
+or direct REST API clients, read only the relevant reference file:
+
+- Overview and safety rules: `references/integrations.md`
+- CI automation: `references/ci.md`
+- Agent hooks and local wrappers: `references/agent-hooks.md`
+- Language and framework starter prompts: `references/language-recipes.md`
+- Direct REST API clients: `references/api.md`
+
+Prefer the CLI for shell automation. Use direct API calls only when the
+integration already owns HTTP clients, retries, telemetry, and secret handling.
 
 ## Monitoring
 

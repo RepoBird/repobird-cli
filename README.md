@@ -105,7 +105,9 @@ Install the default skill so your coding agent knows how to use RepoBird CLI:
 npx skills add RepoBird/repobird-cli
 ```
 
-Then ask your agent to use the `repobird-cli` skill when you want it to submit, monitor, or troubleshoot RepoBird runs from your terminal.
+Then ask your agent to use the `repobird-cli` skill when you want it to submit,
+monitor, troubleshoot, or integrate RepoBird runs from your terminal, CI, hooks,
+or direct API automation.
 
 ### 2. Get Your API Key
 
@@ -361,6 +363,10 @@ For the live product documentation, start at [repobird.ai/docs](https://repobird
 ### User Guides
 - [Terminal UI Guide](docs/TUI-GUIDE.md) - Master the interactive dashboard
 - [Run Configuration Formats](docs/RUN-CONFIG-FORMATS.md) - Task file examples
+- [Common Use Cases](docs/use-cases/README.md) - CI, agent hooks, docs updates, lint/format fixes, tests, and framework-specific automation
+- [CI Automation](docs/use-cases/CI.md) - GitHub Actions and GitLab CI examples for RepoBird runs
+- [Agent Hooks](docs/use-cases/AGENT-HOOKS.md) - Claude Code, Codex, pre-commit, and scheduled maintenance hook patterns
+- [Language and Framework Recipes](docs/use-cases/LANGUAGE-FRAMEWORK-RECIPES.md) - Starter prompts for common stacks and maintenance tasks
 - [Branch Workflow](https://repobird.ai/docs/branch-workflow) - How RepoBird creates branches and pull requests
 - [Troubleshooting Guide](docs/TROUBLESHOOTING.md) - CLI troubleshooting
 - [Error Messages Guide](https://repobird.ai/docs/error-messages-guide) - Product error codes and recovery steps
@@ -370,7 +376,12 @@ For the live product documentation, start at [repobird.ai/docs](https://repobird
 - [REST API Reference](https://repobird.ai/docs/api-reference) - Live API reference for RepoBird integrations
 - [OpenAPI Specification](https://api.repobird.ai/api/v1/openapi.yaml) - Public OpenAPI YAML for `/api/v1`
 - [CLI API Notes](docs/API-REFERENCE.md) - CLI REST client implementation details
+- [API Integration Guide](docs/use-cases/API-INTEGRATION.md) - Direct REST examples and guidance for choosing CLI vs API
 - [Keyboard Shortcuts](docs/QUICK-REFERENCE.md) - TUI navigation cheat sheet
+
+### Agent Skills
+- [RepoBird CLI Skill](.skills/default/SKILL.md) - Installable skill for agents using RepoBird CLI, CI/hooks automation, framework recipes, and API integrations
+- [Skill Integration References](.skills/default/references/integrations.md) - Load-on-demand integration guidance used by the RepoBird CLI skill
 
 ### Development
 - [Architecture Overview](docs/ARCHITECTURE.md) - System design and components
