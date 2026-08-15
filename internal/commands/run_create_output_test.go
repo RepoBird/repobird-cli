@@ -14,8 +14,26 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/repobird/repobird-cli/internal/domain"
 	"github.com/repobird/repobird-cli/internal/models"
 )
+
+func TestPrintRunCreateJSONPreservesExplicitReasoningEffort(t *testing.T) {
+	var output bytes.Buffer
+	err := printRunCreateJSON(&output, &domain.Run{}, domain.CreateRunRequest{
+		Prompt:          "Fix auth",
+		RepositoryName:  "acme/webapp",
+		RunType:         "basic",
+		ReasoningEffort: "future-ultra",
+	})
+	require.NoError(t, err)
+
+	var result map[string]any
+	require.NoError(t, json.Unmarshal(output.Bytes(), &result))
+	request, ok := result["request"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "future-ultra", request["reasoningEffort"])
+}
 
 func TestProcessSingleRunJSONCreateOutputIsMachineReadable(t *testing.T) {
 	ensureRunTestConfig()

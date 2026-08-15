@@ -190,7 +190,7 @@ phases:
           - "Focused command tests pass."
       - id: "T014"
         title: "Preserve optional request fields in dry-run and create JSON in internal/commands/output.go"
-        status: "Pending"
+        status: "Completed"
         type: "implementation"
         parallel: false
         story_id: "US-001"
