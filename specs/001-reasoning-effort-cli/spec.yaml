@@ -12,7 +12,7 @@ user_stories:
       i_want: "to optionally include a reasoning-effort preference when starting a run"
       so_that: "I can express the desired reasoning intensity while allowing the service to apply the final policy"
       why_this_priority: "Submitting the optional preference is the primary new user capability."
-      independent_test: "Start runs with an explicit reasoning effort and with no reasoning effort, then verify the outgoing request preserves the supplied value or omission exactly."
+      independent_test: "Start runs with task-file-only, CLI-only, conflicting task-file and CLI, and no reasoning-effort inputs, then verify precedence, exact preservation, or omission in the outgoing request."
       acceptance_scenarios:
         - given: "a user provides a reasoning-effort value for a new run"
           when: "the run request is prepared"
@@ -20,6 +20,18 @@ user_stories:
         - given: "a user does not provide a reasoning-effort value"
           when: "the run request is prepared"
           then: "the reasoning-effort preference remains omitted so the service can apply its default"
+        - given: "a task file provides reasoningEffort and no CLI flag is present"
+          when: "the run request is prepared"
+          then: "the task-file value is transmitted unchanged"
+        - given: "a CLI flag provides --reasoning-effort and no task-file value is present"
+          when: "the run request is prepared"
+          then: "the CLI value is transmitted unchanged"
+        - given: "both a task file and the CLI provide reasoning-effort values"
+          when: "the run request is prepared"
+          then: "the task-file value takes precedence and the CLI value is not substituted"
+        - given: "neither the task file nor the CLI provides a reasoning-effort value"
+          when: "the run request is prepared"
+          then: "the reasoningEffort field is omitted from the request"
     - id: "US-002"
       title: "See server-selected reasoning policy"
       priority: "P1"
@@ -56,13 +68,13 @@ user_stories:
 requirements:
     functional:
         - id: "FR-001"
-          description: "The CLI MUST allow a user to provide an optional reasoning-effort preference when submitting a run."
+          description: "The CLI MUST allow a user to provide an optional reasoning-effort preference through either the --reasoning-effort flag or a task-file reasoningEffort field, with task-file input taking precedence when both are present."
           testable: true
-          acceptance_criteria: "A run submitted with a reasoning-effort preference contains that exact preference in the request presented to the service."
+          acceptance_criteria: "Task-file-only, CLI-only, and conflicting-source submissions contain the exact resolved preference in the request presented to the service, with task-file input winning conflicts."
         - id: "FR-002"
-          description: "The CLI MUST omit the reasoning-effort request field when the user does not provide a value."
+          description: "The CLI MUST omit the reasoning-effort request field when neither the task file nor the CLI provides a value."
           testable: true
-          acceptance_criteria: "A request created from an existing invocation contains no reasoning-effort field and therefore leaves default selection to the service."
+          acceptance_criteria: "A request created from an invocation with no task-file or CLI preference contains no reasoningEffort field and therefore leaves default selection to the service."
         - id: "FR-003"
           description: "The CLI MUST pass user-supplied reasoning-effort values through without maintaining a client-owned catalog of allowed policy values, eligibility rules, or fallback selections."
           testable: true
