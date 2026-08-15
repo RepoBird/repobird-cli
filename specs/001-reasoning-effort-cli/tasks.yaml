@@ -270,7 +270,7 @@ phases:
           - "Fields may independently be empty without validation failure or inferred fallback."
       - id: "T020"
         title: "Propagate service-returned policy in internal/repository/api_run_repository.go"
-        status: "Pending"
+        status: "Completed"
         type: "implementation"
         parallel: false
         story_id: "US-002"

@@ -302,6 +302,8 @@ func (r *apiRunRepository) toDomainRun(resp *dto.RunResponse) *domain.Run {
 		OutputBranchPolicy: resp.OutputBranchPolicy,
 		PullRequestURL:     resp.PullRequestURL,
 		RunType:            resp.RunType,
+		Model:              resp.Model,
+		ReasoningEffort:    resp.ReasoningEffort,
 		Title:              resp.Title,
 		Context:            resp.Context,
 		Files:              resp.Files,
