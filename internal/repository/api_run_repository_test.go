@@ -130,7 +130,7 @@ func TestAPIRunRepositoryCreateReasoningEffortRequestContract(t *testing.T) {
 	}
 }
 
-func TestAPIRunRepositoryCreateRunTypeDoesNotSelectModelPolicy(t *testing.T) {
+func TestAPIRunRepositoryCreateRunTypePreservesExplicitModelSelection(t *testing.T) {
 	for _, runType := range []string{domain.RunTypeBasic, domain.RunTypePro} {
 		t.Run(runType, func(t *testing.T) {
 			var body map[string]any
@@ -153,8 +153,8 @@ func TestAPIRunRepositoryCreateRunTypeDoesNotSelectModelPolicy(t *testing.T) {
 			})
 			require.NoError(t, err)
 			require.Equal(t, runType, body["runType"])
-			require.NotContains(t, body, "opencodeModel")
-			require.NotContains(t, body, "opencodeProvider")
+			require.Equal(t, "client-selected-model", body["opencodeModel"])
+			require.Equal(t, "client-selected-provider", body["opencodeProvider"])
 		})
 	}
 }
@@ -202,6 +202,34 @@ func TestAPIRunRepositoryCreateReturnsLocal400WithoutRetryOrFallback(t *testing.
 	require.Nil(t, run)
 	require.EqualError(t, err, "validation error for field 'reasoningEffort': reasoning effort rejected")
 	require.Equal(t, 1, attempts)
+}
+
+func TestAPIRunRepositoryCreateDoesNotFallbackAfterModelRejection(t *testing.T) {
+	attempts := 0
+	var body map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		attempts++
+		require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = io.WriteString(w, `{"code":"MODEL_NOT_SUPPORTED","message":"model rejected"}`)
+	}))
+	defer server.Close()
+
+	repo := NewAPIRunRepository(server.Client(), server.URL, "test-key", false)
+	run, err := repo.Create(context.Background(), domain.CreateRunRequest{
+		Prompt:           "Fix auth",
+		RepositoryName:   "acme/webapp",
+		RunType:          domain.RunTypePro,
+		OpenCodeModel:    "future-provider/future-model-v9",
+		OpenCodeProvider: "future-provider",
+	})
+
+	require.Nil(t, run)
+	require.ErrorContains(t, err, "model rejected")
+	require.Equal(t, 1, attempts)
+	require.Equal(t, "future-provider/future-model-v9", body["opencodeModel"])
+	require.Equal(t, "future-provider", body["opencodeProvider"])
 }
 
 func TestAPIRunRepositoryListUsesPageBasedPagination(t *testing.T) {

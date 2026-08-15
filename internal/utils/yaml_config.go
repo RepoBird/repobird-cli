@@ -30,6 +30,8 @@ type YAMLConfig struct {
 	Files                 []string                        `yaml:"files" json:"files"`
 	ProviderCredentialID  string                          `yaml:"providerCredentialId" json:"providerCredentialId"`
 	ProviderMode          string                          `yaml:"providerMode" json:"providerMode"`
+	OpenCodeModel         string                          `yaml:"opencodeModel,omitempty" json:"opencodeModel,omitempty"`
+	OpenCodeProvider      string                          `yaml:"opencodeProvider,omitempty" json:"opencodeProvider,omitempty"`
 	ReasoningEffort       string                          `yaml:"reasoningEffort,omitempty" json:"reasoningEffort,omitempty"`
 	GitLabCredential      *models.GitLabCredentialRequest `yaml:"gitlabCredential,omitempty" json:"gitlabCredential,omitempty"`
 	BranchOnly            bool                            `yaml:"branchOnly" json:"branchOnly"`
@@ -133,6 +135,12 @@ func parseYAMLWithUnknownFieldsAndPrompts(data []byte) (*models.RunConfig, *prom
 	if providerMode, ok := genericMap["providerMode"].(string); ok {
 		config.ProviderMode = providerMode
 	}
+	if opencodeModel, ok := genericMap["opencodeModel"].(string); ok {
+		config.OpenCodeModel = opencodeModel
+	}
+	if opencodeProvider, ok := genericMap["opencodeProvider"].(string); ok {
+		config.OpenCodeProvider = opencodeProvider
+	}
 	if reasoningEffort, ok := genericMap["reasoningEffort"].(string); ok {
 		config.ReasoningEffort = reasoningEffort
 	}
@@ -204,6 +212,8 @@ func parseYAMLWithUnknownFieldsAndPrompts(data []byte) (*models.RunConfig, *prom
 		Files:                 config.Files,
 		ProviderCredentialID:  config.ProviderCredentialID,
 		ProviderMode:          config.ProviderMode,
+		OpenCodeModel:         config.OpenCodeModel,
+		OpenCodeProvider:      config.OpenCodeProvider,
 		ReasoningEffort:       config.ReasoningEffort,
 		GitLabCredential:      config.GitLabCredential,
 		BranchOnly:            config.BranchOnly,
@@ -239,6 +249,8 @@ func findUnsupportedYAMLFieldsWithSuggestions(data map[string]interface{}) ([]st
 		"files":                 true,
 		"providerCredentialId":  true,
 		"providerMode":          true,
+		"opencodeModel":         true,
+		"opencodeProvider":      true,
 		"reasoningEffort":       true,
 		"gitlabCredential":      true,
 		"branchOnly":            true,
@@ -250,7 +262,7 @@ func findUnsupportedYAMLFieldsWithSuggestions(data map[string]interface{}) ([]st
 	supportedFieldsList := []string{
 		"prompt", "repository", "source", "target", "baseBranch",
 		"outputMode", "outputBranch", "prTargetBranch", "outputBranchPolicy",
-		"runType", "title", "context", "files", "providerCredentialId", "providerMode", "reasoningEffort",
+		"runType", "title", "context", "files", "providerCredentialId", "providerMode", "opencodeModel", "opencodeProvider", "reasoningEffort",
 		"gitlabCredential", "branchOnly", "acknowledgePromptRisk", "pullRequest", "metadata",
 	}
 
@@ -506,6 +518,8 @@ func ParseJSONFromStdinWithPrompts() (*models.RunConfig, *prompts.ValidationProm
 		Files:                 runReq.Files,
 		ProviderCredentialID:  runReq.ProviderCredentialID,
 		ProviderMode:          runReq.ProviderMode,
+		OpenCodeModel:         runReq.OpenCodeModel,
+		OpenCodeProvider:      runReq.OpenCodeProvider,
 		ReasoningEffort:       runReq.ReasoningEffort,
 		GitLabCredential:      runReq.GitLabCredential,
 		BranchOnly:            runReq.BranchOnly,
@@ -528,6 +542,8 @@ func findUnsupportedJSONFieldsForStdinWithSuggestions(data map[string]interface{
 		"files":                 true,
 		"providerCredentialId":  true,
 		"providerMode":          true,
+		"opencodeModel":         true,
+		"opencodeProvider":      true,
 		"reasoningEffort":       true,
 		"gitlabCredential":      true,
 		"acknowledgePromptRisk": true,
@@ -535,7 +551,7 @@ func findUnsupportedJSONFieldsForStdinWithSuggestions(data map[string]interface{
 
 	supportedFieldsList := []string{
 		"prompt", "repository", "source", "target", "runType",
-		"title", "context", "files", "providerCredentialId", "providerMode", "reasoningEffort",
+		"title", "context", "files", "providerCredentialId", "providerMode", "opencodeModel", "opencodeProvider", "reasoningEffort",
 		"gitlabCredential", "acknowledgePromptRisk",
 	}
 
