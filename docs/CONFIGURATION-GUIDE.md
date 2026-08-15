@@ -141,6 +141,13 @@ repobird examples generate run -f yaml -o task.yaml
 - `runType` - "run" (default); "plan" is development-only during the OpenCode migration
 - `context` - Additional instructions
 - `files` - Specific files to include
+- `opencodeModel` - Optional exact public model ID from `repobird models`; the server validates and admits it
+- `opencodeProvider` - Optional exact public provider ID paired with `opencodeModel`
+
+The CLI does not keep a model catalog or select Basic/Pro defaults locally. Use
+`repobird models` or `repobird models --json` for public discovery. Omitted model
+and provider fields remain omitted from run requests so the server resolves the
+selection.
 
 ## Cache Configuration
 

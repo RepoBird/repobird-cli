@@ -17,7 +17,7 @@ phases:
     tasks:
       - id: "T001"
         title: "Create the local requirement-to-receipt matrix for the CLI model workflow"
-        status: "Pending"
+        status: "Completed"
         type: "setup"
         parallel: false
         story_id: null
@@ -29,7 +29,7 @@ phases:
           - "Leave all receipts pending until the corresponding failing and passing checks are actually run."
       - id: "T002"
         title: "Write failing public model DTO tests for safe forward-compatible catalog decoding"
-        status: "Pending"
+        status: "Completed"
         type: "test"
         parallel: true
         story_id: "US-004"
@@ -42,7 +42,7 @@ phases:
           - "The focused DTO test command is recorded failing before production DTO code is added."
       - id: "T003"
         title: "Write failing CLI discovery client tests for sibling contract T061"
-        status: "Pending"
+        status: "Completed"
         type: "test"
         parallel: true
         story_id: "US-001"
@@ -55,7 +55,7 @@ phases:
           - "The focused client test command is recorded failing before the client method is added."
       - id: "T004"
         title: "Write failing selected-model request and configuration tests for sibling contracts T066 and T067"
-        status: "Pending"
+        status: "Completed"
         type: "test"
         parallel: true
         story_id: "US-002"
@@ -68,7 +68,7 @@ phases:
           - "The focused model/config test command is recorded failing before production request fields and mapping are added."
       - id: "T005"
         title: "Write failing built models command tests for sibling contract T064"
-        status: "Pending"
+        status: "Completed"
         type: "test"
         parallel: true
         story_id: "US-001"
@@ -88,7 +88,7 @@ phases:
     tasks:
       - id: "T006"
         title: "Implement sanitized forward-compatible model DTOs for sibling contract T062"
-        status: "Pending"
+        status: "Completed"
         type: "implementation"
         parallel: false
         story_id: "US-004"
@@ -101,7 +101,7 @@ phases:
           - "All focused DTO tests pass and no internal field is retained in public JSON output."
       - id: "T007"
         title: "Implement model discovery and conditional requests for sibling contract T063"
-        status: "Pending"
+        status: "Completed"
         type: "implementation"
         parallel: false
         story_id: "US-001"
@@ -114,7 +114,7 @@ phases:
           - "Selected model IDs remain a transport value only and existing credential/provider request fields remain unchanged."
       - id: "T008"
         title: "Implement the built Cobra models command for sibling contract T065"
-        status: "Pending"
+        status: "Completed"
         type: "implementation"
         parallel: false
         story_id: "US-001"
@@ -134,7 +134,7 @@ phases:
     tasks:
       - id: "T009"
         title: "Implement optional model/provider fields in configuration and run preparation"
-        status: "Pending"
+        status: "Completed"
         type: "implementation"
         parallel: false
         story_id: "US-002"
@@ -147,7 +147,7 @@ phases:
           - "Do not infer provider from model, choose a run-type default, consult discovery, or silently replace a value."
       - id: "T010"
         title: "Map selected model/provider through domain and repository request boundaries"
-        status: "Pending"
+        status: "Completed"
         type: "implementation"
         parallel: false
         story_id: "US-002"
@@ -160,7 +160,7 @@ phases:
           - "Server admission errors propagate through the established error path without retry, substitution, or local validation."
       - id: "T011"
         title: "Complete selected-model request and output compatibility tests"
-        status: "Pending"
+        status: "Completed"
         type: "test"
         parallel: false
         story_id: "US-003"
@@ -180,7 +180,7 @@ phases:
     tasks:
       - id: "T012"
         title: "Document server-authoritative discovery and selected-model semantics"
-        status: "Pending"
+        status: "Completed"
         type: "documentation"
         parallel: false
         story_id: "US-001"
@@ -193,7 +193,7 @@ phases:
           - "Update RUN-CONFIG-FORMATS.md and QUICK-REFERENCE.md consistently if their existing examples cover run fields or command lists."
       - id: "T013"
         title: "Run built CLI discovery and submission acceptance for sibling contract T072"
-        status: "Pending"
+        status: "Completed"
         type: "test"
         parallel: false
         story_id: "US-005"
@@ -206,7 +206,7 @@ phases:
           - "The test is local and deterministic and records the sibling T072 contract as satisfied in this worktree."
       - id: "T014"
         title: "Run complete credential-free local validation and artifact checks"
-        status: "Pending"
+        status: "Completed"
         type: "test"
         parallel: false
         story_id: "US-005"

@@ -128,8 +128,8 @@ repobird login
 repobird run -r your-org/your-repo -p "Fix the login bug where users get stuck on loading screen"
 
 # Simple cloud-agent presets
-repobird basic -r your-org/your-repo "Fix a small bug"  # DeepSeek V4 Flash
-repobird pro -r your-org/your-repo "Implement OAuth"    # GLM 5.2
+repobird basic -r your-org/your-repo "Fix a small bug"  # Server resolves the model
+repobird pro -r your-org/your-repo "Implement OAuth"    # Server resolves the model
 
 # Push commits to an output branch without opening a PR
 repobird run -r your-org/your-repo -p "Update generated docs" --output-branch automation/docs --branch-only
@@ -200,14 +200,26 @@ repobird run task.md            # Markdown with frontmatter
 cat task.json | repobird run -  # From stdin
 ```
 
-| Command | Use When | Default Model |
-|---|---|---|
-| `repobird basic "prompt"` | Quick Basic preset from inside a git repo | DeepSeek V4 Flash |
-| `repobird pro "prompt"` | Quick Pro preset from inside a git repo | GLM 5.2 |
-| `repobird run --basic -r owner/repo -p "prompt"` | Basic preset with explicit repository | DeepSeek V4 Flash |
-| `repobird run --pro -r owner/repo -p "prompt"` | Pro preset with explicit repository | GLM 5.2 |
+### Discovering Models
 
-The `basic` and `pro` commands auto-detect the repository from the current git remote when `-r/--repo` is omitted. After submission, the CLI prints the selected run type and model before showing the run ID/status.
+Model availability, canonical IDs, and defaults are owned by the RepoBird service. Use the public discovery command before selecting a model in automation:
+
+```bash
+repobird models          # Human-readable public catalog
+repobird models --json   # Stable JSON catalog for scripts
+repobird models list     # Explicit list subcommand
+```
+
+When a selected model is supplied, the CLI forwards the exact `opencodeModel` and optional `opencodeProvider` values. It does not infer aliases, choose a default, or fall back after server rejection.
+
+| Command | Use When | Model Selection |
+|---|---|---|
+| `repobird basic "prompt"` | Quick Basic preset from inside a git repo | Server resolves the model |
+| `repobird pro "prompt"` | Quick Pro preset from inside a git repo | Server resolves the model |
+| `repobird run --basic -r owner/repo -p "prompt"` | Basic preset with explicit repository | Server resolves the model |
+| `repobird run --pro -r owner/repo -p "prompt"` | Pro preset with explicit repository | Server resolves the model |
+
+The `basic` and `pro` commands auto-detect the repository from the current git remote when `-r/--repo` is omitted. After submission, the CLI prints the selected run type; any final model is reported only when returned by the server.
 
 ### Scripted Run Waiting
 
@@ -254,6 +266,7 @@ repobird run -r your-org/your-repo -p "Fix auth" --json
 repobird run task.json --dry-run --json
 repobird status RUN_ID --json
 repobird repo list --json
+repobird models --json
 ```
 
 Run creation emits `schema: "repobird.run.create.v1"` with `operation`, `success`, `run`, `url`, and `request` fields. Dry runs emit `schema: "repobird.run.dry_run.v1"` with `valid` and `request` fields. Development-gated bulk commands use `repobird.bulk.create.v1` and `repobird.bulk.dry_run.v1`.
@@ -322,6 +335,8 @@ Tasks are defined in JSON, YAML, or Markdown files with two required fields:
   "title": "Add OAuth2 support",
   "context": "Use Google and GitHub as providers",
   "files": ["src/auth/", "config/oauth.json"],
+  "opencodeModel": "openrouter/example-model",
+  "opencodeProvider": "openrouter",
   "gitlabCredential": {
     "mode": "stored_token_reference",
     "tokenReferenceId": "glref_123"

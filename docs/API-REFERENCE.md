@@ -38,6 +38,8 @@ For the live API contract, see the [REST API Reference](https://repobird.ai/docs
   "outputBranchPolicy": "create",
   "runType": "pro",
   "agent": "opencode",
+  "opencodeModel": "openrouter/example-model",
+  "opencodeProvider": "openrouter",
   "reasoningEffort": "max",
   "idempotencyKey": "task-2026-06-10-auth",
   "gitlabCredential": {
@@ -58,6 +60,12 @@ catalog, choose a model or provider, select a default, determine eligibility, or
 apply a fallback. The RepoBird service remains authoritative for validation and
 the final run policy. The CLI exposes the field as `--reasoning-effort` and in
 JSON/YAML task files.
+
+`opencodeModel` and `opencodeProvider` are optional public selection fields. The
+CLI forwards them exactly as supplied, without a client-owned model catalog,
+alias translation, default substitution, or fallback. The service remains
+authoritative for model admission. Use `repobird models --json` to discover
+public canonical IDs and providers.
 
 When no preference is supplied, omit the field entirely:
 
@@ -134,6 +142,7 @@ func (c *Client) ListRuns(ctx context.Context, opts ListOptions) (*RunList, erro
 ```
 
 ### Additional Endpoints
+- `GET /api/v1/models` - Anonymous-compatible public model catalog for discovery. The response contains only public descriptors, a catalog revision, capabilities, and default markers. The CLI preserves safe additive fields, omits internal policy data, and supports ETag/304 revalidation.
 - `DELETE /api/v1/runs/{id}` - Cancel active run
 - `GET /api/v1/runs/{id}/agent-logs` - Stream API-key-authenticated agent logs as NDJSON, with optional `afterSeq` polling.
 - `GET /api/v1/user` - Get user info and credit balance
