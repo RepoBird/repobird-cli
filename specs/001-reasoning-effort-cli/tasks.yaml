@@ -234,7 +234,7 @@ phases:
           - "The focused test is recorded failing before renderer changes."
       - id: "T017"
         title: "Write failing dedicated TUI detail tests in internal/tui/views/details_test.go"
-        status: "Pending"
+        status: "Completed"
         type: "test"
         parallel: true
         story_id: "US-002"
