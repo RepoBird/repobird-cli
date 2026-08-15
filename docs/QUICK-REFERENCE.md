@@ -6,6 +6,7 @@
 repobird tui                        # Launch interactive dashboard
 repobird run task.json              # Submit task
 repobird run task.json --wait --json --timeout 45m # Script wait
+repobird run --basic -r org/repo -p "Fix a bug" --reasoning-effort max
 repobird basic "Fix a bug"          # Basic run, repo auto-detected from git
 repobird pro "Implement OAuth"      # Pro run, repo auto-detected from git
 repobird status                     # View all runs
@@ -106,11 +107,16 @@ repobird config set api-key KEY     # Set API key
   "source": "main",
   "target": "feature/branch",
   "runType": "run",
+  "reasoningEffort": "max",
   "title": "Brief title",
   "context": "Additional context",
   "files": ["file1.js", "file2.js"]
 }
 ```
+
+DeepSeek V4 Flash supports `low`, `high`, and `max`; DeepSeek V4 Pro supports
+`high` and `max`. Both default to the recommended `max` setting. Use
+`repobird run --help` for the complete flag list.
 
 ## Environment Variables
 
