@@ -52,11 +52,10 @@ For the live API contract, see the [REST API Reference](https://repobird.ai/docs
 For direct API integrations, send `runType: "basic"` or `runType: "pro"` explicitly. CLI task files may still use `runType: "run"` for compatibility; the API currently normalizes unknown or CLI-style run types to Pro semantics.
 For self-managed GitLab repositories, send a stored `gitlabCredential` reference as shown above. Managed GitLab.com repositories may omit it. Raw GitLab tokens and provider secrets are not accepted in CLI/API run creation payloads.
 
-`reasoningEffort` is optional and model-aware. DeepSeek V4 Flash accepts `low`,
-`high`, or `max`; DeepSeek V4 Pro accepts `high` or `max`; `max` is the default
-and recommended value for both. Other models use their profile-specific value.
-The API rejects unsupported model/value combinations. The CLI exposes the same
-field as `--reasoning-effort` and in JSON/YAML task files.
+`reasoningEffort` is optional and model-aware. The CLI accepts the stable
+transport values `low`, `medium`, `high`, `max`, and `xhigh`; the server remains
+authoritative for model-specific support and rejects unsupported combinations.
+The CLI exposes the field as `--reasoning-effort` and in JSON/YAML task files.
 
 The CLI also sends a non-empty `idempotencyKey` as the `Idempotency-Key` header. Current CLI builds protect retries locally by blocking identical repository, prompt, and run type submissions for 30 seconds unless `--force` is passed.
 
