@@ -222,7 +222,7 @@ phases:
           - "The focused test is recorded failing before response mapping changes."
       - id: "T016"
         title: "Write failing CLI status renderer tests in internal/commands/status_reasoning_effort_test.go"
-        status: "Pending"
+        status: "Completed"
         type: "test"
         parallel: true
         story_id: "US-002"
