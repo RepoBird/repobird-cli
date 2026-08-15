@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -118,10 +119,19 @@ func TestRunResponseUnmarshalsServerSelectedPolicy(t *testing.T) {
 			var response SingleRunResponse
 			require.NoError(t, json.Unmarshal(fixtures[tt.fixture], &response))
 			require.NotNil(t, response.Data)
-			assert.Equal(t, tt.expectedModel, response.Data.Model)
-			assert.Equal(t, tt.expectedEffort, response.Data.ReasoningEffort)
+			assert.Equal(t, tt.expectedModel, runResponsePolicyField(t, response.Data, "Model"))
+			assert.Equal(t, tt.expectedEffort, runResponsePolicyField(t, response.Data, "ReasoningEffort"))
 		})
 	}
+}
+
+func runResponsePolicyField(t *testing.T, response *RunResponse, fieldName string) string {
+	t.Helper()
+
+	field := reflect.ValueOf(response).Elem().FieldByName(fieldName)
+	require.Truef(t, field.IsValid(), "RunResponse must define an optional %s field", fieldName)
+	require.Equal(t, reflect.String, field.Kind())
+	return field.String()
 }
 
 func loadReasoningEffortRunFixtures(t *testing.T) map[string]json.RawMessage {
