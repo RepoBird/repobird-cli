@@ -115,7 +115,7 @@ phases:
           - "The focused test is recorded failing before repository changes."
       - id: "T008"
         title: "Write failing flag and request preparation tests in internal/commands/run_test.go"
-        status: "Pending"
+        status: "Completed"
         type: "test"
         parallel: true
         story_id: "US-001"

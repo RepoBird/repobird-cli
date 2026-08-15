@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -306,6 +307,147 @@ func TestRunCommand_ValidationWithFlags(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRunCommand_ReasoningEffortPreparation(t *testing.T) {
+	ensureRunTestConfig()
+	originalAPIKey := cfg.APIKey
+	cfg.APIKey = "test-key"
+	t.Cleanup(func() {
+		cfg.APIKey = originalAPIKey
+		resetReasoningEffortRunFlags()
+	})
+
+	tests := []struct {
+		name                    string
+		args                    []string
+		expectedReasoningEffort string
+	}{
+		{
+			name:                    "explicit reasoning effort",
+			args:                    []string{"-r", "test/repo", "-p", "Fix bug", "--reasoning-effort", "max", "--dry-run"},
+			expectedReasoningEffort: "max",
+		},
+		{
+			name:                    "omitted reasoning effort",
+			args:                    []string{"-r", "test/repo", "-p", "Fix bug", "--dry-run"},
+			expectedReasoningEffort: "",
+		},
+		{
+			name:                    "unfamiliar reasoning effort passes through",
+			args:                    []string{"-r", "test/repo", "-p", "Fix bug", "--reasoning-effort", "future-ultra", "--dry-run"},
+			expectedReasoningEffort: "future-ultra",
+		},
+		{
+			name:                    "basic run leaves model policy to service",
+			args:                    []string{"-r", "test/repo", "-p", "Fix bug", "--basic", "--reasoning-effort", "max", "--dry-run"},
+			expectedReasoningEffort: "max",
+		},
+		{
+			name:                    "pro run leaves model policy to service",
+			args:                    []string{"-r", "test/repo", "-p", "Fix bug", "--pro", "--reasoning-effort", "max", "--dry-run"},
+			expectedReasoningEffort: "max",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resetReasoningEffortRunFlags()
+			require.NoError(t, runCmd.ParseFlags(tt.args))
+
+			result, err := executeRunDryRun(t, nil)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expectedReasoningEffort, result["ReasoningEffort"])
+			assert.Empty(t, result["OpenCodeModel"], "the service selects the model")
+			assert.Empty(t, result["OpenCodeProvider"], "the service selects the provider")
+		})
+	}
+}
+
+func TestRunCommand_FileReasoningEffortTakesPrecedenceOverFlag(t *testing.T) {
+	ensureRunTestConfig()
+	originalAPIKey := cfg.APIKey
+	cfg.APIKey = "test-key"
+	t.Cleanup(func() {
+		cfg.APIKey = originalAPIKey
+		resetReasoningEffortRunFlags()
+	})
+
+	configPath := filepath.Join(t.TempDir(), "run.json")
+	configJSON := `{
+  "repository": "test/repo",
+  "prompt": "Fix bug",
+  "runType": "run",
+  "reasoningEffort": "from-file"
+}`
+	require.NoError(t, os.WriteFile(configPath, []byte(configJSON), 0o600))
+
+	resetReasoningEffortRunFlags()
+	require.NoError(t, runCmd.ParseFlags([]string{"--reasoning-effort", "from-flag", "--dry-run"}))
+
+	result, err := executeRunDryRun(t, []string{configPath})
+	require.NoError(t, err)
+	assert.Equal(t, "from-file", result["ReasoningEffort"])
+	assert.Empty(t, result["OpenCodeModel"], "the service selects the model")
+	assert.Empty(t, result["OpenCodeProvider"], "the service selects the provider")
+}
+
+func executeRunDryRun(t *testing.T, args []string) (map[string]interface{}, error) {
+	t.Helper()
+
+	old := os.Stdout
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	os.Stdout = w
+	t.Cleanup(func() { os.Stdout = old })
+
+	cmdErr := runCommand(runCmd, args)
+	require.NoError(t, w.Close())
+	os.Stdout = old
+
+	var buf bytes.Buffer
+	_, err = buf.ReadFrom(r)
+	require.NoError(t, err)
+	require.NoError(t, r.Close())
+	if cmdErr != nil {
+		return nil, cmdErr
+	}
+
+	output := buf.String()
+	jsonStart := strings.Index(output, "{")
+	jsonEnd := strings.LastIndex(output, "}") + 1
+	require.True(t, jsonStart >= 0 && jsonEnd > jsonStart, "JSON output not found in %q", output)
+
+	var result map[string]interface{}
+	require.NoError(t, json.Unmarshal([]byte(output[jsonStart:jsonEnd]), &result))
+	return result, nil
+}
+
+func resetReasoningEffortRunFlags() {
+	repo = ""
+	prompt = ""
+	source = ""
+	target = ""
+	baseBranch = ""
+	outputMode = ""
+	outputBranch = ""
+	prTargetBranch = ""
+	outputBranchPolicy = ""
+	title = ""
+	runType = ""
+	contextFlag = ""
+	providerCredentialID = ""
+	providerMode = ""
+	reasoningEffort = ""
+	gitlabTokenReferenceID = ""
+	basicRun = false
+	proRun = false
+	branchOnly = false
+	acknowledgePromptRisk = false
+	dryRun = false
+	follow = false
+	wait = false
+	jsonOutput = false
 }
 
 func TestRunCommand_PlanTypeAllowedInDevelopment(t *testing.T) {
