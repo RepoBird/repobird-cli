@@ -3,6 +3,8 @@ package dto
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"reflect"
 	"testing"
 	"time"
 
@@ -198,6 +200,117 @@ func TestCreateRunRequest_JSONFields(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "stored_token_reference", gitlabCredential["mode"])
 	assert.Equal(t, "glref_123", gitlabCredential["tokenReferenceId"])
+}
+
+func TestCreateRunRequest_ReasoningEffortSerialization(t *testing.T) {
+	tests := []struct {
+		name          string
+		reasoning     string
+		wantPresent   bool
+		wantReasoning string
+	}{
+		{
+			name:          "preserves explicit opaque value",
+			reasoning:     "adaptive-ultra",
+			wantPresent:   true,
+			wantReasoning: "adaptive-ultra",
+		},
+		{
+			name:        "omits empty value",
+			wantPresent: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			data, err := json.Marshal(CreateRunRequest{
+				Prompt:          "Fix the bug",
+				RepositoryName:  "test/repo",
+				RunType:         "run",
+				ReasoningEffort: tt.reasoning,
+			})
+			require.NoError(t, err)
+
+			var result map[string]json.RawMessage
+			require.NoError(t, json.Unmarshal(data, &result))
+
+			reasoning, present := result["reasoningEffort"]
+			assert.Equal(t, tt.wantPresent, present)
+			if tt.wantPresent {
+				var value string
+				require.NoError(t, json.Unmarshal(reasoning, &value))
+				assert.Equal(t, tt.wantReasoning, value)
+			}
+		})
+	}
+}
+
+func TestSingleRunResponse_DecodesOpaquePolicyFields(t *testing.T) {
+	fixtureData, err := os.ReadFile("testdata/reasoning_effort_runs.json")
+	require.NoError(t, err)
+
+	var fixtures map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(fixtureData, &fixtures))
+
+	tests := []struct {
+		name                string
+		fixture             string
+		wantModel           string
+		wantReasoningEffort string
+	}{
+		{
+			name:                "complete policy response",
+			fixture:             "complete",
+			wantModel:           "openrouter/z-ai/glm-5.2",
+			wantReasoningEffort: "high",
+		},
+		{
+			name:      "partial model-only response",
+			fixture:   "partialModelOnly",
+			wantModel: "openrouter/deepseek/deepseek-v4-flash",
+		},
+		{
+			name:                "partial reasoning-only response",
+			fixture:             "partialReasoningEffortOnly",
+			wantReasoningEffort: "max",
+		},
+		{
+			name:    "legacy response without policy fields",
+			fixture: "absentLegacy",
+		},
+		{
+			name:                "unfamiliar future policy values",
+			fixture:             "unfamiliarFutureValues",
+			wantModel:           "future-provider/future-model-v9",
+			wantReasoningEffort: "adaptive-ultra",
+		},
+		{
+			name:                "legacy opencode model alias",
+			fixture:             "compatibilityAlias",
+			wantModel:           "openrouter/deepseek/deepseek-v4-flash",
+			wantReasoningEffort: "low",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			payload, ok := fixtures[tt.fixture]
+			require.True(t, ok, "missing fixture %q", tt.fixture)
+
+			var response SingleRunResponse
+			require.NoError(t, json.Unmarshal(payload, &response))
+			require.NotNil(t, response.Data)
+
+			policy := reflect.ValueOf(*response.Data)
+			model := policy.FieldByName("Model")
+			require.True(t, model.IsValid(), "RunResponse must expose the service-returned model")
+			reasoningEffort := policy.FieldByName("ReasoningEffort")
+			require.True(t, reasoningEffort.IsValid(), "RunResponse must expose the service-returned reasoning effort")
+
+			assert.Equal(t, tt.wantModel, model.String())
+			assert.Equal(t, tt.wantReasoningEffort, reasoningEffort.String())
+		})
+	}
 }
 
 func TestCreateRunRequest_OmitsPromptRiskAcknowledgementByDefault(t *testing.T) {

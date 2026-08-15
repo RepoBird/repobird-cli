@@ -246,6 +246,12 @@ func printRunDetails(run *models.RunResponse) {
 	if run.Title != "" {
 		fmt.Printf("%s %s\n", styler.Label("Title:"), run.Title)
 	}
+	if run.Model != "" {
+		fmt.Printf("%s %s\n", styler.Label("Model:"), run.Model)
+	}
+	if run.ReasoningEffort != "" {
+		fmt.Printf("%s %s\n", styler.Label("Reasoning effort:"), run.ReasoningEffort)
+	}
 	fmt.Printf("%s %s\n", styler.Label("Created:"), run.CreatedAt.Format("2006-01-02 15:04:05"))
 	fmt.Printf("%s %s\n", styler.Label("Updated:"), run.UpdatedAt.Format("2006-01-02 15:04:05"))
 	if run.Error != "" {

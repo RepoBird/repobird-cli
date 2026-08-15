@@ -38,11 +38,13 @@ The `repobird run` command supports multiple configuration file formats to defin
 | `files` | array | - | List of specific files to include in the context |
 | `providerCredentialId` | string | - | Optional provider credential reference for BYOK or enterprise provider routing |
 | `providerMode` | string | - | Optional provider mode: `bundled`, `byok-user`, or `enterprise-gateway` |
-| `reasoningEffort` | string | model-specific | Optional OpenCode reasoning effort: `low`, `medium`, `high`, `max`, or `xhigh`. DeepSeek V4 Flash supports `low`, `high`, and `max`; DeepSeek V4 Pro supports `high` and `max`; both default to `max`. Model-specific availability is enforced by the server. |
+| `reasoningEffort` | string | - | Optional opaque reasoning-effort preference. The CLI forwards the supplied string unchanged; the RepoBird service validates it and selects the final model and reasoning policy. |
 | `gitlabCredential` | object | - | Stored GitLab credential reference. Use `mode: stored_token_reference` and `tokenReferenceId`; never put raw tokens in task files |
 | `branchOnly` | boolean | `false` | Legacy alias for `outputMode: branch` |
 | `acknowledgePromptRisk` | boolean | `false` | Explicitly acknowledge a `PROMPT_RISK_ACK_REQUIRED` response after reviewing the prompt |
 | `idempotencyKey` | string | auto-derived | Stable key for safely retrying run creation |
+
+`reasoningEffort` is optional in JSON, YAML, and Markdown frontmatter, and the equivalent CLI flag is `--reasoning-effort`. When omitted, the CLI sends no reasoning-effort preference and leaves the default entirely to the RepoBird service. When supplied, the value is treated as an opaque string and forwarded unchanged. The service remains authoritative for validation, eligibility, defaults, model selection, and the final reasoning policy; the CLI does not maintain a closed list of allowed values.
 
 ## Format Examples
 
@@ -55,6 +57,9 @@ Create a run directly using command-line flags without any configuration file:
 ```bash
 # Minimal example (required flags only)
 repobird run -r myorg/webapp -p "Fix the login bug"
+
+# Minimal example with an optional opaque reasoning-effort preference
+repobird run -r myorg/webapp -p "Fix the login bug" --reasoning-effort max
 
 # Basic and Pro cloud-agent presets
 repobird run --basic -r myorg/webapp -p "Fix a small bug"     # DeepSeek V4 Flash
@@ -88,6 +93,7 @@ repobird run --repo myorg/webapp \
   --output-branch fix/login-rate-limit \
   --pr-target-branch main \
   --title "Fix authentication rate limiting issue" \
+  --reasoning-effort max \
   --context "Users report being permanently locked out. Should reset after 15 minutes." \
   --follow
 
@@ -123,7 +129,7 @@ repobird run -r myorg/webapp -p "Add unit tests for auth module" --wait --json -
 - `--pro` - Use the Pro cloud-agent preset (GLM 5.2)
 - `--branch-only`, `--no-pr` - Push commits to the output branch without creating a PR
 - `--provider-mode` - Provider routing mode: `bundled`, `byok-user`, or `enterprise-gateway`
-- `--reasoning-effort` - OpenCode reasoning effort: `low`, `medium`, `high`, `max`, or `xhigh`; available values depend on the selected model
+- `--reasoning-effort` - Optional opaque reasoning-effort preference. The CLI forwards the supplied string unchanged; the RepoBird service validates it and selects the final policy.
 - `--provider-credential-id` - Provider credential reference for BYOK or enterprise provider routing
 - `--gitlab-token-reference-id` - Stored GitLab token reference ID for self-managed GitLab repositories
 - `--acknowledge-prompt-risk` - Resend after reviewing a prompt-risk acknowledgement error
@@ -136,6 +142,8 @@ repobird run -r myorg/webapp -p "Add unit tests for auth module" --wait --json -
 - `--json` - Output machine-readable JSON. With `--wait`, stdout contains one final JSON object.
 - `--dry-run` - Validate without creating the run
 - `--json` - Emit machine-readable JSON without human progress text
+
+For `--reasoning-effort` and the `reasoningEffort` file field, omission means no preference is sent. The CLI does not choose a default or enforce a closed allowed-value list; server validation errors are returned through the normal run-creation error path.
 
 For single-run creation, the CLI records a local submission key before the API request. If the same repository, prompt, and run type are submitted again within 30 seconds, the CLI stops before sending another POST. Use `--force` only when you intend to create another run.
 
@@ -159,6 +167,7 @@ Create a file `task.json`:
   "outputBranchPolicy": "create",
   "title": "Fix authentication rate limiting issue",
   "runType": "run",
+  "reasoningEffort": "max",
   "acknowledgePromptRisk": false,
   "idempotencyKey": "task-2026-06-10-auth",
   "context": "Users report being permanently locked out after 5 failed login attempts. The rate limiting should reset after 15 minutes.",
@@ -197,6 +206,7 @@ prTargetBranch: main
 outputBranchPolicy: create
 title: Fix authentication rate limiting issue
 runType: run
+reasoningEffort: max
 acknowledgePromptRisk: false
 idempotencyKey: task-2026-06-10-auth
 context: |
@@ -230,6 +240,7 @@ outputBranch: fix/login-rate-limit
 prTargetBranch: main
 title: Fix authentication rate limiting issue
 runType: run
+reasoningEffort: max
 files:
   - src/auth/login.js
   - src/auth/rateLimit.js

@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
@@ -86,6 +88,100 @@ func TestAPIRunRepositoryCreateSendsGitLabFields(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestAPIRunRepositoryCreateReasoningEffortRequestContract(t *testing.T) {
+	tests := []struct {
+		name            string
+		reasoningEffort string
+		wantPresent     bool
+	}{
+		{name: "explicit unfamiliar value", reasoningEffort: "future-adaptive", wantPresent: true},
+		{name: "omitted", reasoningEffort: "", wantPresent: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				require.Equal(t, http.MethodPost, req.Method)
+				require.Equal(t, "/api/v1/runs", req.URL.Path)
+
+				var body map[string]any
+				require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
+				value, present := body["reasoningEffort"]
+				require.Equal(t, tt.wantPresent, present)
+				if tt.wantPresent {
+					require.Equal(t, tt.reasoningEffort, value)
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusCreated)
+				_, _ = io.WriteString(w, `{"data":{"id":123,"status":"QUEUED"}}`)
+			}))
+			defer server.Close()
+
+			repo := NewAPIRunRepository(server.Client(), server.URL, "test-key", false)
+			_, err := repo.Create(context.Background(), domain.CreateRunRequest{
+				Prompt:          "Fix auth",
+				RepositoryName:  "acme/webapp",
+				RunType:         domain.RunTypeRun,
+				ReasoningEffort: tt.reasoningEffort,
+			})
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestAPIRunRepositoryCreateRunTypeDoesNotSelectModelPolicy(t *testing.T) {
+	for _, runType := range []string{domain.RunTypeBasic, domain.RunTypePro} {
+		t.Run(runType, func(t *testing.T) {
+			var body map[string]any
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
+
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusCreated)
+				_, _ = io.WriteString(w, `{"data":{"id":123,"status":"QUEUED"}}`)
+			}))
+			defer server.Close()
+
+			repo := NewAPIRunRepository(server.Client(), server.URL, "test-key", false)
+			_, err := repo.Create(context.Background(), domain.CreateRunRequest{
+				Prompt:           "Fix auth",
+				RepositoryName:   "acme/webapp",
+				RunType:          runType,
+				OpenCodeModel:    "client-selected-model",
+				OpenCodeProvider: "client-selected-provider",
+			})
+			require.NoError(t, err)
+			require.Equal(t, runType, body["runType"])
+			require.NotContains(t, body, "opencodeModel")
+			require.NotContains(t, body, "opencodeProvider")
+		})
+	}
+}
+
+func TestAPIRunRepositoryCreateReturnsLocal400WithoutRetryOrFallback(t *testing.T) {
+	attempts := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		attempts++
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = io.WriteString(w, `{"code":"VALIDATION_ERROR","message":"reasoning effort rejected","details":{"field":"reasoningEffort"}}`)
+	}))
+	defer server.Close()
+
+	repo := NewAPIRunRepository(server.Client(), server.URL, "test-key", false)
+	run, err := repo.Create(context.Background(), domain.CreateRunRequest{
+		Prompt:          "Fix auth",
+		RepositoryName:  "acme/webapp",
+		RunType:         domain.RunTypeRun,
+		ReasoningEffort: "service-rejected-value",
+	})
+
+	require.Nil(t, run)
+	require.EqualError(t, err, "validation error for field 'reasoningEffort': reasoning effort rejected")
+	require.Equal(t, 1, attempts)
+}
+
 func TestAPIRunRepositoryListUsesPageBasedPagination(t *testing.T) {
 	var requestedURL string
 	repo := NewAPIRunRepository(roundTripFunc(func(req *http.Request) (*http.Response, error) {
@@ -142,4 +238,129 @@ func TestAPIRunRepositoryCreatePreservesCanonicalBranchFields(t *testing.T) {
 	require.Equal(t, "release", run.PRTargetBranch)
 	require.Equal(t, "create", run.OutputBranchPolicy)
 	require.Equal(t, "run_123e4567-e89b-12d3-a456-426614174000", run.PublicID)
+}
+
+func TestAPIRunRepositoryGetPropagatesResponsePolicy(t *testing.T) {
+	fixtures := loadReasoningEffortRunFixtures(t)
+	tests := []struct {
+		name                string
+		fixture             string
+		wantModel           string
+		wantReasoningEffort string
+	}{
+		{
+			name:                "complete",
+			fixture:             "complete",
+			wantModel:           "openrouter/z-ai/glm-5.2",
+			wantReasoningEffort: "high",
+		},
+		{
+			name:      "partial model only",
+			fixture:   "partialModelOnly",
+			wantModel: "openrouter/deepseek/deepseek-v4-flash",
+		},
+		{
+			name:                "partial reasoning effort only",
+			fixture:             "partialReasoningEffortOnly",
+			wantReasoningEffort: "max",
+		},
+		{
+			name:    "absent legacy response does not reconstruct policy from run type",
+			fixture: "absentLegacy",
+		},
+		{
+			name:                "unfamiliar future values",
+			fixture:             "unfamiliarFutureValues",
+			wantModel:           "future-provider/future-model-v9",
+			wantReasoningEffort: "adaptive-ultra",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				require.Equal(t, http.MethodGet, req.Method)
+				require.Equal(t, "/api/v1/runs/run-under-test", req.URL.Path)
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write(fixtures[tt.fixture])
+			}))
+			defer server.Close()
+
+			repo := NewAPIRunRepository(server.Client(), server.URL, "test-key", false)
+			run, err := repo.Get(context.Background(), "run-under-test")
+			require.NoError(t, err)
+			require.Equal(t, tt.wantModel, run.Model)
+			require.Equal(t, tt.wantReasoningEffort, run.ReasoningEffort)
+		})
+	}
+}
+
+func TestAPIRunRepositoryListPropagatesResponsePolicy(t *testing.T) {
+	fixtures := loadReasoningEffortRunFixtures(t)
+	fixtureNames := []string{
+		"complete",
+		"partialModelOnly",
+		"partialReasoningEffortOnly",
+		"absentLegacy",
+		"unfamiliarFutureValues",
+	}
+
+	data := make([]json.RawMessage, 0, len(fixtureNames))
+	for _, name := range fixtureNames {
+		var fixture struct {
+			Data json.RawMessage `json:"data"`
+		}
+		require.NoError(t, json.Unmarshal(fixtures[name], &fixture))
+		data = append(data, fixture.Data)
+	}
+
+	body, err := json.Marshal(map[string]any{
+		"data": data,
+		"metadata": map[string]int{
+			"currentPage": 1,
+			"total":       len(data),
+			"totalPages":  1,
+		},
+	})
+	require.NoError(t, err)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		require.Equal(t, http.MethodGet, req.Method)
+		require.Equal(t, "/api/v1/runs", req.URL.Path)
+		require.Equal(t, "5", req.URL.Query().Get("limit"))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(body)
+	}))
+	defer server.Close()
+
+	repo := NewAPIRunRepository(server.Client(), server.URL, "test-key", false)
+	runs, err := repo.List(context.Background(), domain.ListOptions{Limit: len(data)})
+	require.NoError(t, err)
+	require.Len(t, runs, len(data))
+
+	want := []struct {
+		model           string
+		reasoningEffort string
+	}{
+		{model: "openrouter/z-ai/glm-5.2", reasoningEffort: "high"},
+		{model: "openrouter/deepseek/deepseek-v4-flash"},
+		{reasoningEffort: "max"},
+		{},
+		{model: "future-provider/future-model-v9", reasoningEffort: "adaptive-ultra"},
+	}
+	for i, expected := range want {
+		require.Equal(t, expected.model, runs[i].Model, "run %d model", i)
+		require.Equal(t, expected.reasoningEffort, runs[i].ReasoningEffort, "run %d reasoning effort", i)
+	}
+}
+
+func loadReasoningEffortRunFixtures(t *testing.T) map[string]json.RawMessage {
+	t.Helper()
+
+	body, err := os.ReadFile("../api/dto/testdata/reasoning_effort_runs.json")
+	require.NoError(t, err)
+
+	var fixtures map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(body, &fixtures))
+	return fixtures
 }

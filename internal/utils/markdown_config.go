@@ -27,6 +27,7 @@ type MarkdownConfig struct {
 	Files                 []string                        `yaml:"files" json:"files"`
 	ProviderCredentialID  string                          `yaml:"providerCredentialId" json:"providerCredentialId"`
 	ProviderMode          string                          `yaml:"providerMode" json:"providerMode"`
+	ReasoningEffort       string                          `yaml:"reasoningEffort,omitempty" json:"reasoningEffort,omitempty"`
 	GitLabCredential      *models.GitLabCredentialRequest `yaml:"gitlabCredential,omitempty" json:"gitlabCredential,omitempty"`
 	BranchOnly            bool                            `yaml:"branchOnly" json:"branchOnly"`
 	AcknowledgePromptRisk bool                            `yaml:"acknowledgePromptRisk" json:"acknowledgePromptRisk"`
@@ -81,6 +82,7 @@ func ParseMarkdownConfigFromReader(r io.Reader) (*models.RunConfig, string, erro
 		Files:                 config.Files,
 		ProviderCredentialID:  config.ProviderCredentialID,
 		ProviderMode:          config.ProviderMode,
+		ReasoningEffort:       config.ReasoningEffort,
 		GitLabCredential:      config.GitLabCredential,
 		BranchOnly:            config.BranchOnly,
 		AcknowledgePromptRisk: config.AcknowledgePromptRisk,
@@ -111,6 +113,7 @@ func validateMarkdownConfig(config *MarkdownConfig) error {
 		Files:                 config.Files,
 		ProviderCredentialID:  config.ProviderCredentialID,
 		ProviderMode:          config.ProviderMode,
+		ReasoningEffort:       config.ReasoningEffort,
 		GitLabCredential:      config.GitLabCredential,
 		BranchOnly:            config.BranchOnly,
 		AcknowledgePromptRisk: config.AcknowledgePromptRisk,
@@ -192,15 +195,6 @@ func ValidateRunConfig(config *models.RunConfig) error {
 		config.ProviderMode != "byok-user" &&
 		config.ProviderMode != "enterprise-gateway" {
 		errors = append(errors, fmt.Sprintf("invalid providerMode '%s', must be 'bundled', 'byok-user', or 'enterprise-gateway'", config.ProviderMode))
-	}
-
-	if config.ReasoningEffort != "" &&
-		config.ReasoningEffort != "low" &&
-		config.ReasoningEffort != "medium" &&
-		config.ReasoningEffort != "high" &&
-		config.ReasoningEffort != "max" &&
-		config.ReasoningEffort != "xhigh" {
-		errors = append(errors, fmt.Sprintf("invalid reasoningEffort '%s', must be 'low', 'medium', 'high', 'max', or 'xhigh'", config.ReasoningEffort))
 	}
 
 	if config.GitLabCredential != nil {

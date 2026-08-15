@@ -1,0 +1,315 @@
+plan:
+  branch: "agent/reasoning-effort-autospec"
+  created: "2026-08-15"
+  spec_path: "specs/001-reasoning-effort-cli/spec.yaml"
+
+summary: |
+  Implement reasoning-effort as an optional, opaque transport preference across the existing Cobra command, JSON/YAML/Markdown configuration, domain, repository, and API DTO layers. The CLI will preserve an explicitly supplied string exactly, omit it when absent, remove client-owned reasoning catalogs and defaults, and stop injecting run-type-derived model/provider selections so the RepoBird service remains authoritative for final policy.
+
+  Extend run response models and renderers to carry and display the service-selected OpenCode model and reasoning effort in CLI status/JSON output and both supported Bubble Tea detail views. Changes will follow red-green-refactor order with local fixtures and httptest-based contract tests covering explicit values, omission, unfamiliar future values, legacy responses, partial responses, service errors, and unchanged invocations. No live or billable validation is permitted.
+
+technical_context:
+  language: "Go 1.24.5"
+  framework: "Cobra 1.9.1 for CLI commands; Bubble Tea 1.3.6 with Bubbles 0.21.0 and Lip Gloss 1.1.0 for the TUI"
+  primary_dependencies:
+    - name: "github.com/spf13/cobra"
+      version: "v1.9.1"
+      purpose: "Expose the optional --reasoning-effort run flag while preserving existing command and flag behavior."
+    - name: "github.com/charmbracelet/bubbletea"
+      version: "v1.3.6"
+      purpose: "Render server-returned run policy in existing message-driven terminal views."
+    - name: "github.com/charmbracelet/lipgloss"
+      version: "v1.1.0"
+      purpose: "Preserve established styling for conditional model and reasoning-effort detail rows."
+    - name: "github.com/stretchr/testify"
+      version: "v1.10.0"
+      purpose: "Express request serialization, response mapping, renderer, and compatibility assertions."
+  storage: "None; the feature adds no client persistence and uses existing in-memory request/response models and cache behavior."
+  testing:
+    framework: "Go testing package with testify assertions, local fixtures, mock services, and net/http/httptest"
+    approach: "Write focused failing tests before each behavior change, then run affected package tests, make test, make test-integration for command coverage, and make check when practical. Clear REPOBIRD_API_KEY and use only local deterministic responses."
+  target_platform: "Linux, macOS, and Windows CLI/TUI builds on amd64 and arm64, consistent with existing Go cross-compilation targets"
+  project_type: "cli"
+  performance_goals: "No additional network requests; optional fields add constant-time serialization and rendering, and 100% of present, omitted, legacy, partial, and unfamiliar-value scenarios must render or submit without unintended failure."
+  constraints:
+    - "Model selection, reasoning defaults, eligibility, normalization, and fallback behavior remain server-authoritative."
+    - "An omitted reasoning-effort preference must remain absent from JSON through omitempty semantics."
+    - "User-supplied reasoning-effort strings must pass through without a client-maintained allowed-value catalog."
+    - "Existing commands, aliases, configuration formats, JSON schemas, exit behavior, and no-preference workflows must remain compatible."
+    - "TUI changes must use existing models and render paths without introducing direct navigation outside internal/tui/app.go."
+    - "All acceptance evidence must be local, deterministic, credential-free, cost-free, and isolated from production or paid services."
+    - "Production code changes require test-first red-green-refactor evidence."
+  scale_scope: "A surgical cross-layer CLI change affecting one optional create-run request field, two optional run policy response fields, CLI status/create output, and the existing dedicated and dashboard TUI detail renderers."
+
+constitution_check:
+  constitution_path: ".autospec/constitution.yaml"
+  gates:
+    - name: "Test-Driven Development"
+      status: "PASS"
+      notes: "Each implementation phase begins with focused failing tests and records red-green evidence before broader local regression targets."
+    - name: "Server-Authoritative Model Policy"
+      status: "PASS"
+      notes: "The plan removes reasoning-effort allowlists and run-type-derived model/provider injection, preserves omission, forwards opaque user values, and renders only server-returned policy."
+    - name: "Backward-Compatible CLI Contracts"
+      status: "PASS"
+      notes: "The new input remains optional, omitempty preserves prior payloads, legacy responses remain valid, and compatibility tests cover existing flags, files, JSON output, errors, and aliases."
+    - name: "Offline and Cost-Free Validation"
+      status: "PASS"
+      notes: "Validation uses credential-cleared Go tests, mocks, fixtures, and httptest only; no live RepoBird, provider, production-adjacent, or billable endpoint is included."
+    - name: "Project Architecture and Data Safety"
+      status: "PASS"
+      notes: "Changes follow existing Go DTO/domain/repository and Bubble Tea rendering patterns, add no global runtime state or navigation, and do not log credentials or policy secrets."
+
+research_findings:
+  decisions:
+    - topic: "Optional reasoning-effort representation"
+      decision: "Keep reasoning effort as a plain optional string at all client layers and rely on json/yaml omitempty for absence."
+      rationale: "A string preserves exact user and future server values, while the zero value naturally omits the request field and avoids client policy ownership."
+      alternatives_considered:
+        - "A closed Go enum of known efforts"
+        - "A CLI-selected default such as max"
+        - "A pointer field solely to distinguish empty from omitted"
+    - topic: "Client-side validation boundary"
+      decision: "Remove the low/medium/high/max/xhigh allowlist from RunConfig validation and limit validation to existing structural request requirements."
+      rationale: "The specification requires unfamiliar syntactically valid values to reach the service unchanged, which is incompatible with a client-owned policy catalog."
+      alternatives_considered:
+        - "Retain the current allowlist"
+        - "Add provider-specific compatibility tables"
+        - "Silently normalize unknown values to a known fallback"
+    - topic: "Model and provider selection authority"
+      decision: "Stop deriving opencodeModel and opencodeProvider from Basic/Pro run presets during request construction; submit runType and optional user preference, then display the service-selected response values."
+      rationale: "Existing modelForRunType/providerForRunType injection conflicts with the binding constitution and would make the CLI authoritative for model policy. Basic/Pro command compatibility can remain through runType without hardcoded model choice."
+      alternatives_considered:
+        - "Keep hardcoded run preset model IDs"
+        - "Move the same catalog into a configuration file"
+        - "Infer the displayed model from runType"
+    - topic: "Response propagation architecture"
+      decision: "Add optional model and reasoning-effort strings to both API-facing response models used by the repository/domain CLI path and the models.RunResponse path used by status and TUI views."
+      rationale: "The repository currently has two established response paths. Updating both avoids inferred values and ensures CLI status, machine JSON, dedicated details, and dashboard details consume the same server data safely."
+      alternatives_considered:
+        - "Render directly from raw JSON"
+        - "Update only the TUI model"
+        - "Derive response policy from the original request"
+    - topic: "Supported display surfaces"
+      decision: "Conditionally display non-empty server-returned policy in status human output, status/create/wait JSON mappings where run details are emitted, RunDetailsView, and DashboardView detail lines."
+      rationale: "These are the existing CLI and terminal run-detail surfaces. Conditional rows preserve legacy usability and avoid invented placeholders."
+      alternatives_considered:
+        - "Always print unknown or default placeholders"
+        - "Show policy only in JSON"
+        - "Show policy only in the dedicated TUI details view"
+    - topic: "Unknown future response values"
+      decision: "Store and render policy values as opaque strings without display-name switches or rejection."
+      rationale: "Plain strings preserve forward compatibility and allow the service to evolve model and effort policy independently of CLI releases."
+      alternatives_considered:
+        - "Map known model IDs to a closed display-name catalog"
+        - "Reject unknown response values during unmarshal"
+        - "Replace unknown values with Other"
+    - topic: "Validation strategy"
+      decision: "Use focused unit and serialization tests plus local httptest repository tests, then run make test, make test-integration, and make check when practical with credentials cleared."
+      rationale: "This gives direct evidence at each boundary and satisfies the constitution without contacting live or paid infrastructure."
+      alternatives_considered:
+        - "Live service end-to-end validation"
+        - "Manual TUI inspection as the only renderer check"
+        - "Snapshot tests without request-boundary assertions"
+
+data_model:
+  entities:
+    - name: "Run Request"
+      description: "A create-run request assembled from flags, stdin, or JSON/YAML/Markdown configuration, with an optional opaque reasoning-effort preference."
+      fields:
+        - name: "reasoning_effort"
+          type: "optional string"
+          description: "Exact user-supplied preference serialized as reasoningEffort when non-empty."
+          constraints: "Must remain unchanged; omitted when absent; no client-owned enum, eligibility, default, normalization, retry, or fallback."
+        - name: "run_type"
+          type: "string"
+          description: "Existing Basic, Pro, run, or plan compatibility signal sent to the service."
+          constraints: "Existing compatibility validation remains; must not be converted into a client-selected model or provider."
+        - name: "existing_submission_fields"
+          type: "composite"
+          description: "Prompt, repository, branch/output, credentials references, context, files, and idempotency inputs already supported by the CLI."
+          constraints: "Existing names, precedence, validation, omission, and error behavior remain compatible."
+      relationships:
+        - target: "Run Policy Result"
+          type: "request-to-result"
+          description: "The optional preference informs the service, but the returned policy result is authoritative and may differ or be absent."
+    - name: "Run Policy Result"
+      description: "Optional policy metadata returned by the service for an accepted or existing run."
+      fields:
+        - name: "model"
+          type: "optional string"
+          description: "The service-selected OpenCode model identifier displayed exactly as returned."
+          constraints: "May be absent or unfamiliar; no client fallback, display-name allowlist, or rejection."
+        - name: "reasoning_effort"
+          type: "optional string"
+          description: "The service-selected reasoning effort displayed exactly as returned."
+          constraints: "May be absent or unfamiliar; must not be reconstructed from the request."
+      relationships:
+        - target: "Run Request"
+          type: "result-of"
+          description: "Represents the service decision for a submitted request, not a client-side assumption about that request."
+
+api_contracts:
+  endpoints:
+    - method: "POST"
+      path: "/api/v1/runs"
+      description: "Create a run with an optional reasoningEffort preference while leaving final model and reasoning policy to the service."
+      request:
+        content_type: "application/json"
+        body_schema: "Existing CreateRunRequest plus optional reasoningEffort:string with omitempty; omit opencodeModel and opencodeProvider unless a separately versioned compatibility contract explicitly requires them."
+      response:
+        success_code: 201
+        body_schema: "Existing create response. Any returned model or reasoning policy fields are optional and must be preserved as opaque strings when present."
+      errors:
+        - code: 400
+          description: "The service rejects malformed input or an unsupported policy preference through the existing API error path; the CLI does not silently retry with a fallback."
+        - code: 401
+          description: "Authentication failure is preserved through existing CLI error and exit behavior."
+        - code: 409
+          description: "Existing conflict or duplicate-submission behavior remains unchanged."
+    - method: "GET"
+      path: "/api/v1/runs/{id}"
+      description: "Retrieve one run, including optional service-selected model and reasoning-effort policy for CLI and dedicated TUI details."
+      request:
+        content_type: "application/json"
+        body_schema: "No request body; existing run identifier path parameter."
+      response:
+        success_code: 200
+        body_schema: "Existing run response plus optional opaque model and reasoning-effort strings; either, both, or neither may be present."
+      errors:
+        - code: 404
+          description: "Run is absent or inaccessible; existing error handling remains unchanged."
+        - code: 429
+          description: "Rate-limit response remains handled by the established API error path."
+    - method: "GET"
+      path: "/api/v1/runs"
+      description: "List runs for dashboard and list-backed detail views, preserving optional policy metadata on each returned run."
+      request:
+        content_type: "application/json"
+        body_schema: "No request body; existing pagination and filter query parameters."
+      response:
+        success_code: 200
+        body_schema: "Existing paginated run list; each item may contain optional opaque model and reasoning-effort strings."
+      errors:
+        - code: 401
+          description: "Authentication failure remains unchanged."
+        - code: 429
+          description: "Rate-limit response remains unchanged."
+
+project_structure:
+  documentation:
+    - path: "specs/001-reasoning-effort-cli/spec.yaml"
+      description: "Governing feature requirements, scenarios, constraints, and measurable outcomes."
+    - path: "specs/001-reasoning-effort-cli/plan.yaml"
+      description: "Implementation architecture, constitution gates, contracts, phases, and validation strategy."
+    - path: "docs/API-REFERENCE.md"
+      description: "Update request and response examples to state opaque pass-through, omission, and server authority without client model-specific catalogs."
+    - path: "docs/RUN-CONFIG-FORMATS.md"
+      description: "Document reasoningEffort as optional and server-validated for flags and JSON/YAML/Markdown inputs."
+    - path: "docs/QUICK-REFERENCE.md"
+      description: "Keep concise command and task-file examples aligned with the optional preference contract."
+    - path: "docs/CLI_API_SPECIFICATION.yaml"
+      description: "Align the documented public request/response schema with server-authoritative optional policy fields."
+  source_code:
+    - path: "internal/commands/run.go"
+      description: "Wire the optional flag through request construction, remove client model/provider preset injection, and avoid inferred policy in human output."
+    - path: "internal/utils/markdown_config.go"
+      description: "Retain structural configuration validation while removing the reasoning-effort value allowlist."
+    - path: "internal/models/run.go"
+      description: "Carry optional request preference and server-returned policy values through configuration and TUI/API response models."
+    - path: "internal/api/dto/run.go"
+      description: "Serialize optional request preference and decode optional service-selected policy values."
+    - path: "internal/domain/models.go"
+      description: "Represent optional request and authoritative response policy in the service/repository domain path."
+    - path: "internal/repository/api_run_repository.go"
+      description: "Map request omission exactly and propagate returned model/reasoning values without inference."
+    - path: "internal/commands/output.go"
+      description: "Preserve reasoning effort in dry-run request JSON and include returned policy in run detail JSON only when present."
+    - path: "internal/commands/status.go"
+      description: "Conditionally render server-selected model and reasoning effort in CLI run details."
+    - path: "internal/tui/views/details.go"
+      description: "Add optional model and reasoning-effort rows to the dedicated run details field builder."
+    - path: "internal/tui/views/dash_updates.go"
+      description: "Add optional model and reasoning-effort rows to dashboard detailLines while preserving copy and viewport behavior."
+  tests:
+    - path: "internal/utils/markdown_config_test.go"
+      description: "Test omission, exact pass-through of unfamiliar values, structural errors, and legacy configuration behavior."
+    - path: "internal/api/dto/run_test.go"
+      description: "Test exact request JSON field naming/omission and response decoding of present, absent, partial, and unfamiliar policy values."
+    - path: "internal/models/run*_test.go"
+      description: "Test configuration conversion and RunResponse unmarshalling without closed policy enums."
+    - path: "internal/repository/api_run_repository_test.go"
+      description: "Use httptest responses to verify request serialization, response propagation, omission, and established service error handling."
+    - path: "internal/commands/run*_test.go"
+      description: "Test flag and file request preparation, dry-run human/JSON output, no model injection, omission, compatibility, and service rejection behavior."
+    - path: "internal/commands/status*_test.go"
+      description: "Test CLI human and JSON details for present, partial, absent, legacy, and unfamiliar returned values."
+    - path: "internal/tui/views/details*_test.go"
+      description: "Test dedicated TUI detail rows and copy metadata for conditional opaque policy values."
+    - path: "internal/tui/views/dashboard*_test.go"
+      description: "Test dashboard detail lines, truncation/original copy values, and legacy rendering safety."
+    - path: "tests/integration/**/*_test.go"
+      description: "Exercise existing command contracts locally with credentials cleared and no live service access."
+
+implementation_phases:
+  - phase: 1
+    name: "Freeze request and policy-boundary contracts"
+    goal: "Create failing tests for exact pass-through, omission, unfamiliar values, no client defaults, no run-type model/provider injection, and unchanged legacy invocations before modifying production code."
+    deliverables:
+      - "Focused red tests for --reasoning-effort and JSON/YAML/Markdown configuration paths."
+      - "DTO and repository serialization tests proving reasoningEffort is exact when present and absent when omitted."
+      - "Compatibility tests proving Basic/Pro retain runType behavior without client-selected opencodeModel/opencodeProvider."
+      - "Service rejection test proving established errors are returned without fallback or silent retry."
+  - phase: 2
+    name: "Implement opaque optional request transport"
+    goal: "Make request tests pass by removing client policy catalogs/defaults and carrying the optional string through established layers."
+    dependencies:
+      - "Phase 1"
+    deliverables:
+      - "Cobra flag and task-file inputs mapped unchanged into RunConfig, domain.CreateRunRequest, and dto.CreateRunRequest."
+      - "Reasoning-effort allowlist removed from client validation while structural validation remains intact."
+      - "Run preset model/provider injection and inferred model display removed from create and dry-run flows."
+      - "Omitted values verified to remain absent through omitempty serialization."
+  - phase: 3
+    name: "Propagate authoritative response policy"
+    goal: "Add optional model and reasoning-effort response fields across both existing response model paths without rejecting unknown values."
+    dependencies:
+      - "Phase 2"
+    deliverables:
+      - "Initially failing DTO, model, and repository tests for present, partial, absent, legacy, and unfamiliar policy values."
+      - "Optional opaque policy fields in dto.RunResponse, domain.Run, models.RunResponse, and output run JSON mappings."
+      - "Repository conversions that copy service-returned values exactly and never reconstruct them from the request."
+      - "Contract fixtures for wrapped and direct run responses plus list-backed TUI data."
+  - phase: 4
+    name: "Render policy in supported CLI and TUI details"
+    goal: "Display authoritative policy conditionally in all established detail surfaces while preserving legacy layouts and copy behavior."
+    dependencies:
+      - "Phase 3"
+    deliverables:
+      - "Initially failing CLI status human/JSON renderer tests for complete, partial, absent, and unfamiliar values."
+      - "Conditional Model and Reasoning effort rows in printRunDetails and run JSON output."
+      - "Conditional opaque policy fields in RunDetailsView.renderOptionalFields."
+      - "Conditional dashboard detailLines with full original values retained for copy operations."
+  - phase: 5
+    name: "Documentation and offline regression validation"
+    goal: "Align public documentation and produce complete local cost-free acceptance evidence."
+    dependencies:
+      - "Phase 4"
+    deliverables:
+      - "API and configuration docs updated to remove client-owned model/effort catalogs and defaults."
+      - "Focused changed-package tests passing after recorded red-green cycles."
+      - "REPOBIRD_API_KEY='' make test passing."
+      - "REPOBIRD_API_KEY='' make test-integration passing when feasible."
+      - "make check passing when practical, with confirmation that no live, production-adjacent, paid, or billable validation ran."
+
+open_questions:
+  - question: "Which public run response JSON keys will the service expose for the selected model and reasoning effort?"
+    context: "The current local repobird-next public serializer does not yet expose either field, while persistence uses opencodeModel and opencodeReasoningEffort and the CLI request uses reasoningEffort. Exact tags must match the versioned public API contract."
+    proposed_resolution: "Confirm the sibling service contract before production edits. Prefer opencodeModel for the model and reasoningEffort for the public reasoning value; if a rollout must consume opencodeReasoningEffort, support it as a decoding compatibility alias while presenting one canonical CLI field."
+
+_meta:
+  version: "1.0.0"
+  generator: "autospec"
+  generator_version: "autospec dev"
+  created: "2026-08-15T06:40:32Z"
+  artifact_type: "plan"

@@ -80,6 +80,8 @@ type RunResponse struct {
 	PublicID           string     `json:"publicId,omitempty"`
 	Status             string     `json:"status"`
 	StatusMessage      string     `json:"statusMessage,omitempty"`
+	Model              string     `json:"model,omitempty"`
+	ReasoningEffort    string     `json:"reasoningEffort,omitempty"`
 	Prompt             string     `json:"prompt"`
 	RepositoryName     string     `json:"repositoryName"`
 	SourceBranch       string     `json:"sourceBranch"`
@@ -108,6 +110,27 @@ type RunResponse struct {
 	Error              string     `json:"error,omitempty"`
 }
 
+// UnmarshalJSON preserves the legacy opencodeModel response alias while using
+// model as the canonical public API field.
+func (r *RunResponse) UnmarshalJSON(data []byte) error {
+	type runResponse RunResponse
+	decoded := struct {
+		*runResponse
+		OpenCodeModel string `json:"opencodeModel"`
+	}{
+		runResponse: (*runResponse)(r),
+	}
+
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	if r.Model == "" {
+		r.Model = decoded.OpenCodeModel
+	}
+
+	return nil
+}
+
 // CreateRunResponse represents the wrapped API response for create operations
 type CreateRunResponse struct {
 	Data *CreateRunData `json:"data"`
@@ -119,6 +142,8 @@ type CreateRunData struct {
 	PublicID           string `json:"publicId,omitempty"`
 	Message            string `json:"message,omitempty"`
 	Status             string `json:"status"`
+	Model              string `json:"model,omitempty"`
+	ReasoningEffort    string `json:"reasoningEffort,omitempty"`
 	BaseBranch         string `json:"baseBranch,omitempty"`
 	OutputMode         string `json:"outputMode,omitempty"`
 	OutputBranch       string `json:"outputBranch,omitempty"`

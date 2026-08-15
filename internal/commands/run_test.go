@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -128,6 +129,7 @@ func TestRunCommand_WithFlags(t *testing.T) {
 				outputBranchPolicy = ""
 				title = ""
 				runType = ""
+				reasoningEffort = ""
 				contextFlag = ""
 				dryRun = false
 				follow = false
@@ -196,23 +198,21 @@ func TestRunCommand_ValidationWithFlags(t *testing.T) {
 			},
 		},
 		{
-			name: "Basic preset selects DeepSeek model",
+			name: "Basic preset preserves run type without selecting policy",
 			args: []string{"-r", "test/repo", "-p", "Fix bug", "--basic", "--dry-run"},
 			expectInJSON: map[string]string{
 				"RunType":        "basic",
 				"RepositoryName": "test/repo",
 				"Prompt":         "Fix bug",
-				"OpenCodeModel":  "openrouter/deepseek/deepseek-v4-flash",
 			},
 		},
 		{
-			name: "Pro preset selects GLM model",
+			name: "Pro preset preserves run type without selecting policy",
 			args: []string{"-r", "test/repo", "-p", "Fix bug", "--pro", "--dry-run"},
 			expectInJSON: map[string]string{
 				"RunType":        "pro",
 				"RepositoryName": "test/repo",
 				"Prompt":         "Fix bug",
-				"OpenCodeModel":  "openrouter/z-ai/glm-5.2",
 			},
 		},
 		{
@@ -308,6 +308,147 @@ func TestRunCommand_ValidationWithFlags(t *testing.T) {
 	}
 }
 
+func TestRunCommand_ReasoningEffortPreparation(t *testing.T) {
+	ensureRunTestConfig()
+	originalAPIKey := cfg.APIKey
+	cfg.APIKey = "test-key"
+	t.Cleanup(func() {
+		cfg.APIKey = originalAPIKey
+		resetReasoningEffortRunFlags()
+	})
+
+	tests := []struct {
+		name                    string
+		args                    []string
+		expectedReasoningEffort string
+	}{
+		{
+			name:                    "explicit reasoning effort",
+			args:                    []string{"-r", "test/repo", "-p", "Fix bug", "--reasoning-effort", "max", "--dry-run"},
+			expectedReasoningEffort: "max",
+		},
+		{
+			name:                    "omitted reasoning effort",
+			args:                    []string{"-r", "test/repo", "-p", "Fix bug", "--dry-run"},
+			expectedReasoningEffort: "",
+		},
+		{
+			name:                    "unfamiliar reasoning effort passes through",
+			args:                    []string{"-r", "test/repo", "-p", "Fix bug", "--reasoning-effort", "future-ultra", "--dry-run"},
+			expectedReasoningEffort: "future-ultra",
+		},
+		{
+			name:                    "basic run leaves model policy to service",
+			args:                    []string{"-r", "test/repo", "-p", "Fix bug", "--basic", "--reasoning-effort", "max", "--dry-run"},
+			expectedReasoningEffort: "max",
+		},
+		{
+			name:                    "pro run leaves model policy to service",
+			args:                    []string{"-r", "test/repo", "-p", "Fix bug", "--pro", "--reasoning-effort", "max", "--dry-run"},
+			expectedReasoningEffort: "max",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resetReasoningEffortRunFlags()
+			require.NoError(t, runCmd.ParseFlags(tt.args))
+
+			result, err := executeRunDryRun(t, nil)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expectedReasoningEffort, result["ReasoningEffort"])
+			assert.Empty(t, result["OpenCodeModel"], "the service selects the model")
+			assert.Empty(t, result["OpenCodeProvider"], "the service selects the provider")
+		})
+	}
+}
+
+func TestRunCommand_FileReasoningEffortTakesPrecedenceOverFlag(t *testing.T) {
+	ensureRunTestConfig()
+	originalAPIKey := cfg.APIKey
+	cfg.APIKey = "test-key"
+	t.Cleanup(func() {
+		cfg.APIKey = originalAPIKey
+		resetReasoningEffortRunFlags()
+	})
+
+	configPath := filepath.Join(t.TempDir(), "run.json")
+	configJSON := `{
+  "repository": "test/repo",
+  "prompt": "Fix bug",
+  "runType": "run",
+  "reasoningEffort": "from-file"
+}`
+	require.NoError(t, os.WriteFile(configPath, []byte(configJSON), 0o600))
+
+	resetReasoningEffortRunFlags()
+	require.NoError(t, runCmd.ParseFlags([]string{"--reasoning-effort", "from-flag", "--dry-run"}))
+
+	result, err := executeRunDryRun(t, []string{configPath})
+	require.NoError(t, err)
+	assert.Equal(t, "from-file", result["ReasoningEffort"])
+	assert.Empty(t, result["OpenCodeModel"], "the service selects the model")
+	assert.Empty(t, result["OpenCodeProvider"], "the service selects the provider")
+}
+
+func executeRunDryRun(t *testing.T, args []string) (map[string]interface{}, error) {
+	t.Helper()
+
+	old := os.Stdout
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	os.Stdout = w
+	t.Cleanup(func() { os.Stdout = old })
+
+	cmdErr := runCommand(runCmd, args)
+	require.NoError(t, w.Close())
+	os.Stdout = old
+
+	var buf bytes.Buffer
+	_, err = buf.ReadFrom(r)
+	require.NoError(t, err)
+	require.NoError(t, r.Close())
+	if cmdErr != nil {
+		return nil, cmdErr
+	}
+
+	output := buf.String()
+	jsonStart := strings.Index(output, "{")
+	jsonEnd := strings.LastIndex(output, "}") + 1
+	require.True(t, jsonStart >= 0 && jsonEnd > jsonStart, "JSON output not found in %q", output)
+
+	var result map[string]interface{}
+	require.NoError(t, json.Unmarshal([]byte(output[jsonStart:jsonEnd]), &result))
+	return result, nil
+}
+
+func resetReasoningEffortRunFlags() {
+	repo = ""
+	prompt = ""
+	source = ""
+	target = ""
+	baseBranch = ""
+	outputMode = ""
+	outputBranch = ""
+	prTargetBranch = ""
+	outputBranchPolicy = ""
+	title = ""
+	runType = ""
+	contextFlag = ""
+	providerCredentialID = ""
+	providerMode = ""
+	reasoningEffort = ""
+	gitlabTokenReferenceID = ""
+	basicRun = false
+	proRun = false
+	branchOnly = false
+	acknowledgePromptRisk = false
+	dryRun = false
+	follow = false
+	wait = false
+	jsonOutput = false
+}
+
 func TestRunCommand_PlanTypeAllowedInDevelopment(t *testing.T) {
 	t.Setenv(config.EnvEnvironment, "development")
 	ensureRunTestConfig()
@@ -327,6 +468,7 @@ func TestRunCommand_PlanTypeAllowedInDevelopment(t *testing.T) {
 		outputBranchPolicy = ""
 		title = ""
 		runType = ""
+		reasoningEffort = ""
 		contextFlag = ""
 		basicRun = false
 		proRun = false
@@ -647,6 +789,7 @@ func TestRunPresetCommand_UsesPromptArgument(t *testing.T) {
 		target = ""
 		title = ""
 		runType = ""
+		reasoningEffort = ""
 		contextFlag = ""
 		basicRun = false
 		proRun = false
@@ -654,7 +797,7 @@ func TestRunPresetCommand_UsesPromptArgument(t *testing.T) {
 	}()
 
 	cmd := newRunPresetCommand("pro")
-	err := cmd.ParseFlags([]string{"-r", "test/repo", "--dry-run"})
+	err := cmd.ParseFlags([]string{"-r", "test/repo", "--reasoning-effort", "future-ultra", "--dry-run"})
 	require.NoError(t, err)
 
 	old := os.Stdout
@@ -672,8 +815,10 @@ func TestRunPresetCommand_UsesPromptArgument(t *testing.T) {
 	assert.Contains(t, output, "Validation successful")
 	assert.Contains(t, output, "Repository: test/repo")
 	assert.Contains(t, output, `"RunType": "pro"`)
-	assert.Contains(t, output, `"OpenCodeModel": "openrouter/z-ai/glm-5.2"`)
-	assert.Contains(t, output, "Model: GLM 5.2")
+	assert.Contains(t, output, `"ReasoningEffort": "future-ultra"`)
+	assert.Contains(t, output, `"OpenCodeModel": ""`)
+	assert.Contains(t, output, `"OpenCodeProvider": ""`)
+	assert.NotContains(t, output, "Model:")
 }
 
 func TestRunPresetCommand_AutoDetectsRepository(t *testing.T) {
@@ -725,7 +870,7 @@ func TestRunPresetCommand_AutoDetectsRepository(t *testing.T) {
 	assert.Contains(t, output, "Auto-detected repository: acme/webapp")
 	assert.Contains(t, output, `"RepositoryName": "acme/webapp"`)
 	assert.Contains(t, output, `"RunType": "basic"`)
-	assert.Contains(t, output, "Model: DeepSeek V4 Flash")
+	assert.NotContains(t, output, "Model:")
 }
 
 func TestRunCommand_ErrorMessages(t *testing.T) {

@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -261,12 +262,89 @@ func TestValidateRunConfigReasoningEffort(t *testing.T) {
 	}
 }
 
-func TestValidateRunConfigRejectsInvalidReasoningEffort(t *testing.T) {
-	err := ValidateRunConfig(&models.RunConfig{
-		Prompt:          "Fix bug",
-		Repository:      "acme/webapp",
-		ReasoningEffort: "turbo",
-	})
+func TestRunConfigFormatsPreserveReasoningEffortValidationContract(t *testing.T) {
+	tests := []struct {
+		name     string
+		explicit string
+		omitted  string
+		invalid  string
+		parse    func(t *testing.T, input string) (*models.RunConfig, error)
+	}{
+		{
+			name:     "JSON",
+			explicit: `{"prompt":"Fix bug","repository":"acme/webapp","reasoningEffort":"future-balanced"}`,
+			omitted:  `{"prompt":"Fix bug","repository":"acme/webapp"}`,
+			invalid:  `{"repository":"acme/webapp"}`,
+			parse: func(t *testing.T, input string) (*models.RunConfig, error) {
+				t.Helper()
+				var config models.RunConfig
+				require.NoError(t, json.Unmarshal([]byte(input), &config))
+				return &config, ValidateRunConfig(&config)
+			},
+		},
+		{
+			name: "YAML",
+			explicit: `prompt: "Fix bug"
+repository: "acme/webapp"
+reasoningEffort: "future-balanced"
+`,
+			omitted: `prompt: "Fix bug"
+repository: "acme/webapp"
+`,
+			invalid: `repository: "acme/webapp"
+`,
+			parse: func(t *testing.T, input string) (*models.RunConfig, error) {
+				t.Helper()
+				config, err := ParseYAMLConfigFromReader(strings.NewReader(input))
+				if err != nil {
+					return nil, err
+				}
+				return config, ValidateRunConfig(config)
+			},
+		},
+		{
+			name: "Markdown",
+			explicit: `---
+prompt: "Fix bug"
+repository: "acme/webapp"
+reasoningEffort: "future-balanced"
+---
+`,
+			omitted: `---
+prompt: "Fix bug"
+repository: "acme/webapp"
+---
+`,
+			invalid: `---
+repository: "acme/webapp"
+---
+`,
+			parse: func(t *testing.T, input string) (*models.RunConfig, error) {
+				t.Helper()
+				config, _, err := ParseMarkdownConfigFromReader(strings.NewReader(input))
+				return config, err
+			},
+		},
+	}
 
-	require.ErrorContains(t, err, "invalid reasoningEffort 'turbo'")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Run("preserves unfamiliar value", func(t *testing.T) {
+				config, err := tt.parse(t, tt.explicit)
+				require.NoError(t, err)
+				assert.Equal(t, "future-balanced", config.ReasoningEffort)
+			})
+
+			t.Run("preserves omission", func(t *testing.T) {
+				config, err := tt.parse(t, tt.omitted)
+				require.NoError(t, err)
+				assert.Empty(t, config.ReasoningEffort)
+			})
+
+			t.Run("preserves structural validation", func(t *testing.T) {
+				_, err := tt.parse(t, tt.invalid)
+				require.ErrorContains(t, err, "prompt is required")
+			})
+		})
+	}
 }
