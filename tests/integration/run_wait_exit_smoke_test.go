@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -27,8 +28,8 @@ func TestRunWaitShellExitCodeContract(t *testing.T) {
 		{
 			name:       "successful terminal state exits zero",
 			statusCode: http.StatusCreated,
-			createBody: runWaitSmokeRun("QUEUED", ""),
-			getBody:    runWaitSmokeRun("DONE", ""),
+			createBody: runWaitSmokeRunWithPolicy("QUEUED", ""),
+			getBody:    runWaitSmokeRunWithPolicy("DONE", ""),
 			wantExit:   0,
 			wantJSON: map[string]any{
 				"schema":   "repobird.run.wait.v1",
@@ -41,8 +42,8 @@ func TestRunWaitShellExitCodeContract(t *testing.T) {
 		{
 			name:       "failed terminal state exits four",
 			statusCode: http.StatusCreated,
-			createBody: runWaitSmokeRun("QUEUED", ""),
-			getBody:    runWaitSmokeRun("FAILED", "tests failed"),
+			createBody: runWaitSmokeRunWithPolicy("QUEUED", ""),
+			getBody:    runWaitSmokeRunWithPolicy("FAILED", "tests failed"),
 			wantExit:   4,
 			wantJSON: map[string]any{
 				"schema":   "repobird.run.wait.v1",
@@ -56,8 +57,8 @@ func TestRunWaitShellExitCodeContract(t *testing.T) {
 		{
 			name:       "timeout exits five",
 			statusCode: http.StatusCreated,
-			createBody: runWaitSmokeRun("QUEUED", ""),
-			getBody:    runWaitSmokeRun("PROCESSING", ""),
+			createBody: runWaitSmokeRunWithPolicy("QUEUED", ""),
+			getBody:    runWaitSmokeRunWithPolicy("PROCESSING", ""),
 			wantExit:   5,
 			wantJSON: map[string]any{
 				"schema":   "repobird.run.wait.v1",
@@ -83,7 +84,7 @@ func TestRunWaitShellExitCodeContract(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			server := newRunWaitSmokeServer(t, tt.statusCode, tt.createBody, tt.getBody)
+			server, requests := newRunWaitSmokeServer(t, tt.statusCode, tt.createBody, tt.getBody)
 			defer server.Close()
 
 			homeDir := SetupTestConfig(t)
@@ -103,6 +104,10 @@ func TestRunWaitShellExitCodeContract(t *testing.T) {
 
 			result := RunCommandWithEnv(t, env, "run", taskFile, "--wait", "--json", "--timeout", "20ms", "--force")
 			AssertExitCode(t, result, tt.wantExit)
+			assertRunWaitRequestOmittedReasoningEffort(t, requests)
+			if tt.getBody != nil && requests.getCount.Load() == 0 {
+				t.Fatal("wait flow did not poll the local run endpoint")
+			}
 
 			if tt.wantJSON == nil {
 				return
@@ -124,13 +129,22 @@ func TestRunWaitShellExitCodeContract(t *testing.T) {
 	}
 }
 
-func newRunWaitSmokeServer(t *testing.T, createStatus int, createBody, getBody map[string]any) *httptest.Server {
+type runWaitSmokeRequests struct {
+	createBody map[string]any
+	getCount   atomic.Int32
+}
+
+func newRunWaitSmokeServer(t *testing.T, createStatus int, createBody, getBody map[string]any) (*httptest.Server, *runWaitSmokeRequests) {
 	t.Helper()
 
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	requests := &runWaitSmokeRequests{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
 		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/runs":
+			if err := json.NewDecoder(r.Body).Decode(&requests.createBody); err != nil {
+				t.Errorf("decode create request: %v", err)
+			}
 			w.WriteHeader(createStatus)
 			if createStatus >= http.StatusBadRequest {
 				_ = json.NewEncoder(w).Encode(createBody)
@@ -138,11 +152,23 @@ func newRunWaitSmokeServer(t *testing.T, createStatus int, createBody, getBody m
 			}
 			_ = json.NewEncoder(w).Encode(map[string]any{"data": createBody})
 		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/runs/123":
+			requests.getCount.Add(1)
 			_ = json.NewEncoder(w).Encode(map[string]any{"data": getBody})
 		default:
 			http.NotFound(w, r)
 		}
 	}))
+	return server, requests
+}
+
+func assertRunWaitRequestOmittedReasoningEffort(t *testing.T, requests *runWaitSmokeRequests) {
+	t.Helper()
+	if requests.createBody == nil {
+		t.Fatal("local server did not receive a create request")
+	}
+	if _, ok := requests.createBody["reasoningEffort"]; ok {
+		t.Fatalf("create request unexpectedly included reasoningEffort: %#v", requests.createBody)
+	}
 }
 
 func runWaitSmokeRun(status, message string) map[string]any {
@@ -156,5 +182,12 @@ func runWaitSmokeRun(status, message string) map[string]any {
 	if message != "" {
 		run["error"] = message
 	}
+	return run
+}
+
+func runWaitSmokeRunWithPolicy(status, message string) map[string]any {
+	run := runWaitSmokeRun(status, message)
+	run["model"] = "future/model-v9"
+	run["reasoningEffort"] = "ultra-deliberate"
 	return run
 }

@@ -351,7 +351,7 @@ phases:
           - "Tests clear credentials and use only local mocks or fixtures."
       - id: "T026"
         title: "Preserve wait/create compatibility coverage in tests/integration/run_wait_exit_smoke_test.go"
-        status: "Pending"
+        status: "Completed"
         type: "test"
         parallel: true
         story_id: "US-003"
