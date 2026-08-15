@@ -45,7 +45,7 @@ phases:
           - "The focused test is recorded failing before production DTO changes."
       - id: "T003"
         title: "Implement optional opaque DTO fields in internal/api/dto/run.go"
-        status: "Pending"
+        status: "Completed"
         type: "implementation"
         parallel: false
         story_id: null
