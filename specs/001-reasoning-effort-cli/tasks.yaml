@@ -368,7 +368,7 @@ phases:
     tasks:
       - id: "T027"
         title: "Document server-authoritative request and response policy in docs/API-REFERENCE.md"
-        status: "Pending"
+        status: "Completed"
         type: "documentation"
         parallel: true
         story_id: null
