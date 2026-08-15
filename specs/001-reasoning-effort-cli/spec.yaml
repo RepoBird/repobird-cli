@@ -1,0 +1,195 @@
+feature:
+  branch: "001-reasoning-effort-cli"
+  created: "2026-08-15"
+  status: "Draft"
+  input: "Implement the CLI-side reasoning-effort request and display support while keeping model and reasoning policy server-authoritative, preserving backward compatibility, and validating only with local cost-free tests."
+
+user_stories:
+  - id: "US-001"
+    title: "Request a reasoning effort"
+    priority: "P1"
+    as_a: "RepoBird CLI user"
+    i_want: "to optionally include a reasoning-effort preference when starting a run"
+    so_that: "I can express the desired reasoning intensity while allowing the service to apply the final policy"
+    why_this_priority: "Submitting the optional preference is the primary new user capability."
+    independent_test: "Start runs with an explicit reasoning effort and with no reasoning effort, then verify the outgoing request preserves the supplied value or omission exactly."
+    acceptance_scenarios:
+      - given: "a user provides a reasoning-effort value for a new run"
+        when: "the run request is prepared"
+        then: "the request includes the user's value without the CLI substituting a default or deciding whether the value is eligible"
+      - given: "a user does not provide a reasoning-effort value"
+        when: "the run request is prepared"
+        then: "the reasoning-effort preference remains omitted so the service can apply its default"
+
+  - id: "US-002"
+    title: "See server-selected reasoning policy"
+    priority: "P1"
+    as_a: "RepoBird CLI or terminal-interface user"
+    i_want: "run details to show the model and reasoning effort returned by the service"
+    so_that: "I can understand the policy actually applied to my run"
+    why_this_priority: "Users need accurate feedback about the server's final decision, not a client-side assumption."
+    independent_test: "Render run data containing present, absent, and previously unknown model or reasoning-effort values and verify that the displayed result reflects the service response safely."
+    acceptance_scenarios:
+      - given: "the service returns both a model and a reasoning effort for a run"
+        when: "the user views that run in supported CLI and terminal views"
+        then: "both returned values are displayed without replacement by locally inferred values"
+      - given: "the service omits a model or reasoning effort"
+        when: "the user views that run"
+        then: "the view remains usable and does not invent a value"
+      - given: "the service returns a future value not previously known to the CLI"
+        when: "the user views that run"
+        then: "the value is preserved or represented safely rather than rejected solely because it is unfamiliar"
+
+  - id: "US-003"
+    title: "Preserve existing CLI workflows"
+    priority: "P1"
+    as_a: "user or automation relying on existing RepoBird CLI behavior"
+    i_want: "existing commands, inputs, and output contracts to continue working when reasoning effort is not used"
+    so_that: "I can upgrade without changing established workflows"
+    why_this_priority: "Backward compatibility is required for both interactive users and scripts."
+    independent_test: "Exercise prior invocations and legacy run data without reasoning-effort fields and verify unchanged request behavior, successful rendering, and established error outcomes."
+    acceptance_scenarios:
+      - given: "an existing invocation that does not mention reasoning effort"
+        when: "the invocation is run after the feature is introduced"
+        then: "it behaves as before and sends no new policy preference"
+      - given: "legacy run data without reasoning-effort information"
+        when: "the data is displayed"
+        then: "existing run information remains readable without failure or misleading defaults"
+
+requirements:
+  functional:
+    - id: "FR-001"
+      description: "The CLI MUST allow a user to provide an optional reasoning-effort preference when submitting a run."
+      testable: true
+      acceptance_criteria: "A run submitted with a reasoning-effort preference contains that exact preference in the request presented to the service."
+    - id: "FR-002"
+      description: "The CLI MUST omit the reasoning-effort request field when the user does not provide a value."
+      testable: true
+      acceptance_criteria: "A request created from an existing invocation contains no reasoning-effort field and therefore leaves default selection to the service."
+    - id: "FR-003"
+      description: "The CLI MUST pass user-supplied reasoning-effort values through without maintaining a client-owned catalog of allowed policy values, eligibility rules, or fallback selections."
+      testable: true
+      acceptance_criteria: "A syntactically valid preference is transmitted unchanged, including a value not otherwise recognized by the client, and no local policy fallback is selected."
+    - id: "FR-004"
+      description: "The CLI MUST keep model selection, reasoning-effort defaults, eligibility, and final run policy authoritative to the service."
+      testable: true
+      acceptance_criteria: "Request and display behavior contains no client-selected model or reasoning default when the service or user has not supplied one."
+    - id: "FR-005"
+      description: "Supported run-detail displays MUST show model and reasoning-effort values returned by the service when those values are present."
+      testable: true
+      acceptance_criteria: "Given run data with both values, each supported detail view presents both values exactly as returned."
+    - id: "FR-006"
+      description: "Supported run-detail displays MUST remain usable when model or reasoning-effort values are absent."
+      testable: true
+      acceptance_criteria: "Legacy or partial run data renders successfully without inventing policy values or obscuring existing information."
+    - id: "FR-007"
+      description: "Supported run-detail displays MUST safely preserve or represent future server-returned model and reasoning-effort values that the CLI does not recognize."
+      testable: true
+      acceptance_criteria: "An unfamiliar returned value does not cause rejection or rendering failure and remains distinguishable to the user."
+    - id: "FR-008"
+      description: "Existing commands, flags, aliases, configuration behavior, input formats, script-relevant output, and documented exit behavior MUST remain compatible when the new preference is omitted."
+      testable: true
+      acceptance_criteria: "Regression scenarios for prior invocations and legacy responses produce the same observable behavior except where additional server-returned policy information is available for display."
+    - id: "FR-009"
+      description: "All acceptance evidence MUST be produced using local, deterministic, cost-free validation that does not contact live RepoBird services, production systems, paid model providers, or billable infrastructure."
+      testable: true
+      acceptance_criteria: "The complete acceptance suite passes with credentials absent and external service behavior replaced by local controlled responses."
+    - id: "FR-010"
+      description: "Behavior-changing implementation work MUST follow test-first development and cover success, omission, error, edge, display, and compatibility paths."
+      testable: true
+      acceptance_criteria: "Implementation records identify an initially failing focused test for each new behavior and passing focused and broader local regression results after implementation."
+  non_functional:
+    - id: "NFR-001"
+      category: "reliability"
+      description: "The feature must handle present, omitted, legacy, and unfamiliar policy values without preventing users from submitting or viewing otherwise valid runs."
+      measurable_target: "100% of defined present, omitted, legacy, and unfamiliar-value acceptance scenarios complete without an unintended failure."
+    - id: "NFR-002"
+      category: "usability"
+      description: "Displayed policy information must clearly reflect the service-returned decision and must not imply a client-selected default."
+      measurable_target: "All display acceptance cases identify returned values accurately, and all omitted-value cases display no invented policy value."
+    - id: "NFR-003"
+      category: "code_quality"
+      description: "Validation evidence must be repeatable in an isolated local environment without credentials or paid dependencies."
+      measurable_target: "The required local test suite passes in one clean credential-free run with zero live or billable network calls."
+
+success_criteria:
+  measurable_outcomes:
+    - id: "SC-001"
+      description: "Users who specify a reasoning effort have their preference represented exactly in every accepted run request."
+      metric: "Accuracy across explicit-preference acceptance scenarios"
+      target: "100% exact representation"
+    - id: "SC-002"
+      description: "Users who do not specify a reasoning effort retain the service's ability to choose the default policy."
+      metric: "Omission accuracy across existing and new no-preference scenarios"
+      target: "100% of no-preference requests omit the optional value"
+    - id: "SC-003"
+      description: "Users can see the service-returned model and reasoning effort wherever supported run details are presented."
+      metric: "Coverage of supported run-detail acceptance scenarios"
+      target: "100% of supported views show all present returned policy values accurately"
+    - id: "SC-004"
+      description: "Existing users and automation can upgrade without changing workflows that do not use reasoning effort."
+      metric: "Pass rate for backward-compatibility scenarios"
+      target: "100% of established compatibility scenarios pass"
+    - id: "SC-005"
+      description: "The feature can be accepted without production access or financial cost."
+      metric: "External paid or live service calls during acceptance validation"
+      target: "0 calls and 0 cost-incurring operations"
+
+key_entities:
+  - name: "Run Request"
+    description: "The user's request to start a RepoBird run while optionally expressing a reasoning-effort preference."
+    attributes:
+      - "optional reasoning-effort preference"
+      - "existing run submission inputs"
+      - "omission state"
+  - name: "Run Policy Result"
+    description: "The model and reasoning policy reported by the service as applied to a run."
+    attributes:
+      - "server-returned model"
+      - "server-returned reasoning effort"
+      - "presence or absence of each value"
+
+edge_cases:
+  - scenario: "The user omits reasoning effort."
+    expected_behavior: "The request omits the optional preference and the CLI does not apply a default."
+  - scenario: "The user supplies a reasoning-effort value that is unfamiliar to the current CLI."
+    expected_behavior: "The CLI passes the syntactically valid value through for the service to accept or reject according to server policy."
+  - scenario: "A legacy run response contains neither model nor reasoning-effort information."
+    expected_behavior: "Existing run information remains readable and no policy value is fabricated."
+  - scenario: "A response contains a model but no reasoning effort, or a reasoning effort but no model."
+    expected_behavior: "The available value is displayed accurately and the absent value does not cause a failure or invented fallback."
+  - scenario: "The service returns a future model or reasoning-effort value unknown to the CLI."
+    expected_behavior: "The value is rendered safely without local policy rejection."
+  - scenario: "The service rejects a submitted reasoning-effort preference."
+    expected_behavior: "The user receives the service's error through established error behavior without a silent client-selected retry or fallback."
+
+assumptions:
+  - "Reasoning effort is an optional user preference, while the service retains authority to accept, reject, normalize, or override it under the API contract."
+  - "The existing product contract already has or will provide optional model and reasoning-effort data in run responses."
+  - "Supported run-detail displays include the existing CLI and terminal-interface locations that currently present comparable run metadata."
+  - "Existing structural input validation may remain, but it will not encode provider catalogs, eligibility, defaults, or other server-owned policy."
+  - "No breaking change is approved by this specification."
+
+constraints:
+  - "The specification and subsequent plan must pass an explicit constitution compliance check before implementation begins."
+  - "Model and reasoning policy must remain server-authoritative."
+  - "Omitted optional values must remain omitted."
+  - "All validation must be local, isolated, deterministic, credential-free, and cost-free."
+  - "No live, production-adjacent, paid-provider, or billable-infrastructure validation is permitted."
+  - "Behavior changes require test-first evidence and backward-compatibility coverage."
+
+out_of_scope:
+  - "Defining or hardcoding the supported model catalog."
+  - "Defining or hardcoding allowed reasoning-effort values, defaults, eligibility, or fallback policy."
+  - "Changing service-side model or reasoning policy."
+  - "Changing pricing, credits, quotas, or run availability rules."
+  - "Breaking or removing existing CLI commands, flags, aliases, configuration sources, inputs, outputs, or exit behavior."
+  - "Live end-to-end validation against RepoBird services or paid model providers."
+  - "Release, deployment, or production rollout activity."
+
+_meta:
+  version: "1.0.0"
+  generator: "autospec"
+  generator_version: "autospec dev"
+  created: "2026-08-15T06:38:19Z"
+  artifact_type: "spec"
