@@ -1,0 +1,510 @@
+tasks:
+  branch: "agent/reasoning-effort-autospec"
+  created: "2026-08-15"
+  spec_path: "specs/001-reasoning-effort-cli/spec.yaml"
+  plan_path: "specs/001-reasoning-effort-cli/plan.yaml"
+
+summary:
+  total_tasks: 31
+  total_phases: 6
+  parallel_opportunities: 16
+  estimated_complexity: "high"
+
+phases:
+  - number: 1
+    title: "Setup"
+    purpose: "Establish deterministic local contract fixtures for request and response policy cases"
+    tasks:
+      - id: "T001"
+        title: "Add local reasoning-policy API fixtures in internal/api/dto/testdata/reasoning_effort_runs.json"
+        status: "Pending"
+        type: "setup"
+        parallel: false
+        story_id: null
+        file_path: "internal/api/dto/testdata/reasoning_effort_runs.json"
+        dependencies: []
+        acceptance_criteria:
+          - "Fixtures cover complete, partial, absent/legacy, unfamiliar future-value, and service-rejection payloads without credentials or live endpoints."
+          - "Fixture keys use the canonical public API response tags resolved from the versioned local contract, with any required compatibility alias explicitly represented."
+
+  - number: 2
+    title: "Foundational"
+    purpose: "Define shared opaque request and response data contracts before story-specific wiring"
+    tasks:
+      - id: "T002"
+        title: "Write failing DTO serialization and decoding tests in internal/api/dto/run_test.go"
+        status: "Pending"
+        type: "test"
+        parallel: true
+        story_id: null
+        file_path: "internal/api/dto/run_test.go"
+        dependencies: ["T001"]
+        acceptance_criteria:
+          - "Tests prove reasoningEffort is serialized exactly when present and omitted when empty."
+          - "Tests prove present, partial, absent, legacy, and unfamiliar model/reasoning values decode without rejection or invented defaults."
+          - "The focused test is recorded failing before production DTO changes."
+      - id: "T003"
+        title: "Implement optional opaque DTO fields in internal/api/dto/run.go"
+        status: "Pending"
+        type: "implementation"
+        parallel: false
+        story_id: null
+        file_path: "internal/api/dto/run.go"
+        dependencies: ["T002"]
+        acceptance_criteria:
+          - "CreateRunRequest carries optional reasoningEffort with exact JSON naming and omitempty behavior."
+          - "Run response DTOs carry optional service-returned model and reasoning effort as plain strings."
+          - "No enum, allowlist, default, eligibility rule, normalization, retry, or fallback is introduced."
+          - "The focused DTO tests pass after implementation."
+      - id: "T004"
+        title: "Write failing configuration and response-model tests in internal/models/run_test.go"
+        status: "Pending"
+        type: "test"
+        parallel: true
+        story_id: null
+        file_path: "internal/models/run_test.go"
+        dependencies: ["T001"]
+        acceptance_criteria:
+          - "Tests cover exact reasoning-effort preservation through RunConfig and response unmarshalling."
+          - "Tests accept omitted, partial, legacy, and unfamiliar policy values without local inference."
+          - "The focused test is recorded failing before production model changes."
+      - id: "T005"
+        title: "Implement optional policy fields in internal/models/run.go"
+        status: "Pending"
+        type: "implementation"
+        parallel: false
+        story_id: null
+        file_path: "internal/models/run.go"
+        dependencies: ["T004"]
+        acceptance_criteria:
+          - "RunConfig represents an optional opaque reasoning-effort preference."
+          - "RunResponse represents optional server-selected model and reasoning effort as plain strings."
+          - "Existing zero-value behavior and legacy JSON compatibility remain intact."
+          - "The focused model tests pass after implementation."
+
+  - number: 3
+    title: "User Story 1 - Request a reasoning effort"
+    purpose: "Allow users to submit an optional opaque reasoning-effort preference while leaving final policy to the service"
+    story_reference: "US-001"
+    independent_test: "Prepare flag, JSON, YAML, and Markdown run requests with explicit, omitted, and unfamiliar reasoning-effort values and verify exact transport, omission, no model/provider injection, and established service errors using only local tests."
+    tasks:
+      - id: "T006"
+        title: "Write failing configuration validation tests in internal/utils/markdown_config_test.go"
+        status: "Pending"
+        type: "test"
+        parallel: true
+        story_id: "US-001"
+        file_path: "internal/utils/markdown_config_test.go"
+        dependencies: ["T003", "T005"]
+        acceptance_criteria:
+          - "Tests accept an unfamiliar syntactically valid reasoning-effort string unchanged."
+          - "Tests preserve omission and existing structural validation errors across JSON, YAML, and Markdown inputs."
+          - "The focused test is recorded failing before validation changes."
+      - id: "T007"
+        title: "Write failing local repository request contract tests in internal/repository/api_run_repository_test.go"
+        status: "Pending"
+        type: "test"
+        parallel: true
+        story_id: "US-001"
+        file_path: "internal/repository/api_run_repository_test.go"
+        dependencies: ["T003", "T005"]
+        acceptance_criteria:
+          - "httptest assertions prove exact reasoningEffort pass-through and omission."
+          - "Basic and Pro requests retain runType compatibility but omit client-selected opencodeModel and opencodeProvider."
+          - "A local 400 response is returned through the established error path without retry or fallback."
+          - "The focused test is recorded failing before repository changes."
+      - id: "T008"
+        title: "Write failing flag and request preparation tests in internal/commands/run_test.go"
+        status: "Pending"
+        type: "test"
+        parallel: true
+        story_id: "US-001"
+        file_path: "internal/commands/run_test.go"
+        dependencies: ["T003", "T005"]
+        acceptance_criteria:
+          - "Tests cover --reasoning-effort explicit, omitted, and unfamiliar values."
+          - "Flag and file-based inputs preserve existing precedence and command behavior."
+          - "No client-selected model, provider, or reasoning default is added to prepared requests."
+          - "The focused test is recorded failing before command changes."
+      - id: "T009"
+        title: "Write failing dry-run and create-output tests in internal/commands/run_create_output_test.go"
+        status: "Pending"
+        type: "test"
+        parallel: true
+        story_id: "US-001"
+        file_path: "internal/commands/run_create_output_test.go"
+        dependencies: ["T003", "T005"]
+        acceptance_criteria:
+          - "Dry-run JSON includes an explicit reasoningEffort exactly and omits it when absent."
+          - "Human output does not infer or advertise a client-selected model or reasoning default."
+          - "Existing create output remains compatible when the preference is omitted."
+          - "The focused test is recorded failing before output changes."
+      - id: "T010"
+        title: "Remove the reasoning-effort policy allowlist in internal/utils/markdown_config.go"
+        status: "Pending"
+        type: "implementation"
+        parallel: true
+        story_id: "US-001"
+        file_path: "internal/utils/markdown_config.go"
+        dependencies: ["T006"]
+        acceptance_criteria:
+          - "Structural request validation remains unchanged."
+          - "Reasoning-effort values are no longer rejected through a low/medium/high/max/xhigh client catalog."
+          - "Omitted values remain omitted and focused configuration tests pass."
+      - id: "T011"
+        title: "Add optional request policy to the domain contract in internal/domain/models.go"
+        status: "Pending"
+        type: "implementation"
+        parallel: true
+        story_id: "US-001"
+        file_path: "internal/domain/models.go"
+        dependencies: ["T007"]
+        acceptance_criteria:
+          - "domain.CreateRunRequest carries the optional reasoning-effort string without transformation."
+          - "Existing runType and submission fields retain their names, zero values, and behavior."
+          - "No model/provider derivation or policy fallback is encoded in the domain model."
+      - id: "T012"
+        title: "Map exact request omission and pass-through in internal/repository/api_run_repository.go"
+        status: "Pending"
+        type: "implementation"
+        parallel: false
+        story_id: "US-001"
+        file_path: "internal/repository/api_run_repository.go"
+        dependencies: ["T007", "T011"]
+        acceptance_criteria:
+          - "Repository mapping copies a non-empty reasoning effort exactly and omits an absent value."
+          - "Repository requests do not inject opencodeModel or opencodeProvider from runType."
+          - "Service errors propagate without silent fallback or retry and focused httptest tests pass."
+      - id: "T013"
+        title: "Wire --reasoning-effort and remove preset policy injection in internal/commands/run.go"
+        status: "Pending"
+        type: "implementation"
+        parallel: false
+        story_id: "US-001"
+        file_path: "internal/commands/run.go"
+        dependencies: ["T008", "T010", "T012"]
+        acceptance_criteria:
+          - "The new optional Cobra flag reaches RunConfig and the create request unchanged."
+          - "Existing flag, file, stdin, alias, and precedence behavior is unchanged when the flag is omitted."
+          - "Basic/Pro runType compatibility remains, but model/provider and reasoning defaults are not client-selected."
+          - "Focused command tests pass."
+      - id: "T014"
+        title: "Preserve optional request fields in dry-run and create JSON in internal/commands/output.go"
+        status: "Pending"
+        type: "implementation"
+        parallel: false
+        story_id: "US-001"
+        file_path: "internal/commands/output.go"
+        dependencies: ["T009", "T013"]
+        acceptance_criteria:
+          - "Dry-run and create JSON preserve explicit reasoningEffort and omit it when absent."
+          - "Human output contains no locally inferred policy value."
+          - "Existing script-relevant output remains unchanged when the preference is omitted."
+          - "Focused output tests pass."
+
+  - number: 4
+    title: "User Story 2 - See server-selected reasoning policy"
+    purpose: "Propagate and conditionally display authoritative service-returned model and reasoning-effort values"
+    story_reference: "US-002"
+    independent_test: "Render complete, partial, absent/legacy, and unfamiliar server-returned policy values through repository, CLI human/JSON, dedicated TUI, and dashboard detail paths and verify exact conditional output."
+    tasks:
+      - id: "T015"
+        title: "Write failing repository response propagation tests in internal/repository/api_run_repository_test.go"
+        status: "Pending"
+        type: "test"
+        parallel: true
+        story_id: "US-002"
+        file_path: "internal/repository/api_run_repository_test.go"
+        dependencies: ["T014"]
+        acceptance_criteria:
+          - "Local GET and list responses cover complete, partial, absent/legacy, and unfamiliar policy values."
+          - "Assertions require exact response propagation without reconstruction from the request or runType."
+          - "The focused test is recorded failing before response mapping changes."
+      - id: "T016"
+        title: "Write failing CLI status renderer tests in internal/commands/status_reasoning_effort_test.go"
+        status: "Pending"
+        type: "test"
+        parallel: true
+        story_id: "US-002"
+        file_path: "internal/commands/status_reasoning_effort_test.go"
+        dependencies: ["T014"]
+        acceptance_criteria:
+          - "Human and JSON cases cover both fields present, each partial combination, neither field, legacy data, and unfamiliar values."
+          - "Absent values produce no invented placeholder or default and existing run information remains readable."
+          - "The focused test is recorded failing before renderer changes."
+      - id: "T017"
+        title: "Write failing dedicated TUI detail tests in internal/tui/views/details_test.go"
+        status: "Pending"
+        type: "test"
+        parallel: true
+        story_id: "US-002"
+        file_path: "internal/tui/views/details_test.go"
+        dependencies: ["T014"]
+        acceptance_criteria:
+          - "Tests require conditional Model and Reasoning effort rows for complete and partial data."
+          - "Legacy and unfamiliar values render safely, and copy metadata preserves exact originals."
+          - "The focused test is recorded failing before TUI detail changes."
+      - id: "T018"
+        title: "Write failing dashboard detail and copy tests in internal/tui/views/dashboard_copy_full_test.go"
+        status: "Pending"
+        type: "test"
+        parallel: true
+        story_id: "US-002"
+        file_path: "internal/tui/views/dashboard_copy_full_test.go"
+        dependencies: ["T014"]
+        acceptance_criteria:
+          - "Tests cover conditional complete, partial, absent/legacy, and unfamiliar policy lines."
+          - "Truncated display values retain full opaque originals for copy operations."
+          - "Viewport and existing dashboard detail behavior remain usable."
+          - "The focused test is recorded failing before dashboard changes."
+      - id: "T019"
+        title: "Add authoritative response policy fields to internal/domain/models.go"
+        status: "Pending"
+        type: "implementation"
+        parallel: false
+        story_id: "US-002"
+        file_path: "internal/domain/models.go"
+        dependencies: ["T015"]
+        acceptance_criteria:
+          - "domain.Run carries optional service-returned model and reasoning effort as opaque strings."
+          - "Fields may independently be empty without validation failure or inferred fallback."
+      - id: "T020"
+        title: "Propagate service-returned policy in internal/repository/api_run_repository.go"
+        status: "Pending"
+        type: "implementation"
+        parallel: false
+        story_id: "US-002"
+        file_path: "internal/repository/api_run_repository.go"
+        dependencies: ["T015", "T019"]
+        acceptance_criteria:
+          - "Single-run and list mappings copy model and reasoning effort exactly from DTOs."
+          - "Legacy, partial, and unfamiliar values remain valid."
+          - "Repository response tests pass without live network access."
+      - id: "T021"
+        title: "Render conditional policy rows in internal/commands/status.go"
+        status: "Pending"
+        type: "implementation"
+        parallel: true
+        story_id: "US-002"
+        file_path: "internal/commands/status.go"
+        dependencies: ["T016", "T020"]
+        acceptance_criteria:
+          - "Human run details show each non-empty server-returned policy value exactly."
+          - "Absent values add no row and do not obscure existing run details."
+          - "Unknown future strings render without a client display-name catalog."
+      - id: "T022"
+        title: "Include optional returned policy in run JSON mappings in internal/commands/output.go"
+        status: "Pending"
+        type: "implementation"
+        parallel: true
+        story_id: "US-002"
+        file_path: "internal/commands/output.go"
+        dependencies: ["T016", "T020"]
+        acceptance_criteria:
+          - "Status/create/wait JSON mappings include present server-returned model and reasoning effort using the documented keys."
+          - "Absent values preserve legacy omission and existing JSON compatibility."
+          - "CLI renderer tests pass."
+      - id: "T023"
+        title: "Render optional policy fields in internal/tui/views/details.go"
+        status: "Pending"
+        type: "implementation"
+        parallel: true
+        story_id: "US-002"
+        file_path: "internal/tui/views/details.go"
+        dependencies: ["T017", "T020"]
+        acceptance_criteria:
+          - "renderOptionalFields conditionally adds exact Model and Reasoning effort values."
+          - "Legacy layouts remain valid and exact original strings are available to copy behavior."
+          - "Dedicated TUI tests pass without new navigation paths."
+      - id: "T024"
+        title: "Render optional policy lines in internal/tui/views/dash_updates.go"
+        status: "Pending"
+        type: "implementation"
+        parallel: true
+        story_id: "US-002"
+        file_path: "internal/tui/views/dash_updates.go"
+        dependencies: ["T018", "T020"]
+        acceptance_criteria:
+          - "detailLines conditionally includes exact Model and Reasoning effort values."
+          - "Display truncation preserves full original strings for copy operations."
+          - "Legacy dashboard rendering, viewport behavior, and message-based navigation remain unchanged."
+          - "Dashboard tests pass."
+
+  - number: 5
+    title: "User Story 3 - Preserve existing CLI workflows"
+    purpose: "Prove existing no-preference invocations, legacy responses, errors, and script contracts remain compatible"
+    story_reference: "US-003"
+    independent_test: "Run local integration scenarios with REPOBIRD_API_KEY cleared for prior commands and legacy fixtures, confirming unchanged requests, output, aliases, errors, and exits when reasoning effort is unused."
+    tasks:
+      - id: "T025"
+        title: "Add no-preference and legacy compatibility coverage in tests/integration/cli_test.go"
+        status: "Pending"
+        type: "test"
+        parallel: true
+        story_id: "US-003"
+        file_path: "tests/integration/cli_test.go"
+        dependencies: ["T021", "T022", "T023", "T024"]
+        acceptance_criteria:
+          - "Existing commands, aliases, flags, task-file formats, and no-preference requests retain prior observable behavior."
+          - "Legacy and partial run fixtures render successfully without invented policy values."
+          - "Script-relevant JSON, documented exit behavior, and established service errors remain compatible."
+          - "Tests clear credentials and use only local mocks or fixtures."
+      - id: "T026"
+        title: "Preserve wait/create compatibility coverage in tests/integration/run_wait_exit_smoke_test.go"
+        status: "Pending"
+        type: "test"
+        parallel: true
+        story_id: "US-003"
+        file_path: "tests/integration/run_wait_exit_smoke_test.go"
+        dependencies: ["T021", "T022", "T023", "T024"]
+        acceptance_criteria:
+          - "Create and wait flows keep existing success and error exit outcomes when reasoning effort is omitted."
+          - "Returned optional policy data does not change polling behavior or cause live service access."
+          - "The test remains deterministic, credential-free, and cost-free."
+
+  - number: 6
+    title: "Polish & Cross-Cutting Concerns"
+    purpose: "Align public documentation and complete local deterministic acceptance validation"
+    tasks:
+      - id: "T027"
+        title: "Document server-authoritative request and response policy in docs/API-REFERENCE.md"
+        status: "Pending"
+        type: "documentation"
+        parallel: true
+        story_id: null
+        file_path: "docs/API-REFERENCE.md"
+        dependencies: ["T025", "T026"]
+        acceptance_criteria:
+          - "Examples document optional reasoningEffort omission and opaque pass-through."
+          - "Response documentation identifies optional model and reasoning-effort keys without a client-owned value catalog."
+          - "No model, provider, default, eligibility, or fallback policy is attributed to the CLI."
+      - id: "T028"
+        title: "Document flag and file-format support in docs/RUN-CONFIG-FORMATS.md"
+        status: "Pending"
+        type: "documentation"
+        parallel: true
+        story_id: null
+        file_path: "docs/RUN-CONFIG-FORMATS.md"
+        dependencies: ["T025", "T026"]
+        acceptance_criteria:
+          - "The --reasoning-effort flag and JSON/YAML/Markdown reasoningEffort field are documented as optional opaque preferences."
+          - "Omission and server validation/authority are explicit, with no closed allowed-value list."
+      - id: "T029"
+        title: "Align concise command examples in docs/QUICK-REFERENCE.md"
+        status: "Pending"
+        type: "documentation"
+        parallel: true
+        story_id: null
+        file_path: "docs/QUICK-REFERENCE.md"
+        dependencies: ["T025", "T026"]
+        acceptance_criteria:
+          - "Examples use the canonical --reasoning-effort flag and reasoningEffort configuration field names."
+          - "Examples describe the preference as optional and preserve existing command behavior when omitted."
+          - "No closed reasoning-effort catalog or client-selected model/default is documented."
+      - id: "T030"
+        title: "Align the machine-readable public contract in docs/CLI_API_SPECIFICATION.yaml"
+        status: "Pending"
+        type: "documentation"
+        parallel: true
+        story_id: null
+        file_path: "docs/CLI_API_SPECIFICATION.yaml"
+        dependencies: ["T025", "T026"]
+        acceptance_criteria:
+          - "The schema includes optional request and response policy fields with canonical names and omission semantics."
+          - "Opaque strings allow unfamiliar future values without a client-owned enum."
+          - "Existing request and response contracts remain valid when the optional fields are absent."
+      - id: "T031"
+        title: "Run complete credential-free local validation through Makefile targets"
+        status: "Pending"
+        type: "test"
+        parallel: false
+        story_id: null
+        file_path: "Makefile"
+        dependencies: ["T027", "T028", "T029", "T030"]
+        acceptance_criteria:
+          - "Record the initial failing focused test and passing focused result for every behavior-changing task."
+          - "All changed-package Go tests pass with REPOBIRD_API_KEY cleared."
+          - "REPOBIRD_API_KEY='' make test passes."
+          - "REPOBIRD_API_KEY='' make test-integration passes when feasible, or a concrete local blocker is recorded."
+          - "make check passes when practical, or a concrete local blocker is recorded."
+          - "Validation confirms zero live RepoBird, production-adjacent, paid-provider, or billable-infrastructure calls and includes a secret-safety diff inspection."
+
+dependencies:
+  user_story_order:
+    - story_id: "US-001"
+      depends_on: []
+      blocks: ["US-002", "US-003"]
+    - story_id: "US-002"
+      depends_on: ["US-001"]
+      blocks: ["US-003"]
+    - story_id: "US-003"
+      depends_on: ["US-001", "US-002"]
+      blocks: []
+  phase_order:
+    - phase: 1
+      blocks: [2]
+    - phase: 2
+      blocks: [3]
+    - phase: 3
+      blocks: [4]
+    - phase: 4
+      blocks: [5]
+    - phase: 5
+      blocks: [6]
+    - phase: 6
+      blocks: []
+
+parallel_execution:
+  - phase: 2
+    parallel_groups:
+      - tasks: ["T002", "T004"]
+        rationale: "DTO and client-model tests modify different packages and share only the completed fixture setup."
+  - phase: 3
+    parallel_groups:
+      - tasks: ["T006", "T007", "T008", "T009"]
+        rationale: "Configuration, repository, command preparation, and output tests are separate red-test lanes after shared contracts exist."
+      - tasks: ["T010", "T011"]
+        rationale: "Validation and domain request implementations modify different packages after their focused tests are written."
+  - phase: 4
+    parallel_groups:
+      - tasks: ["T015", "T016", "T017", "T018"]
+        rationale: "Repository, CLI, dedicated TUI, and dashboard response tests are independent files."
+      - tasks: ["T021", "T022", "T023", "T024"]
+        rationale: "Once response propagation is complete, the four established rendering surfaces can be implemented independently."
+  - phase: 5
+    parallel_groups:
+      - tasks: ["T025", "T026"]
+        rationale: "General CLI compatibility and wait/exit smoke coverage are independent local integration files."
+  - phase: 6
+    parallel_groups:
+      - tasks: ["T027", "T028", "T029", "T030"]
+        rationale: "Public API, configuration, and reference documentation can be aligned independently after compatibility evidence passes."
+
+implementation_strategy:
+  mvp_scope:
+    phases: [1, 2, 3]
+    description: "Setup, shared opaque contracts, and User Story 1 provide optional reasoning-effort request support with exact pass-through, omission, server authority, and local contract tests."
+    validation: "Run focused DTO/model/config/repository/command tests and verify explicit, omitted, unfamiliar, no-model-injection, and service-rejection cases against local fixtures and httptest only."
+  incremental_delivery:
+    - milestone: "Shared Contracts Ready"
+      phases: [1, 2]
+      deliverable: "Deterministic fixtures and optional opaque request/response structures with serialization tests."
+    - milestone: "MVP Complete"
+      phases: [1, 2, 3]
+      deliverable: "Users can request reasoning effort through supported inputs without the CLI selecting policy."
+    - milestone: "Authoritative Policy Visible"
+      phases: [1, 2, 3, 4]
+      deliverable: "CLI and both TUI detail surfaces display optional service-selected policy safely."
+    - milestone: "Compatibility Accepted"
+      phases: [1, 2, 3, 4, 5]
+      deliverable: "Prior workflows and legacy data pass credential-free local integration coverage."
+    - milestone: "Feature Complete"
+      phases: [1, 2, 3, 4, 5, 6]
+      deliverable: "Documentation is aligned and all feasible local cost-free project validation gates pass."
+
+_meta:
+  version: "1.0.0"
+  generator: "autospec"
+  generator_version: "autospec dev"
+  created: "2026-08-15T06:45:40Z"
+  artifact_type: "tasks"
