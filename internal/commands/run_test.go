@@ -197,23 +197,21 @@ func TestRunCommand_ValidationWithFlags(t *testing.T) {
 			},
 		},
 		{
-			name: "Basic preset selects DeepSeek model",
+			name: "Basic preset preserves run type without selecting policy",
 			args: []string{"-r", "test/repo", "-p", "Fix bug", "--basic", "--dry-run"},
 			expectInJSON: map[string]string{
 				"RunType":        "basic",
 				"RepositoryName": "test/repo",
 				"Prompt":         "Fix bug",
-				"OpenCodeModel":  "openrouter/deepseek/deepseek-v4-flash",
 			},
 		},
 		{
-			name: "Pro preset selects GLM model",
+			name: "Pro preset preserves run type without selecting policy",
 			args: []string{"-r", "test/repo", "-p", "Fix bug", "--pro", "--dry-run"},
 			expectInJSON: map[string]string{
 				"RunType":        "pro",
 				"RepositoryName": "test/repo",
 				"Prompt":         "Fix bug",
-				"OpenCodeModel":  "openrouter/z-ai/glm-5.2",
 			},
 		},
 		{
@@ -796,7 +794,7 @@ func TestRunPresetCommand_UsesPromptArgument(t *testing.T) {
 	}()
 
 	cmd := newRunPresetCommand("pro")
-	err := cmd.ParseFlags([]string{"-r", "test/repo", "--dry-run"})
+	err := cmd.ParseFlags([]string{"-r", "test/repo", "--reasoning-effort", "future-ultra", "--dry-run"})
 	require.NoError(t, err)
 
 	old := os.Stdout
@@ -814,8 +812,10 @@ func TestRunPresetCommand_UsesPromptArgument(t *testing.T) {
 	assert.Contains(t, output, "Validation successful")
 	assert.Contains(t, output, "Repository: test/repo")
 	assert.Contains(t, output, `"RunType": "pro"`)
-	assert.Contains(t, output, `"OpenCodeModel": "openrouter/z-ai/glm-5.2"`)
-	assert.Contains(t, output, "Model: GLM 5.2")
+	assert.Contains(t, output, `"ReasoningEffort": "future-ultra"`)
+	assert.Contains(t, output, `"OpenCodeModel": ""`)
+	assert.Contains(t, output, `"OpenCodeProvider": ""`)
+	assert.NotContains(t, output, "Model:")
 }
 
 func TestRunPresetCommand_AutoDetectsRepository(t *testing.T) {
@@ -867,7 +867,7 @@ func TestRunPresetCommand_AutoDetectsRepository(t *testing.T) {
 	assert.Contains(t, output, "Auto-detected repository: acme/webapp")
 	assert.Contains(t, output, `"RepositoryName": "acme/webapp"`)
 	assert.Contains(t, output, `"RunType": "basic"`)
-	assert.Contains(t, output, "Model: DeepSeek V4 Flash")
+	assert.NotContains(t, output, "Model:")
 }
 
 func TestRunCommand_ErrorMessages(t *testing.T) {

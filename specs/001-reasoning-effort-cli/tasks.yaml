@@ -177,7 +177,7 @@ phases:
           - "Service errors propagate without silent fallback or retry and focused httptest tests pass."
       - id: "T013"
         title: "Wire --reasoning-effort and remove preset policy injection in internal/commands/run.go"
-        status: "Pending"
+        status: "Completed"
         type: "implementation"
         parallel: false
         story_id: "US-001"

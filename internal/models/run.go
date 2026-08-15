@@ -412,6 +412,7 @@ func parseJSONWithUnknownFieldsAndPrompts(file *os.File) (*RunConfig, *prompts.V
 		Files:                 runReq.Files,
 		ProviderCredentialID:  runReq.ProviderCredentialID,
 		ProviderMode:          runReq.ProviderMode,
+		ReasoningEffort:       runReq.ReasoningEffort,
 		GitLabCredential:      runReq.GitLabCredential,
 		BranchOnly:            runReq.BranchOnly,
 		AcknowledgePromptRisk: runReq.AcknowledgePromptRisk,
@@ -445,6 +446,7 @@ func findUnsupportedJSONFieldsWithSuggestions(data map[string]interface{}) ([]st
 		"files":                 true,
 		"providerCredentialId":  true,
 		"providerMode":          true,
+		"reasoningEffort":       true,
 		"gitlabCredential":      true,
 		"branchOnly":            true,
 		"acknowledgePromptRisk": true,
@@ -454,7 +456,7 @@ func findUnsupportedJSONFieldsWithSuggestions(data map[string]interface{}) ([]st
 	supportedFieldsList := []string{
 		"prompt", "repository", "source", "target", "baseBranch",
 		"outputMode", "outputBranch", "prTargetBranch", "outputBranchPolicy",
-		"runType", "title", "context", "files", "providerCredentialId", "providerMode",
+		"runType", "title", "context", "files", "providerCredentialId", "providerMode", "reasoningEffort",
 		"gitlabCredential", "branchOnly", "acknowledgePromptRisk", "idempotencyKey",
 	}
 

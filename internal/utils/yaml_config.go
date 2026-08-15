@@ -506,6 +506,7 @@ func ParseJSONFromStdinWithPrompts() (*models.RunConfig, *prompts.ValidationProm
 		Files:                 runReq.Files,
 		ProviderCredentialID:  runReq.ProviderCredentialID,
 		ProviderMode:          runReq.ProviderMode,
+		ReasoningEffort:       runReq.ReasoningEffort,
 		GitLabCredential:      runReq.GitLabCredential,
 		BranchOnly:            runReq.BranchOnly,
 		AcknowledgePromptRisk: runReq.AcknowledgePromptRisk,
@@ -527,13 +528,14 @@ func findUnsupportedJSONFieldsForStdinWithSuggestions(data map[string]interface{
 		"files":                 true,
 		"providerCredentialId":  true,
 		"providerMode":          true,
+		"reasoningEffort":       true,
 		"gitlabCredential":      true,
 		"acknowledgePromptRisk": true,
 	}
 
 	supportedFieldsList := []string{
 		"prompt", "repository", "source", "target", "runType",
-		"title", "context", "files", "providerCredentialId", "providerMode",
+		"title", "context", "files", "providerCredentialId", "providerMode", "reasoningEffort",
 		"gitlabCredential", "acknowledgePromptRisk",
 	}
 
