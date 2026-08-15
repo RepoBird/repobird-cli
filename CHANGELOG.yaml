@@ -3,9 +3,7 @@ versions:
     unreleased:
         added:
             - Add common use-case guides and default skill references for RepoBird CI automation, agent hooks, language/framework recipes, and API integration.
-        internal:
-            changed:
-                - Added reasoning effort to run configuration and API request plumbing.
+            - Add the --reasoning-effort CLI flag and reasoningEffort task-file configuration field for per-run preferences.
     0.10.0:
         date: 2026-06-26
         added:

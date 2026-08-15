@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - Add common use-case guides and default skill references for RepoBird CI automation, agent hooks, language/framework recipes, and API integration.
+- Add the --reasoning-effort CLI flag and reasoningEffort task-file configuration field for per-run preferences.
 
 ## [0.10.0] - 2026-06-26
 

@@ -27,10 +27,11 @@ The request-domain and request-output fields covered by T011 and T014 already ex
 
 | Check | Result |
 |---|---|
-| Changed-package tests with `REPOBIRD_API_KEY=''` | PASS, 1,043 tests across 8 packages |
-| `TMPDIR=/var/tmp REPOBIRD_API_KEY='' make test` | PASS, 654 passed and 2 skipped |
-| `TMPDIR=/var/tmp REPOBIRD_API_KEY='' make test-integration` | PASS, 22 passed |
+| Changed-package tests with `REPOBIRD_API_KEY=''` | PASS, 1,043 individual test cases across 8 packages |
+| `TMPDIR=/var/tmp REPOBIRD_API_KEY='' make test` | PASS, 654 individual test cases passed and 2 skipped |
+| `TMPDIR=/var/tmp REPOBIRD_API_KEY='' make test-integration` | PASS, 22 integration test cases passed |
 | `TMPDIR=/var/tmp REPOBIRD_API_KEY='' make check` | PASS, formatting, vet, lint, and tests |
+| `TMPDIR=/tmp REPOBIRD_API_KEY='' go test -race -tags=integration ./tests/integration` | PASS, race-enabled integration test suite |
 | `autospec artifact specs/001-reasoning-effort-cli/tasks.yaml` | PASS |
 | `git diff --check` | PASS |
 | Added live or paid endpoint scan | PASS, zero suspicious production URL additions |

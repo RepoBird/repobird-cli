@@ -468,6 +468,7 @@ func TestRunCommand_PlanTypeAllowedInDevelopment(t *testing.T) {
 		outputBranchPolicy = ""
 		title = ""
 		runType = ""
+		reasoningEffort = ""
 		contextFlag = ""
 		basicRun = false
 		proRun = false
@@ -788,6 +789,7 @@ func TestRunPresetCommand_UsesPromptArgument(t *testing.T) {
 		target = ""
 		title = ""
 		runType = ""
+		reasoningEffort = ""
 		contextFlag = ""
 		basicRun = false
 		proRun = false
