@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
@@ -237,4 +238,129 @@ func TestAPIRunRepositoryCreatePreservesCanonicalBranchFields(t *testing.T) {
 	require.Equal(t, "release", run.PRTargetBranch)
 	require.Equal(t, "create", run.OutputBranchPolicy)
 	require.Equal(t, "run_123e4567-e89b-12d3-a456-426614174000", run.PublicID)
+}
+
+func TestAPIRunRepositoryGetPropagatesResponsePolicy(t *testing.T) {
+	fixtures := loadReasoningEffortRunFixtures(t)
+	tests := []struct {
+		name                string
+		fixture             string
+		wantModel           string
+		wantReasoningEffort string
+	}{
+		{
+			name:                "complete",
+			fixture:             "complete",
+			wantModel:           "openrouter/z-ai/glm-5.2",
+			wantReasoningEffort: "high",
+		},
+		{
+			name:      "partial model only",
+			fixture:   "partialModelOnly",
+			wantModel: "openrouter/deepseek/deepseek-v4-flash",
+		},
+		{
+			name:                "partial reasoning effort only",
+			fixture:             "partialReasoningEffortOnly",
+			wantReasoningEffort: "max",
+		},
+		{
+			name:    "absent legacy response does not reconstruct policy from run type",
+			fixture: "absentLegacy",
+		},
+		{
+			name:                "unfamiliar future values",
+			fixture:             "unfamiliarFutureValues",
+			wantModel:           "future-provider/future-model-v9",
+			wantReasoningEffort: "adaptive-ultra",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				require.Equal(t, http.MethodGet, req.Method)
+				require.Equal(t, "/api/v1/runs/run-under-test", req.URL.Path)
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write(fixtures[tt.fixture])
+			}))
+			defer server.Close()
+
+			repo := NewAPIRunRepository(server.Client(), server.URL, "test-key", false)
+			run, err := repo.Get(context.Background(), "run-under-test")
+			require.NoError(t, err)
+			require.Equal(t, tt.wantModel, run.Model)
+			require.Equal(t, tt.wantReasoningEffort, run.ReasoningEffort)
+		})
+	}
+}
+
+func TestAPIRunRepositoryListPropagatesResponsePolicy(t *testing.T) {
+	fixtures := loadReasoningEffortRunFixtures(t)
+	fixtureNames := []string{
+		"complete",
+		"partialModelOnly",
+		"partialReasoningEffortOnly",
+		"absentLegacy",
+		"unfamiliarFutureValues",
+	}
+
+	data := make([]json.RawMessage, 0, len(fixtureNames))
+	for _, name := range fixtureNames {
+		var fixture struct {
+			Data json.RawMessage `json:"data"`
+		}
+		require.NoError(t, json.Unmarshal(fixtures[name], &fixture))
+		data = append(data, fixture.Data)
+	}
+
+	body, err := json.Marshal(map[string]any{
+		"data": data,
+		"metadata": map[string]int{
+			"currentPage": 1,
+			"total":       len(data),
+			"totalPages":  1,
+		},
+	})
+	require.NoError(t, err)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		require.Equal(t, http.MethodGet, req.Method)
+		require.Equal(t, "/api/v1/runs", req.URL.Path)
+		require.Equal(t, "5", req.URL.Query().Get("limit"))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(body)
+	}))
+	defer server.Close()
+
+	repo := NewAPIRunRepository(server.Client(), server.URL, "test-key", false)
+	runs, err := repo.List(context.Background(), domain.ListOptions{Limit: len(data)})
+	require.NoError(t, err)
+	require.Len(t, runs, len(data))
+
+	want := []struct {
+		model           string
+		reasoningEffort string
+	}{
+		{model: "openrouter/z-ai/glm-5.2", reasoningEffort: "high"},
+		{model: "openrouter/deepseek/deepseek-v4-flash"},
+		{reasoningEffort: "max"},
+		{},
+		{model: "future-provider/future-model-v9", reasoningEffort: "adaptive-ultra"},
+	}
+	for i, expected := range want {
+		require.Equal(t, expected.model, runs[i].Model, "run %d model", i)
+		require.Equal(t, expected.reasoningEffort, runs[i].ReasoningEffort, "run %d reasoning effort", i)
+	}
+}
+
+func loadReasoningEffortRunFixtures(t *testing.T) map[string]json.RawMessage {
+	t.Helper()
+
+	body, err := os.ReadFile("../api/dto/testdata/reasoning_effort_runs.json")
+	require.NoError(t, err)
+
+	var fixtures map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(body, &fixtures))
+	return fixtures
 }

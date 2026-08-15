@@ -210,7 +210,7 @@ phases:
     tasks:
       - id: "T015"
         title: "Write failing repository response propagation tests in internal/repository/api_run_repository_test.go"
-        status: "Pending"
+        status: "Completed"
         type: "test"
         parallel: true
         story_id: "US-002"
