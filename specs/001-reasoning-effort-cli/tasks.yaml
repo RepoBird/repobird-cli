@@ -128,7 +128,7 @@ phases:
           - "The focused test is recorded failing before command changes."
       - id: "T009"
         title: "Write failing dry-run and create-output tests in internal/commands/run_create_output_test.go"
-        status: "Pending"
+        status: "Completed"
         type: "test"
         parallel: true
         story_id: "US-001"

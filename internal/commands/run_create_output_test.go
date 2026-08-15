@@ -96,6 +96,10 @@ func TestProcessSingleRunJSONCreateOutputIsMachineReadable(t *testing.T) {
 	require.Equal(t, "repobird/fix-auth", run["outputBranch"])
 	require.Equal(t, "release", run["prTargetBranch"])
 	require.Equal(t, "create", run["outputBranchPolicy"])
+
+	request, ok := result["request"].(map[string]any)
+	require.True(t, ok)
+	require.NotContains(t, request, "reasoningEffort")
 }
 
 func TestProcessSingleRunJSONDryRunOutputIsMachineReadable(t *testing.T) {
@@ -134,11 +138,42 @@ func TestProcessSingleRunJSONDryRunOutputIsMachineReadable(t *testing.T) {
 	require.Equal(t, "acme/webapp", request["repositoryName"])
 	require.Equal(t, "basic", request["runType"])
 	require.Equal(t, "opencode", request["agent"])
-	require.Equal(t, "openrouter/deepseek/deepseek-v4-flash", request["opencodeModel"])
 	require.Equal(t, "max", request["reasoningEffort"])
+	require.NotContains(t, request, "opencodeModel")
+	require.NotContains(t, request, "opencodeProvider")
 }
 
-func TestProcessSingleRunHumanDryRunDisplaysReasoningEffort(t *testing.T) {
+func TestProcessSingleRunJSONDryRunOmitsUnspecifiedPolicy(t *testing.T) {
+	ensureRunTestConfig()
+
+	originalDryRun := dryRun
+	originalJSONOutput := jsonOutput
+	dryRun = true
+	jsonOutput = true
+	defer func() {
+		dryRun = originalDryRun
+		jsonOutput = originalJSONOutput
+	}()
+
+	output := captureRunStdout(t, func() {
+		err := processSingleRun(&models.RunConfig{
+			Prompt:     "Fix auth",
+			Repository: "acme/webapp",
+			RunType:    "basic",
+		}, "")
+		require.NoError(t, err)
+	})
+
+	var result map[string]any
+	require.NoError(t, json.Unmarshal([]byte(output), &result))
+	request, ok := result["request"].(map[string]any)
+	require.True(t, ok)
+	require.NotContains(t, request, "reasoningEffort")
+	require.NotContains(t, request, "opencodeModel")
+	require.NotContains(t, request, "opencodeProvider")
+}
+
+func TestProcessSingleRunHumanDryRunDoesNotAdvertiseClientPolicy(t *testing.T) {
 	ensureRunTestConfig()
 
 	originalDryRun := dryRun
@@ -152,15 +187,16 @@ func TestProcessSingleRunHumanDryRunDisplaysReasoningEffort(t *testing.T) {
 
 	output := captureRunStdout(t, func() {
 		err := processSingleRun(&models.RunConfig{
-			Prompt:          "Fix auth",
-			Repository:      "acme/webapp",
-			RunType:         "basic",
-			ReasoningEffort: "max",
+			Prompt:     "Fix auth",
+			Repository: "acme/webapp",
+			RunType:    "basic",
 		}, "")
 		require.NoError(t, err)
 	})
 
-	require.Contains(t, output, "Reasoning effort: max")
+	require.Contains(t, output, "Run type: Basic")
+	require.NotContains(t, output, "Model:")
+	require.NotContains(t, output, "Reasoning effort:")
 }
 
 func TestProcessSingleRunRejectsJSONFollowBeforeCreate(t *testing.T) {
