@@ -259,7 +259,7 @@ phases:
           - "The focused test is recorded failing before dashboard changes."
       - id: "T019"
         title: "Add authoritative response policy fields to internal/domain/models.go"
-        status: "Pending"
+        status: "Completed"
         type: "implementation"
         parallel: false
         story_id: "US-002"
