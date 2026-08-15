@@ -194,6 +194,15 @@ func ValidateRunConfig(config *models.RunConfig) error {
 		errors = append(errors, fmt.Sprintf("invalid providerMode '%s', must be 'bundled', 'byok-user', or 'enterprise-gateway'", config.ProviderMode))
 	}
 
+	if config.ReasoningEffort != "" &&
+		config.ReasoningEffort != "low" &&
+		config.ReasoningEffort != "medium" &&
+		config.ReasoningEffort != "high" &&
+		config.ReasoningEffort != "max" &&
+		config.ReasoningEffort != "xhigh" {
+		errors = append(errors, fmt.Sprintf("invalid reasoningEffort '%s', must be 'low', 'medium', 'high', 'max', or 'xhigh'", config.ReasoningEffort))
+	}
+
 	if config.GitLabCredential != nil {
 		if config.GitLabCredential.Mode != "stored_token_reference" {
 			errors = append(errors, "gitlabCredential.mode must be 'stored_token_reference'")

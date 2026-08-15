@@ -100,6 +100,7 @@ type runRequest struct {
 	Agent                 string                   `json:"agent,omitempty"`
 	OpenCodeModel         string                   `json:"opencodeModel,omitempty"`
 	OpenCodeProvider      string                   `json:"opencodeProvider,omitempty"`
+	ReasoningEffort       string                   `json:"reasoningEffort,omitempty"`
 	Title                 string                   `json:"title,omitempty"`
 	Context               string                   `json:"context,omitempty"`
 	Files                 []string                 `json:"files,omitempty"`
@@ -256,6 +257,7 @@ func makeRunRequestJSON(req domain.CreateRunRequest) runRequest {
 		Agent:                 req.Agent,
 		OpenCodeModel:         req.OpenCodeModel,
 		OpenCodeProvider:      req.OpenCodeProvider,
+		ReasoningEffort:       req.ReasoningEffort,
 		Title:                 req.Title,
 		Context:               req.Context,
 		Files:                 req.Files,

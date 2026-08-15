@@ -6,6 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/repobird/repobird-cli/internal/models"
 )
 
 func TestParseMarkdownConfigFromReader(t *testing.T) {
@@ -244,4 +246,27 @@ func TestValidateRunConfig(t *testing.T) {
 			// For now, we're just testing that the validation logic is working
 		})
 	}
+}
+
+func TestValidateRunConfigReasoningEffort(t *testing.T) {
+	for _, effort := range []string{"low", "medium", "high", "max", "xhigh"} {
+		t.Run(effort, func(t *testing.T) {
+			err := ValidateRunConfig(&models.RunConfig{
+				Prompt:          "Fix bug",
+				Repository:      "acme/webapp",
+				ReasoningEffort: effort,
+			})
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestValidateRunConfigRejectsInvalidReasoningEffort(t *testing.T) {
+	err := ValidateRunConfig(&models.RunConfig{
+		Prompt:          "Fix bug",
+		Repository:      "acme/webapp",
+		ReasoningEffort: "turbo",
+	})
+
+	require.ErrorContains(t, err, "invalid reasoningEffort 'turbo'")
 }

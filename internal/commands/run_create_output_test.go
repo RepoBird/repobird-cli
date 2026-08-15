@@ -112,9 +112,10 @@ func TestProcessSingleRunJSONDryRunOutputIsMachineReadable(t *testing.T) {
 
 	output := captureRunStdout(t, func() {
 		err := processSingleRun(&models.RunConfig{
-			Prompt:     "Fix auth",
-			Repository: "acme/webapp",
-			RunType:    "basic",
+			Prompt:          "Fix auth",
+			Repository:      "acme/webapp",
+			RunType:         "basic",
+			ReasoningEffort: "max",
 		}, "")
 		require.NoError(t, err)
 	})
@@ -134,6 +135,7 @@ func TestProcessSingleRunJSONDryRunOutputIsMachineReadable(t *testing.T) {
 	require.Equal(t, "basic", request["runType"])
 	require.Equal(t, "opencode", request["agent"])
 	require.Equal(t, "openrouter/deepseek/deepseek-v4-flash", request["opencodeModel"])
+	require.Equal(t, "max", request["reasoningEffort"])
 }
 
 func TestProcessSingleRunRejectsJSONFollowBeforeCreate(t *testing.T) {
