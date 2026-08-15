@@ -165,7 +165,7 @@ phases:
           - "No model/provider derivation or policy fallback is encoded in the domain model."
       - id: "T012"
         title: "Map exact request omission and pass-through in internal/repository/api_run_repository.go"
-        status: "Pending"
+        status: "Completed"
         type: "implementation"
         parallel: false
         story_id: "US-001"

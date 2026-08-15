@@ -54,8 +54,6 @@ func (r *apiRunRepository) Create(ctx context.Context, req domain.CreateRunReque
 		OutputBranchPolicy:    req.OutputBranchPolicy,
 		RunType:               req.RunType,
 		Agent:                 agentOrDefault(req.Agent),
-		OpenCodeModel:         req.OpenCodeModel,
-		OpenCodeProvider:      req.OpenCodeProvider,
 		ReasoningEffort:       req.ReasoningEffort,
 		Title:                 req.Title,
 		Context:               req.Context,
