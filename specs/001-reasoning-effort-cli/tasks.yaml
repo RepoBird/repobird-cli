@@ -58,7 +58,7 @@ phases:
           - "The focused DTO tests pass after implementation."
       - id: "T004"
         title: "Write failing configuration and response-model tests in internal/models/run_test.go"
-        status: "Pending"
+        status: "Completed"
         type: "test"
         parallel: true
         story_id: null
