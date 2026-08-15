@@ -59,6 +59,48 @@ func TestNewClient(t *testing.T) {
 	}
 }
 
+func TestClientGetModelsUsesPublicEndpointAndETag(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Fatalf("expected GET, got %s", r.Method)
+		}
+		if r.URL.Path != EndpointModels {
+			t.Fatalf("expected path %s, got %s", EndpointModels, r.URL.Path)
+		}
+		if authorization := r.Header.Get("Authorization"); authorization != "" {
+			t.Fatalf("discovery should not send an empty authorization header, got %q", authorization)
+		}
+		w.Header().Set("ETag", `"catalog_test"`)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"data": map[string]any{
+				"catalogRevision": "catalog_test",
+				"models": []map[string]any{{
+					"id": "future-provider/future-model-v9",
+					"label": "Future Model",
+					"provider": "Future Provider",
+					"capabilities": []string{"future-flow"},
+					"isDefault": true,
+				}},
+			},
+		})
+	}))
+	defer server.Close()
+
+	result, err := NewClient("", server.URL, false).GetModels("")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.ETag != `"catalog_test"` {
+		t.Fatalf("ETag = %q, want %q", result.ETag, `"catalog_test"`)
+	}
+	if result.NotModified {
+		t.Fatal("first discovery response must not be marked not modified")
+	}
+	if result.Catalog == nil || result.Catalog.Data == nil {
+		t.Fatal("expected catalog data")
+	}
+}
+
 func TestGetRepositorySupportsBranchDefaults(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/v1/repositories/repo_123" {

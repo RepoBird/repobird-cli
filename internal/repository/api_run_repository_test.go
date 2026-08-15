@@ -159,6 +159,28 @@ func TestAPIRunRepositoryCreateRunTypeDoesNotSelectModelPolicy(t *testing.T) {
 	}
 }
 
+func TestAPIRunRepositoryCreatePassesExplicitOpenCodeSelection(t *testing.T) {
+	var body map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
+		w.WriteHeader(http.StatusCreated)
+		_, _ = io.WriteString(w, `{"data":{"id":123,"status":"QUEUED"}}`)
+	}))
+	defer server.Close()
+
+	repo := NewAPIRunRepository(server.Client(), server.URL, "test-key", false)
+	_, err := repo.Create(context.Background(), domain.CreateRunRequest{
+		Prompt:           "Fix auth",
+		RepositoryName:   "acme/webapp",
+		RunType:          domain.RunTypePro,
+		OpenCodeModel:    "future-provider/future-model-v9",
+		OpenCodeProvider: "future-provider",
+	})
+	require.NoError(t, err)
+	require.Equal(t, "future-provider/future-model-v9", body["opencodeModel"])
+	require.Equal(t, "future-provider", body["opencodeProvider"])
+}
+
 func TestAPIRunRepositoryCreateReturnsLocal400WithoutRetryOrFallback(t *testing.T) {
 	attempts := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
