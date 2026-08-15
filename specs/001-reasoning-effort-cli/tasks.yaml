@@ -294,7 +294,7 @@ phases:
           - "Unknown future strings render without a client display-name catalog."
       - id: "T022"
         title: "Include optional returned policy in run JSON mappings in internal/commands/output.go"
-        status: "Pending"
+        status: "Completed"
         type: "implementation"
         parallel: true
         story_id: "US-002"

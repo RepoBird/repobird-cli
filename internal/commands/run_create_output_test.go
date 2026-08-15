@@ -35,6 +35,60 @@ func TestPrintRunCreateJSONPreservesExplicitReasoningEffort(t *testing.T) {
 	require.Equal(t, "future-ultra", request["reasoningEffort"])
 }
 
+func TestRunJSONOutputsPreserveReturnedReasoningPolicy(t *testing.T) {
+	tests := []struct {
+		name  string
+		print func(io.Writer, *domain.Run) error
+	}{
+		{
+			name: "create",
+			print: func(out io.Writer, run *domain.Run) error {
+				return printRunCreateJSON(out, run, domain.CreateRunRequest{})
+			},
+		},
+		{
+			name: "wait",
+			print: func(out io.Writer, run *domain.Run) error {
+				return printRunWaitJSON(out, run, domain.CreateRunRequest{}, ExitCodeSuccess, false, "")
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Run("present", func(t *testing.T) {
+				var output bytes.Buffer
+				err := tt.print(&output, &domain.Run{
+					ID:              "run-123",
+					Model:           "future-provider/model-v99",
+					ReasoningEffort: "future-ultra",
+				})
+				require.NoError(t, err)
+
+				var result map[string]any
+				require.NoError(t, json.Unmarshal(output.Bytes(), &result))
+				run, ok := result["run"].(map[string]any)
+				require.True(t, ok)
+				require.Equal(t, "future-provider/model-v99", run["model"])
+				require.Equal(t, "future-ultra", run["reasoningEffort"])
+				require.NotContains(t, run, "opencodeModel")
+			})
+
+			t.Run("absent", func(t *testing.T) {
+				var output bytes.Buffer
+				require.NoError(t, tt.print(&output, &domain.Run{ID: "run-123"}))
+
+				var result map[string]any
+				require.NoError(t, json.Unmarshal(output.Bytes(), &result))
+				run, ok := result["run"].(map[string]any)
+				require.True(t, ok)
+				require.NotContains(t, run, "model")
+				require.NotContains(t, run, "reasoningEffort")
+			})
+		})
+	}
+}
+
 func TestProcessSingleRunJSONCreateOutputIsMachineReadable(t *testing.T) {
 	ensureRunTestConfig()
 	t.Setenv("XDG_CACHE_HOME", t.TempDir())
