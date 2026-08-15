@@ -17,7 +17,7 @@ phases:
     tasks:
       - id: "T001"
         title: "Add local reasoning-policy API fixtures in internal/api/dto/testdata/reasoning_effort_runs.json"
-        status: "Pending"
+        status: "Completed"
         type: "setup"
         parallel: false
         story_id: null
