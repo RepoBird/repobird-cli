@@ -38,7 +38,7 @@ The `repobird run` command supports multiple configuration file formats to defin
 | `files` | array | - | List of specific files to include in the context |
 | `providerCredentialId` | string | - | Optional provider credential reference for BYOK or enterprise provider routing |
 | `providerMode` | string | - | Optional provider mode: `bundled`, `byok-user`, or `enterprise-gateway` |
-| `reasoningEffort` | string | model-specific | Optional OpenCode reasoning effort: `low`, `medium`, `high`, `max`, or `xhigh`. Model-specific availability is enforced by the server. |
+| `reasoningEffort` | string | model-specific | Optional OpenCode reasoning effort: `low`, `medium`, `high`, `max`, or `xhigh`. DeepSeek V4 Flash supports `low`, `high`, and `max`; DeepSeek V4 Pro supports `high` and `max`; both default to `max`. Model-specific availability is enforced by the server. |
 | `gitlabCredential` | object | - | Stored GitLab credential reference. Use `mode: stored_token_reference` and `tokenReferenceId`; never put raw tokens in task files |
 | `branchOnly` | boolean | `false` | Legacy alias for `outputMode: branch` |
 | `acknowledgePromptRisk` | boolean | `false` | Explicitly acknowledge a `PROMPT_RISK_ACK_REQUIRED` response after reviewing the prompt |

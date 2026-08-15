@@ -114,9 +114,10 @@ repobird config set api-key KEY     # Set API key
 }
 ```
 
-The CLI accepts `low`, `medium`, `high`, `max`, and `xhigh`. Model-specific
-availability is enforced by the server. Use `repobird run --help` for the
-complete flag list.
+The CLI accepts `low`, `medium`, `high`, `max`, and `xhigh`. DeepSeek V4 Flash
+supports `low`, `high`, and `max`; DeepSeek V4 Pro supports `high` and `max`;
+both default to the recommended `max` setting. Model-specific availability is
+enforced by the server. Use `repobird run --help` for the complete flag list.
 
 ## Environment Variables
 
