@@ -415,7 +415,7 @@ phases:
           - "Existing request and response contracts remain valid when the optional fields are absent."
       - id: "T031"
         title: "Run complete credential-free local validation through Makefile targets"
-        status: "Pending"
+        status: "Completed"
         type: "test"
         parallel: false
         story_id: null
