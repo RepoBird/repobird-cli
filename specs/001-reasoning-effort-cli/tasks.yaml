@@ -70,7 +70,7 @@ phases:
           - "The focused test is recorded failing before production model changes."
       - id: "T005"
         title: "Implement optional policy fields in internal/models/run.go"
-        status: "Pending"
+        status: "Completed"
         type: "implementation"
         parallel: false
         story_id: null
