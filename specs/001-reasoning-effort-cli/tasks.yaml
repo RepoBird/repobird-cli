@@ -318,7 +318,7 @@ phases:
           - "Dedicated TUI tests pass without new navigation paths."
       - id: "T024"
         title: "Render optional policy lines in internal/tui/views/dash_updates.go"
-        status: "Pending"
+        status: "Completed"
         type: "implementation"
         parallel: true
         story_id: "US-002"
