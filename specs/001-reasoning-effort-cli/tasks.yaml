@@ -306,7 +306,7 @@ phases:
           - "CLI renderer tests pass."
       - id: "T023"
         title: "Render optional policy fields in internal/tui/views/details.go"
-        status: "Pending"
+        status: "Completed"
         type: "implementation"
         parallel: true
         story_id: "US-002"
