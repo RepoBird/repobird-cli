@@ -1,0 +1,212 @@
+constitution:
+  project_name: "RepoBird CLI"
+  version: "1.0.0"
+  ratified: "2026-08-15"
+  last_amended: "2026-08-15"
+
+preamble: |
+  RepoBird CLI is a stable Go command-line and terminal interface to the RepoBird
+  service. These principles keep client behavior testable, compatible, and aligned
+  with server policy while preventing validation from consuming live resources.
+
+principles:
+  - name: "Test-Driven Development"
+    id: "PRIN-001"
+    category: "quality"
+    priority: "NON-NEGOTIABLE"
+    description: |
+      Every behavior change must begin with a failing automated test that expresses
+      the intended contract before production code is changed. Implementations must
+      make that test pass without weakening existing assertions, and refactoring may
+      occur only while the relevant suite remains green. Tests must cover success,
+      error, edge, and compatibility paths appropriate to the change.
+    rationale: "Tests written first make behavior explicit, prevent regressions, and provide durable evidence for CLI and API contracts."
+    enforcement:
+      - mechanism: "Red-green-refactor evidence"
+        description: "Reviews and implementation records must identify the initially failing focused test and the passing result after implementation."
+      - mechanism: "Repository test targets"
+        description: "Run focused package tests first, then make test for Go changes and make test-integration for CLI command changes when applicable."
+      - mechanism: "Test isolation"
+        description: "External dependencies must be mocked or replaced with local fixtures, and configuration tests must use isolated temporary directories."
+    exceptions:
+      - "Documentation-only or metadata-only changes that cannot alter runtime behavior."
+      - "A time-boxed exploratory spike that is not merged as production code."
+
+  - name: "Server-Authoritative Model Policy"
+    id: "PRIN-002"
+    category: "architecture"
+    priority: "NON-NEGOTIABLE"
+    description: |
+      The RepoBird service is the authority for supported models, reasoning-effort
+      values, defaults, eligibility, and final run policy. The CLI must transmit only
+      fields allowed by the API contract, preserve omission when the user does not
+      specify an optional value, and display server-returned decisions without
+      substituting client assumptions. The CLI must not hardcode a provider catalog,
+      invent fallback models, override server-selected policy, or use plan, credit,
+      or legacy run-count heuristics to determine model availability.
+    rationale: "Centralizing policy on the server prevents client drift and allows policy changes without forcing synchronized CLI releases."
+    enforcement:
+      - mechanism: "Request serialization tests"
+        description: "Tests verify exact JSON field names, omission semantics, accepted legacy inputs, and pass-through behavior for model-policy fields."
+      - mechanism: "Response rendering tests"
+        description: "Tests verify that CLI and TUI output reflect server-returned model and reasoning policy rather than locally inferred values."
+      - mechanism: "Architecture review"
+        description: "Changes introducing model lists, defaults, eligibility checks, or fallback selection in the client require rejection unless the current API contract explicitly mandates them for compatibility."
+    exceptions:
+      - "Purely structural client validation required to produce a valid API request."
+      - "An explicit, versioned API compatibility rule documented in the specification and covered by regression tests."
+
+  - name: "Backward-Compatible CLI Contracts"
+    id: "PRIN-003"
+    category: "process"
+    priority: "MUST"
+    description: |
+      Existing commands, flags, aliases, configuration locations, input formats,
+      environment-variable precedence, output relied upon by scripts, and documented
+      exit behavior must remain compatible unless a specification explicitly approves
+      a breaking change. New optional request fields must preserve previous behavior
+      when omitted. Deprecations must retain a migration path and must not silently
+      reinterpret existing user input.
+    rationale: "RepoBird CLI is used interactively and in automation, so silent contract drift can break user workflows and scripts."
+    enforcement:
+      - mechanism: "Compatibility regression tests"
+        description: "Command changes include tests for prior invocations, omitted new fields, legacy configuration paths, output contracts, and error behavior."
+      - mechanism: "Integration test target"
+        description: "Changes under internal/commands run make test-integration when feasible, using only local or mocked dependencies."
+      - mechanism: "Change review"
+        description: "Any intentional break must be named in the specification, documented in the changelog, versioned appropriately, and approved by a maintainer."
+    exceptions:
+      - "Removal of behavior that creates a confirmed security vulnerability, with an explicit migration notice and maintainer approval."
+      - "A breaking change explicitly requested by the governing specification and accompanied by compatibility impact documentation."
+
+  - name: "Offline and Cost-Free Validation"
+    id: "PRIN-004"
+    category: "process"
+    priority: "NON-NEGOTIABLE"
+    description: |
+      Development and acceptance validation must not call live RepoBird services,
+      production systems, paid model providers, billable infrastructure, or other
+      cost-incurring endpoints. Tests must clear or replace credentials, use mocks,
+      fixtures, local test servers, or free deterministic simulators, and fail closed
+      if a live endpoint or credential is unexpectedly present. Passing local evidence
+      is the completion gate for this project unless a separate, explicitly approved
+      external-validation task is created.
+    rationale: "Deterministic, cost-free validation protects production data, avoids unintended spend, and keeps test results reproducible."
+    enforcement:
+      - mechanism: "Credential-free test commands"
+        description: "Canonical test targets clear REPOBIRD_API_KEY and must not require production credentials or paid provider access."
+      - mechanism: "Network boundary tests"
+        description: "API behavior is exercised through mocks, httptest servers, fixtures, or contract tests that do not leave the local environment."
+      - mechanism: "Validation review"
+        description: "Plans and handoffs must list validation commands and confirm that no live, production-adjacent, or paid validation was run."
+    exceptions: []
+
+  - name: "Project Architecture and Data Safety"
+    id: "PRIN-005"
+    category: "architecture"
+    priority: "MUST"
+    description: |
+      Changes must follow Go conventions and established RepoBird patterns. TUI
+      transitions must use messages routed through internal/tui/app.go, runtime code
+      must avoid global state, errors must remain explicit and user-safe, and secrets
+      such as API keys or tokens must never be logged, committed, or exposed in test
+      output. Product behavior must use credits-based concepts unless the current API
+      contract requires legacy terminology for compatibility.
+    rationale: "Consistent architecture and safe data handling reduce regressions during the OpenCode and credits-based migration."
+    enforcement:
+      - mechanism: "Focused code review"
+        description: "Review verifies message-based TUI navigation, explicit errors, short focused functions, and compatibility with established package patterns."
+      - mechanism: "Static and automated checks"
+        description: "Significant changes run make check when practical, after focused tests and the required Go test targets pass."
+      - mechanism: "Secret-safety inspection"
+        description: "Tests and diffs are inspected for credentials, tokens, sensitive logs, and accidental production endpoint use."
+    exceptions:
+      - "Compatibility adapters that isolate a legacy API contract and include removal criteria."
+
+sections:
+  - name: "Implementation Workflow"
+    content: |
+      Specifications must translate each behavioral requirement into an observable
+      test. Implementation proceeds in red-green-refactor order, beginning with the
+      smallest focused suite. Developers must read affected code and contracts before
+      changing behavior, keep changes surgical, and run broader local checks only
+      after focused evidence passes.
+
+  - name: "API and Model-Policy Boundaries"
+    content: |
+      API schemas and server responses define model and reasoning-effort policy. CLI
+      parsing and validation may enforce syntax and request shape, but policy decisions
+      belong to the server. Unknown future server-returned values should be preserved
+      or rendered safely rather than rejected solely because the CLI does not recognize
+      them. Omitted optional fields must remain omitted to preserve server defaults and
+      backward-compatible behavior.
+
+  - name: "Validation and Release Evidence"
+    content: |
+      Validation must be local, deterministic, isolated, and cost-free. Focused tests
+      run before make test; command changes also run make test-integration when
+      applicable; significant changes run make check when practical. Release activity
+      remains governed by repository branch and remote policy, and no release may be
+      published from an unvalidated main branch.
+
+  - name: "Security and Documentation"
+    content: |
+      Secrets must never enter source control or logs. Trust-boundary inputs must be
+      validated without duplicating server policy. Public behavior, deprecations,
+      architecture decisions, and intentional compatibility changes must be documented
+      in the appropriate project docs and changelog.
+
+governance:
+  amendment_process:
+    - step: 1
+      action: "Propose the constitution change in a reviewed repository change"
+      requirements: "State the rationale, affected principles, compatibility impact, enforcement impact, and proposed semantic version bump."
+    - step: 2
+      action: "Map the amendment to verifiable repository evidence"
+      requirements: "Identify tests, checks, documentation, or review gates that will enforce each changed requirement without live or paid validation."
+    - step: 3
+      action: "Obtain maintainer approval"
+      requirements: "At least one maintainer must approve; backward-incompatible governance changes require explicit team discussion."
+    - step: 4
+      action: "Merge the amendment and synchronize dependent guidance"
+      requirements: "Update the constitution version and last_amended date, then align affected templates, AGENTS.md, CLAUDE.md, and project documentation."
+
+  versioning_policy: |
+    Constitution versions follow semantic versioning.
+    MAJOR: A change removes or weakens a principle, permits behavior previously
+    forbidden, or otherwise invalidates existing compliant workflows.
+    MINOR: A new principle or materially expanded mandatory guidance is added.
+    PATCH: Wording, examples, or enforcement details are clarified without changing
+    required behavior.
+
+  compliance_review:
+    frequency: "At each specification, plan, implementation review, and quarterly governance review"
+    process: "Map every applicable principle to direct local evidence, record any allowed exception with rationale and approver, and reject completion when evidence depends on live or paid validation."
+
+  rules:
+    - "This constitution supersedes conflicting workflow guidance in specifications, plans, templates, and implementation notes."
+    - "Every specification and plan must include an explicit constitution compliance check before implementation begins."
+    - "Every behavior-changing implementation must provide test-first evidence and compatibility coverage."
+    - "Model and reasoning policy remains server-authoritative; client-side policy duplication requires an explicit versioned compatibility exception."
+    - "Live, production-adjacent, or paid validation is prohibited for project acceptance."
+    - "Exceptions must be narrow, documented, time-bounded when applicable, and approved by a maintainer."
+    - "Emergency security changes may use expedited review but require post-hoc documentation, regression tests, and a constitution compliance review."
+
+sync_impact:
+  version_change: "none -> 1.0.0"
+  modified_principles: []
+  added_sections:
+    - "Implementation Workflow"
+    - "API and Model-Policy Boundaries"
+    - "Validation and Release Evidence"
+    - "Security and Documentation"
+  removed_sections: []
+  templates_requiring_updates: []
+  follow_up_todos: []
+
+_meta:
+  version: "1.0.0"
+  generator: "autospec"
+  generator_version: "autospec dev"
+  created: "2026-08-15T06:33:59Z"
+  artifact_type: "constitution"
