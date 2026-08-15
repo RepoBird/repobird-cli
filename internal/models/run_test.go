@@ -129,7 +129,9 @@ func runResponsePolicyField(t *testing.T, response *RunResponse, fieldName strin
 	t.Helper()
 
 	field := reflect.ValueOf(response).Elem().FieldByName(fieldName)
-	require.Truef(t, field.IsValid(), "RunResponse must define an optional %s field", fieldName)
+	if !assert.Truef(t, field.IsValid(), "RunResponse must define an optional %s field", fieldName) {
+		return ""
+	}
 	require.Equal(t, reflect.String, field.Kind())
 	return field.String()
 }
