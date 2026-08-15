@@ -153,7 +153,7 @@ phases:
           - "Omitted values remain omitted and focused configuration tests pass."
       - id: "T011"
         title: "Add optional request policy to the domain contract in internal/domain/models.go"
-        status: "Pending"
+        status: "Completed"
         type: "implementation"
         parallel: true
         story_id: "US-001"
