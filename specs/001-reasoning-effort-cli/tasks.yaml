@@ -246,7 +246,7 @@ phases:
           - "The focused test is recorded failing before TUI detail changes."
       - id: "T018"
         title: "Write failing dashboard detail and copy tests in internal/tui/views/dashboard_copy_full_test.go"
-        status: "Pending"
+        status: "Completed"
         type: "test"
         parallel: true
         story_id: "US-002"
