@@ -102,7 +102,7 @@ phases:
           - "The focused test is recorded failing before validation changes."
       - id: "T007"
         title: "Write failing local repository request contract tests in internal/repository/api_run_repository_test.go"
-        status: "Pending"
+        status: "Completed"
         type: "test"
         parallel: true
         story_id: "US-001"

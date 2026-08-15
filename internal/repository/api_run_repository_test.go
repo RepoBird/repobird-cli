@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -84,6 +85,100 @@ func TestAPIRunRepositoryCreateSendsGitLabFields(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
+}
+
+func TestAPIRunRepositoryCreateReasoningEffortRequestContract(t *testing.T) {
+	tests := []struct {
+		name            string
+		reasoningEffort string
+		wantPresent     bool
+	}{
+		{name: "explicit unfamiliar value", reasoningEffort: "future-adaptive", wantPresent: true},
+		{name: "omitted", reasoningEffort: "", wantPresent: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				require.Equal(t, http.MethodPost, req.Method)
+				require.Equal(t, "/api/v1/runs", req.URL.Path)
+
+				var body map[string]any
+				require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
+				value, present := body["reasoningEffort"]
+				require.Equal(t, tt.wantPresent, present)
+				if tt.wantPresent {
+					require.Equal(t, tt.reasoningEffort, value)
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusCreated)
+				_, _ = io.WriteString(w, `{"data":{"id":123,"status":"QUEUED"}}`)
+			}))
+			defer server.Close()
+
+			repo := NewAPIRunRepository(server.Client(), server.URL, "test-key", false)
+			_, err := repo.Create(context.Background(), domain.CreateRunRequest{
+				Prompt:          "Fix auth",
+				RepositoryName:  "acme/webapp",
+				RunType:         domain.RunTypeRun,
+				ReasoningEffort: tt.reasoningEffort,
+			})
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestAPIRunRepositoryCreateRunTypeDoesNotSelectModelPolicy(t *testing.T) {
+	for _, runType := range []string{domain.RunTypeBasic, domain.RunTypePro} {
+		t.Run(runType, func(t *testing.T) {
+			var body map[string]any
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
+
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusCreated)
+				_, _ = io.WriteString(w, `{"data":{"id":123,"status":"QUEUED"}}`)
+			}))
+			defer server.Close()
+
+			repo := NewAPIRunRepository(server.Client(), server.URL, "test-key", false)
+			_, err := repo.Create(context.Background(), domain.CreateRunRequest{
+				Prompt:           "Fix auth",
+				RepositoryName:   "acme/webapp",
+				RunType:          runType,
+				OpenCodeModel:    "client-selected-model",
+				OpenCodeProvider: "client-selected-provider",
+			})
+			require.NoError(t, err)
+			require.Equal(t, runType, body["runType"])
+			require.NotContains(t, body, "opencodeModel")
+			require.NotContains(t, body, "opencodeProvider")
+		})
+	}
+}
+
+func TestAPIRunRepositoryCreateReturnsLocal400WithoutRetryOrFallback(t *testing.T) {
+	attempts := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		attempts++
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = io.WriteString(w, `{"code":"VALIDATION_ERROR","message":"reasoning effort rejected","details":{"field":"reasoningEffort"}}`)
+	}))
+	defer server.Close()
+
+	repo := NewAPIRunRepository(server.Client(), server.URL, "test-key", false)
+	run, err := repo.Create(context.Background(), domain.CreateRunRequest{
+		Prompt:          "Fix auth",
+		RepositoryName:  "acme/webapp",
+		RunType:         domain.RunTypeRun,
+		ReasoningEffort: "service-rejected-value",
+	})
+
+	require.Nil(t, run)
+	require.EqualError(t, err, "validation error for field 'reasoningEffort': reasoning effort rejected")
+	require.Equal(t, 1, attempts)
 }
 
 func TestAPIRunRepositoryListUsesPageBasedPagination(t *testing.T) {
