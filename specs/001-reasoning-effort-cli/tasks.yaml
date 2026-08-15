@@ -282,7 +282,7 @@ phases:
           - "Repository response tests pass without live network access."
       - id: "T021"
         title: "Render conditional policy rows in internal/commands/status.go"
-        status: "Pending"
+        status: "Completed"
         type: "implementation"
         parallel: true
         story_id: "US-002"
