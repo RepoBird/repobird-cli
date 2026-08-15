@@ -30,6 +30,7 @@ type YAMLConfig struct {
 	Files                 []string                        `yaml:"files" json:"files"`
 	ProviderCredentialID  string                          `yaml:"providerCredentialId" json:"providerCredentialId"`
 	ProviderMode          string                          `yaml:"providerMode" json:"providerMode"`
+	ReasoningEffort       string                          `yaml:"reasoningEffort,omitempty" json:"reasoningEffort,omitempty"`
 	GitLabCredential      *models.GitLabCredentialRequest `yaml:"gitlabCredential,omitempty" json:"gitlabCredential,omitempty"`
 	BranchOnly            bool                            `yaml:"branchOnly" json:"branchOnly"`
 	AcknowledgePromptRisk bool                            `yaml:"acknowledgePromptRisk" json:"acknowledgePromptRisk"`
@@ -132,6 +133,9 @@ func parseYAMLWithUnknownFieldsAndPrompts(data []byte) (*models.RunConfig, *prom
 	if providerMode, ok := genericMap["providerMode"].(string); ok {
 		config.ProviderMode = providerMode
 	}
+	if reasoningEffort, ok := genericMap["reasoningEffort"].(string); ok {
+		config.ReasoningEffort = reasoningEffort
+	}
 	if gitlabCredential, ok := parseGitLabCredential(genericMap["gitlabCredential"]); ok {
 		config.GitLabCredential = gitlabCredential
 	}
@@ -200,6 +204,7 @@ func parseYAMLWithUnknownFieldsAndPrompts(data []byte) (*models.RunConfig, *prom
 		Files:                 config.Files,
 		ProviderCredentialID:  config.ProviderCredentialID,
 		ProviderMode:          config.ProviderMode,
+		ReasoningEffort:       config.ReasoningEffort,
 		GitLabCredential:      config.GitLabCredential,
 		BranchOnly:            config.BranchOnly,
 		AcknowledgePromptRisk: config.AcknowledgePromptRisk,
@@ -234,6 +239,7 @@ func findUnsupportedYAMLFieldsWithSuggestions(data map[string]interface{}) ([]st
 		"files":                 true,
 		"providerCredentialId":  true,
 		"providerMode":          true,
+		"reasoningEffort":       true,
 		"gitlabCredential":      true,
 		"branchOnly":            true,
 		"acknowledgePromptRisk": true,
@@ -244,7 +250,7 @@ func findUnsupportedYAMLFieldsWithSuggestions(data map[string]interface{}) ([]st
 	supportedFieldsList := []string{
 		"prompt", "repository", "source", "target", "baseBranch",
 		"outputMode", "outputBranch", "prTargetBranch", "outputBranchPolicy",
-		"runType", "title", "context", "files", "providerCredentialId", "providerMode",
+		"runType", "title", "context", "files", "providerCredentialId", "providerMode", "reasoningEffort",
 		"gitlabCredential", "branchOnly", "acknowledgePromptRisk", "pullRequest", "metadata",
 	}
 
@@ -284,6 +290,7 @@ func validateYAMLConfigForPrompts(config *YAMLConfig) error {
 		Files:                config.Files,
 		ProviderCredentialID: config.ProviderCredentialID,
 		ProviderMode:         config.ProviderMode,
+		ReasoningEffort:      config.ReasoningEffort,
 		GitLabCredential:     config.GitLabCredential,
 		BranchOnly:           config.BranchOnly,
 	}
