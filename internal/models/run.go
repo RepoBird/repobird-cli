@@ -51,6 +51,7 @@ type RunRequest struct {
 	Files                 []string                 `json:"files,omitempty"`
 	ProviderCredentialID  string                   `json:"providerCredentialId,omitempty"`
 	ProviderMode          string                   `json:"providerMode,omitempty"`
+	ReasoningEffort       string                   `json:"reasoningEffort,omitempty"`
 	GitLabCredential      *GitLabCredentialRequest `json:"gitlabCredential,omitempty"`
 	BranchOnly            bool                     `json:"branchOnly,omitempty"`
 	AcknowledgePromptRisk bool                     `json:"acknowledgePromptRisk,omitempty"`
@@ -79,6 +80,7 @@ type RunConfig struct {
 	Files                 []string                 `json:"files,omitempty" yaml:"files,omitempty"`
 	ProviderCredentialID  string                   `json:"providerCredentialId,omitempty" yaml:"providerCredentialId,omitempty"`
 	ProviderMode          string                   `json:"providerMode,omitempty" yaml:"providerMode,omitempty"`
+	ReasoningEffort       string                   `json:"reasoningEffort,omitempty" yaml:"reasoningEffort,omitempty"`
 	GitLabCredential      *GitLabCredentialRequest `json:"gitlabCredential,omitempty" yaml:"gitlabCredential,omitempty"`
 	BranchOnly            bool                     `json:"branchOnly,omitempty" yaml:"branchOnly,omitempty"`
 	AcknowledgePromptRisk bool                     `json:"acknowledgePromptRisk,omitempty" yaml:"acknowledgePromptRisk,omitempty"`
@@ -100,6 +102,7 @@ type APIRunRequest struct {
 	Agent                 string                   `json:"agent,omitempty"`
 	OpenCodeModel         string                   `json:"opencodeModel,omitempty"`
 	OpenCodeProvider      string                   `json:"opencodeProvider,omitempty"`
+	ReasoningEffort       string                   `json:"reasoningEffort,omitempty"`
 	Title                 string                   `json:"title,omitempty"`
 	Context               string                   `json:"context,omitempty"`
 	Files                 []string                 `json:"files,omitempty"`
@@ -139,6 +142,7 @@ func (r *RunRequest) ToAPIRequest() *APIRunRequest {
 		OutputBranchPolicy:    config.OutputBranchPolicy,
 		RunType:               r.RunType,
 		Agent:                 "opencode",
+		ReasoningEffort:       r.ReasoningEffort,
 		Title:                 r.Title,
 		Context:               r.Context,
 		Files:                 r.Files,

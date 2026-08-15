@@ -38,6 +38,7 @@ The `repobird run` command supports multiple configuration file formats to defin
 | `files` | array | - | List of specific files to include in the context |
 | `providerCredentialId` | string | - | Optional provider credential reference for BYOK or enterprise provider routing |
 | `providerMode` | string | - | Optional provider mode: `bundled`, `byok-user`, or `enterprise-gateway` |
+| `reasoningEffort` | string | model-specific | Optional OpenCode reasoning effort: `low`, `medium`, `high`, `max`, or `xhigh`. DeepSeek V4 Flash supports `low`, `high`, and `max`; DeepSeek V4 Pro supports `high` and `max`. |
 | `gitlabCredential` | object | - | Stored GitLab credential reference. Use `mode: stored_token_reference` and `tokenReferenceId`; never put raw tokens in task files |
 | `branchOnly` | boolean | `false` | Legacy alias for `outputMode: branch` |
 | `acknowledgePromptRisk` | boolean | `false` | Explicitly acknowledge a `PROMPT_RISK_ACK_REQUIRED` response after reviewing the prompt |
@@ -122,6 +123,7 @@ repobird run -r myorg/webapp -p "Add unit tests for auth module" --wait --json -
 - `--pro` - Use the Pro cloud-agent preset (GLM 5.2)
 - `--branch-only`, `--no-pr` - Push commits to the output branch without creating a PR
 - `--provider-mode` - Provider routing mode: `bundled`, `byok-user`, or `enterprise-gateway`
+- `--reasoning-effort` - OpenCode reasoning effort: `low`, `medium`, `high`, `max`, or `xhigh`; available values depend on the selected model
 - `--provider-credential-id` - Provider credential reference for BYOK or enterprise provider routing
 - `--gitlab-token-reference-id` - Stored GitLab token reference ID for self-managed GitLab repositories
 - `--acknowledge-prompt-risk` - Resend after reviewing a prompt-risk acknowledgement error

@@ -147,6 +147,7 @@ func TestCreateRunRequest_JSONFields(t *testing.T) {
 		OutputBranch:         "fix/bug",
 		OutputBranchPolicy:   "reuse",
 		RunType:              "run",
+		ReasoningEffort:      "max",
 		Agent:                "opencode",
 		ProviderCredentialID: "cred_123",
 		ProviderMode:         "byok-user",
@@ -180,6 +181,7 @@ func TestCreateRunRequest_JSONFields(t *testing.T) {
 	assert.Equal(t, "fix/bug", result["outputBranch"])
 	assert.Equal(t, "reuse", result["outputBranchPolicy"])
 	assert.Equal(t, "run", result["runType"])
+	assert.Equal(t, "max", result["reasoningEffort"])
 	assert.Equal(t, "opencode", result["agent"])
 	assert.Equal(t, "cred_123", result["providerCredentialId"])
 	assert.Equal(t, "byok-user", result["providerMode"])

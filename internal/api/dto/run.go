@@ -57,6 +57,7 @@ type CreateRunRequest struct {
 	Agent                 string                   `json:"agent,omitempty"`
 	OpenCodeModel         string                   `json:"opencodeModel,omitempty"`
 	OpenCodeProvider      string                   `json:"opencodeProvider,omitempty"`
+	ReasoningEffort       string                   `json:"reasoningEffort,omitempty"`
 	Title                 string                   `json:"title,omitempty"`
 	Context               string                   `json:"context,omitempty"`
 	Files                 []string                 `json:"files,omitempty"`

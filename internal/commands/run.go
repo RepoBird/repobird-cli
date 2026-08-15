@@ -48,6 +48,7 @@ var (
 	contextFlag            string
 	providerCredentialID   string
 	providerMode           string
+	reasoningEffort        string
 	gitlabTokenReferenceID string
 	basicRun               bool
 	proRun                 bool
@@ -152,6 +153,7 @@ func init() {
 	runCmd.Flags().StringVar(&contextFlag, "context", "", "additional context (use @file to read from file, - for stdin)")
 	runCmd.Flags().StringVar(&providerCredentialID, "provider-credential-id", "", "provider credential ID for BYOK or enterprise provider routing")
 	runCmd.Flags().StringVar(&providerMode, "provider-mode", "", "provider mode: bundled, byok-user, or enterprise-gateway")
+	runCmd.Flags().StringVar(&reasoningEffort, "reasoning-effort", "", "OpenCode reasoning effort: low, medium, high, max, or xhigh")
 	runCmd.Flags().StringVar(&gitlabTokenReferenceID, "gitlab-token-reference-id", "", "stored GitLab token reference ID for self-managed GitLab repositories")
 }
 
@@ -220,6 +222,7 @@ func runCommandWithPreset(cmd *cobra.Command, args []string, presetName string) 
 			Context:               processedContext,
 			ProviderCredentialID:  providerCredentialID,
 			ProviderMode:          providerMode,
+			ReasoningEffort:       reasoningEffort,
 			GitLabCredential:      gitLabCredentialFromFlag(gitlabTokenReferenceID),
 			BranchOnly:            branchOnly,
 			AcknowledgePromptRisk: acknowledgePromptRisk,
@@ -370,6 +373,7 @@ func processSingleRun(runConfig *models.RunConfig, additionalContext string) err
 		Agent:                 "opencode",
 		OpenCodeModel:         modelForRunType(runConfig.RunType),
 		OpenCodeProvider:      providerForRunType(runConfig.RunType),
+		ReasoningEffort:       runConfig.ReasoningEffort,
 		Title:                 runConfig.Title,
 		Context:               runConfig.Context,
 		Files:                 runConfig.Files,
