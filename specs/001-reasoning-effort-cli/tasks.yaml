@@ -7,7 +7,7 @@ tasks:
 summary:
   total_tasks: 31
   total_phases: 6
-  parallel_opportunities: 16
+  parallel_opportunities: 22
   estimated_complexity: "high"
 
 phases:
