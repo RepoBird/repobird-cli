@@ -138,6 +138,31 @@ func TestProcessSingleRunJSONDryRunOutputIsMachineReadable(t *testing.T) {
 	require.Equal(t, "max", request["reasoningEffort"])
 }
 
+func TestProcessSingleRunHumanDryRunDisplaysReasoningEffort(t *testing.T) {
+	ensureRunTestConfig()
+
+	originalDryRun := dryRun
+	originalJSONOutput := jsonOutput
+	dryRun = true
+	jsonOutput = false
+	defer func() {
+		dryRun = originalDryRun
+		jsonOutput = originalJSONOutput
+	}()
+
+	output := captureRunStdout(t, func() {
+		err := processSingleRun(&models.RunConfig{
+			Prompt:          "Fix auth",
+			Repository:      "acme/webapp",
+			RunType:         "basic",
+			ReasoningEffort: "max",
+		}, "")
+		require.NoError(t, err)
+	})
+
+	require.Contains(t, output, "Reasoning effort: max")
+}
+
 func TestProcessSingleRunRejectsJSONFollowBeforeCreate(t *testing.T) {
 	ensureRunTestConfig()
 

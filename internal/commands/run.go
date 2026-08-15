@@ -739,6 +739,9 @@ func printRunSelection(req domain.CreateRunRequest) {
 	}
 	fmt.Printf("%s %s\n", styler.Label("Run type:"), preset.Label)
 	fmt.Printf("%s %s (%s)\n", styler.Label("Model:"), modelDisplayName(preset.Model), preset.Model)
+	if req.ReasoningEffort != "" {
+		fmt.Printf("%s %s\n", styler.Label("Reasoning effort:"), req.ReasoningEffort)
+	}
 }
 
 func modelDisplayName(model string) string {
