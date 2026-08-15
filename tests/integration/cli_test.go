@@ -10,6 +10,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -339,6 +341,238 @@ title: Test YAML Run
 			t.Fatalf("expected acknowledgePromptRisk=true in create-run request, got %#v", createBody["acknowledgePromptRisk"])
 		}
 	})
+}
+
+func TestReasoningEffortCompatibility(t *testing.T) {
+	t.Run("no-preference flag request preserves the legacy payload", func(t *testing.T) {
+		env, mockServer := SetupTestEnv(t)
+		defer mockServer.Close()
+
+		result := RunCommandWithEnv(t, env,
+			"run",
+			"--repo", "test/repo",
+			"--prompt", "Test task",
+			"--run-type", "run",
+			"--acknowledge-prompt-risk",
+		)
+		AssertSuccess(t, result)
+
+		request := lastCreateRunRequest(t, mockServer.Requests())
+		if got := request["runType"]; got != "run" {
+			t.Fatalf("expected runType compatibility, got %#v", got)
+		}
+		for _, field := range []string{"reasoningEffort", "opencodeModel", "opencodeProvider"} {
+			if _, ok := request[field]; ok {
+				t.Fatalf("expected omitted %s in no-preference request, got %#v", field, request[field])
+			}
+		}
+	})
+
+	t.Run("no-preference task files retain supported formats and JSON output", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		files := []struct {
+			name    string
+			content string
+		}{
+			{
+				name: "task.json",
+				content: `{
+					"prompt": "JSON compatibility task",
+					"repository": "test/repo",
+					"source": "main",
+					"target": "feature/json",
+					"runType": "run"
+				}`,
+			},
+			{
+				name: "task.yaml",
+				content: `prompt: YAML compatibility task
+repository: test/repo
+source: main
+target: feature/yaml
+runType: run
+`,
+			},
+		}
+
+		for _, file := range files {
+			t.Run(file.name, func(t *testing.T) {
+				path := CreateTestFile(t, tmpDir, file.name, file.content)
+				homeDir := t.TempDir()
+				result := RunCommandWithEnv(t, map[string]string{
+					"HOME":               homeDir,
+					"XDG_CONFIG_HOME":    filepath.Join(homeDir, ".config"),
+					"REPOBIRD_API_KEY":   "TEST_KEY",
+					"REPOBIRD_TEST_MODE": "true",
+					"NO_COLOR":           "true",
+				}, "--json", "run", path, "--dry-run")
+				AssertSuccess(t, result)
+				assertStdoutIsSingleJSONValue(t, result)
+
+				var output struct {
+					Schema  string         `json:"schema"`
+					Request map[string]any `json:"request"`
+				}
+				if err := json.Unmarshal([]byte(result.Stdout), &output); err != nil {
+					t.Fatalf("failed to decode dry-run JSON: %v", err)
+				}
+				if output.Schema != "repobird.run.dry_run.v1" {
+					t.Fatalf("unexpected dry-run schema: %q", output.Schema)
+				}
+				for _, field := range []string{"reasoningEffort", "opencodeModel", "opencodeProvider"} {
+					if _, ok := output.Request[field]; ok {
+						t.Fatalf("expected omitted %s in no-preference dry-run JSON", field)
+					}
+				}
+			})
+		}
+	})
+
+	t.Run("existing command aliases remain compatible", func(t *testing.T) {
+		versionResult := RunCommand(t, "v")
+		AssertSuccess(t, versionResult)
+		AssertContains(t, versionResult.Stdout, "Version:")
+
+		env, mockServer := SetupTestEnv(t)
+		defer mockServer.Close()
+		statusResult := RunCommandWithEnv(t, env, "st", "12345")
+		AssertSuccess(t, statusResult)
+		AssertContains(t, statusResult.Stdout, "12345")
+		AssertContains(t, statusResult.Stdout, "DONE")
+		AssertNotContains(t, statusResult.Stdout, "Model:")
+		AssertNotContains(t, statusResult.Stdout, "Reasoning effort:")
+	})
+
+	t.Run("legacy and partial run responses do not invent policy values", func(t *testing.T) {
+		tests := []struct {
+			name            string
+			policyFields    string
+			expectedModel   string
+			expectedEffort  string
+			expectModel     bool
+			expectReasoning bool
+		}{
+			{name: "legacy response"},
+			{
+				name:          "model-only response",
+				policyFields:  `,"model":"future-provider/model-v99"`,
+				expectedModel: "future-provider/model-v99",
+				expectModel:   true,
+			},
+			{
+				name:            "reasoning-only response",
+				policyFields:    `,"reasoningEffort":"future-ultra"`,
+				expectedEffort:  "future-ultra",
+				expectReasoning: true,
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if r.Header.Get("Authorization") != "Bearer TEST_KEY" {
+						t.Errorf("unexpected authorization header: %q", r.Header.Get("Authorization"))
+						http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+						return
+					}
+					if r.Method != http.MethodGet || r.URL.Path != "/api/v1/runs/legacy-run" {
+						http.NotFound(w, r)
+						return
+					}
+					w.Header().Set("Content-Type", "application/json")
+					_, _ = fmt.Fprintf(w, `{"data":{"id":"legacy-run","status":"DONE","repository":"test/repo","repositoryName":"test/repo","source":"main","target":"feature/test","runType":"run","title":"Legacy Run","createdAt":"2026-08-15T07:00:00Z","updatedAt":"2026-08-15T07:01:00Z"%s}}`, tt.policyFields)
+				}))
+				defer server.Close()
+
+				homeDir := t.TempDir()
+				env := map[string]string{
+					"HOME":               homeDir,
+					"XDG_CONFIG_HOME":    filepath.Join(homeDir, ".config"),
+					"REPOBIRD_API_URL":   server.URL,
+					"REPOBIRD_API_KEY":   "TEST_KEY",
+					"REPOBIRD_TEST_MODE": "true",
+					"NO_COLOR":           "true",
+				}
+
+				human := RunCommandWithEnv(t, env, "status", "legacy-run")
+				AssertSuccess(t, human)
+				AssertContains(t, human.Stdout, "Legacy Run")
+				if tt.expectModel {
+					AssertContains(t, human.Stdout, tt.expectedModel)
+				} else {
+					AssertNotContains(t, human.Stdout, "Model:")
+				}
+				if tt.expectReasoning {
+					AssertContains(t, human.Stdout, tt.expectedEffort)
+				} else {
+					AssertNotContains(t, human.Stdout, "Reasoning effort:")
+				}
+
+				machine := RunCommandWithEnv(t, env, "status", "legacy-run", "--json")
+				AssertSuccess(t, machine)
+				assertStdoutIsSingleJSONValue(t, machine)
+				var output map[string]any
+				if err := json.Unmarshal([]byte(machine.Stdout), &output); err != nil {
+					t.Fatalf("failed to decode status JSON: %v", err)
+				}
+				model, hasModel := output["model"]
+				if hasModel != tt.expectModel || (hasModel && model != tt.expectedModel) {
+					t.Fatalf("unexpected model JSON field: %#v", model)
+				}
+				effort, hasEffort := output["reasoningEffort"]
+				if hasEffort != tt.expectReasoning || (hasEffort && effort != tt.expectedEffort) {
+					t.Fatalf("unexpected reasoningEffort JSON field: %#v", effort)
+				}
+			})
+		}
+	})
+
+	t.Run("service rejection keeps the established error and exit path", func(t *testing.T) {
+		requests := make(chan struct{}, 2)
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodPost || r.URL.Path != "/api/v1/runs" {
+				http.NotFound(w, r)
+				return
+			}
+			requests <- struct{}{}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = io.WriteString(w, `{"error":{"code":"INVALID_REASONING_EFFORT","message":"Reasoning effort is not supported"}}`)
+		}))
+		defer server.Close()
+
+		homeDir := t.TempDir()
+		result := RunCommandWithEnv(t, map[string]string{
+			"HOME":               homeDir,
+			"XDG_CONFIG_HOME":    filepath.Join(homeDir, ".config"),
+			"REPOBIRD_API_URL":   server.URL,
+			"REPOBIRD_API_KEY":   "TEST_KEY",
+			"REPOBIRD_TEST_MODE": "true",
+			"NO_COLOR":           "true",
+		}, "run", "--repo", "test/repo", "--prompt", "Test task", "--acknowledge-prompt-risk")
+		AssertFailure(t, result)
+		AssertContains(t, result.Stderr, "Reasoning effort is not supported")
+		if got := len(requests); got != 1 {
+			t.Fatalf("expected one create attempt without fallback or retry, got %d", got)
+		}
+	})
+}
+
+func lastCreateRunRequest(t *testing.T, requests []RecordedRequest) map[string]any {
+	t.Helper()
+	for i := len(requests) - 1; i >= 0; i-- {
+		request := requests[i]
+		if request.Method != http.MethodPost || request.Path != "/api/v1/runs" {
+			continue
+		}
+		var body map[string]any
+		if err := json.Unmarshal(request.Body, &body); err != nil {
+			t.Fatalf("failed to decode create-run request: %v\n%s", err, request.Body)
+		}
+		return body
+	}
+	t.Fatal("expected create-run request")
+	return nil
 }
 
 // TestStatusCommand tests the status command

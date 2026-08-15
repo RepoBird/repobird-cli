@@ -338,7 +338,7 @@ phases:
     tasks:
       - id: "T025"
         title: "Add no-preference and legacy compatibility coverage in tests/integration/cli_test.go"
-        status: "Pending"
+        status: "Completed"
         type: "test"
         parallel: true
         story_id: "US-003"
