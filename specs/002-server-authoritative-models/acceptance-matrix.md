@@ -8,7 +8,7 @@ All evidence below is local, deterministic, credential-cleared, and cost-free un
 |---|---|---|
 | Specify artifact | `autospec artifact specs/002-server-authoritative-models/spec.yaml` | PASS: valid, 5 user stories, 13 functional requirements, 5 non-functional requirements |
 | Plan artifact | `autospec artifact specs/002-server-authoritative-models/plan.yaml` | PASS: valid, 5 implementation phases, 0 open questions |
-| Tasks artifact | `autospec artifact specs/002-server-authoritative-models/tasks.yaml` | PASS: valid, 14 completed tasks, 4 phases |
+| Tasks artifact | `autospec artifact specs/002-server-authoritative-models/tasks.yaml` | PASS: valid, 38 completed tasks, 8 phases |
 | Generated plan runner | `autospec --profile oauth-cheap plan ...` | BLOCKED before artifact generation: connected jcode rejected Autospec's unsupported `-c` argument. Manual plan and tasks were written in the validated repository artifact shape instead of retrying unchanged. |
 | TDD red evidence | Focused model/discovery test command recorded before production edits | PASS: failed as expected on missing DTO, endpoint, client, model fields, repository mapping, and command registration before implementation commit `cab4bd3` |
 

@@ -5,18 +5,18 @@ tasks:
   plan_path: "specs/002-server-authoritative-models/plan.yaml"
 
 summary:
-  total_tasks: 14
-  total_phases: 4
-  parallel_opportunities: 4
+  total_tasks: 38
+  total_phases: 8
+  parallel_opportunities: 17
   estimated_complexity: "high"
 
 phases:
   - number: 1
-    title: "Setup and red contract tests"
-    purpose: "Freeze the sibling T061-T067/T072 boundary, record local acceptance evidence, and prove every behavior change with failing focused tests before production edits."
+    title: "Setup"
+    purpose: "Freeze the server contract, acceptance boundaries, and cost-free validation rules before implementation work."
     tasks:
       - id: "T001"
-        title: "Create the local requirement-to-receipt matrix for the CLI model workflow"
+        title: "Create or refresh the server-authoritative model acceptance matrix"
         status: "Completed"
         type: "setup"
         parallel: false
@@ -24,255 +24,592 @@ phases:
         file_path: "specs/002-server-authoritative-models/acceptance-matrix.md"
         dependencies: []
         acceptance_criteria:
-          - "Map FR-001 through FR-013, NFR-001 through NFR-005, SC-001 through SC-005, and the sibling T061-T067/T072 contracts to focused tests or local commands."
-          - "Record the no-live/no-cost boundary, cleared-credential requirement, built-binary acceptance, explicit-file staging rule, and the Autospec plan-runner incompatibility without mutating sibling repositories or Beads."
-          - "Leave all receipts pending until the corresponding failing and passing checks are actually run."
+          - "Map FR-001 through FR-013, NFR-001 through NFR-005, SC-001 through SC-005, the GET /api/v1/models contract, the POST /api/v1/runs contract, and the sibling T061-T067/T072 obligations to direct tests or local commands."
+          - "Record that discovery is anonymous-compatible, run admission remains server-authoritative, omitted model fields stay omitted, safe additive fields are retained, and internal policy data is excluded."
+          - "Record the cleared-credential, local-httptest-only, no-live/no-cost, read-only-sibling, and explicit-file-staging boundaries."
+
+  - number: 2
+    title: "Foundational"
+    purpose: "Provide shared local test infrastructure required by every user story without adding production policy or a client catalog."
+    tasks:
       - id: "T002"
-        title: "Write failing public model DTO tests for safe forward-compatible catalog decoding"
+        title: "Establish reusable local HTTP and credential-clearing fixtures"
+        status: "Completed"
+        type: "setup"
+        parallel: false
+        story_id: null
+        file_path: "tests/integration/cli_test.go"
+        dependencies: ["T001"]
+        acceptance_criteria:
+          - "Provide deterministic loopback HTTP fixtures that can serve public catalog responses, ETag/304 responses, stable discovery errors, and run-submission responses while capturing request paths, headers, and JSON bodies."
+          - "Ensure fixture setup clears or replaces RepoBird credentials and cannot target live RepoBird, provider, deployment, preview, or release endpoints."
+          - "Keep helpers reusable by built-binary discovery, explicit-selection, Basic/Pro compatibility, and error-path acceptance tests."
+
+  - number: 3
+    title: "User Story 1 - Discover the current public model catalog"
+    purpose: "Expose the current sanitized server catalog through a typed client and built human or stable JSON CLI command."
+    story_reference: "US-001"
+    independent_test: "Run API and command tests against a local fixture, then invoke the built binary with repobird models and repobird models --json and compare the observed GET path, output, ETag behavior, and stable errors."
+    tasks:
+      - id: "T003"
+        title: "Write failing public catalog DTO contract tests"
         status: "Completed"
         type: "test"
         parallel: true
-        story_id: "US-004"
+        story_id: "US-001"
         file_path: "internal/api/dto/models_test.go"
-        dependencies: ["T001"]
+        dependencies: ["T002"]
         acceptance_criteria:
-          - "Tests cover the documented data.catalogRevision, models, id, label, provider, capabilities, and isDefault fields."
-          - "Tests require safe additive unknown fields and unknown provider/capability values to survive JSON output without rejection."
-          - "Tests require policy, worker, credential, tenant, dispatch, secret, and hash-looking fields to be omitted from public DTO output."
-          - "The focused DTO test command is recorded failing before production DTO code is added."
-      - id: "T003"
-        title: "Write failing CLI discovery client tests for sibling contract T061"
+          - "Cover data.catalogRevision, data.models, id, label, provider, capabilities, and isDefault with exact public JSON field names."
+          - "Require safe additive fields and unknown provider or capability values to survive decode and JSON rendering without local policy validation."
+          - "Require policy, worker, credential, tenant, dispatch, secret, token, and hash-looking fields to be absent from public DTO serialization."
+          - "Record the focused DTO test as failing before the production DTO implementation is added."
+      - id: "T004"
+        title: "Write failing model discovery client tests"
         status: "Completed"
         type: "test"
         parallel: true
         story_id: "US-001"
         file_path: "internal/api/client_test.go"
-        dependencies: ["T001"]
+        dependencies: ["T002"]
         acceptance_criteria:
-          - "A local fixture test requires GET /api/v1/models, empty-credential discovery compatibility, catalog decoding, and response ETag capture."
-          - "A conditional request test requires If-None-Match transmission and explicit 304 not-modified handling."
-          - "429, 503, and 500 fixtures must preserve stable API error codes without local fallback or catalog loading."
-          - "The focused client test command is recorded failing before the client method is added."
-      - id: "T004"
-        title: "Write failing selected-model request and configuration tests for sibling contracts T066 and T067"
-        status: "Completed"
-        type: "test"
-        parallel: true
-        story_id: "US-002"
-        file_path: "internal/models/run_test.go"
-        dependencies: ["T001"]
-        acceptance_criteria:
-          - "JSON and YAML RunConfig/RunRequest tests require exact opencodeModel and opencodeProvider pass-through when supplied."
-          - "Omission tests require both optional fields to remain absent when empty."
-          - "Basic and Pro request tests require no client-owned model or provider values and preserve existing reasoning, credential, and run type behavior."
-          - "The focused model/config test command is recorded failing before production request fields and mapping are added."
+          - "Require GET /api/v1/models with no request body, anonymous-compatible discovery when credentials are empty, catalog decoding, and response ETag capture."
+          - "Require request-scoped If-None-Match transmission and an explicit 304 not-modified result without decoding a response body."
+          - "Require stable 429, 503, and 500 API errors with no local catalog fallback or retry."
+          - "Record the focused client test as failing before the discovery method is added."
       - id: "T005"
-        title: "Write failing built models command tests for sibling contract T064"
+        title: "Write failing models command output tests"
         status: "Completed"
         type: "test"
         parallel: true
         story_id: "US-001"
         file_path: "internal/commands/models_test.go"
-        dependencies: ["T001"]
+        dependencies: ["T002"]
         acceptance_criteria:
-          - "Tests require repobird models human output and repobird models --json output to render fixture descriptors, revision, defaults, and safe additive fields."
-          - "Tests require the optional models list form to use the same implementation and preserve deterministic output without a hard-coded catalog."
-          - "Tests require stable non-secret rendering for 429, 503, 500, and server admission errors."
-          - "The focused command test command is recorded failing before the Cobra command is registered."
-
-  - number: 2
-    title: "Implement discovery DTOs, client, and command"
-    purpose: "Complete sibling T062-T065 while preserving the existing API error, authentication, and output conventions."
-    story_reference: "US-001"
-    independent_test: "Run the API and command package tests against local fixtures and assert the exact GET path, JSON output, redaction, ETag behavior, and stable errors."
-    tasks:
+          - "Require repobird models human output and repobird models --json output to contain server revision, every public descriptor value, default markers, and safe additive fields."
+          - "Require repobird models list to use the same implementation as the primary command and produce deterministic output without a hard-coded catalog."
+          - "Require stable non-secret rendering for discovery failures and no invented fallback output."
+          - "Record the focused command test as failing before command registration."
       - id: "T006"
-        title: "Implement sanitized forward-compatible model DTOs for sibling contract T062"
+        title: "Add the public models endpoint constant"
         status: "Completed"
         type: "implementation"
         parallel: false
-        story_id: "US-004"
-        file_path: "internal/api/dto/models.go"
-        dependencies: ["T002"]
+        story_id: "US-001"
+        file_path: "internal/api/endpoints.go"
+        dependencies: ["T003", "T004", "T005"]
         acceptance_criteria:
-          - "Define public response, catalog data, and descriptor DTOs with exact JSON field names and documented required fields."
-          - "Preserve additive safe JSON fields and opaque future provider/capability values without maintaining a client model catalog."
-          - "Filter internal policy, worker, credential, tenant, dispatch, secret, and hash-looking fields on decode and re-encode."
-          - "All focused DTO tests pass and no internal field is retained in public JSON output."
+          - "Define one reusable endpoint constant for /api/v1/models and use it instead of duplicating the path in discovery code."
+          - "Leave existing protected endpoint constants and URL construction behavior unchanged."
       - id: "T007"
-        title: "Implement model discovery and conditional requests for sibling contract T063"
+        title: "Implement sanitized forward-compatible public model DTOs"
+        status: "Completed"
+        type: "implementation"
+        parallel: false
+        story_id: "US-001"
+        file_path: "internal/api/dto/models.go"
+        dependencies: ["T003"]
+        acceptance_criteria:
+          - "Define typed public response, catalog data, and descriptor structures with exact documented fields and server ordering."
+          - "Retain safe additive JSON fields and opaque future public string values while conservatively discarding internal-looking fields."
+          - "Never expose credentials, tenant availability, worker profiles, policy documents, dispatch data, secrets, tokens, or hashes through public DTO output."
+          - "Make all focused DTO tests pass without maintaining a client model catalog or admission logic."
+      - id: "T008"
+        title: "Implement typed model discovery and conditional request handling"
         status: "Completed"
         type: "implementation"
         parallel: false
         story_id: "US-001"
         file_path: "internal/api/client.go"
-        dependencies: ["T003", "T006"]
+        dependencies: ["T004", "T006", "T007"]
         acceptance_criteria:
-          - "Add a typed client method backed by GET /api/v1/models with optional If-None-Match and returned ETag metadata."
-          - "Handle 304 without decoding a body and reuse stable API error parsing for 429, 503, and 500 responses."
-          - "Do not require an API key for discovery while preserving Authorization behavior for non-empty-key protected requests."
-          - "Selected model IDs remain a transport value only and existing credential/provider request fields remain unchanged."
-      - id: "T008"
-        title: "Implement the built Cobra models command for sibling contract T065"
+          - "Add a typed GET /api/v1/models client method with optional If-None-Match and returned ETag metadata."
+          - "Handle 304 without decoding a body and reuse the existing stable API error parser for 429, 503, and 500 responses."
+          - "Suppress an empty Authorization header only for anonymous-compatible discovery while preserving authenticated protected requests."
+          - "Make the focused discovery client tests pass without consulting a cache or selecting a run model."
+      - id: "T009"
+        title: "Implement the built models command and list alias"
         status: "Completed"
         type: "implementation"
         parallel: false
         story_id: "US-001"
         file_path: "internal/commands/models.go"
-        dependencies: ["T005", "T007"]
+        dependencies: ["T005", "T008"]
         acceptance_criteria:
-          - "Register repobird models and an additive models list path using the existing config, API client, output, and error conventions."
-          - "Human output includes every documented descriptor value, default marker, revision, and safe additive field without adding client values."
-          - "JSON output is stable, machine-readable, and contains no forbidden internal fields."
-          - "Command failures preserve stable API error codes and do not fall back to a local catalog."
+          - "Render every documented public descriptor value, revision, default marker, and safe additive field in human output."
+          - "Emit one stable machine-readable JSON value containing the public response envelope and no forbidden internal fields."
+          - "Preserve stable API error codes and avoid local validation, fallback catalogs, credential disclosure, or provider inference."
+          - "Make the focused command tests pass for both the primary command and the additive list path."
+      - id: "T010"
+        title: "Register models discovery without changing existing commands"
+        status: "Completed"
+        type: "implementation"
+        parallel: false
+        story_id: "US-001"
+        file_path: "internal/commands/root.go"
+        dependencies: ["T009"]
+        acceptance_criteria:
+          - "Register the models command in the root Cobra command exactly once."
+          - "Keep existing command names, aliases, flags, authentication setup, output modes, and exit behavior unchanged."
+          - "Built help output exposes repobird models and its list alias without removing prior commands."
 
-  - number: 3
-    title: "Implement selected-model submission pass-through"
-    purpose: "Complete sibling T066-T067 by carrying explicit model/provider values through direct flags, files, domain, repository, and API serialization while leaving server resolution authoritative."
+  - number: 4
+    title: "User Story 2 - Submit an explicitly selected model"
+    purpose: "Carry exact optional OpenCode model and provider selections through every existing configuration and request boundary."
     story_reference: "US-002"
-    independent_test: "Use dry-run and local httptest POST /api/v1/runs assertions for explicit, omitted, Basic, Pro, credential-preserving, rejected, and unfamiliar values."
+    independent_test: "Submit a run to a local HTTP fixture from direct flags and JSON, YAML, and Markdown configuration, then inspect the POST body for exact values, omission, credentials, and no fallback retry."
     tasks:
-      - id: "T009"
-        title: "Implement optional model/provider fields in configuration and run preparation"
+      - id: "T011"
+        title: "Write failing RunConfig and RunRequest pass-through tests"
+        status: "Completed"
+        type: "test"
+        parallel: true
+        story_id: "US-002"
+        file_path: "internal/models/run_test.go"
+        dependencies: ["T010"]
+        acceptance_criteria:
+          - "Require JSON and YAML RunConfig, RunRequest, and API-facing run structures to preserve opencodeModel and opencodeProvider exactly when supplied."
+          - "Require omitempty behavior so both fields are absent when empty and unfamiliar future values remain opaque."
+          - "Require existing run type, reasoning effort, provider credential, GitLab credential, branch, and idempotency fields to remain unchanged."
+          - "Record focused model tests failing before production field mapping is implemented."
+      - id: "T012"
+        title: "Write failing YAML configuration pass-through tests"
+        status: "Completed"
+        type: "test"
+        parallel: true
+        story_id: "US-002"
+        file_path: "internal/utils/yaml_config_test.go"
+        dependencies: ["T010"]
+        acceptance_criteria:
+          - "Parse opencodeModel and opencodeProvider from YAML with exact casing and values."
+          - "Keep omitted fields empty and preserve existing unknown-field warnings, validation prompts, and credential parsing behavior."
+          - "Record a failing focused YAML test before the parser and loader changes."
+      - id: "T013"
+        title: "Write failing Markdown configuration pass-through tests"
+        status: "Completed"
+        type: "test"
+        parallel: true
+        story_id: "US-002"
+        file_path: "internal/utils/markdown_config_test.go"
+        dependencies: ["T010"]
+        acceptance_criteria:
+          - "Parse opencodeModel and opencodeProvider from Markdown frontmatter without normalization or inference."
+          - "Preserve existing prompt, repository, branch, credential, and validation behavior when the fields are absent."
+          - "Record a failing focused Markdown test before parser changes."
+      - id: "T014"
+        title: "Write failing direct-flag and precedence tests"
+        status: "Completed"
+        type: "test"
+        parallel: true
+        story_id: "US-002"
+        file_path: "internal/commands/run_test.go"
+        dependencies: ["T010"]
+        acceptance_criteria:
+          - "Require --opencode-model and --opencode-provider to accept exact explicit values on direct run invocation."
+          - "Require established precedence in which explicit flags override file or config values while omitted flags preserve file or config values."
+          - "Require no provider inference, catalog lookup, client default, normalization, substitution, or silent fallback."
+          - "Record the focused command tests failing before flag and request preparation changes."
+      - id: "T015"
+        title: "Write failing repository request serialization tests"
+        status: "Completed"
+        type: "test"
+        parallel: true
+        story_id: "US-002"
+        file_path: "internal/repository/api_run_repository_test.go"
+        dependencies: ["T010"]
+        acceptance_criteria:
+          - "Inspect POST /api/v1/runs and require exact opencodeModel and opencodeProvider values when selected."
+          - "Require both fields to be omitted when empty while provider credentials, authentication, run type, reasoning effort, and idempotency remain present as before."
+          - "Require one server rejection to propagate unchanged with no second request using a fallback model."
+          - "Record the focused repository tests failing before mapping changes."
+      - id: "T016"
+        title: "Add optional model and provider fields to run models"
+        status: "Completed"
+        type: "implementation"
+        parallel: false
+        story_id: "US-002"
+        file_path: "internal/models/run.go"
+        dependencies: ["T011"]
+        acceptance_criteria:
+          - "Add exact JSON and YAML tags for opencodeModel and opencodeProvider to RunRequest, RunConfig, and APIRunRequest."
+          - "Use optional omission semantics for empty values and preserve all existing field names, aliases, and precedence."
+          - "Make model package serialization tests pass without validating selections locally."
+      - id: "T017"
+        title: "Map optional selections through YAML configuration parsing"
+        status: "Completed"
+        type: "implementation"
+        parallel: false
+        story_id: "US-002"
+        file_path: "internal/utils/yaml_config.go"
+        dependencies: ["T012", "T016"]
+        acceptance_criteria:
+          - "Read both optional fields from generic YAML input and map them to models.RunConfig unchanged."
+          - "Preserve unknown-field handling, prompt generation, credential mapping, and empty-field omission."
+          - "Make focused YAML tests pass with no model catalog or local authorization."
+      - id: "T018"
+        title: "Map optional selections through Markdown configuration parsing"
+        status: "Completed"
+        type: "implementation"
+        parallel: false
+        story_id: "US-002"
+        file_path: "internal/utils/markdown_config.go"
+        dependencies: ["T013", "T016"]
+        acceptance_criteria:
+          - "Read frontmatter opencodeModel and opencodeProvider values unchanged into the existing configuration path."
+          - "Preserve legacy Markdown fields, prompts, credentials, and omitted-field behavior."
+          - "Make focused Markdown tests pass without provider inference or fallback."
+      - id: "T019"
+        title: "Map optional selections through loaded configuration"
+        status: "Completed"
+        type: "implementation"
+        parallel: false
+        story_id: "US-002"
+        file_path: "internal/config/loader.go"
+        dependencies: ["T012", "T016"]
+        acceptance_criteria:
+          - "Copy optional model and provider values from loaded configuration into the existing RunRequest preparation path."
+          - "Preserve configuration precedence, environment handling, legacy aliases, provider credentials, and empty-value omission."
+          - "Do not inspect discovery results or add a local admission gate."
+      - id: "T020"
+        title: "Retain selected values in the domain request contract"
+        status: "Completed"
+        type: "implementation"
+        parallel: false
+        story_id: "US-002"
+        file_path: "internal/domain/models.go"
+        dependencies: ["T011", "T016"]
+        acceptance_criteria:
+          - "Carry optional OpenCodeModel and OpenCodeProvider values through domain.CreateRunRequest without renaming or normalization."
+          - "Preserve run type, credentials, reasoning effort, branch, file, idempotency, and output fields."
+          - "Keep domain validation structural only and leave selection admission to the server."
+      - id: "T021"
+        title: "Add optional selection fields to the API create-run DTO"
+        status: "Completed"
+        type: "implementation"
+        parallel: false
+        story_id: "US-002"
+        file_path: "internal/api/dto/run.go"
+        dependencies: ["T015", "T016"]
+        acceptance_criteria:
+          - "Serialize opencodeModel and opencodeProvider with exact API field names and omitempty semantics."
+          - "Preserve legacy response aliases and existing create-run request fields."
+          - "Keep selected values opaque and avoid adding local enum or provider validation."
+      - id: "T022"
+        title: "Add direct and preset selection flags with established precedence"
         status: "Completed"
         type: "implementation"
         parallel: false
         story_id: "US-002"
         file_path: "internal/commands/run.go"
-        dependencies: ["T004"]
+        dependencies: ["T014", "T016", "T017", "T018", "T019", "T020"]
         acceptance_criteria:
-          - "Add --opencode-model and --opencode-provider to direct run and Basic/Pro command flags without removing or renaming existing flags."
-          - "Map JSON, YAML, Markdown, stdin, direct flag, and preset inputs into RunConfig/RunRequest with explicit user values preserved exactly."
-          - "Use established precedence so an explicitly supplied flag can override file/config selection, while omitted flags preserve file/config values."
-          - "Do not infer provider from model, choose a run-type default, consult discovery, or silently replace a value."
-      - id: "T010"
-        title: "Map selected model/provider through domain and repository request boundaries"
+          - "Expose --opencode-model and --opencode-provider on supported direct and preset run command paths without removing legacy flags or aliases."
+          - "Apply explicit flag-over-config precedence and preserve configured values when flags are omitted."
+          - "Pass exact selected values into the domain request and never infer provider, select a default, consult discovery, or retry with another value."
+      - id: "T023"
+        title: "Serialize selected values through the API repository"
         status: "Completed"
         type: "implementation"
         parallel: false
         story_id: "US-002"
         file_path: "internal/repository/api_run_repository.go"
-        dependencies: ["T009"]
+        dependencies: ["T015", "T020", "T021", "T022"]
         acceptance_criteria:
-          - "Copy optional OpenCodeModel and OpenCodeProvider values exactly into dto.CreateRunRequest with omitempty omission when empty."
-          - "Preserve provider credential ID, provider mode, GitLab credential, reasoning effort, idempotency, run type, and existing authentication behavior."
-          - "Basic and Pro requests omit both fields when the user does not select them."
-          - "Server admission errors propagate through the established error path without retry, substitution, or local validation."
-      - id: "T011"
-        title: "Complete selected-model request and output compatibility tests"
+          - "Copy selected values exactly into dto.CreateRunRequest and omit each empty field."
+          - "Preserve provider credential ID, provider mode, GitLab credential, reasoning effort, agent, run type, idempotency, authentication, and response compatibility."
+          - "Return server admission errors through the existing stable error path without retry, substitution, or local validation."
+
+  - number: 5
+    title: "User Story 3 - Preserve existing Basic and Pro workflows"
+    purpose: "Prove that legacy invocations retain their shape and behavior while CLI-owned model defaults are removed."
+    story_reference: "US-003"
+    independent_test: "Run existing Basic and Pro command, configuration, output, and integration fixtures against a local server and compare request omission, credentials, output, aliases, and exit behavior."
+    tasks:
+      - id: "T024"
+        title: "Write failing Basic and Pro command compatibility tests"
         status: "Completed"
         type: "test"
-        parallel: false
+        parallel: true
+        story_id: "US-003"
+        file_path: "internal/commands/run_test.go"
+        dependencies: ["T023"]
+        acceptance_criteria:
+          - "Require legacy Basic and Pro flags, aliases, input files, run types, and omitted selection values to remain accepted."
+          - "Require no CLI-owned model or provider identifiers when the user does not select them."
+          - "Require existing reasoning effort, provider credential, authentication, output, and exit behavior to remain unchanged."
+          - "Record compatibility assertions before any Basic/Pro-specific repair."
+      - id: "T025"
+        title: "Write failing legacy output and error compatibility tests"
+        status: "Completed"
+        type: "test"
+        parallel: true
         story_id: "US-003"
         file_path: "internal/commands/run_create_output_test.go"
-        dependencies: ["T010"]
+        dependencies: ["T023"]
         acceptance_criteria:
-          - "Dry-run and create JSON include exact explicit model/provider values and omit them when unspecified."
-          - "Basic and Pro command/config fixtures retain runType, reasoning effort, provider credential, output, and exit behavior without client defaults."
-          - "Unknown future model/provider values remain opaque and machine-readable."
-          - "Local rejection fixtures preserve stable JSON and human error behavior without a second fallback request."
-
-  - number: 4
-    title: "Built acceptance, documentation, and final validation"
-    purpose: "Complete sibling T072, document the public contract, and produce exact local cost-free evidence for review and handoff."
-    story_reference: "US-005"
-    independent_test: "Build the binary, run human and JSON models discovery against a local httptest server, inspect POST serialization, then run all required repository checks with credentials cleared."
-    tasks:
-      - id: "T012"
-        title: "Document server-authoritative discovery and selected-model semantics"
+          - "Require dry-run and create JSON to omit optional selection fields when absent and preserve existing output shape."
+          - "Require stable machine-readable and human-readable server errors without fallback requests or secret disclosure."
+          - "Require legacy output aliases and status fields to remain compatible."
+      - id: "T026"
+        title: "Write failing local Basic and Pro HTTP compatibility tests"
         status: "Completed"
-        type: "documentation"
-        parallel: false
-        story_id: "US-001"
-        file_path: "docs/API-REFERENCE.md"
-        dependencies: ["T008", "T010"]
+        type: "test"
+        parallel: true
+        story_id: "US-003"
+        file_path: "tests/integration/cli_test.go"
+        dependencies: ["T023"]
         acceptance_criteria:
-          - "Document GET /api/v1/models, sanitized public fields, opaque revision/ETag metadata, stable errors, and no internal policy disclosure."
-          - "Document --opencode-model and --opencode-provider plus JSON/YAML/Markdown fields as optional exact pass-through values."
-          - "State that Basic/Pro omission delegates model resolution and that discovery never authorizes or selects credentials."
-          - "Update RUN-CONFIG-FORMATS.md and QUICK-REFERENCE.md consistently if their existing examples cover run fields or command lists."
-      - id: "T013"
-        title: "Run built CLI discovery and submission acceptance for sibling contract T072"
+          - "Observe Basic and Pro POST /api/v1/runs requests from local fixtures and require run type, authentication, provider credentials, and existing fields."
+          - "Require absent opencodeModel and opencodeProvider when omitted by the caller."
+          - "Verify no live endpoint, provider, or credential store is contacted."
+      - id: "T027"
+        title: "Preserve Basic and Pro omission behavior in command preparation"
+        status: "Completed"
+        type: "implementation"
+        parallel: false
+        story_id: "US-003"
+        file_path: "internal/commands/run.go"
+        dependencies: ["T024", "T025", "T026"]
+        acceptance_criteria:
+          - "Keep all existing Basic and Pro invocation shapes, aliases, presets, config inputs, and flag behavior."
+          - "Omit both optional selection fields when the caller provides neither and never replace omission with a CLI default."
+          - "Preserve explicit selected values, config precedence, reasoning effort, credentials, authentication, output, and exit behavior."
+      - id: "T028"
+        title: "Preserve repository compatibility and reject fallback admission"
+        status: "Completed"
+        type: "refactor"
+        parallel: false
+        story_id: "US-003"
+        file_path: "internal/repository/api_run_repository.go"
+        dependencies: ["T026", "T027"]
+        acceptance_criteria:
+          - "Keep existing Basic and Pro request fields, agent value, authentication, provider credentials, response decoding, and stable errors intact."
+          - "Ensure a rejected model or provider produces one server request and one surfaced stable error, never a substitute request."
+          - "Confirm no discovery result, cache, run type, or provider prefix is used to construct admission values."
+
+  - number: 6
+    title: "User Story 4 - Keep public model data safe and forward-compatible"
+    purpose: "Close the public data-safety boundary with additive-field preservation, opaque future values, and internal-field redaction tests."
+    story_reference: "US-004"
+    independent_test: "Serve additive unknown public fields and values plus forbidden internal-looking fields, then inspect DTO JSON, human output, and stable run behavior for safe preservation and complete redaction."
+    tasks:
+      - id: "T029"
+        title: "Write failing additive-field and redaction regression tests"
+        status: "Completed"
+        type: "test"
+        parallel: true
+        story_id: "US-004"
+        file_path: "internal/api/dto/models_test.go"
+        dependencies: ["T007", "T028"]
+        acceptance_criteria:
+          - "Require unknown non-sensitive object fields and unknown provider or capability values to survive decode and re-encode."
+          - "Require nested and top-level policy, worker, credential, tenant, dispatch, secret, token, and hash-looking fields to be discarded."
+          - "Require malformed or incomplete public envelopes to return stable safe errors rather than a fabricated catalog."
+      - id: "T030"
+        title: "Write failing safe-output command regression tests"
+        status: "Completed"
+        type: "test"
+        parallel: true
+        story_id: "US-004"
+        file_path: "internal/commands/models_test.go"
+        dependencies: ["T009", "T029"]
+        acceptance_criteria:
+          - "Require safe additive values to appear in JSON output and documented public values to remain understandable in human output."
+          - "Require forbidden internal fields and credential values to be absent from both output modes."
+          - "Require unknown public values to remain opaque and not trigger client validation or fallback selection."
+      - id: "T031"
+        title: "Write failing no-cache admission regression tests"
+        status: "Completed"
+        type: "test"
+        parallel: true
+        story_id: "US-004"
+        file_path: "internal/repository/api_run_repository_test.go"
+        dependencies: ["T023", "T029"]
+        acceptance_criteria:
+          - "Prove discovery data is never consulted to authorize or construct a run request."
+          - "Require omitted selections to remain omitted and explicit unfamiliar values to be sent unchanged."
+          - "Require server rejection to stop the request flow without a cached or hard-coded replacement."
+      - id: "T032"
+        title: "Harden public DTO filtering and additive-field round-tripping"
+        status: "Completed"
+        type: "implementation"
+        parallel: false
+        story_id: "US-004"
+        file_path: "internal/api/dto/models.go"
+        dependencies: ["T029", "T030", "T031"]
+        acceptance_criteria:
+          - "Implement the smallest conservative filter that retains safe additive public data and excludes internal policy or credential patterns at every decoded public boundary."
+          - "Keep documented fields typed and future provider/capability values opaque without introducing a local catalog or authorization check."
+          - "Make DTO, command, and repository safety regressions pass without changing protected endpoint authentication."
+
+  - number: 7
+    title: "User Story 5 - Validate locally without service or provider spend"
+    purpose: "Exercise the completed workflow with built-binary and repository checks using only local fixtures and cleared credentials."
+    story_reference: "US-005"
+    independent_test: "Build the CLI, run human and JSON discovery and selected-model submission against loopback httptest fixtures, clear credentials, and execute the required focused, race, integration, and artifact checks."
+    tasks:
+      - id: "T033"
+        title: "Add built-binary discovery and submission acceptance"
         status: "Completed"
         type: "test"
         parallel: false
         story_id: "US-005"
         file_path: "tests/integration/model_discovery_test.go"
-        dependencies: ["T008", "T011"]
+        dependencies: ["T028", "T030", "T032"]
         acceptance_criteria:
-          - "Build the CLI and exercise repobird models and repobird models --json against a local fixture server with cleared credentials."
-          - "Compare rendered descriptors and safe additive fields with the fixture and inspect selected-model POST serialization for exact values and omission."
-          - "Exercise stable discovery and admission errors without invoking live RepoBird, providers, release, deployment, or preview infrastructure."
-          - "The test is local and deterministic and records the sibling T072 contract as satisfied in this worktree."
-      - id: "T014"
-        title: "Run complete credential-free local validation and artifact checks"
+          - "Build the CLI and exercise repobird models, repobird models --json, and repobird models list against a local fixture server with cleared credentials."
+          - "Compare server revision, descriptors, safe additive fields, stable errors, and request headers with expected local fixtures."
+          - "Inspect explicit selected-model POST serialization, omission semantics, Basic/Pro compatibility, and no-fallback rejection behavior."
+          - "Fail closed if the test attempts a non-loopback or live RepoBird/provider request."
+      - id: "T034"
+        title: "Run credential-free repository validation and record receipts"
         status: "Completed"
         type: "test"
         parallel: false
         story_id: "US-005"
         file_path: "specs/002-server-authoritative-models/acceptance-matrix.md"
-        dependencies: ["T012", "T013"]
+        dependencies: ["T033"]
         acceptance_criteria:
-          - "Run focused Go package tests first, affected-package race tests where practical, make test, make test-integration, make check, built-binary checks, git diff --check, and Autospec artifact validation."
-          - "Clear REPOBIRD_API_KEY and verify no test or acceptance command targets a live RepoBird or provider endpoint."
-          - "Record exact pass/fail receipts, changed files, commits, compatibility evidence, risk/blast-radius/rollback, unresolved issues, and one next action."
-          - "Stage explicit files only, create bounded conventional commits, and leave the assigned worktree clean without merging, pushing, Bead/provider mutation, or cleanup."
+          - "Run focused package tests, affected-package race tests where practical, make test, make test-integration, make check, built-binary acceptance, git diff --check, and Autospec artifact validation."
+          - "Clear REPOBIRD_API_KEY and verify all network assertions use fixtures or loopback httptest servers only."
+          - "Record exact commands, pass/fail results, changed files, compatibility evidence, risk, rollback, and unresolved tooling issues without mutating sibling repositories, Beads, providers, or remotes."
+
+  - number: 8
+    title: "Polish & Cross-Cutting Concerns"
+    purpose: "Align user-facing documentation and complete final artifact, formatting, safety, and worktree checks."
+    tasks:
+      - id: "T035"
+        title: "Document public model discovery and server authority"
+        status: "Completed"
+        type: "documentation"
+        parallel: true
+        story_id: null
+        file_path: "docs/API-REFERENCE.md"
+        dependencies: ["T034"]
+        acceptance_criteria:
+          - "Document GET /api/v1/models, public response fields, safe additive-field behavior, ETag/304 metadata, anonymous-compatible discovery, and stable errors."
+          - "State that discovery is display-only and the service owns model admission, defaults, credentials, and rejection."
+          - "Document repobird models and repobird models list without introducing a client-maintained catalog."
+      - id: "T036"
+        title: "Document optional model and provider configuration fields"
+        status: "Completed"
+        type: "documentation"
+        parallel: true
+        story_id: null
+        file_path: "docs/RUN-CONFIG-FORMATS.md"
+        dependencies: ["T034"]
+        acceptance_criteria:
+          - "Document --opencode-model and --opencode-provider plus JSON, YAML, and Markdown field names as optional exact pass-through values."
+          - "Document flag/config precedence and omission semantics for Basic and Pro."
+          - "Preserve existing examples, aliases, credential guidance, and backward-compatible input formats."
+      - id: "T037"
+        title: "Add concise discovery and selected-run examples"
+        status: "Completed"
+        type: "documentation"
+        parallel: true
+        story_id: null
+        file_path: "docs/QUICK-REFERENCE.md"
+        dependencies: ["T034"]
+        acceptance_criteria:
+          - "Show human and JSON discovery commands and a selected model/provider submission example."
+          - "Warn that model values are opaque server-admitted selections and that omitted Basic/Pro values remain server-resolved."
+          - "Do not imply local authorization, credential selection, fallback, or a hard-coded provider catalog."
+      - id: "T038"
+        title: "Validate the generated artifact and final worktree state"
+        status: "Completed"
+        type: "test"
+        parallel: false
+        story_id: null
+        file_path: "specs/002-server-authoritative-models/tasks.yaml"
+        dependencies: ["T034", "T035", "T036", "T037"]
+        acceptance_criteria:
+          - "Run autospec artifact specs/002-server-authoritative-models/tasks.yaml and confirm the task schema, IDs, dependency references, story references, phase order, and summary counts are valid."
+          - "Run git diff --check and inspect the final diff for secrets, forbidden internal data, live endpoints, unintended source changes, and stale documentation counts."
+          - "Stage only explicit changed files, preserve unrelated work, and leave the assigned worktree clean and committed without merging, pushing, Bead/provider mutation, or cleanup."
 
 dependencies:
   user_story_order:
     - story_id: "US-001"
       depends_on: []
-      blocks: ["US-002", "US-003"]
+      blocks: ["US-002", "US-004"]
     - story_id: "US-002"
       depends_on: ["US-001"]
       blocks: ["US-003"]
     - story_id: "US-003"
-      depends_on: ["US-001", "US-002"]
-      blocks: ["US-005"]
+      depends_on: ["US-002"]
+      blocks: ["US-004", "US-005"]
     - story_id: "US-004"
-      depends_on: ["US-001"]
+      depends_on: ["US-001", "US-003"]
       blocks: ["US-005"]
     - story_id: "US-005"
       depends_on: ["US-001", "US-002", "US-003", "US-004"]
       blocks: []
+
   phase_order:
     - phase: 1
-      blocks: [2, 3]
+      blocks: [2]
     - phase: 2
-      blocks: [4]
+      blocks: [3]
     - phase: 3
       blocks: [4]
     - phase: 4
+      blocks: [5]
+    - phase: 5
+      blocks: [6]
+    - phase: 6
+      blocks: [7]
+    - phase: 7
+      blocks: [8]
+    - phase: 8
       blocks: []
 
 parallel_execution:
-  - phase: 1
+  - phase: 3
     parallel_groups:
-      - tasks: ["T002", "T003", "T004", "T005"]
-        rationale: "The red tests target separate DTO, client, model/config, and command boundaries and must all fail before production edits."
+      - tasks: ["T003", "T004", "T005"]
+        rationale: "DTO, client, and command red tests target separate boundaries and all precede discovery production edits."
+  - phase: 4
+    parallel_groups:
+      - tasks: ["T011", "T012", "T013", "T014", "T015"]
+        rationale: "Run model, YAML, Markdown, command, and repository red tests target separate files and can be written independently."
+  - phase: 5
+    parallel_groups:
+      - tasks: ["T024", "T025", "T026"]
+        rationale: "Command, output, and local HTTP compatibility tests cover separate existing workflow surfaces."
+  - phase: 6
+    parallel_groups:
+      - tasks: ["T029", "T030", "T031"]
+        rationale: "DTO, command-output, and repository no-cache regressions independently exercise the safety boundary."
+  - phase: 8
+    parallel_groups:
+      - tasks: ["T035", "T036", "T037"]
+        rationale: "API reference, configuration, and quick-reference documentation touch different files after behavior is complete."
 
 implementation_strategy:
   mvp_scope:
-    phases: [1, 2, 3]
-    description: "Provide typed public discovery, built command output, and explicit selected-model/provider transport with omission-preserving Basic/Pro behavior."
-    validation: "Focused red-green tests and local httptest requests prove safe catalog handling, exact pass-through, omission, stable errors, and no fallback."
+    phases: [1, 2, 3, 4, 5, 6]
+    description: "Deliver server-backed catalog discovery, exact selected-model/provider transport, Basic/Pro compatibility, and safe forward-compatible public data handling."
+    validation: "Run focused red-green tests and local httptest requests for discovery, omission, exact pass-through, stable errors, redaction, and no-fallback admission behavior."
   incremental_delivery:
-    - milestone: "Red Contracts Recorded"
-      phases: [1]
-      deliverable: "Required focused tests fail for missing discovery, safe DTO preservation, command wiring, and selected-model submission."
-    - milestone: "Discovery Complete"
+    - milestone: "Foundation Ready"
       phases: [1, 2]
-      deliverable: "API client and built models command render the server catalog safely in human and JSON modes."
-    - milestone: "Submission Complete"
+      deliverable: "Acceptance matrix and reusable credential-free local fixture infrastructure are ready for story work."
+    - milestone: "Discovery Ready"
       phases: [1, 2, 3]
-      deliverable: "Explicit model/provider values pass unchanged and omitted Basic/Pro values remain absent."
-    - milestone: "Local Acceptance Complete"
-      phases: [1, 2, 3, 4]
-      deliverable: "Built-binary, repository, integration, artifact, and cost-free validation receipts are recorded in the assigned worktree."
+      deliverable: "The CLI can retrieve and render the current sanitized public catalog in human and stable JSON modes."
+    - milestone: "Submission Compatible"
+      phases: [1, 2, 3, 4, 5]
+      deliverable: "Explicit model/provider values pass unchanged and legacy Basic/Pro invocations omit client-owned defaults."
+    - milestone: "MVP Complete"
+      phases: [1, 2, 3, 4, 5, 6]
+      deliverable: "Public data is safe and forward-compatible, with no local catalog, authorization gate, cache-based admission, or fallback request."
+    - milestone: "Validated Release Candidate"
+      phases: [1, 2, 3, 4, 5, 6, 7, 8]
+      deliverable: "Built-binary, repository, integration, documentation, artifact, and cost-free validation evidence is complete."
 
 _meta:
   version: "1.0.0"
   generator: "autospec"
   generator_version: "autospec dev"
-  created: "2026-08-15T19:15:21Z"
+  created: "2026-08-15T19:46:27Z"
   artifact_type: "tasks"
