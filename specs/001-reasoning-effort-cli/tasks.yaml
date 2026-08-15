@@ -380,7 +380,7 @@ phases:
           - "No model, provider, default, eligibility, or fallback policy is attributed to the CLI."
       - id: "T028"
         title: "Document flag and file-format support in docs/RUN-CONFIG-FORMATS.md"
-        status: "Pending"
+        status: "Completed"
         type: "documentation"
         parallel: true
         story_id: null
