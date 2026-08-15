@@ -36,3 +36,41 @@ func TestCreateRunRequestReasoningEffortContract(t *testing.T) {
 		}
 	})
 }
+
+func TestRunResponsePolicyFieldsAreIndependentOpaqueValues(t *testing.T) {
+	tests := []struct {
+		name          string
+		run           Run
+		wantModel     string
+		wantReasoning string
+	}{
+		{
+			name:          "complete unfamiliar policy",
+			run:           Run{Model: "future-provider/model-v9", ReasoningEffort: "adaptive-ultra"},
+			wantModel:     "future-provider/model-v9",
+			wantReasoning: "adaptive-ultra",
+		},
+		{
+			name:      "model only",
+			run:       Run{Model: "model-only"},
+			wantModel: "model-only",
+		},
+		{
+			name:          "reasoning effort only",
+			run:           Run{ReasoningEffort: "reasoning-only"},
+			wantReasoning: "reasoning-only",
+		},
+		{name: "absent legacy policy"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.run.Model != tt.wantModel {
+				t.Fatalf("Model = %q, want %q", tt.run.Model, tt.wantModel)
+			}
+			if tt.run.ReasoningEffort != tt.wantReasoning {
+				t.Fatalf("ReasoningEffort = %q, want %q", tt.run.ReasoningEffort, tt.wantReasoning)
+			}
+		})
+	}
+}
