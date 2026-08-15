@@ -30,6 +30,7 @@ All evidence below is local, deterministic, credential-cleared, and cost-free un
 | Requirement | Direct check | Receipt |
 |---|---|---|
 | Human and stable JSON `repobird models` | `TestBuiltBinaryModelsAndRunSubmissionContracts` | PASS: both modes render fixture revision and descriptors, JSON is one parseable value |
+| Safe additive fields in human output | focused `TestModelsCommandOutputsHumanAndStableJSONFromPublicCatalog` plus built-binary acceptance | PASS after lifecycle review repair: catalog-level and descriptor-level safe fields render deterministically while forbidden nested fields remain absent |
 | Safe additive DTO fields and opaque future values | `internal/api/dto/models_test.go` | PASS: safe additive fields and unfamiliar provider/capability values survive round-trip |
 | No internal policy data | DTO and integration forbidden-field assertions | PASS: policy, worker, credential, tenant, dispatch, secret, token, and hash-looking fields omitted |
 | Basic/Pro omit CLI defaults | local Basic/Pro POST assertions and existing run tests | PASS: no `opencodeModel` or `opencodeProvider` sent when omitted |

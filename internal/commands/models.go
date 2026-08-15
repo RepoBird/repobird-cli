@@ -4,6 +4,7 @@
 package commands
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -88,20 +89,35 @@ func printModelsHuman(out io.Writer, response *dto.PublicModelsResponse) {
 	}
 
 	_, _ = fmt.Fprintf(out, "Catalog revision: %s\n", response.Data.CatalogRevision)
+	if details := formatAdditionalFields(response.Data.AdditionalFields); details != "" {
+		_, _ = fmt.Fprintf(out, "Catalog fields: %s\n", details)
+	}
 	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(w, "ID\tLABEL\tPROVIDER\tCAPABILITIES\tDEFAULT")
+	_, _ = fmt.Fprintln(w, "ID\tLABEL\tPROVIDER\tCAPABILITIES\tDEFAULT\tDETAILS")
 	for _, model := range response.Data.Models {
 		defaultValue := "no"
 		if model.IsDefault {
 			defaultValue = "yes"
 		}
-		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
 			model.ID,
 			model.Label,
 			model.Provider,
 			strings.Join(model.Capabilities, ","),
 			defaultValue,
+			formatAdditionalFields(model.AdditionalFields),
 		)
 	}
 	_ = w.Flush()
+}
+
+func formatAdditionalFields(fields map[string]json.RawMessage) string {
+	if len(fields) == 0 {
+		return ""
+	}
+	encoded, err := json.Marshal(fields)
+	if err != nil {
+		return ""
+	}
+	return string(encoded)
 }

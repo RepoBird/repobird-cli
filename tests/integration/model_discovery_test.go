@@ -60,6 +60,10 @@ func TestBuiltBinaryModelsAndRunSubmissionContracts(t *testing.T) {
 	AssertSuccess(t, human)
 	AssertContains(t, human.Stdout, "future-provider/future-model-v9")
 	AssertContains(t, human.Stdout, "Future Provider")
+	AssertContains(t, human.Stdout, "futureCatalogField")
+	AssertContains(t, human.Stdout, "preserve-me")
+	AssertContains(t, human.Stdout, "futureDescriptorField")
+	AssertContains(t, human.Stdout, "displayHint")
 	AssertNotContains(t, human.Stdout, "policyHash")
 	AssertNotContains(t, human.Stdout, "workerProfile")
 
