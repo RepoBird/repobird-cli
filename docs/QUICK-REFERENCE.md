@@ -6,7 +6,7 @@
 repobird tui                        # Launch interactive dashboard
 repobird run task.json              # Submit task
 repobird run task.json --wait --json --timeout 45m # Script wait
-repobird run --basic -r org/repo -p "Fix a bug" --reasoning-effort max
+repobird run --basic -r org/repo -p "Fix a bug" --reasoning-effort max # Optional preference
 repobird basic "Fix a bug"          # Basic run, repo auto-detected from git
 repobird pro "Implement OAuth"      # Pro run, repo auto-detected from git
 repobird status                     # View all runs
@@ -114,10 +114,11 @@ repobird config set api-key KEY     # Set API key
 }
 ```
 
-The CLI accepts `low`, `medium`, `high`, `max`, and `xhigh`. DeepSeek V4 Flash
-supports `low`, `high`, and `max`; DeepSeek V4 Pro supports `high` and `max`;
-both default to the recommended `max` setting. Model-specific availability is
-enforced by the server. Use `repobird run --help` for the complete flag list.
+`reasoningEffort` is an optional, opaque preference. The equivalent CLI flag is
+`--reasoning-effort`. When omitted, existing commands behave as before and send
+no reasoning-effort preference. When supplied, the CLI forwards the value
+unchanged; the RepoBird service validates it and selects the final model and
+reasoning policy. Use `repobird run --help` for the complete flag list.
 
 ## Environment Variables
 

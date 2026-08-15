@@ -391,7 +391,7 @@ phases:
           - "Omission and server validation/authority are explicit, with no closed allowed-value list."
       - id: "T029"
         title: "Align concise command examples in docs/QUICK-REFERENCE.md"
-        status: "Pending"
+        status: "Completed"
         type: "documentation"
         parallel: true
         story_id: null
