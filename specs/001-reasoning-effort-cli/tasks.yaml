@@ -33,7 +33,7 @@ phases:
     tasks:
       - id: "T002"
         title: "Write failing DTO serialization and decoding tests in internal/api/dto/run_test.go"
-        status: "Pending"
+        status: "Completed"
         type: "test"
         parallel: true
         story_id: null
