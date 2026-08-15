@@ -104,17 +104,18 @@ func (c *Client) CreateRunWithRetry(ctx context.Context, req *RunRequest) (*Run,
   "id": "run-123",
   "status": "pending|running|completed|failed|cancelled",
   "progress": { "percentage": 75, "message": "Processing..." },
-  "opencodeModel": "service-selected-model",
+  "model": "service-selected-model",
   "reasoningEffort": "service-selected-effort",
   "prUrl": "https://github.com/org/repo/pull/123"
 }
 ```
 
-`opencodeModel` and `reasoningEffort` are optional response fields containing
-the policy selected by the service. The CLI displays unfamiliar values as
-returned rather than validating them against a client-owned catalog. Either
-field may be absent in legacy or partial responses, and its absence does not
-cause the CLI to invent a value.
+`model` and `reasoningEffort` are optional response fields containing the policy
+selected by the service. Older responses may use `opencodeModel`; the CLI
+decodes that legacy alias into the canonical `model` field. The CLI displays
+unfamiliar values as returned rather than validating them against a client-owned
+catalog. Either field may be absent in legacy or partial responses, and its
+absence does not cause the CLI to invent a value.
 
 **Methods:**
 ```go

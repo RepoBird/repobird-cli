@@ -129,6 +129,7 @@ func TestRunCommand_WithFlags(t *testing.T) {
 				outputBranchPolicy = ""
 				title = ""
 				runType = ""
+				reasoningEffort = ""
 				contextFlag = ""
 				dryRun = false
 				follow = false

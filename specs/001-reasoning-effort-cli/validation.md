@@ -36,6 +36,6 @@ The request-domain and request-output fields covered by T011 and T014 already ex
 | Added live or paid endpoint scan | PASS, zero suspicious production URL additions |
 | Secret-safety diff inspection | PASS, matches were policy text and test-only placeholder credentials; no secret values found |
 
-The first plain `REPOBIRD_API_KEY='' make test` attempt exposed an environment-only failure: Jcode sets `TMPDIR=/home/ari/.jcode/scratch`, which is nested inside a separate Git repository. `TestDetectRepository_NotGitRepo` therefore discovered that parent repository. The focused test passed with `TMPDIR=/var/tmp`, and all canonical targets then passed with that isolated temporary directory.
+The first plain `REPOBIRD_API_KEY='' make test` attempt exposed an environment-only failure: the harness set `TMPDIR` to a scratch directory nested inside a separate Git repository. `TestDetectRepository_NotGitRepo` therefore discovered that parent repository. The focused test passed with an isolated temporary directory, and all canonical targets then passed with that setting.
 
 No live RepoBird service, production-adjacent system, paid provider, or billable infrastructure was contacted. Expected tests attempted localhost-only failure paths and local mock or `httptest` endpoints.

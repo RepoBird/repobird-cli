@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 )
@@ -130,8 +131,21 @@ func TestRunWaitShellExitCodeContract(t *testing.T) {
 }
 
 type runWaitSmokeRequests struct {
+	mu         sync.Mutex
 	createBody map[string]any
 	getCount   atomic.Int32
+}
+
+func (r *runWaitSmokeRequests) setCreateBody(body map[string]any) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.createBody = body
+}
+
+func (r *runWaitSmokeRequests) create() map[string]any {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.createBody
 }
 
 func newRunWaitSmokeServer(t *testing.T, createStatus int, createBody, getBody map[string]any) (*httptest.Server, *runWaitSmokeRequests) {
@@ -142,9 +156,11 @@ func newRunWaitSmokeServer(t *testing.T, createStatus int, createBody, getBody m
 		w.Header().Set("Content-Type", "application/json")
 		switch {
 		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/runs":
-			if err := json.NewDecoder(r.Body).Decode(&requests.createBody); err != nil {
+			var body map[string]any
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 				t.Errorf("decode create request: %v", err)
 			}
+			requests.setCreateBody(body)
 			w.WriteHeader(createStatus)
 			if createStatus >= http.StatusBadRequest {
 				_ = json.NewEncoder(w).Encode(createBody)
@@ -163,11 +179,12 @@ func newRunWaitSmokeServer(t *testing.T, createStatus int, createBody, getBody m
 
 func assertRunWaitRequestOmittedReasoningEffort(t *testing.T, requests *runWaitSmokeRequests) {
 	t.Helper()
-	if requests.createBody == nil {
+	createBody := requests.create()
+	if createBody == nil {
 		t.Fatal("local server did not receive a create request")
 	}
-	if _, ok := requests.createBody["reasoningEffort"]; ok {
-		t.Fatalf("create request unexpectedly included reasoningEffort: %#v", requests.createBody)
+	if _, ok := createBody["reasoningEffort"]; ok {
+		t.Fatalf("create request unexpectedly included reasoningEffort: %#v", createBody)
 	}
 }
 

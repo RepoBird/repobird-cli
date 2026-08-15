@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -528,13 +529,13 @@ runType: run
 	})
 
 	t.Run("service rejection keeps the established error and exit path", func(t *testing.T) {
-		requests := make(chan struct{}, 2)
+		var createAttempts atomic.Int32
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method != http.MethodPost || r.URL.Path != "/api/v1/runs" {
 				http.NotFound(w, r)
 				return
 			}
-			requests <- struct{}{}
+			createAttempts.Add(1)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusBadRequest)
 			_, _ = io.WriteString(w, `{"error":{"code":"INVALID_REASONING_EFFORT","message":"Reasoning effort is not supported"}}`)
@@ -552,7 +553,7 @@ runType: run
 		}, "run", "--repo", "test/repo", "--prompt", "Test task", "--acknowledge-prompt-risk")
 		AssertFailure(t, result)
 		AssertContains(t, result.Stderr, "Reasoning effort is not supported")
-		if got := len(requests); got != 1 {
+		if got := createAttempts.Load(); got != 1 {
 			t.Fatalf("expected one create attempt without fallback or retry, got %d", got)
 		}
 	})
