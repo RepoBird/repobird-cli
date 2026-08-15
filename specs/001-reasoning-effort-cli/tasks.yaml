@@ -403,7 +403,7 @@ phases:
           - "No closed reasoning-effort catalog or client-selected model/default is documented."
       - id: "T030"
         title: "Align the machine-readable public contract in docs/CLI_API_SPECIFICATION.yaml"
-        status: "Pending"
+        status: "Completed"
         type: "documentation"
         parallel: true
         story_id: null
