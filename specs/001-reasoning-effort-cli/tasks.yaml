@@ -90,7 +90,7 @@ phases:
     tasks:
       - id: "T006"
         title: "Write failing configuration validation tests in internal/utils/markdown_config_test.go"
-        status: "Pending"
+        status: "Completed"
         type: "test"
         parallel: true
         story_id: "US-001"
