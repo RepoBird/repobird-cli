@@ -3,10 +3,13 @@
 ## Essential Commands
 
 ```bash
+repobird models                     # Discover server-authoritative models
+repobird models --json              # Stable JSON model catalog
 repobird tui                        # Launch interactive dashboard
 repobird run task.json              # Submit task
 repobird run task.json --wait --json --timeout 45m # Script wait
-repobird run --basic -r org/repo -p "Fix a bug" --reasoning-effort max # Optional preference
+repobird run --basic -r org/repo -p "Fix a bug" --reasoning-effort max # Server resolves model
+repobird run -r org/repo -p "Fix a bug" --opencode-model MODEL_ID --opencode-provider PROVIDER_ID
 repobird basic "Fix a bug"          # Basic run, repo auto-detected from git
 repobird pro "Implement OAuth"      # Pro run, repo auto-detected from git
 repobird status                     # View all runs

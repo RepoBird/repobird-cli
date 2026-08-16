@@ -177,6 +177,7 @@ make check          # Run all checks
 ### CLI Usage
 ```bash
 repobird config set api-key YOUR_KEY
+repobird models --json
 repobird run task.json --follow
 repobird tui
 repobird bulk config.json
@@ -191,7 +192,12 @@ The `repobird run` command supports multiple formats for task definitions:
 
 **Minimal single run**: `{"prompt": "task description", "repository": "owner/repo"}`
 
-**Optional fields**: `target` (branch), `title`, `source` (base branch), `runType` (run|plan), `context`, `files`
+**Optional fields**: `target` (branch), `title`, `source` (base branch), `runType` (run|plan), `context`, `files`, `opencodeModel`, `opencodeProvider`, `reasoningEffort`
+
+Model discovery and admission are server-authoritative. `repobird models`
+fetches the public catalog, while explicit `--opencode-model` and
+`--opencode-provider` values are passed through unchanged. Basic and Pro runs
+omit client-owned model defaults.
 
 **Bulk runs**: Top-level `repository` + `runs` array, each with its own `prompt`
 

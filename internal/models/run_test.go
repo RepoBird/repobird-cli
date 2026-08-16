@@ -84,6 +84,25 @@ func TestRunConfigReasoningEffortPreservesOpaqueValues(t *testing.T) {
 	})
 }
 
+func TestRunConfigPreservesExplicitOpenCodeSelection(t *testing.T) {
+	var config RunConfig
+	require.NoError(t, json.Unmarshal([]byte(`{"prompt":"test","opencodeModel":"future-provider/future-model-v9","opencodeProvider":"future-provider"}`), &config))
+	assert.Equal(t, "future-provider/future-model-v9", config.OpenCodeModel)
+	assert.Equal(t, "future-provider", config.OpenCodeProvider)
+
+	data, err := json.Marshal(config)
+	require.NoError(t, err)
+	assert.Contains(t, string(data), `"opencodeModel":"future-provider/future-model-v9"`)
+	assert.Contains(t, string(data), `"opencodeProvider":"future-provider"`)
+}
+
+func TestRunConfigOmitsUnspecifiedOpenCodeSelection(t *testing.T) {
+	data, err := json.Marshal(RunConfig{})
+	require.NoError(t, err)
+	assert.NotContains(t, string(data), "opencodeModel")
+	assert.NotContains(t, string(data), "opencodeProvider")
+}
+
 func TestRunConfigReasoningEffortRemainsOmitted(t *testing.T) {
 	var config RunConfig
 	require.NoError(t, json.Unmarshal([]byte(`{"prompt":"test"}`), &config))

@@ -344,7 +344,7 @@ curl -X GET https://api.repobird.ai/api/v1/runs?page=1&limit=10 \
    - Repository resolution: name → repoId via API
    - Auto-detect repo from git config if not specified
    - Preserve legacy CLI runType values for compatibility, but keep plan submissions development-only during the OpenCode migration while exposing Basic/Pro presets
-   - Basic preset uses DeepSeek V4 Flash; Pro preset uses GLM 5.2
+   - Basic and Pro presets must not select client-owned model IDs; the server resolves admission. Use public model discovery and forward explicit selections unchanged when supplied.
    - Handle status enum values correctly
 
 2. **Core Features**:
@@ -355,17 +355,17 @@ curl -X GET https://api.repobird.ai/api/v1/runs?page=1&limit=10 \
 
 3. **Error Handling**:
    - Map status enums to user-friendly messages
-   - Handle tier limits gracefully
+   - Surface server credit and admission errors without local quota assumptions
    - Retry logic for transient failures
 
 4. **User Experience**:
    - Clear status indicators (QUEUED → DONE)
    - Progress tracking with 5s polling
-   - Usage limits display (runs remaining)
+   - Display server-provided credit or admission information when available
    - Human-readable messages mapped from API responses
    - Auto-detect repository from git config in CWD
 
 5. **Configuration**:
    - Store API key securely (keyring)
    - Default agent and run type settings
-   - User tier caching for offline limits check
+   - Do not use client-side tier or model-policy data to decide run admission

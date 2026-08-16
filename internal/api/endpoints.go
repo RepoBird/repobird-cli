@@ -13,6 +13,9 @@ const (
 	// EndpointRuns is the base endpoint for runs operations
 	EndpointRuns = "/api/v1/runs"
 
+	// EndpointModels is the public endpoint for the server-authoritative model catalog.
+	EndpointModels = "/api/v1/models"
+
 	// EndpointRunDetails is the endpoint template for getting a specific run
 	EndpointRunDetailsTemplate = "/api/v1/runs/%s"
 

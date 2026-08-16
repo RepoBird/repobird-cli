@@ -59,6 +59,114 @@ func TestNewClient(t *testing.T) {
 	}
 }
 
+func TestClientGetModelsUsesPublicEndpointAndETag(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Fatalf("expected GET, got %s", r.Method)
+		}
+		if r.URL.Path != EndpointModels {
+			t.Fatalf("expected path %s, got %s", EndpointModels, r.URL.Path)
+		}
+		if authorization := r.Header.Get("Authorization"); authorization != "" {
+			t.Fatalf("discovery should not send an empty authorization header, got %q", authorization)
+		}
+		w.Header().Set("ETag", `"catalog_test"`)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"data": map[string]any{
+				"catalogRevision": "catalog_test",
+				"models": []map[string]any{{
+					"id":           "future-provider/future-model-v9",
+					"label":        "Future Model",
+					"provider":     "Future Provider",
+					"capabilities": []string{"future-flow"},
+					"isDefault":    true,
+				}},
+			},
+		})
+	}))
+	defer server.Close()
+
+	result, err := NewClient("", server.URL, false).GetModels("")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.ETag != `"catalog_test"` {
+		t.Fatalf("ETag = %q, want %q", result.ETag, `"catalog_test"`)
+	}
+	if result.NotModified {
+		t.Fatal("first discovery response must not be marked not modified")
+	}
+	if result.Catalog == nil || result.Catalog.Data == nil {
+		t.Fatal("expected catalog data")
+	}
+}
+
+func TestClientGetModelsUsesIfNoneMatchAndHandlesNotModified(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("If-None-Match"); got != `"catalog_test"` {
+			t.Fatalf("If-None-Match = %q, want %q", got, `"catalog_test"`)
+		}
+		w.Header().Set("ETag", `"catalog_test"`)
+		w.WriteHeader(http.StatusNotModified)
+	}))
+	defer server.Close()
+
+	result, err := NewClient("", server.URL, false).GetModels(`"catalog_test"`)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result.NotModified {
+		t.Fatal("304 response must be marked not modified")
+	}
+	if result.Catalog != nil {
+		t.Fatal("304 response must not include a catalog")
+	}
+}
+
+func TestClientGetModelsPreservesStableAPIErrors(t *testing.T) {
+	tests := []struct {
+		name       string
+		statusCode int
+		body       string
+		contains   string
+	}{
+		{
+			name:       "rate limited",
+			statusCode: http.StatusTooManyRequests,
+			body:       `{"code":"RATE_LIMIT_EXCEEDED","message":"rate limit exceeded"}`,
+			contains:   "rate limit",
+		},
+		{
+			name:       "policy unavailable",
+			statusCode: http.StatusServiceUnavailable,
+			body:       `{"code":"MODEL_POLICY_UNAVAILABLE","message":"model policy unavailable"}`,
+			contains:   "model policy unavailable",
+		},
+		{
+			name:       "catalog unavailable",
+			statusCode: http.StatusInternalServerError,
+			body:       `{"code":"MODEL_CATALOG_UNAVAILABLE","message":"model catalog unavailable"}`,
+			contains:   "model catalog unavailable",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(tt.statusCode)
+				_, _ = w.Write([]byte(tt.body))
+			}))
+			defer server.Close()
+
+			_, err := NewClient("", server.URL, false).GetModels("")
+			if err == nil || !strings.Contains(strings.ToLower(err.Error()), tt.contains) {
+				t.Fatalf("GetModels() error = %v, want substring %q", err, tt.contains)
+			}
+		})
+	}
+}
+
 func TestGetRepositorySupportsBranchDefaults(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/v1/repositories/repo_123" {

@@ -216,6 +216,21 @@ func TestRunCommand_ValidationWithFlags(t *testing.T) {
 			},
 		},
 		{
+			name: "Explicit model and provider pass through",
+			args: []string{
+				"-r", "owner/repo", "-p", "Fix bug",
+				"--basic",
+				"--opencode-model", "future-provider/future-model-v9",
+				"--opencode-provider", "future-provider",
+				"--dry-run",
+			},
+			expectInJSON: map[string]string{
+				"RunType":          "basic",
+				"OpenCodeModel":    "future-provider/future-model-v9",
+				"OpenCodeProvider": "future-provider",
+			},
+		},
+		{
 			name: "All optional fields populated",
 			args: []string{
 				"-r", "owner/repo", "-p", "Task prompt",
@@ -256,6 +271,8 @@ func TestRunCommand_ValidationWithFlags(t *testing.T) {
 				outputBranchPolicy = ""
 				title = ""
 				runType = ""
+				opencodeModel = ""
+				opencodeProvider = ""
 				contextFlag = ""
 				acknowledgePromptRisk = false
 				basicRun = false
@@ -377,7 +394,9 @@ func TestRunCommand_FileReasoningEffortTakesPrecedenceOverFlag(t *testing.T) {
   "repository": "test/repo",
   "prompt": "Fix bug",
   "runType": "run",
-  "reasoningEffort": "from-file"
+  "reasoningEffort": "from-file",
+  "opencodeModel": "future-provider/future-model-v9",
+  "opencodeProvider": "future-provider"
 }`
 	require.NoError(t, os.WriteFile(configPath, []byte(configJSON), 0o600))
 
@@ -387,8 +406,8 @@ func TestRunCommand_FileReasoningEffortTakesPrecedenceOverFlag(t *testing.T) {
 	result, err := executeRunDryRun(t, []string{configPath})
 	require.NoError(t, err)
 	assert.Equal(t, "from-file", result["ReasoningEffort"])
-	assert.Empty(t, result["OpenCodeModel"], "the service selects the model")
-	assert.Empty(t, result["OpenCodeProvider"], "the service selects the provider")
+	assert.Equal(t, "future-provider/future-model-v9", result["OpenCodeModel"])
+	assert.Equal(t, "future-provider", result["OpenCodeProvider"])
 }
 
 func executeRunDryRun(t *testing.T, args []string) (map[string]interface{}, error) {
@@ -437,6 +456,8 @@ func resetReasoningEffortRunFlags() {
 	contextFlag = ""
 	providerCredentialID = ""
 	providerMode = ""
+	opencodeModel = ""
+	opencodeProvider = ""
 	reasoningEffort = ""
 	gitlabTokenReferenceID = ""
 	basicRun = false

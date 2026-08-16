@@ -1,0 +1,320 @@
+plan:
+  branch: "agent/repobird-cli-5vd"
+  created: "2026-08-15"
+  spec_path: "specs/002-server-authoritative-models/spec.yaml"
+
+summary: |
+  Add a server-authoritative public model discovery path to the existing Go CLI without
+  copying the service policy into the client. The API client will decode GET /api/v1/models
+  through public DTOs that retain additive safe fields and opaque future values while
+  filtering credential, tenant, worker, policy, and hash internals. A built `repobird
+  models` command will render deterministic human and stable JSON output and preserve
+  documented API errors, ETag metadata, and anonymous-compatible discovery behavior.
+
+  Extend the current run input path so --opencode-model and --opencode-provider, plus
+  their JSON/YAML/Markdown configuration fields, travel unchanged through RunConfig,
+  domain, repository, and API DTOs. Basic and Pro continue to send their run type and
+  existing credential fields but no client-owned model or provider default. Omitted
+  selections remain omitted so the server resolves them, and server rejection is
+  returned without substitution or retry. The implementation uses focused red tests,
+  local httptest fixtures, and built-binary acceptance only; no persistent cache is
+  required because a cache is never authoritative for admission.
+
+technical_context:
+  language: "Go 1.24.5"
+  framework: "Cobra 1.9.1 CLI with existing internal API, domain, repository, configuration, and output layers"
+  primary_dependencies:
+    - name: "github.com/spf13/cobra"
+      version: "v1.9.1"
+      purpose: "Register repobird models and preserve existing run and preset command behavior."
+    - name: "encoding/json"
+      version: "Go standard library"
+      purpose: "Decode the public catalog, preserve safe additive fields, filter internal fields, and emit stable JSON."
+    - name: "net/http/httptest"
+      version: "Go standard library"
+      purpose: "Exercise discovery, conditional requests, errors, and run serialization against local servers only."
+    - name: "github.com/stretchr/testify"
+      version: "v1.10.0"
+      purpose: "Express focused DTO, client, repository, command, and compatibility assertions."
+  storage: "No new persistent storage. Conditional ETag support is request-scoped; no catalog cache is consulted for run admission."
+  testing:
+    framework: "Go testing package with testify, fixtures, local httptest servers, and built-binary subprocess acceptance"
+    approach: "Write focused failing tests before production edits, implement the smallest transport and command changes, then run focused packages, race tests where practical, make test, make test-integration, make check, built-binary checks, and diff/artifact validation with credentials cleared."
+  target_platform: "Linux, macOS, and Windows Go CLI builds supported by the existing repository"
+  project_type: "cli"
+  performance_goals: "Discovery adds one bounded HTTP request, preserves server cache metadata, and renders a representative catalog without client-side policy computation."
+  constraints:
+    - "GET /api/v1/models is the only source of public model discovery; the CLI must not maintain a provider catalog or authorize selections locally."
+    - "Public DTOs may retain additive safe fields and opaque values but must never retain or render credential, tenant, policy, worker, dispatch, secret, or hash internals."
+    - "Basic and Pro run types remain compatible while opencodeModel and opencodeProvider are omitted unless explicitly supplied by the user or configuration."
+    - "Explicit selected values are transmitted unchanged; the server owns admission, defaults, credential authorization, and rejection."
+    - "Existing authentication, provider credential fields, flags, configuration formats, output contracts, and stable errors remain compatible."
+    - "All validation is local, deterministic, credential-cleared, and cost-free. No live RepoBird or provider calls are allowed."
+    - "The current assigned worktree and branch are authoritative. Do not edit the sibling repository or the older non-ancestor branch."
+  scale_scope: "One public discovery command, one typed catalog client path, additive public DTO decoding, and the existing single-run command/request pipeline."
+
+constitution_check:
+  constitution_path: ".autospec/constitution.yaml"
+  gates:
+    - name: "Test-Driven Development (PRIN-001)"
+      status: "PASS"
+      notes: "The task order begins with focused red tests for DTOs, client behavior, request omission/pass-through, and command output before production changes."
+    - name: "Server-Authoritative Model Policy (PRIN-002)"
+      status: "PASS"
+      notes: "The plan removes client-owned Basic/Pro model/provider defaults, keeps omitted fields absent, forwards explicit values, and never uses discovery or cache for admission."
+    - name: "Backward-Compatible CLI Contracts (PRIN-003)"
+      status: "PASS"
+      notes: "Existing run types, flags, config formats, authentication, provider credentials, JSON output, error codes, and aliases are covered by compatibility tests."
+    - name: "Offline and Cost-Free Validation (PRIN-004)"
+      status: "PASS"
+      notes: "Every network assertion uses local httptest or fixture data; credentials are cleared and no live or paid endpoint is permitted."
+    - name: "Project Architecture and Data Safety (PRIN-005)"
+      status: "PASS"
+      notes: "Changes follow existing API/DTO, domain/repository, Cobra, output, and configuration patterns and redact internal fields without logging secrets."
+
+research_findings:
+  decisions:
+    - topic: "Discovery DTO forward compatibility"
+      decision: "Represent documented fields as typed values and retain only additive unknown JSON fields that pass a conservative internal-field filter; preserve unknown provider, capability, and other public string values as opaque strings."
+      rationale: "The server may add safe public fields or values before the CLI releases, but public output must not become a container for policy, credential, tenant, worker, dispatch, secret, or hash data."
+      alternatives_considered:
+        - "Strictly reject every unknown field, rejected because safe additive server evolution would break older CLIs."
+        - "Retain every unknown field, rejected because internal policy data must never enter public DTOs or output."
+        - "Maintain a local model catalog, rejected because it duplicates server policy and drifts."
+    - topic: "Conditional discovery requests"
+      decision: "Expose request-scoped If-None-Match support in the client and handle 304 as an explicit not-modified result, but do not add a persistent catalog cache in this change."
+      rationale: "The server contract supplies opaque ETag and catalogRevision metadata. Avoiding persistence keeps the feature bounded and guarantees cached data cannot affect run admission."
+      alternatives_considered:
+        - "Persist a catalog cache immediately, deferred because offline display is optional and adds stale-state UX and test surface."
+        - "Ignore ETag and 304, rejected because the public contract explicitly defines conditional discovery behavior."
+    - topic: "Run selection authority"
+      decision: "Carry optional model and provider strings from direct flags or config through every existing request layer and omit both when empty; do not infer provider from model or run type."
+      rationale: "The selected canonical ID must reach server admission unchanged, while Basic and Pro must rely on server resolution when no value is supplied."
+      alternatives_considered:
+        - "Infer provider from the model prefix, rejected because it rewrites user input and can conflict with credential authorization."
+        - "Select defaults from Basic/Pro, rejected by the constitution and server contract."
+        - "Validate against the discovered catalog before submit, rejected because discovery is not authorization and would add a local policy gate."
+    - topic: "Command shape"
+      decision: "Register `repobird models` as the primary command and provide `repobird models list` as an additive alias path using the same implementation."
+      rationale: "The requested built command is short and script-friendly while the sibling T064 contract names a models-list command. Supporting both has no existing compatibility cost."
+      alternatives_considered:
+        - "Expose only `models list`, rejected because the approved user contract explicitly names `repobird models`."
+        - "Expose only `models`, rejected because the cross-repo task names the list form."
+    - topic: "Error and authentication behavior"
+      decision: "Reuse the existing API error parser and authenticated client construction, suppressing an empty Authorization header only for anonymous-compatible discovery."
+      rationale: "This preserves stable error codes and protected endpoint authentication while allowing local credential-free discovery tests."
+      alternatives_considered:
+        - "Use a second unauthenticated HTTP client, rejected because it duplicates URL, timeout, user-agent, and error behavior."
+        - "Change protected request semantics, rejected because it risks existing auth and credential behavior."
+    - topic: "Autospec execution fallback"
+      decision: "Keep the validated spec and hand-author plan/tasks using the repository's existing valid artifact shape after the configured plan runner failed before generation because it passed an unsupported `-c` argument to the connected jcode CLI."
+      rationale: "The failure is local tooling incompatibility, not a feature ambiguity. Manual artifacts remain schema-validated and preserve the requested specify → plan → tasks flow without retrying the broken command unchanged."
+      alternatives_considered:
+        - "Retry the same jcode-backed plan command, rejected because the error is deterministic and the skill forbids unchanged retries."
+        - "Use an unapproved external or live provider fallback, rejected by routing and cost constraints."
+
+data_model:
+  entities:
+    - name: "Public models response"
+      description: "The public GET /api/v1/models envelope returned by the service."
+      fields:
+        - name: "data.catalogRevision"
+          type: "string"
+          description: "Opaque revision token used for display and conditional change detection."
+          constraints: "Preserve exactly; never parse as policy or use for admission."
+        - name: "data.models"
+          type: "array of Public model descriptor"
+          description: "Server-ordered sanitized model descriptors."
+          constraints: "Preserve server order for JSON; human rendering uses deterministic order without adding entries."
+        - name: "safe additive fields"
+          type: "JSON object fields"
+          description: "Unknown public fields that do not match conservative internal-field patterns."
+          constraints: "Round-trip in JSON output; internal-looking fields are discarded."
+    - name: "Public model descriptor"
+      description: "One selectable public model option returned by the service."
+      fields:
+        - name: "id"
+          type: "string"
+          description: "Canonical requested model identifier."
+          constraints: "Opaque and unchanged."
+        - name: "label"
+          type: "string"
+          description: "User-facing public label."
+          constraints: "Opaque and unchanged."
+        - name: "provider"
+          type: "string"
+          description: "Public provider label."
+          constraints: "Unknown future values are preserved."
+        - name: "capabilities"
+          type: "array of strings"
+          description: "Public flow capability values."
+          constraints: "Unknown future values are preserved."
+        - name: "isDefault"
+          type: "boolean"
+          description: "Server-provided catalog default marker."
+          constraints: "Display only; never used to construct a run."
+    - name: "Run selection request"
+      description: "Existing run request with optional explicit OpenCode selection."
+      fields:
+        - name: "opencodeModel"
+          type: "optional string"
+          description: "Exact user/config-selected model identifier."
+          constraints: "Omit when empty; no client validation, aliasing, defaulting, or fallback."
+        - name: "opencodeProvider"
+          type: "optional string"
+          description: "Exact user/config-selected provider binding."
+          constraints: "Omit when empty; no inference from model or credentials."
+        - name: "existing fields"
+          type: "composite"
+          description: "Run type, credentials, branches, prompt, context, files, and idempotency values."
+          constraints: "Preserve names, precedence, and existing behavior."
+
+api_contracts:
+  endpoints:
+    - method: "GET"
+      path: "/api/v1/models"
+      description: "Retrieve the anonymous-compatible sanitized public model catalog."
+      request:
+        content_type: "application/json"
+        body_schema: "No request body; optional If-None-Match header carries an opaque prior ETag."
+      response:
+        success_code: 200
+        body_schema: "PublicModelsResponse with data.catalogRevision, data.models, typed public fields, and safe additive fields."
+      errors:
+        - code: 304
+          description: "Catalog is unchanged for the supplied ETag; return a not-modified result without decoding a body."
+        - code: 429
+          description: "Existing stable rate-limit error is parsed and surfaced without retry or local fallback."
+        - code: 503
+          description: "MODEL_POLICY_UNAVAILABLE remains a stable user-safe error."
+        - code: 500
+          description: "MODEL_CATALOG_UNAVAILABLE remains a stable user-safe error."
+    - method: "POST"
+      path: "/api/v1/runs"
+      description: "Create a run with optional explicit model/provider values while leaving admission and defaulting to the server."
+      request:
+        content_type: "application/json"
+        body_schema: "Existing create-run request plus optional opencodeModel and opencodeProvider with exact field names and omission semantics."
+      response:
+        success_code: 201
+        body_schema: "Existing create response; service-returned model values remain opaque and existing compatibility aliases continue to decode."
+      errors:
+        - code: 400
+          description: "Unsupported or invalid selection remains the server's stable admission error; the CLI does not silently retry or substitute."
+        - code: 401
+          description: "Existing authentication failure behavior remains unchanged."
+        - code: 429
+          description: "Existing rate-limit behavior remains unchanged."
+
+project_structure:
+  documentation:
+    - path: "specs/002-server-authoritative-models/spec.yaml"
+      description: "Governing feature requirements and acceptance scenarios."
+    - path: "specs/002-server-authoritative-models/plan.yaml"
+      description: "Implementation decisions, boundaries, phases, and validation strategy."
+    - path: "specs/002-server-authoritative-models/tasks.yaml"
+      description: "Dependency-ordered TDD and implementation tasks."
+    - path: "docs/API-REFERENCE.md"
+      description: "Document public model discovery and server-authoritative selected-model request semantics."
+    - path: "docs/RUN-CONFIG-FORMATS.md"
+      description: "Document optional opencodeModel and opencodeProvider fields for flags and file formats."
+    - path: "docs/QUICK-REFERENCE.md"
+      description: "Add concise models command and selected-model examples without a local catalog."
+  source_code:
+    - path: "internal/api/endpoints.go"
+      description: "Add the public models endpoint constant."
+    - path: "internal/api/dto/models.go"
+      description: "Define sanitized catalog DTOs, safe additive-field preservation, and internal-field filtering."
+    - path: "internal/api/client.go"
+      description: "Implement typed discovery, ETag/304 handling, and stable error behavior."
+    - path: "internal/models/run.go"
+      description: "Carry optional model/provider values through RunRequest and RunConfig into APIRunRequest."
+    - path: "internal/utils/markdown_config.go"
+      description: "Parse model/provider fields from Markdown frontmatter."
+    - path: "internal/config/loader.go"
+      description: "Map model/provider fields from loaded configuration to RunRequest."
+    - path: "internal/domain/models.go"
+      description: "Retain selected model/provider in the existing domain request contract."
+    - path: "internal/repository/api_run_repository.go"
+      description: "Map selected model/provider to API DTOs without inference and preserve response compatibility."
+    - path: "internal/commands/run.go"
+      description: "Add direct and preset flags, config precedence, and selected values to create requests."
+    - path: "internal/commands/models.go"
+      description: "Register built human/JSON discovery commands and safe error rendering."
+    - path: "internal/commands/root.go"
+      description: "Register the models command without altering existing command behavior."
+  tests:
+    - path: "internal/api/dto/models_test.go"
+      description: "Test public schema decoding, additive safe fields, redaction, unknown values, and stable marshaling."
+    - path: "internal/api/client_test.go"
+      description: "Test GET path, anonymous-compatible auth behavior, ETag/304, errors, and catalog decoding."
+    - path: "internal/models/run_test.go"
+      description: "Test JSON/YAML exact pass-through and omission for model/provider fields."
+    - path: "internal/repository/api_run_repository_test.go"
+      description: "Test selected model/provider request serialization and preserved credential fields."
+    - path: "internal/commands/models_test.go"
+      description: "Test human/JSON command output, command wiring, deterministic descriptors, and stable errors."
+    - path: "internal/commands/run_test.go"
+      description: "Test direct/config selected values, Basic/Pro omission, and no provider inference."
+    - path: "internal/commands/run_create_output_test.go"
+      description: "Test selected values in dry-run/create JSON and machine-readable server errors."
+    - path: "tests/integration/cli_test.go"
+      description: "Extend local command acceptance for selected model/provider and omitted Basic/Pro requests."
+
+implementation_phases:
+  - phase: 1
+    name: "Freeze the public and submission contracts"
+    goal: "Create all required focused red tests before production code changes and capture the local tooling blocker for generated planning."
+    deliverables:
+      - "DTO red tests for catalog fields, safe additive fields, internal-field redaction, and opaque unknown values."
+      - "API client red tests for GET /api/v1/models, ETag/304, stable errors, and empty-credential discovery."
+      - "Run/config/repository/command red tests for exact selected model/provider pass-through and omission on Basic/Pro."
+      - "Models command red tests for human output, stable JSON, and error rendering."
+  - phase: 2
+    name: "Implement discovery transport and safe DTOs"
+    goal: "Make public catalog decoding and client requests pass while retaining only safe public data."
+    dependencies:
+      - "Phase 1"
+    deliverables:
+      - "Typed public model DTOs with additive-field preservation and conservative internal redaction."
+      - "Models endpoint constant and client method with optional If-None-Match and explicit 304 handling."
+      - "Existing error parsing and protected authentication behavior preserved."
+  - phase: 3
+    name: "Implement selected-model request pass-through"
+    goal: "Make explicit flags and configuration reach the server unchanged while omitted values remain absent."
+    dependencies:
+      - "Phase 1"
+      - "Phase 2"
+    deliverables:
+      - "RunRequest and RunConfig JSON/YAML fields for opencodeModel and opencodeProvider."
+      - "Direct run and Basic/Pro preset flags with explicit values taking precedence over config where supplied."
+      - "Domain and repository mapping preserving existing provider credential behavior and no inference/defaulting."
+  - phase: 4
+    name: "Add built discovery command and compatibility coverage"
+    goal: "Expose human and stable JSON discovery and verify built CLI behavior against local HTTP fixtures."
+    dependencies:
+      - "Phase 2"
+      - "Phase 3"
+    deliverables:
+      - "repobird models and additive models list command wiring."
+      - "Human output for identifiers, labels, providers, capabilities, default marker, and safe additive fields."
+      - "Stable JSON output and stable non-secret error behavior."
+      - "Local integration and built-binary request serialization acceptance."
+  - phase: 5
+    name: "Documentation, polish, and cost-free acceptance"
+    goal: "Align user-facing documentation and run every feasible local validation gate without live or costly calls."
+    dependencies:
+      - "Phase 4"
+    deliverables:
+      - "API, configuration, and quick-reference docs explain server authority and optional fields."
+      - "Focused package and race tests pass with credentials cleared."
+      - "make test, make test-integration, make check, built-binary models checks, git diff --check, and Autospec artifact checks are recorded."
+
+open_questions: []
+
+_meta:
+  version: "1.0.0"
+  generator: "autospec"
+  generator_version: "autospec dev"
+  created: "2026-08-15T19:42:00Z"
+  artifact_type: "plan"
