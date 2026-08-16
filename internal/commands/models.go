@@ -19,8 +19,6 @@ import (
 	"github.com/repobird/repobird-cli/internal/utils"
 )
 
-var modelsCmd = newModelsCommand()
-
 func newModelsCommand() *cobra.Command {
 	list := &cobra.Command{
 		Use:   "list",

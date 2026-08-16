@@ -192,7 +192,7 @@ The `repobird run` command supports multiple formats for task definitions:
 
 **Minimal single run**: `{"prompt": "task description", "repository": "owner/repo"}`
 
-**Optional fields**: `target` (branch), `title`, `source` (base branch), `runType` (run|plan), `context`, `files`, `opencodeModel`, `opencodeProvider`
+**Optional fields**: `target` (branch), `title`, `source` (base branch), `runType` (run|plan), `context`, `files`, `opencodeModel`, `opencodeProvider`, `reasoningEffort`
 
 Model discovery and admission are server-authoritative. `repobird models`
 fetches the public catalog, while explicit `--opencode-model` and

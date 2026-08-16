@@ -13,29 +13,39 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 )
 
 func TestBuiltBinaryModelsAndRunSubmissionContracts(t *testing.T) {
 	var createBodies []map[string]any
+	var createBodiesMu sync.Mutex
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/models":
 			if got := r.Header.Get("Authorization"); got != "" {
-				t.Fatalf("models discovery sent authorization with cleared credentials: %q", got)
+				t.Errorf("models discovery sent authorization with cleared credentials: %q", got)
+				http.Error(w, "unexpected authorization", http.StatusBadRequest)
+				return
 			}
 			w.Header().Set("ETag", `"catalog_test"`)
 			_, _ = io.WriteString(w, `{"data":{"catalogRevision":"catalog_test","futureCatalogField":"preserve-me","models":[{"id":"future-provider/future-model-v9","label":"Future Model","provider":"Future Provider","capabilities":["future-flow"],"isDefault":true,"futureDescriptorField":{"displayHint":"safe"},"policyHash":"omit-me","workerProfile":"omit-me","metadata":{"safe":true,"credentialId":"omit-me"}}]}}`)
 		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/runs":
 			if got := r.Header.Get("Authorization"); got != "Bearer TEST_KEY" {
-				t.Fatalf("run submission authorization = %q, want fake local key", got)
+				t.Errorf("run submission authorization = %q, want fake local key", got)
+				http.Error(w, "unexpected authorization", http.StatusUnauthorized)
+				return
 			}
 			var body map[string]any
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-				t.Fatalf("decode run request: %v", err)
+				t.Errorf("decode run request: %v", err)
+				http.Error(w, "invalid request", http.StatusBadRequest)
+				return
 			}
+			createBodiesMu.Lock()
 			createBodies = append(createBodies, body)
+			createBodiesMu.Unlock()
 			w.WriteHeader(http.StatusCreated)
 			_, _ = io.WriteString(w, `{"data":{"id":123,"status":"QUEUED","repositoryName":"test/repo","runType":"run"}}`)
 		default:
@@ -66,6 +76,8 @@ func TestBuiltBinaryModelsAndRunSubmissionContracts(t *testing.T) {
 	AssertContains(t, human.Stdout, "displayHint")
 	AssertNotContains(t, human.Stdout, "policyHash")
 	AssertNotContains(t, human.Stdout, "workerProfile")
+	AssertNotContains(t, human.Stdout, "credentialId")
+	AssertNotContains(t, human.Stdout, "omit-me")
 
 	machine := RunCommandWithEnv(t, baseEnv(""), "models", "--json")
 	AssertSuccess(t, machine)
@@ -91,10 +103,13 @@ func TestBuiltBinaryModelsAndRunSubmissionContracts(t *testing.T) {
 	explicit := RunCommandWithEnv(t, baseEnv("TEST_KEY"), "run", "--repo", "test/repo", "--prompt", "Explicit submission", "--opencode-model", "future-provider/future-model-v9", "--opencode-provider", "future-provider", "--acknowledge-prompt-risk", "--force")
 	AssertSuccess(t, explicit)
 
-	if len(createBodies) != 3 {
-		t.Fatalf("captured %d create requests, want 3", len(createBodies))
+	createBodiesMu.Lock()
+	capturedBodies := append([]map[string]any(nil), createBodies...)
+	createBodiesMu.Unlock()
+	if len(capturedBodies) != 3 {
+		t.Fatalf("captured %d create requests, want 3", len(capturedBodies))
 	}
-	for _, body := range createBodies[:2] {
+	for _, body := range capturedBodies[:2] {
 		if _, ok := body["opencodeModel"]; ok {
 			t.Fatalf("preset request unexpectedly selected a model: %#v", body)
 		}
@@ -102,10 +117,10 @@ func TestBuiltBinaryModelsAndRunSubmissionContracts(t *testing.T) {
 			t.Fatalf("preset request unexpectedly selected a provider: %#v", body)
 		}
 	}
-	if got := createBodies[2]["opencodeModel"]; got != "future-provider/future-model-v9" {
+	if got := capturedBodies[2]["opencodeModel"]; got != "future-provider/future-model-v9" {
 		t.Fatalf("explicit opencodeModel = %#v", got)
 	}
-	if got := createBodies[2]["opencodeProvider"]; got != "future-provider" {
+	if got := capturedBodies[2]["opencodeProvider"]; got != "future-provider" {
 		t.Fatalf("explicit opencodeProvider = %#v", got)
 	}
 	if strings.Contains(explicit.Stdout, "fallback") || strings.Contains(explicit.Stderr, "fallback") {

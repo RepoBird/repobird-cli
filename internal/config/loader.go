@@ -44,6 +44,7 @@ func (c *ConfigLoader) LoadConfig(filePath string) (*models.RunRequest, error) {
 		Files:                 runConfig.Files,
 		OpenCodeModel:         runConfig.OpenCodeModel,
 		OpenCodeProvider:      runConfig.OpenCodeProvider,
+		ReasoningEffort:       runConfig.ReasoningEffort,
 		BranchOnly:            runConfig.BranchOnly,
 		AcknowledgePromptRisk: runConfig.AcknowledgePromptRisk,
 	}

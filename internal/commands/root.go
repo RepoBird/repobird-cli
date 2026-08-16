@@ -101,7 +101,7 @@ func init() {
 	rootCmd.AddCommand(statusCmd)
 	rootCmd.AddCommand(logsCmd)
 	rootCmd.AddCommand(repoCmd)
-	rootCmd.AddCommand(modelsCmd)
+	rootCmd.AddCommand(newModelsCommand())
 	InitConfigSubcommands() // Initialize config subcommands
 	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(loginCmd)

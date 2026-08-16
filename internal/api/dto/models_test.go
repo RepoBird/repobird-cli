@@ -23,6 +23,9 @@ func TestPublicModelsResponsePreservesSafeAdditiveFieldsAndRedactsInternalData(t
         "policyHash": "must-not-survive",
         "workerProfile": "must-not-survive",
         "credentialId": "must-not-survive",
+        "apiKey": "must-not-survive",
+        "email": "must-not-survive",
+        "password": "must-not-survive",
         "tenantAvailability": "must-not-survive",
         "metadata": {"safe": true, "workerProfile": "must-not-survive"}
       }
@@ -49,6 +52,9 @@ func TestPublicModelsResponsePreservesSafeAdditiveFieldsAndRedactsInternalData(t
 	require.NotContains(t, model, "policyHash")
 	require.NotContains(t, model, "workerProfile")
 	require.NotContains(t, model, "credentialId")
+	require.NotContains(t, model, "apiKey")
+	require.NotContains(t, model, "email")
+	require.NotContains(t, model, "password")
 	require.NotContains(t, model, "tenantAvailability")
 	require.NotContains(t, model["metadata"], "workerProfile")
 }

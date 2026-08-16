@@ -193,10 +193,11 @@ func cloneAdditionalFields(fields map[string]json.RawMessage) map[string]json.Ra
 
 func safePublicFieldName(name string) bool {
 	normalized := strings.ToLower(name)
+	compact := strings.NewReplacer("_", "", "-", "").Replace(normalized)
 	for _, fragment := range []string{
-		"credential", "secret", "token", "tenant", "worker", "policy", "availability", "dispatch", "hash", "internal",
+		"apikey", "availability", "credential", "dispatch", "email", "hash", "internal", "password", "policy", "secret", "tenant", "token", "worker",
 	} {
-		if strings.Contains(normalized, fragment) {
+		if strings.Contains(compact, fragment) {
 			return false
 		}
 	}
