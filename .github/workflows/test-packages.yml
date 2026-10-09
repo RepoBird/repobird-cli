@@ -2,9 +2,6 @@ name: Test Package Managers
 
 on:
   workflow_dispatch:
-  schedule:
-    # Test weekly to catch package manager changes
-    - cron: '0 2 * * 0'
 
 jobs:
   # Test native package managers on their respective OS

@@ -33,14 +33,14 @@ var configCmd = &cobra.Command{
 	Long: `Manage RepoBird CLI configuration including API keys and endpoints.
 
 Available configuration keys:
-  api-key    API authentication key (stored securely)
+  api-key    API authentication key
   api-url    API endpoint URL (default: https://api.repobird.ai)
   debug      Enable debug output (true/false)
   color      Color output mode: auto, always, or never
 
 Storage locations:
   Config file: ~/.config/repobird/config.yaml
-  API key:     Secure storage (system keyring or encrypted file)
+  API key:     System keyring with permission-protected file fallback
   Cache:       ~/.config/repobird/cache/
 
 Examples:
@@ -82,7 +82,7 @@ var configSetCmd = &cobra.Command{
 		case configKeyAPIKey, "api_key":
 			// Use secure storage for API key
 			if err := secureCfg.SaveAPIKey(value); err != nil {
-				return fmt.Errorf("failed to save API key securely: %w", err)
+				return fmt.Errorf("failed to save API key: %w", err)
 			}
 
 			// Get storage info to show user where it's stored
@@ -95,7 +95,8 @@ var configSetCmd = &cobra.Command{
 						fmt.Printf("  %s %s\n", styler.Label("Stored securely in:"), keyringType)
 					}
 				case "encrypted_file":
-					fmt.Printf("  %s encrypted file\n", styler.Label("Stored securely in:"))
+					fmt.Printf("  %s encrypted file (permission-protected fallback)\n", styler.Label("Stored in:"))
+					fmt.Printf("  %s %s\n", styler.Warning("Warning:"), info["warning"])
 				default:
 					fmt.Printf("  %s %s\n", styler.Label("Storage method:"), source)
 				}

@@ -24,6 +24,8 @@ type Run struct {
 	OutputBranchPolicy string
 	PullRequestURL     string
 	RunType            string
+	Model              string
+	ReasoningEffort    string
 	Title              string
 	Context            string
 	Files              []string
@@ -56,6 +58,7 @@ type CreateRunRequest struct {
 	Agent                 string
 	OpenCodeModel         string
 	OpenCodeProvider      string
+	ReasoningEffort       string
 	Title                 string
 	Context               string
 	Files                 []string

@@ -3,9 +3,13 @@
 ## Essential Commands
 
 ```bash
+repobird models                     # Discover server-authoritative models
+repobird models --json              # Stable JSON model catalog
 repobird tui                        # Launch interactive dashboard
 repobird run task.json              # Submit task
 repobird run task.json --wait --json --timeout 45m # Script wait
+repobird run --basic -r org/repo -p "Fix a bug" --reasoning-effort max # Server resolves model
+repobird run -r org/repo -p "Fix a bug" --opencode-model MODEL_ID --opencode-provider PROVIDER_ID
 repobird basic "Fix a bug"          # Basic run, repo auto-detected from git
 repobird pro "Implement OAuth"      # Pro run, repo auto-detected from git
 repobird status                     # View all runs
@@ -106,11 +110,18 @@ repobird config set api-key KEY     # Set API key
   "source": "main",
   "target": "feature/branch",
   "runType": "run",
+  "reasoningEffort": "max",
   "title": "Brief title",
   "context": "Additional context",
   "files": ["file1.js", "file2.js"]
 }
 ```
+
+`reasoningEffort` is an optional, opaque preference. The equivalent CLI flag is
+`--reasoning-effort`. When omitted, existing commands behave as before and send
+no reasoning-effort preference. When supplied, the CLI forwards the value
+unchanged; the RepoBird service validates it and selects the final model and
+reasoning policy. Use `repobird run --help` for the complete flag list.
 
 ## Environment Variables
 

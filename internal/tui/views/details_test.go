@@ -136,6 +136,81 @@ func TestRunDetailsViewDisplaysCanonicalBranchFields(t *testing.T) {
 	assert.NotContains(t, content, "Target Branch: legacy-target")
 }
 
+func TestRunDetailsViewDisplaysServerSelectedPolicy(t *testing.T) {
+	client := api.NewClient("test-key", "http://localhost:8080", false)
+	testCache := cache.NewSimpleCache()
+
+	tests := []struct {
+		name            string
+		model           string
+		reasoningEffort string
+		wantModel       bool
+		wantReasoning   bool
+	}{
+		{
+			name:            "complete policy",
+			model:           "openai/gpt-5.6",
+			reasoningEffort: "max",
+			wantModel:       true,
+			wantReasoning:   true,
+		},
+		{
+			name:      "model only with unfamiliar value",
+			model:     "future-provider/future-model:v9-beta",
+			wantModel: true,
+		},
+		{
+			name:            "reasoning effort only with unfamiliar value",
+			reasoningEffort: "future-ultra/adaptive:v2",
+			wantReasoning:   true,
+		},
+		{
+			name: "legacy response without policy",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			run := models.RunResponse{
+				ID:              "policy-run-123",
+				Status:          models.StatusDone,
+				Repository:      "acme/webapp",
+				Source:          "main",
+				CreatedAt:       time.Date(2026, time.August, 15, 7, 0, 0, 0, time.UTC),
+				UpdatedAt:       time.Date(2026, time.August, 15, 7, 5, 0, 0, time.UTC),
+				Model:           tt.model,
+				ReasoningEffort: tt.reasoningEffort,
+			}
+
+			view := NewRunDetailsViewWithData(client, testCache, run)
+			content := view.viewport.View()
+
+			assertPolicyField := func(label, value string, want bool) {
+				t.Helper()
+
+				line := fmt.Sprintf("%s: %s", label, value)
+				if !want {
+					assert.NotContains(t, content, label+":", "empty policy values must not produce placeholders")
+					return
+				}
+
+				assert.Contains(t, content, line)
+				for i, fieldLine := range view.fieldLines {
+					if fieldLine == line {
+						assert.Equal(t, value, view.fieldValues[i], "copy metadata must preserve the exact server value")
+						return
+					}
+				}
+				assert.Failf(t, "missing copy metadata", "field %q was not registered for copying", line)
+			}
+
+			assertPolicyField("Model", tt.model, tt.wantModel)
+			assertPolicyField("Reasoning effort", tt.reasoningEffort, tt.wantReasoning)
+			assert.Contains(t, content, "Run ID: policy-run-123", "policy rendering must preserve existing run details")
+		})
+	}
+}
+
 func TestRunDetailsView_LoadingStateHandling(t *testing.T) {
 	// Test that loading state is properly managed
 	client := api.NewClient("test-key", "http://localhost:8080", false)

@@ -1,11 +1,14 @@
 package utils
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/repobird/repobird-cli/internal/models"
 )
 
 func TestParseMarkdownConfigFromReader(t *testing.T) {
@@ -242,6 +245,106 @@ func TestValidateRunConfig(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// This is a simplified test - in real usage, you'd pass actual RunConfig structs
 			// For now, we're just testing that the validation logic is working
+		})
+	}
+}
+
+func TestValidateRunConfigReasoningEffort(t *testing.T) {
+	for _, effort := range []string{"low", "medium", "high", "max", "xhigh"} {
+		t.Run(effort, func(t *testing.T) {
+			err := ValidateRunConfig(&models.RunConfig{
+				Prompt:          "Fix bug",
+				Repository:      "acme/webapp",
+				ReasoningEffort: effort,
+			})
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestRunConfigFormatsPreserveReasoningEffortValidationContract(t *testing.T) {
+	tests := []struct {
+		name     string
+		explicit string
+		omitted  string
+		invalid  string
+		parse    func(t *testing.T, input string) (*models.RunConfig, error)
+	}{
+		{
+			name:     "JSON",
+			explicit: `{"prompt":"Fix bug","repository":"acme/webapp","reasoningEffort":"future-balanced"}`,
+			omitted:  `{"prompt":"Fix bug","repository":"acme/webapp"}`,
+			invalid:  `{"repository":"acme/webapp"}`,
+			parse: func(t *testing.T, input string) (*models.RunConfig, error) {
+				t.Helper()
+				var config models.RunConfig
+				require.NoError(t, json.Unmarshal([]byte(input), &config))
+				return &config, ValidateRunConfig(&config)
+			},
+		},
+		{
+			name: "YAML",
+			explicit: `prompt: "Fix bug"
+repository: "acme/webapp"
+reasoningEffort: "future-balanced"
+`,
+			omitted: `prompt: "Fix bug"
+repository: "acme/webapp"
+`,
+			invalid: `repository: "acme/webapp"
+`,
+			parse: func(t *testing.T, input string) (*models.RunConfig, error) {
+				t.Helper()
+				config, err := ParseYAMLConfigFromReader(strings.NewReader(input))
+				if err != nil {
+					return nil, err
+				}
+				return config, ValidateRunConfig(config)
+			},
+		},
+		{
+			name: "Markdown",
+			explicit: `---
+prompt: "Fix bug"
+repository: "acme/webapp"
+reasoningEffort: "future-balanced"
+---
+`,
+			omitted: `---
+prompt: "Fix bug"
+repository: "acme/webapp"
+---
+`,
+			invalid: `---
+repository: "acme/webapp"
+---
+`,
+			parse: func(t *testing.T, input string) (*models.RunConfig, error) {
+				t.Helper()
+				config, _, err := ParseMarkdownConfigFromReader(strings.NewReader(input))
+				return config, err
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Run("preserves unfamiliar value", func(t *testing.T) {
+				config, err := tt.parse(t, tt.explicit)
+				require.NoError(t, err)
+				assert.Equal(t, "future-balanced", config.ReasoningEffort)
+			})
+
+			t.Run("preserves omission", func(t *testing.T) {
+				config, err := tt.parse(t, tt.omitted)
+				require.NoError(t, err)
+				assert.Empty(t, config.ReasoningEffort)
+			})
+
+			t.Run("preserves structural validation", func(t *testing.T) {
+				_, err := tt.parse(t, tt.invalid)
+				require.ErrorContains(t, err, "prompt is required")
+			})
 		})
 	}
 }

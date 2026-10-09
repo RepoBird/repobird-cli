@@ -4,6 +4,7 @@
 package views
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -145,4 +146,141 @@ func TestDashboardViewCopyLongPrompt(t *testing.T) {
 	if !strings.Contains(view.copiedMessage, "Failed") {
 		t.Logf("Successfully prepared to copy full prompt: %s", originalLine)
 	}
+}
+
+func TestDashboardViewDisplaysServerSelectedPolicy(t *testing.T) {
+	tests := []struct {
+		name            string
+		model           string
+		reasoningEffort string
+		wantModel       bool
+		wantReasoning   bool
+	}{
+		{
+			name:            "complete policy",
+			model:           "openai/gpt-5.6",
+			reasoningEffort: "max",
+			wantModel:       true,
+			wantReasoning:   true,
+		},
+		{
+			name:      "model only with unfamiliar value",
+			model:     "future-provider/future-model:v9-beta",
+			wantModel: true,
+		},
+		{
+			name:            "reasoning effort only with unfamiliar value",
+			reasoningEffort: "future-ultra/adaptive:v2",
+			wantReasoning:   true,
+		},
+		{
+			name: "legacy response without policy",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			view := NewDashboardView(nil, cache.NewSimpleCache())
+			view.width = 90
+			view.height = 20
+			view.focusedColumn = 2
+			view.updateViewportSizes()
+			view.selectedRunData = &models.RunResponse{
+				ID:              "policy-run-123",
+				Status:          models.StatusDone,
+				Repository:      "acme/webapp",
+				CreatedAt:       time.Date(2026, time.August, 15, 7, 0, 0, 0, time.UTC),
+				UpdatedAt:       time.Date(2026, time.August, 15, 7, 5, 0, 0, time.UTC),
+				Model:           tt.model,
+				ReasoningEffort: tt.reasoningEffort,
+			}
+
+			view.updateDetailLines()
+
+			assertDashboardPolicyLine(t, view, "Model", tt.model, tt.wantModel)
+			assertDashboardPolicyLine(t, view, "Reasoning effort", tt.reasoningEffort, tt.wantReasoning)
+			if !containsLine(view.detailLinesOriginal, "ID: policy-run-123") {
+				t.Fatalf("existing dashboard details were lost: %q", view.detailLinesOriginal)
+			}
+			if content := view.detailsViewport.View(); !strings.Contains(content, "ID: policy-run-123") {
+				t.Fatalf("details viewport became unusable, content: %q", content)
+			}
+		})
+	}
+}
+
+func TestDashboardViewPolicyCopyUsesFullOpaqueValue(t *testing.T) {
+	view := NewDashboardView(nil, cache.NewSimpleCache())
+	view.width = 60
+	view.height = 20
+	view.focusedColumn = 2
+	view.updateViewportSizes()
+
+	longModel := "future-provider/very-long-model-identifier:v99-experimental"
+	longReasoningEffort := "future-ultra-adaptive-reasoning-policy:v42"
+	view.selectedRunData = &models.RunResponse{
+		ID:              "policy-copy-123",
+		Status:          models.StatusDone,
+		Repository:      "acme/webapp",
+		CreatedAt:       time.Date(2026, time.August, 15, 7, 0, 0, 0, time.UTC),
+		UpdatedAt:       time.Date(2026, time.August, 15, 7, 5, 0, 0, time.UTC),
+		Model:           longModel,
+		ReasoningEffort: longReasoningEffort,
+	}
+
+	view.updateDetailLines()
+
+	for _, policy := range []struct {
+		label string
+		value string
+	}{
+		{label: "Model", value: longModel},
+		{label: "Reasoning effort", value: longReasoningEffort},
+	} {
+		expected := fmt.Sprintf("%s: %s", policy.label, policy.value)
+		lineIndex := lineIndex(view.detailLinesOriginal, expected)
+		if lineIndex < 0 {
+			t.Fatalf("missing %s copy metadata in %q", policy.label, view.detailLinesOriginal)
+		}
+		if display := view.detailLines[lineIndex]; display == expected || !strings.HasSuffix(display, "...") {
+			t.Fatalf("expected truncated %s display, got %q", policy.label, display)
+		}
+
+		view.selectedDetailLine = lineIndex
+		if copied := view.getDetailTextToCopy(); copied != expected {
+			t.Fatalf("expected full %s value for copy, got %q", policy.label, copied)
+		}
+	}
+}
+
+func assertDashboardPolicyLine(t *testing.T, view *DashboardView, label, value string, want bool) {
+	t.Helper()
+
+	prefix := label + ":"
+	if !want {
+		for _, line := range view.detailLinesOriginal {
+			if strings.HasPrefix(line, prefix) {
+				t.Fatalf("empty policy value produced an invented line %q", line)
+			}
+		}
+		return
+	}
+
+	expected := fmt.Sprintf("%s: %s", label, value)
+	if !containsLine(view.detailLinesOriginal, expected) {
+		t.Fatalf("missing policy line %q in %q", expected, view.detailLinesOriginal)
+	}
+}
+
+func containsLine(lines []string, expected string) bool {
+	return lineIndex(lines, expected) >= 0
+}
+
+func lineIndex(lines []string, expected string) int {
+	for i, line := range lines {
+		if line == expected {
+			return i
+		}
+	}
+	return -1
 }

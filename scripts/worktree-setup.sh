@@ -3,7 +3,7 @@ set -euo pipefail
 
 BRANCH="${1:?Usage: worktree-setup.sh <branch-name> [base-branch]}"
 BASE="${2:-HEAD}"
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_ROOT="$(dirname "$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --path-format=absolute --git-common-dir)")"
 WORKTREE_DIR="$REPO_ROOT/.worktrees/$BRANCH"
 
 sync_agent_context() {
@@ -47,6 +47,13 @@ link_beads_db() {
   local dst_root="$2"
 
   [ -e "$src_root/.beads" ] || return 0
+
+  if [ -d "$dst_root/.beads" ] && [ ! -L "$dst_root/.beads" ] &&
+    [ -z "$(git -C "$dst_root" ls-files -- .beads)" ]; then
+    echo "error: $dst_root/.beads is a separate copy of the beads database." >&2
+    echo "inspect it, remove it, and rerun to link $src_root/.beads" >&2
+    exit 1
+  fi
 
   if [ -e "$dst_root/.beads" ] || [ -L "$dst_root/.beads" ]; then
     echo "beads database exists, preserving: $dst_root/.beads" >&2

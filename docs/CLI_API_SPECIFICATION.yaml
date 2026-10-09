@@ -172,6 +172,14 @@ components:
           type: string
           enum: [pro, pro-plan]
           example: pro
+        model:
+          type: string
+          description: Optional model selected and returned by the RepoBird service. The value is opaque, may contain an unfamiliar future identifier, and may be absent in legacy or partial responses.
+          example: provider/service-selected-model
+        reasoningEffort:
+          type: string
+          description: Optional reasoning effort selected and returned by the RepoBird service. The value is opaque, may contain an unfamiliar future value, and may be absent in legacy or partial responses.
+          example: service-selected-effort
         title:
           type: string
           example: Implement user authentication
@@ -333,7 +341,7 @@ components:
           type: string
           enum: [run, plan, basic, pro]
           default: run
-          description: Type of run. Legacy plan remains a development-only compatibility value during the OpenCode migration; CLI Basic/Pro shortcuts send basic/pro with the matching OpenCode model.
+          description: Type of run. Legacy plan remains a development-only compatibility value during the OpenCode migration; CLI Basic/Pro shortcuts send basic/pro while the RepoBird service selects the final model and reasoning policy.
           example: run
         agent:
           type: string
@@ -342,13 +350,16 @@ components:
           example: opencode
         opencodeModel:
           type: string
-          description: Optional OpenCode model override. CLI Basic uses openrouter/deepseek/deepseek-v4-flash; CLI Pro uses openrouter/z-ai/glm-5.2.
-          example: openrouter/z-ai/glm-5.2
+          description: Optional opaque model preference for direct API integrations. The CLI does not inject a model, maintain a model catalog, or select a fallback; the service remains authoritative.
+          example: provider/future-model
         opencodeProvider:
           type: string
-          enum: [openrouter]
-          description: Provider for the selected OpenCode model.
-          example: openrouter
+          description: Optional opaque provider preference for direct API integrations. The CLI does not inject a provider or maintain a provider catalog.
+          example: future-provider
+        reasoningEffort:
+          type: string
+          description: Optional opaque reasoning-effort preference. Omit this field to leave the default and final policy to the service; unfamiliar future values are allowed and passed through unchanged.
+          example: future-adaptive-effort
         prompt:
           type: string
           description: The task description or prompt
@@ -459,6 +470,7 @@ components:
       example:
         repositoryName: acme/webapp
         runType: run
+        reasoningEffort: future-adaptive-effort
         prompt: Implement JWT authentication with refresh tokens
         baseBranch: main
         outputMode: pull_request
@@ -958,6 +970,14 @@ paths:
                         type: string
                         nullable: true
                         example: run_123e4567-e89b-12d3-a456-426614174000
+                      model:
+                        type: string
+                        description: Optional opaque model selected by the RepoBird service. May be absent in legacy or partial responses.
+                        example: provider/service-selected-model
+                      reasoningEffort:
+                        type: string
+                        description: Optional opaque reasoning effort selected by the RepoBird service. May be absent in legacy or partial responses.
+                        example: service-selected-effort
                       baseBranch:
                         type: string
                         example: main
@@ -985,6 +1005,8 @@ paths:
                       publicId: run_123e4567-e89b-12d3-a456-426614174000
                       status: QUEUED
                       message: Run created successfully
+                      model: provider/service-selected-model
+                      reasoningEffort: service-selected-effort
                       baseBranch: main
                       outputMode: pull_request
                       outputBranch: repobird/auth-refresh

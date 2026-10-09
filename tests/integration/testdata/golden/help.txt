@@ -15,9 +15,10 @@ Available Commands:
   examples    Show configuration schemas and generate example files
   help        Help about any command
   info        Display authentication information
-  login       Configure your API key securely
+  login       Configure your API key
   logout      Remove stored API key
   logs        Inspect run agent logs
+  models      Discover server-authoritative models
   pro         Create a Pro cloud agent run
   repo        Manage connected repositories
   run         Create a run from a JSON, YAML, or Markdown configuration file, or with flags

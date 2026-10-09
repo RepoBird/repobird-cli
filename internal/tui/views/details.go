@@ -890,6 +890,8 @@ func (v *RunDetailsView) renderOptionalFields(content *strings.Builder, lines *[
 	if v.run.RunType != "" {
 		lineCount = addField("Run Type", v.run.RunType)
 	}
+	lineCount = addField("Model", v.run.Model)
+	lineCount = addField("Reasoning effort", v.run.ReasoningEffort)
 	if v.run.PullRequestURL != nil && *v.run.PullRequestURL != "" {
 		lineCount = addField("PR URL", *v.run.PullRequestURL)
 	}

@@ -36,6 +36,15 @@ type Client struct {
 	circuitBreaker *retry.CircuitBreaker
 }
 
+// ModelsResult contains the public model catalog response and cache metadata.
+// The catalog is for display and discovery only. Run admission remains a
+// server-side decision made by the create-run request.
+type ModelsResult struct {
+	Catalog     *dto.PublicModelsResponse
+	ETag        string
+	NotModified bool
+}
+
 func NewClient(apiKey, baseURL string, debug bool) *Client {
 	if baseURL == "" {
 		baseURL = DefaultAPIURL
@@ -59,6 +68,10 @@ func (c *Client) GetAPIEndpoint() string {
 }
 
 func (c *Client) doRequest(method, path string, body interface{}) (*http.Response, error) {
+	return c.doRequestWithHeaders(method, path, body, nil)
+}
+
+func (c *Client) doRequestWithHeaders(method, path string, body interface{}, headers http.Header) (*http.Response, error) {
 	var bodyReader io.Reader
 	if body != nil {
 		bodyBytes, err := json.Marshal(body)
@@ -73,10 +86,17 @@ func (c *Client) doRequest(method, path string, body interface{}) (*http.Respons
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	if c.apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", fmt.Sprintf("repobird-cli/%s", version.GetVersion()))
+	for key, values := range headers {
+		for _, value := range values {
+			req.Header.Add(key, value)
+		}
+	}
 	if key := idempotencyKeyFromBody(body); key != "" {
 		req.Header.Set("Idempotency-Key", key)
 	}
@@ -116,6 +136,40 @@ func (c *Client) doRequest(method, path string, body interface{}) (*http.Respons
 	}
 
 	return resp, nil
+}
+
+// GetModels fetches the public server-authoritative model catalog. An empty
+// API key is intentional because the public endpoint is anonymous-compatible.
+func (c *Client) GetModels(ifNoneMatch string) (*ModelsResult, error) {
+	headers := make(http.Header)
+	if ifNoneMatch != "" {
+		headers.Set("If-None-Match", ifNoneMatch)
+	}
+
+	resp, err := c.doRequestWithHeaders(http.MethodGet, EndpointModels, nil, headers)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	result := &ModelsResult{ETag: resp.Header.Get("ETag")}
+	if resp.StatusCode == http.StatusNotModified {
+		result.NotModified = true
+		return result, nil
+	}
+	if err := ValidateResponseOK(resp); err != nil {
+		return nil, err
+	}
+
+	var catalog dto.PublicModelsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&catalog); err != nil {
+		return nil, fmt.Errorf("failed to decode models response: %w", err)
+	}
+	if err := catalog.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid models response: %w", err)
+	}
+	result.Catalog = &catalog
+	return result, nil
 }
 
 func idempotencyKeyFromBody(body interface{}) string {

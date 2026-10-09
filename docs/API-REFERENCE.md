@@ -38,6 +38,9 @@ For the live API contract, see the [REST API Reference](https://repobird.ai/docs
   "outputBranchPolicy": "create",
   "runType": "pro",
   "agent": "opencode",
+  "opencodeModel": "openrouter/example-model",
+  "opencodeProvider": "openrouter",
+  "reasoningEffort": "max",
   "idempotencyKey": "task-2026-06-10-auth",
   "gitlabCredential": {
     "mode": "stored_token_reference",
@@ -50,6 +53,30 @@ For the live API contract, see the [REST API Reference](https://repobird.ai/docs
 `sourceBranch`/`targetBranch`, `source`/`target`, and `branchOnly` remain legacy compatibility aliases. New create-run responses return canonical branch fields.
 For direct API integrations, send `runType: "basic"` or `runType: "pro"` explicitly. CLI task files may still use `runType: "run"` for compatibility; the API currently normalizes unknown or CLI-style run types to Pro semantics.
 For self-managed GitLab repositories, send a stored `gitlabCredential` reference as shown above. Managed GitLab.com repositories may omit it. Raw GitLab tokens and provider secrets are not accepted in CLI/API run creation payloads.
+
+`reasoningEffort` is an optional, opaque preference. When supplied, the CLI
+passes the string through unchanged. It does not maintain an allowed-value
+catalog, choose a model or provider, select a default, determine eligibility, or
+apply a fallback. The RepoBird service remains authoritative for validation and
+the final run policy. The CLI exposes the field as `--reasoning-effort` and in
+JSON/YAML task files.
+
+`opencodeModel` and `opencodeProvider` are optional public selection fields. The
+CLI forwards them exactly as supplied, without a client-owned model catalog,
+alias translation, default substitution, or fallback. The service remains
+authoritative for model admission. Use `repobird models --json` to discover
+public canonical IDs and providers.
+
+When no preference is supplied, omit the field entirely:
+
+```json
+{
+  "prompt": "Fix authentication bug",
+  "repositoryName": "org/repo",
+  "runType": "pro",
+  "agent": "opencode"
+}
+```
 
 The CLI also sends a non-empty `idempotencyKey` as the `Idempotency-Key` header. Current CLI builds protect retries locally by blocking identical repository, prompt, and run type submissions for 30 seconds unless `--force` is passed.
 
@@ -85,9 +112,18 @@ func (c *Client) CreateRunWithRetry(ctx context.Context, req *RunRequest) (*Run,
   "id": "run-123",
   "status": "pending|running|completed|failed|cancelled",
   "progress": { "percentage": 75, "message": "Processing..." },
+  "model": "service-selected-model",
+  "reasoningEffort": "service-selected-effort",
   "prUrl": "https://github.com/org/repo/pull/123"
 }
 ```
+
+`model` and `reasoningEffort` are optional response fields containing the policy
+selected by the service. Older responses may use `opencodeModel`; the CLI
+decodes that legacy alias into the canonical `model` field. The CLI displays
+unfamiliar values as returned rather than validating them against a client-owned
+catalog. Either field may be absent in legacy or partial responses, and its
+absence does not cause the CLI to invent a value.
 
 **Methods:**
 ```go
@@ -106,6 +142,7 @@ func (c *Client) ListRuns(ctx context.Context, opts ListOptions) (*RunList, erro
 ```
 
 ### Additional Endpoints
+- `GET /api/v1/models` - Anonymous-compatible public model catalog for discovery. The response contains only public descriptors, a catalog revision, capabilities, and default markers. The CLI preserves safe additive fields, omits internal policy data, and supports ETag/304 revalidation.
 - `DELETE /api/v1/runs/{id}` - Cancel active run
 - `GET /api/v1/runs/{id}/agent-logs` - Stream API-key-authenticated agent logs as NDJSON, with optional `afterSeq` polling.
 - `GET /api/v1/user` - Get user info and credit balance

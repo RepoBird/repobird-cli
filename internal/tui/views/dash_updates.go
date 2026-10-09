@@ -71,6 +71,13 @@ func (d *DashboardView) updateDetailLines() {
 		addLine(fmt.Sprintf("Type: %s", displayType))
 	}
 
+	if run.Model != "" {
+		addLine(fmt.Sprintf("Model: %s", run.Model))
+	}
+	if run.ReasoningEffort != "" {
+		addLine(fmt.Sprintf("Reasoning effort: %s", run.ReasoningEffort))
+	}
+
 	if run.Source != "" && run.Target != "" {
 		addLine(fmt.Sprintf("Branch: %s → %s", run.Source, run.Target))
 	}

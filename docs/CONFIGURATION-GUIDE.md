@@ -38,10 +38,12 @@ repobird config get api-key
 - Linux: Secret Service
 - Windows: Credential Manager
 
-**Encrypted File:**
-- Fallback when keyring unavailable
-- AES-256-GCM encryption
-- Machine-specific key derivation
+**Permission-Protected File Fallback:**
+- Used when keyring is unavailable; also saved as a backup after keyring success.
+- Retains AES-256-GCM for compatibility, but the key derives from non-secret machine attributes. Anyone who can read the file and reconstruct those attributes can recover the API key.
+- Unix permissions are enforced as 0600 on every save (new directories: 0700). On Windows, restrict directory ACLs to your account.
+- Existing files remain readable without re-login. The next write keeps the format and restores owner-only permissions.
+- Treat this file and backups as credentials. See [Security Policy](SECURITY.md) for the threat model; no KDF can make public machine identifiers secret.
 
 **Environment Variable:**
 ```bash
@@ -141,6 +143,13 @@ repobird examples generate run -f yaml -o task.yaml
 - `runType` - "run" (default); "plan" is development-only during the OpenCode migration
 - `context` - Additional instructions
 - `files` - Specific files to include
+- `opencodeModel` - Optional exact public model ID from `repobird models`; the server validates and admits it
+- `opencodeProvider` - Optional exact public provider ID paired with `opencodeModel`
+
+The CLI does not keep a model catalog or select Basic/Pro defaults locally. Use
+`repobird models` or `repobird models --json` for public discovery. Omitted model
+and provider fields remain omitted from run requests so the server resolves the
+selection.
 
 ## Cache Configuration
 

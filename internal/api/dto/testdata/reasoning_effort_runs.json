@@ -1,0 +1,113 @@
+{
+  "complete": {
+    "data": {
+      "id": 1001,
+      "publicId": "run_reasoning_complete",
+      "status": "PROCESSING",
+      "prompt": "Implement the requested change",
+      "repositoryName": "acme/widgets",
+      "sourceBranch": "main",
+      "targetBranch": "repobird/reasoning-complete",
+      "runType": "pro",
+      "userId": 42,
+      "repositoryId": 7,
+      "createdAt": "2026-08-15T06:00:00Z",
+      "updatedAt": "2026-08-15T06:01:00Z",
+      "model": "openrouter/z-ai/glm-5.2",
+      "reasoningEffort": "high"
+    }
+  },
+  "partialModelOnly": {
+    "data": {
+      "id": 1002,
+      "publicId": "run_reasoning_model_only",
+      "status": "PROCESSING",
+      "prompt": "Review the repository",
+      "repositoryName": "acme/widgets",
+      "sourceBranch": "main",
+      "targetBranch": "repobird/model-only",
+      "runType": "basic",
+      "userId": 42,
+      "repositoryId": 7,
+      "createdAt": "2026-08-15T06:02:00Z",
+      "updatedAt": "2026-08-15T06:03:00Z",
+      "model": "openrouter/deepseek/deepseek-v4-flash"
+    }
+  },
+  "partialReasoningEffortOnly": {
+    "data": {
+      "id": 1003,
+      "publicId": "run_reasoning_effort_only",
+      "status": "QUEUED",
+      "prompt": "Prepare an implementation plan",
+      "repositoryName": "acme/widgets",
+      "sourceBranch": "main",
+      "targetBranch": "repobird/reasoning-only",
+      "runType": "pro",
+      "userId": 42,
+      "repositoryId": 7,
+      "createdAt": "2026-08-15T06:04:00Z",
+      "updatedAt": "2026-08-15T06:04:00Z",
+      "reasoningEffort": "max"
+    }
+  },
+  "absentLegacy": {
+    "data": {
+      "id": 1004,
+      "status": "DONE",
+      "prompt": "Update documentation",
+      "repositoryName": "acme/widgets",
+      "sourceBranch": "main",
+      "targetBranch": "repobird/legacy-run",
+      "runType": "pro",
+      "userId": 42,
+      "repositoryId": 7,
+      "createdAt": "2026-08-14T05:00:00Z",
+      "updatedAt": "2026-08-14T05:10:00Z",
+      "completedAt": "2026-08-14T05:10:00Z"
+    }
+  },
+  "unfamiliarFutureValues": {
+    "data": {
+      "id": "run_future_policy_1005",
+      "publicId": "run_future_policy_1005",
+      "status": "PROCESSING",
+      "prompt": "Exercise a future policy value",
+      "repositoryName": "acme/widgets",
+      "sourceBranch": "main",
+      "targetBranch": "repobird/future-policy",
+      "runType": "pro",
+      "userId": 42,
+      "repositoryId": 7,
+      "createdAt": "2026-08-15T06:05:00Z",
+      "updatedAt": "2026-08-15T06:06:00Z",
+      "model": "future-provider/future-model-v9",
+      "reasoningEffort": "adaptive-ultra"
+    }
+  },
+  "compatibilityAlias": {
+    "data": {
+      "id": 1006,
+      "publicId": "run_opencode_model_alias",
+      "status": "PROCESSING",
+      "prompt": "Decode a legacy model field alias",
+      "repositoryName": "acme/widgets",
+      "sourceBranch": "main",
+      "targetBranch": "repobird/model-alias",
+      "runType": "basic",
+      "userId": 42,
+      "repositoryId": 7,
+      "createdAt": "2026-08-15T06:07:00Z",
+      "updatedAt": "2026-08-15T06:08:00Z",
+      "opencodeModel": "openrouter/deepseek/deepseek-v4-flash",
+      "reasoningEffort": "low"
+    }
+  },
+  "serviceRejection": {
+    "status": 400,
+    "body": {
+      "error": "UNSUPPORTED_REASONING_EFFORT",
+      "message": "The requested reasoning effort is not supported for the selected server policy."
+    }
+  }
+}

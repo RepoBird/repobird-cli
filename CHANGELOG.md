@@ -6,9 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-09
+
 ### Added
 
 - Add common use-case guides and default skill references for RepoBird CI automation, agent hooks, language/framework recipes, and API integration.
+- Add the --reasoning-effort CLI flag and reasoningEffort task-file configuration field for per-run preferences.
+- Add server-authoritative model discovery with repobird models and exact OpenCode model/provider pass-through
+
+### Security
+
+- Enforce owner-only credential fallback permissions on every save and clarify that its machine-derived encryption key is not secret; preserve existing file compatibility.
 
 ## [0.10.0] - 2026-06-26
 
@@ -168,7 +176,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Configuration management
 - API integration with RepoBird platform
 
-[Unreleased]: https://github.com/RepoBird/repobird-cli/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/RepoBird/repobird-cli/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/RepoBird/repobird-cli/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/RepoBird/repobird-cli/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/RepoBird/repobird-cli/compare/v0.8.2...v0.9.0
 [0.8.2]: https://github.com/RepoBird/repobird-cli/compare/v0.8.1...v0.8.2

@@ -78,6 +78,8 @@ type runJSON struct {
 	OutputBranchPolicy string  `json:"outputBranchPolicy,omitempty"`
 	PullRequestURL     string  `json:"prUrl,omitempty"`
 	RunType            string  `json:"runType,omitempty"`
+	Model              string  `json:"model,omitempty"`
+	ReasoningEffort    string  `json:"reasoningEffort,omitempty"`
 	Title              string  `json:"title,omitempty"`
 	Error              string  `json:"error,omitempty"`
 	Cost               float64 `json:"cost,omitempty"`
@@ -100,6 +102,7 @@ type runRequest struct {
 	Agent                 string                   `json:"agent,omitempty"`
 	OpenCodeModel         string                   `json:"opencodeModel,omitempty"`
 	OpenCodeProvider      string                   `json:"opencodeProvider,omitempty"`
+	ReasoningEffort       string                   `json:"reasoningEffort,omitempty"`
 	Title                 string                   `json:"title,omitempty"`
 	Context               string                   `json:"context,omitempty"`
 	Files                 []string                 `json:"files,omitempty"`
@@ -232,6 +235,8 @@ func makeRunJSON(run *domain.Run) runJSON {
 		OutputBranchPolicy: run.OutputBranchPolicy,
 		PullRequestURL:     run.PullRequestURL,
 		RunType:            run.RunType,
+		Model:              run.Model,
+		ReasoningEffort:    run.ReasoningEffort,
 		Title:              run.Title,
 		Error:              run.Error,
 		Cost:               run.Cost,
@@ -256,6 +261,7 @@ func makeRunRequestJSON(req domain.CreateRunRequest) runRequest {
 		Agent:                 req.Agent,
 		OpenCodeModel:         req.OpenCodeModel,
 		OpenCodeProvider:      req.OpenCodeProvider,
+		ReasoningEffort:       req.ReasoningEffort,
 		Title:                 req.Title,
 		Context:               req.Context,
 		Files:                 req.Files,

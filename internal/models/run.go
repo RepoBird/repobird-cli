@@ -51,6 +51,9 @@ type RunRequest struct {
 	Files                 []string                 `json:"files,omitempty"`
 	ProviderCredentialID  string                   `json:"providerCredentialId,omitempty"`
 	ProviderMode          string                   `json:"providerMode,omitempty"`
+	OpenCodeModel         string                   `json:"opencodeModel,omitempty"`
+	OpenCodeProvider      string                   `json:"opencodeProvider,omitempty"`
+	ReasoningEffort       string                   `json:"reasoningEffort,omitempty"`
 	GitLabCredential      *GitLabCredentialRequest `json:"gitlabCredential,omitempty"`
 	BranchOnly            bool                     `json:"branchOnly,omitempty"`
 	AcknowledgePromptRisk bool                     `json:"acknowledgePromptRisk,omitempty"`
@@ -79,6 +82,9 @@ type RunConfig struct {
 	Files                 []string                 `json:"files,omitempty" yaml:"files,omitempty"`
 	ProviderCredentialID  string                   `json:"providerCredentialId,omitempty" yaml:"providerCredentialId,omitempty"`
 	ProviderMode          string                   `json:"providerMode,omitempty" yaml:"providerMode,omitempty"`
+	OpenCodeModel         string                   `json:"opencodeModel,omitempty" yaml:"opencodeModel,omitempty"`
+	OpenCodeProvider      string                   `json:"opencodeProvider,omitempty" yaml:"opencodeProvider,omitempty"`
+	ReasoningEffort       string                   `json:"reasoningEffort,omitempty" yaml:"reasoningEffort,omitempty"`
 	GitLabCredential      *GitLabCredentialRequest `json:"gitlabCredential,omitempty" yaml:"gitlabCredential,omitempty"`
 	BranchOnly            bool                     `json:"branchOnly,omitempty" yaml:"branchOnly,omitempty"`
 	AcknowledgePromptRisk bool                     `json:"acknowledgePromptRisk,omitempty" yaml:"acknowledgePromptRisk,omitempty"`
@@ -100,6 +106,7 @@ type APIRunRequest struct {
 	Agent                 string                   `json:"agent,omitempty"`
 	OpenCodeModel         string                   `json:"opencodeModel,omitempty"`
 	OpenCodeProvider      string                   `json:"opencodeProvider,omitempty"`
+	ReasoningEffort       string                   `json:"reasoningEffort,omitempty"`
 	Title                 string                   `json:"title,omitempty"`
 	Context               string                   `json:"context,omitempty"`
 	Files                 []string                 `json:"files,omitempty"`
@@ -139,6 +146,9 @@ func (r *RunRequest) ToAPIRequest() *APIRunRequest {
 		OutputBranchPolicy:    config.OutputBranchPolicy,
 		RunType:               r.RunType,
 		Agent:                 "opencode",
+		OpenCodeModel:         r.OpenCodeModel,
+		OpenCodeProvider:      r.OpenCodeProvider,
+		ReasoningEffort:       r.ReasoningEffort,
 		Title:                 r.Title,
 		Context:               r.Context,
 		Files:                 r.Files,
@@ -206,6 +216,8 @@ type RunResponse struct {
 	PullRequestURL     *string   `json:"prUrl,omitempty"`
 	TriggerSource      *string   `json:"triggerSource,omitempty"`
 	RunType            string    `json:"runType,omitempty"`
+	Model              string    `json:"model,omitempty"`
+	ReasoningEffort    string    `json:"reasoningEffort,omitempty"`
 	Plan               string    `json:"plan,omitempty"`
 	FileHash           string    `json:"fileHash,omitempty"`
 }
@@ -238,7 +250,8 @@ func (r *RunResponse) GetRepositoryName() string {
 func (r *RunResponse) UnmarshalJSON(data []byte) error {
 	type Alias RunResponse
 	aux := &struct {
-		ID interface{} `json:"id"`
+		ID            interface{} `json:"id"`
+		OpenCodeModel string      `json:"opencodeModel"`
 		*Alias
 	}{
 		Alias: (*Alias)(r),
@@ -260,6 +273,9 @@ func (r *RunResponse) UnmarshalJSON(data []byte) error {
 		default:
 			r.ID = fmt.Sprintf("%v", v)
 		}
+	}
+	if r.Model == "" {
+		r.Model = aux.OpenCodeModel
 	}
 
 	return nil
@@ -402,6 +418,9 @@ func parseJSONWithUnknownFieldsAndPrompts(file *os.File) (*RunConfig, *prompts.V
 		Files:                 runReq.Files,
 		ProviderCredentialID:  runReq.ProviderCredentialID,
 		ProviderMode:          runReq.ProviderMode,
+		OpenCodeModel:         runReq.OpenCodeModel,
+		OpenCodeProvider:      runReq.OpenCodeProvider,
+		ReasoningEffort:       runReq.ReasoningEffort,
 		GitLabCredential:      runReq.GitLabCredential,
 		BranchOnly:            runReq.BranchOnly,
 		AcknowledgePromptRisk: runReq.AcknowledgePromptRisk,
@@ -435,6 +454,9 @@ func findUnsupportedJSONFieldsWithSuggestions(data map[string]interface{}) ([]st
 		"files":                 true,
 		"providerCredentialId":  true,
 		"providerMode":          true,
+		"opencodeModel":         true,
+		"opencodeProvider":      true,
+		"reasoningEffort":       true,
 		"gitlabCredential":      true,
 		"branchOnly":            true,
 		"acknowledgePromptRisk": true,
@@ -444,7 +466,7 @@ func findUnsupportedJSONFieldsWithSuggestions(data map[string]interface{}) ([]st
 	supportedFieldsList := []string{
 		"prompt", "repository", "source", "target", "baseBranch",
 		"outputMode", "outputBranch", "prTargetBranch", "outputBranchPolicy",
-		"runType", "title", "context", "files", "providerCredentialId", "providerMode",
+		"runType", "title", "context", "files", "providerCredentialId", "providerMode", "opencodeModel", "opencodeProvider", "reasoningEffort",
 		"gitlabCredential", "branchOnly", "acknowledgePromptRisk", "idempotencyKey",
 	}
 

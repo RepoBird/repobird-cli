@@ -48,10 +48,11 @@ func readAPIKeyInteractive(stdin *os.File, output io.Writer) (string, error) {
 
 var loginCmd = &cobra.Command{
 	Use:   "login",
-	Short: "Configure your API key securely",
-	Long: `Configure your RepoBird API key using secure storage.
+	Short: "Configure your API key",
+	Long: `Configure your RepoBird API key.
 The key will be stored in your system keyring when available,
-or in an encrypted file as a fallback.`,
+with a permission-protected file fallback. The fallback's encryption key
+comes from non-secret machine attributes; file readers can recover the API key.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		styler := stdoutStyle()
 		fmt.Println(styler.Heading("Welcome to RepoBird CLI!"))
@@ -113,11 +114,12 @@ or in an encrypted file as a fallback.`,
 		case "system_keyring":
 			fmt.Printf("  %s %s (secure)\n", styler.Label("Storage:"), storageInfo["keyring_type"])
 		case "encrypted_file":
-			fmt.Printf("  %s Encrypted file (secure)\n", styler.Label("Storage:"))
+			fmt.Printf("  %s Encrypted file (permission-protected fallback)\n", styler.Label("Storage:"))
+			fmt.Printf("  %s %s\n", styler.Warning("Warning:"), storageInfo["warning"])
 		case "environment":
 			fmt.Printf("  %s Environment variable\n", styler.Label("Storage:"))
 		default:
-			fmt.Printf("  %s Encrypted file (secure fallback)\n", styler.Label("Storage:"))
+			fmt.Printf("  %s %v\n", styler.Label("Storage:"), storageInfo["source"])
 		}
 
 		return nil

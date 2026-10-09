@@ -27,6 +27,9 @@ type MarkdownConfig struct {
 	Files                 []string                        `yaml:"files" json:"files"`
 	ProviderCredentialID  string                          `yaml:"providerCredentialId" json:"providerCredentialId"`
 	ProviderMode          string                          `yaml:"providerMode" json:"providerMode"`
+	OpenCodeModel         string                          `yaml:"opencodeModel,omitempty" json:"opencodeModel,omitempty"`
+	OpenCodeProvider      string                          `yaml:"opencodeProvider,omitempty" json:"opencodeProvider,omitempty"`
+	ReasoningEffort       string                          `yaml:"reasoningEffort,omitempty" json:"reasoningEffort,omitempty"`
 	GitLabCredential      *models.GitLabCredentialRequest `yaml:"gitlabCredential,omitempty" json:"gitlabCredential,omitempty"`
 	BranchOnly            bool                            `yaml:"branchOnly" json:"branchOnly"`
 	AcknowledgePromptRisk bool                            `yaml:"acknowledgePromptRisk" json:"acknowledgePromptRisk"`
@@ -81,6 +84,9 @@ func ParseMarkdownConfigFromReader(r io.Reader) (*models.RunConfig, string, erro
 		Files:                 config.Files,
 		ProviderCredentialID:  config.ProviderCredentialID,
 		ProviderMode:          config.ProviderMode,
+		OpenCodeModel:         config.OpenCodeModel,
+		OpenCodeProvider:      config.OpenCodeProvider,
+		ReasoningEffort:       config.ReasoningEffort,
 		GitLabCredential:      config.GitLabCredential,
 		BranchOnly:            config.BranchOnly,
 		AcknowledgePromptRisk: config.AcknowledgePromptRisk,
@@ -111,6 +117,9 @@ func validateMarkdownConfig(config *MarkdownConfig) error {
 		Files:                 config.Files,
 		ProviderCredentialID:  config.ProviderCredentialID,
 		ProviderMode:          config.ProviderMode,
+		OpenCodeModel:         config.OpenCodeModel,
+		OpenCodeProvider:      config.OpenCodeProvider,
+		ReasoningEffort:       config.ReasoningEffort,
 		GitLabCredential:      config.GitLabCredential,
 		BranchOnly:            config.BranchOnly,
 		AcknowledgePromptRisk: config.AcknowledgePromptRisk,

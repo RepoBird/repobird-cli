@@ -47,7 +47,8 @@ var infoCmd = &cobra.Command{
 		case "encrypted_file":
 			fmt.Printf("  %s Encrypted File\n", styler.Label("Method:"))
 			fmt.Printf("  %s %s\n", styler.Label("Location:"), storageInfo["location"])
-			fmt.Printf("  %s %s\n", styler.Label("Security:"), styler.Success("✓ Secure (AES-256-GCM)"))
+			fmt.Printf("  %s %s\n", styler.Label("Security:"), styler.Warning("Permission-protected fallback (not secret-backed encryption)"))
+			fmt.Printf("  %s %s\n", styler.Warning("Warning:"), storageInfo["warning"])
 
 		case "plain_text_config":
 			fmt.Printf("  %s Plain Text Config\n", styler.Label("Method:"))
