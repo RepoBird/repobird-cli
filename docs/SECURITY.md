@@ -2,26 +2,30 @@
 
 ## Secure API Key Storage
 
-RepoBird CLI implements multiple layers of security for API key storage, automatically selecting the most secure method available on your system.
+RepoBird CLI supports environment credentials, native system keyrings, and a permission-protected file fallback. The fallback is not secret-backed encryption; its security boundary is filesystem access.
 
-### Storage Methods (in order of preference)
+### Storage Methods
 
 #### 1. System Keyring (Most Secure)
 - **macOS**: Keychain
 - **Windows**: Credential Manager  
 - **Linux**: GNOME Keyring, KWallet, or Secret Service (when desktop environment is available)
 
-This is the default primary storage method when available. The CLI also writes an encrypted XDG fallback so authentication survives keyring availability changes.
+This is the default primary storage method when available. The CLI also writes an XDG fallback so authentication survives keyring availability changes. **That fallback has the limitations below even after a successful keyring save**; keyring use does not eliminate the file copy.
 
-#### 2. Encrypted File Storage (Secure Fallback)
-- Uses AES-256-GCM encryption
-- Key derived from machine-specific identifiers
-- File permissions set to 0600 (owner read/write only)
-- Location: `~/.config/repobird/.api_key.enc`
+#### 2. Permission-Protected File Fallback
+- Retains the existing AES-256-GCM format with random nonces for compatibility.
+- Its SHA-256 key derives from hostname, username, home directory, machine ID (when available), and a static application salt. **These attributes are not secret.**
+- File permissions are set to **0600 on every save**, including overwrites of existing files. New configuration directories use 0700.
+- Location: `$XDG_CONFIG_HOME/repobird/.api_key.enc`, or `~/.config/repobird/.api_key.enc` by default.
 
-Legacy encrypted keys in `~/.repobird/.api_key.enc` are still read and migrated.
+Anyone who can read the fallback and obtain these machine attributes can reconstruct its key and recover the API key. Treat the file and its backups as credentials. This is obfuscation, not encryption that protects against a file-reading attacker, the same user, or root. A stronger KDF cannot create secrecy from public inputs; a random key stored alongside the ciphertext would not protect against an attacker who reads both.
 
-Automatically used on headless servers, containers, or when keyring is unavailable.
+Unix owner-only permissions protect against other unprivileged users only while filesystem permissions are enforced. On Windows, 0600 is not a replacement for access-control lists; restrict the configuration directory's ACL to your account. Do not share configuration directories or include credential files in broadly readable backups.
+
+Existing fallback files remain readable without re-login and keep the same format on the next write. Reads do not tighten existing permissions; the next save restores 0600. Legacy encrypted keys in `~/.repobird/.api_key.enc` are still read and migrated.
+
+Automatically used on headless servers, containers, or when keyring is unavailable. Use externally managed secret injection via `REPOBIRD_API_KEY` when local file storage is unsuitable.
 
 #### 3. Environment Variable (CI/CD)
 - Set `REPOBIRD_API_KEY` environment variable
@@ -41,7 +45,7 @@ Automatically used on headless servers, containers, or when keyring is unavailab
    ```bash
    repobird login
    ```
-   This ensures your key is stored using the most secure method available.
+   This validates your key and saves it using the available storage methods, including the fallback copy described above.
 
 3. **Check your storage method**
    ```bash
@@ -87,7 +91,7 @@ We appreciate your help in keeping RepoBird secure for all users.
 
 ### Migration from Insecure Storage
 
-If you have an API key stored in plain text (legacy versions), it will be automatically migrated to secure storage on first use. You can manually trigger migration:
+If you have an API key stored in plain text (legacy versions), it will be automatically migrated to the available storage methods on first use. On keyless systems, this moves the key to the permission-protected fallback, not secret-backed encryption. You can manually trigger migration:
 
 ```bash
 repobird login
@@ -95,18 +99,18 @@ repobird login
 
 ## Compliance
 
-RepoBird CLI's security implementation follows industry best practices:
-- Encryption at rest for stored credentials
+The storage design provides:
 - Platform-specific security integration (Keychain, Credential Manager, Keyring)
-- Secure defaults with automatic fallback mechanisms
-- Clear security warnings when using less secure methods
+- Owner-only Unix permissions for fallback files on each write
+- Backward-compatible reads and migration of existing credentials
+- Explicit warnings about the keyless fallback's limits
 
 ### Security Warnings
 
 The CLI will warn you when:
 - Using environment variables (less secure than keyring)
 - API key is stored in plain text (legacy config)
-- Keyring is unavailable (falling back to encrypted file)
+- The keyless file fallback is used (its machine-derived key is not secret)
 
 Example warnings:
 ```
@@ -117,7 +121,7 @@ Example warnings:
 ## Frequently Asked Questions
 
 **Q: Is my API key encrypted?**  
-A: Yes, when stored via `repobird login`, your key is either stored in the system keyring or encrypted with AES-256-GCM.
+A: The fallback uses AES-256-GCM, but its key is reproducible from non-secret machine attributes. File permissions, not cryptographic secrecy, protect that copy. The system keyring uses native platform protection; the CLI also maintains a fallback file copy.
 
 **Q: Can I use the same API key on multiple machines?**  
 A: Yes, but for better security, consider using different keys for different machines and revoking access when needed.

@@ -27,11 +27,11 @@ const (
 // Security Strategy:
 // 1. Environment variable (REPOBIRD_API_KEY) - Best for CI/CD, containers
 // 2. System keyring - Only on macOS/Windows or Linux with desktop environment
-// 3. Encrypted file (AES-256-GCM) - Universal fallback, works everywhere
+// 3. Permission-protected file - Universal keyless fallback
 //
-// On Linux servers/containers, we default to encrypted file storage
-// which is more reliable than trying to use desktop keyrings that
-// may not be available or properly configured.
+// The fallback retains AES-256-GCM for file compatibility, but its key is
+// reproducible from non-secret machine attributes. It is obfuscation, not
+// protection against anyone who can read the file. Filesystem access is the boundary.
 
 // SecureStorage handles secure storage of sensitive data
 type SecureStorage struct {
@@ -209,7 +209,7 @@ func (s *SecureStorage) saveEncryptedAPIKey(apiKey string) error {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
-	// Generate encryption key from machine ID
+	// Retain the existing non-secret key derivation for file compatibility.
 	key := s.getEncryptionKey()
 
 	// Encrypt the API key
@@ -218,10 +218,25 @@ func (s *SecureStorage) saveEncryptedAPIKey(apiKey string) error {
 		return fmt.Errorf("failed to encrypt API key: %w", err)
 	}
 
-	// Save to file with restricted permissions
+	// Restrict existing files too: os.WriteFile's mode only applies on creation.
 	encryptedFile := filepath.Join(s.configDir, ".api_key.enc")
-	if err := os.WriteFile(encryptedFile, []byte(encrypted), 0600); err != nil {
+	file, err := os.OpenFile(encryptedFile, os.O_WRONLY|os.O_CREATE, 0600)
+	if err != nil {
+		return fmt.Errorf("failed to open encrypted API key file: %w", err)
+	}
+	defer func() { _ = file.Close() }()
+	// Set permissions before truncating or writing any credential data.
+	if err := file.Chmod(0600); err != nil {
+		return fmt.Errorf("failed to restrict API key file permissions: %w", err)
+	}
+	if err := file.Truncate(0); err != nil {
+		return fmt.Errorf("failed to truncate encrypted API key file: %w", err)
+	}
+	if _, err := file.WriteString(encrypted); err != nil {
 		return fmt.Errorf("failed to save encrypted API key: %w", err)
+	}
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("failed to close encrypted API key file: %w", err)
 	}
 
 	// Remove from plain text config if exists
@@ -263,9 +278,10 @@ func (s *SecureStorage) getEncryptedAPIKeyFromDir(dir string) (string, error) {
 	return string(decrypted), nil
 }
 
-// getEncryptionKey generates a machine-specific encryption key
+// getEncryptionKey preserves the key derivation used by existing fallback files.
+// These inputs are not secrets; a KDF would not make this keyless storage secure.
 func (s *SecureStorage) getEncryptionKey() []byte {
-	// Use multiple machine-specific identifiers for better entropy
+	// Keep the exact identifiers and encoding so existing files remain readable.
 	var parts []string
 
 	// Hostname
@@ -549,7 +565,8 @@ func (sc *SecureConfig) GetStorageInfo() map[string]interface{} {
 	encryptedFile := filepath.Join(sc.storage.configDir, ".api_key.enc")
 	if _, err := os.Stat(encryptedFile); err == nil {
 		info["source"] = "encrypted_file"
-		info["secure"] = true
+		info["secure"] = false
+		info["warning"] = "File permissions are the only protection: machine attributes are not secret, so anyone who can read this file can recover the API key."
 		info["location"] = encryptedFile
 		return info
 	}

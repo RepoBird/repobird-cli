@@ -87,10 +87,10 @@ Hybrid cache with automatic persistence:
 - Test isolation via `XDG_CONFIG_HOME`
 
 ### 6. Configuration Management (`/internal/config/`)
-Multi-backend secure configuration:
+Multi-backend credential configuration:
 1. Environment variables (`REPOBIRD_API_KEY`)
 2. System keyring (secure desktop storage)
-3. Encrypted file fallback (`~/.config/repobird/.api_key.enc`; legacy `~/.repobird/.api_key.enc` is still read)
+3. Permission-protected file fallback (`~/.config/repobird/.api_key.enc`; legacy `~/.repobird/.api_key.enc` is still read)
 
 See **[Configuration Guide](CONFIGURATION-GUIDE.md)** for details.
 
@@ -111,9 +111,9 @@ Structured errors with user-friendly messages:
 **API Key Storage:**
 - Environment variables (plain text, isolated)
 - System keyring (native secure storage)
-- Encrypted file (AES-256-GCM)
+- Permission-protected fallback file (0600 on every write; also written after keyring success)
 
-**Encryption:** Machine-specific key derivation, random nonces, authenticated encryption
+**Fallback threat model:** The compatible AES-256-GCM format uses random nonces and authentication, but its key derives from non-secret machine attributes. It is obfuscation, not protection from file readers. Filesystem permissions are the security boundary; see [Security Policy](SECURITY.md).
 
 ## Concurrency & Performance
 

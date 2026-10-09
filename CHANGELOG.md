@@ -12,6 +12,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Add the --reasoning-effort CLI flag and reasoningEffort task-file configuration field for per-run preferences.
 - Add server-authoritative model discovery with repobird models and exact OpenCode model/provider pass-through
 
+### Security
+
+- Enforce owner-only credential fallback permissions on every save and clarify that its machine-derived encryption key is not secret; preserve existing file compatibility.
+
 ## [0.10.0] - 2026-06-26
 
 ### Added

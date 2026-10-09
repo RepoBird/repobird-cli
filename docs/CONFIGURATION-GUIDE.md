@@ -38,10 +38,12 @@ repobird config get api-key
 - Linux: Secret Service
 - Windows: Credential Manager
 
-**Encrypted File:**
-- Fallback when keyring unavailable
-- AES-256-GCM encryption
-- Machine-specific key derivation
+**Permission-Protected File Fallback:**
+- Used when keyring is unavailable; also saved as a backup after keyring success.
+- Retains AES-256-GCM for compatibility, but the key derives from non-secret machine attributes. Anyone who can read the file and reconstruct those attributes can recover the API key.
+- Unix permissions are enforced as 0600 on every save (new directories: 0700). On Windows, restrict directory ACLs to your account.
+- Existing files remain readable without re-login. The next write keeps the format and restores owner-only permissions.
+- Treat this file and backups as credentials. See [Security Policy](SECURITY.md) for the threat model; no KDF can make public machine identifiers secret.
 
 **Environment Variable:**
 ```bash

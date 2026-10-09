@@ -6,6 +6,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -69,6 +70,66 @@ func TestSecureStorage_SaveAndGetAPIKey(t *testing.T) {
 		if mode != 0600 {
 			t.Errorf("Incorrect file permissions: got %o, want 0600", mode)
 		}
+	}
+}
+
+func TestSecureStorage_SaveRestoresOwnerOnlyPermissions(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix permission bits do not model Windows ACLs")
+	}
+	t.Setenv(EnvAPIKey, "")
+	storage := &SecureStorage{configDir: t.TempDir()}
+	encryptedFile := filepath.Join(storage.configDir, ".api_key.enc")
+	if err := os.WriteFile(encryptedFile, []byte("old content"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(encryptedFile, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := storage.SaveAPIKey("test-replacement-key"); err != nil {
+		t.Fatalf("SaveAPIKey failed: %v", err)
+	}
+	info, err := os.Stat(encryptedFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mode := info.Mode().Perm(); mode != 0600 {
+		t.Errorf("rewritten fallback permissions = %o, want 0600", mode)
+	}
+	got, err := storage.GetAPIKey()
+	if err != nil || got != "test-replacement-key" {
+		t.Fatal("rewritten fallback could not be read")
+	}
+}
+
+func TestSecureStorage_ExistingCiphertextCompatibility(t *testing.T) {
+	t.Setenv(EnvAPIKey, "")
+	storage := &SecureStorage{configDir: t.TempDir()}
+	// Create the pre-existing AES-GCM/base64 format, without using SaveAPIKey.
+	oldKey := "test-existing-key"
+	encrypted, err := encrypt([]byte(oldKey), storage.getEncryptionKey())
+	if err != nil {
+		t.Fatal(err)
+	}
+	encryptedFile := filepath.Join(storage.configDir, ".api_key.enc")
+	if err := os.WriteFile(encryptedFile, []byte(encrypted), 0600); err != nil {
+		t.Fatal(err)
+	}
+	got, err := storage.GetAPIKey()
+	if err != nil || got != oldKey {
+		t.Fatal("existing ciphertext could not be read")
+	}
+	if err := storage.SaveAPIKey("test-next-write-key"); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(encryptedFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, err := decrypt(string(data), storage.getEncryptionKey())
+	if err != nil || string(decoded) != "test-next-write-key" {
+		t.Fatal("next write was not compatible with the existing encrypted format")
 	}
 }
 
@@ -324,8 +385,11 @@ func TestGetStorageInfo(t *testing.T) {
 	if source := info["source"]; source != "encrypted_file" {
 		t.Errorf("Expected 'encrypted_file', got %v", source)
 	}
-	if secure := info["secure"].(bool); !secure {
-		t.Error("Encrypted file should be marked as secure")
+	if secure := info["secure"].(bool); secure {
+		t.Error("Keyless fallback must not be marked as secret-backed secure storage")
+	}
+	if warning, ok := info["warning"].(string); !ok || !strings.Contains(warning, "machine attributes are not secret") {
+		t.Error("Keyless fallback must explain its security limitation")
 	}
 }
 

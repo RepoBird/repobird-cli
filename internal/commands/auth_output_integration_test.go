@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/repobird/repobird-cli/internal/api"
+	"github.com/repobird/repobird-cli/internal/config"
 	"github.com/repobird/repobird-cli/internal/models"
 )
 
@@ -280,6 +281,46 @@ func captureStdout(t *testing.T, fn func()) string {
 	require.NoError(t, err)
 
 	return buf.String()
+}
+
+func TestCredentialFallbackOutputExplainsProtection(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"data":{"id":"fallback-test-user","email":"test@example.com","tier":"free"}}`)
+	}))
+	defer server.Close()
+	t.Setenv("REPOBIRD_API_KEY", "")
+	t.Setenv("REPOBIRD_API_URL", server.URL)
+	t.Setenv("REPOBIRD_ENV", "")
+	t.Setenv("NO_COLOR", "1")
+	oldCfg := cfg
+	cfg = &config.SecureConfig{Config: &config.Config{APIURL: server.URL}}
+	t.Cleanup(func() { cfg = oldCfg })
+
+	tests := []struct {
+		name string
+		run  func() error
+	}{
+		{"config set", func() error { return configSetCmd.RunE(configSetCmd, []string{"api-key", "test-fallback-key"}) }},
+		{"config get", func() error { return configGetCmd.RunE(configGetCmd, nil) }},
+		{"info", func() error { return infoCmd.RunE(infoCmd, nil) }},
+		{"login", func() error { return loginCmd.RunE(loginCmd, []string{"test-fallback-key"}) }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+			t.Setenv("HOME", t.TempDir())
+			require.NoError(t, config.NewSecureStorage().SaveAPIKey("test-fallback-key"))
+			var err error
+			output := captureStdout(t, func() { err = tt.run() })
+			require.NoError(t, err)
+			assert.Contains(t, output, "machine attributes are not secret")
+			assert.NotContains(t, output, "Stored securely in:")
+			assert.NotContains(t, output, "(secure)")
+			assert.NotContains(t, output, "Secure (AES-256-GCM)")
+			assert.NotContains(t, output, "test-fallback-key")
+		})
+	}
 }
 
 // TestFieldOrderInOutput verifies fields appear in correct order

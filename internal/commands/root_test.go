@@ -92,7 +92,7 @@ func TestRootCommand_CommandDescriptions(t *testing.T) {
 		"status":     "Check the status of runs",
 		"repo":       "Manage connected repositories",
 		"config":     "Manage RepoBird configuration",
-		"login":      "Configure your API key securely",
+		"login":      "Configure your API key",
 		"logout":     "Remove stored API key",
 		"verify":     "Verify current API key",
 		"info":       "Display authentication information",
